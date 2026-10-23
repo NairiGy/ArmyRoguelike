@@ -41,13 +41,28 @@ public static class PreviewCapture
         var encounters = new[] { Encounter.Wolves, Encounter.Necromancer, Encounter.Ogre, Encounter.Goblins };
         var army = ArmyMember.StartingArmy();
         army.Add(new ArmyMember(UnitStats.Sapper));
+
+        // -previewUnits "Juggernaut,Sniper,...": show these unit types instead (up to 16, filling the back two rows).
+        var args = System.Environment.GetCommandLineArgs();
+        var unitsArg = System.Array.IndexOf(args, "-previewUnits");
+        if (unitsArg >= 0 && unitsArg + 1 < args.Length)
+        {
+            var names = args[unitsArg + 1].Split(',').Select(n => n.Trim());
+            army = names.Select(n => UnitStats.AllPlayerTypes.Concat(new[] { UnitStats.Turret }).FirstOrDefault(s => s.Name == n))
+                .Where(s => s != null).Take(16).Select(s => new ArmyMember(s)).ToList();
+        }
+
         var battle = encounters[Mathf.Clamp(encounter, 0, encounters.Length - 1)].CreateBattle(army);
         if (placeArmy)
         {
-            var x = 2;
-            foreach (var u in battle.Units)
-                if (u.Team == Team.Player)
-                    battle.Place(u, new GridPos(x++, 1));
+            var i = 0;
+            foreach (var u in battle.Units.Where(u => u.Team == Team.Player))
+            {
+                // Front row first, from the left; small armies sit in the middle as before.
+                var slot = army.Count <= 6 ? new GridPos(2 + i, 1) : new GridPos(i % 8, 1 - i / 8);
+                battle.Place(u, slot);
+                i++;
+            }
         }
 
         // -previewPlayTurn: the sapper lays a mine and the enemies take one turn, to show mines and bombs.
