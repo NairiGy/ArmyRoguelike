@@ -101,6 +101,9 @@ namespace ArmyRoguelike.Core
         public const int CollisionDamage = 2;
         public const int TauntRange = 3;
 
+        /// <summary>Zone of control: extra AP for each step out of a tile next to an enemy.</summary>
+        public const int ZocCost = 2;
+
         // Actions (placeholders).
         public const int ActionRange = 3;
         public const int FireballRange = 4;
@@ -329,76 +332,111 @@ namespace ArmyRoguelike.Core
         public bool IsShielded(Unit unit) =>
             _units.Any(w => w != unit && w.Team == unit.Team && w.IsPlaced && w.IsAlive && w.Has(Ability.ShieldWall) && Distance(w, unit) == 1);
 
-        /// <summary>AP cost of walking the given number of tiles, counting a free Spring Boots step.</summary>
-        public int MoveCostFor(Unit unit, int tiles)
+        /// <summary>True if the unit, standing with its anchor here, is next to a living enemy (inside its reach).</summary>
+        public bool InEnemyReach(Unit unit, GridPos anchor) =>
+            _units.Any(u => u.IsPlaced && u.IsAlive && u.Team != unit.Team && Distance(anchor, unit.Size, u) == 1);
+
+        /// <summary>
+        /// AP for one step. Zone of control: stepping out of a tile next to an enemy costs
+        /// <see cref="ZocCost"/> extra. Spring Boots make the first step of the turn's base cost free.
+        /// </summary>
+        public int StepCost(Unit unit, GridPos from, bool firstStep)
         {
-            var free = unit.Has(Ability.SpringBoots) && !unit.FreeStepUsed ? 1 : 0;
-            return Math.Max(0, tiles - free) * MoveCost;
+            var cost = firstStep && unit.Has(Ability.SpringBoots) && !unit.FreeStepUsed ? 0 : MoveCost;
+            if (InEnemyReach(unit, from))
+                cost += ZocCost;
+            return cost;
+        }
+
+        /// <summary>Total AP for walking a path from the unit's tile (path excludes the start).</summary>
+        public int PathCost(Unit unit, IReadOnlyList<GridPos> path)
+        {
+            var cost = 0;
+            var from = unit.Pos;
+            for (var i = 0; i < path.Count; i++)
+            {
+                cost += StepCost(unit, from, i == 0);
+                from = path[i];
+            }
+
+            return cost;
+        }
+
+        /// <summary>How many steps of a path leave an enemy's reach (each costs <see cref="ZocCost"/> extra).</summary>
+        public int ZocSteps(Unit unit, IReadOnlyList<GridPos> path)
+        {
+            var count = 0;
+            var from = unit.Pos;
+            foreach (var p in path)
+            {
+                if (InEnemyReach(unit, from))
+                    count++;
+                from = p;
+            }
+
+            return count;
         }
 
         public bool CanMove(Unit unit) => !unit.Has(Ability.Immobile) && !unit.RootedThisTurn;
 
+        /// <summary>
+        /// Cheapest AP cost to every reachable anchor tile (Dijkstra, since steps cost different amounts),
+        /// with the parent of each tile for rebuilding the path. Stops at <paramref name="budget"/>.
+        /// </summary>
+        private (Dictionary<GridPos, int> cost, Dictionary<GridPos, GridPos> parent) CheapestRoutes(Unit unit, int budget)
+        {
+            var cost = new Dictionary<GridPos, int> { [unit.Pos] = 0 };
+            var parent = new Dictionary<GridPos, GridPos>();
+            var open = new List<GridPos> { unit.Pos };
+            var closed = new HashSet<GridPos>();
+            while (open.Count > 0)
+            {
+                // The board is tiny, so a linear scan for the cheapest open tile is plenty.
+                var p = open[0];
+                foreach (var o in open)
+                    if (cost[o] < cost[p])
+                        p = o;
+                open.Remove(p);
+                if (!closed.Add(p))
+                    continue;
+
+                foreach (var n in p.Neighbours())
+                {
+                    if (closed.Contains(n) || !CanStand(unit, n))
+                        continue;
+                    var c = cost[p] + StepCost(unit, p, p == unit.Pos);
+                    if (c > budget || (cost.TryGetValue(n, out var old) && old <= c))
+                        continue;
+                    cost[n] = c;
+                    parent[n] = p;
+                    open.Add(n);
+                }
+            }
+
+            return (cost, parent);
+        }
+
         /// <summary>Every anchor tile the unit can walk to with its current AP, with the AP cost. Excludes its own tile.</summary>
         public Dictionary<GridPos, int> GetReachable(Unit unit)
         {
-            var costs = new Dictionary<GridPos, int>();
             if (!CanMove(unit))
-                return costs;
-            var start = unit.Pos;
-            var frontier = new Queue<GridPos>();
-            var steps = new Dictionary<GridPos, int> { [start] = 0 };
-            frontier.Enqueue(start);
-            while (frontier.Count > 0)
-            {
-                var p = frontier.Dequeue();
-                var next = steps[p] + 1;
-                var cost = MoveCostFor(unit, next);
-                if (cost > unit.Ap)
-                    continue;
-                foreach (var n in p.Neighbours())
-                {
-                    if (steps.ContainsKey(n) || !CanStand(unit, n))
-                        continue;
-                    steps[n] = next;
-                    costs[n] = cost;
-                    frontier.Enqueue(n);
-                }
-            }
-
-            return costs;
+                return new Dictionary<GridPos, int>();
+            var routes = CheapestRoutes(unit, unit.Ap).cost;
+            routes.Remove(unit.Pos);
+            return routes;
         }
 
-        /// <summary>Shortest walkable path to an anchor tile, without the start tile. Null if unreachable.</summary>
+        /// <summary>Cheapest walkable path to an anchor tile, without the start tile. Null if unreachable.</summary>
         public List<GridPos> FindPath(Unit unit, GridPos target)
         {
-            var start = unit.Pos;
-            var parent = new Dictionary<GridPos, GridPos>();
-            var frontier = new Queue<GridPos>();
-            var seen = new HashSet<GridPos> { start };
-            frontier.Enqueue(start);
-            while (frontier.Count > 0)
-            {
-                var p = frontier.Dequeue();
-                if (p == target)
-                {
-                    var path = new List<GridPos>();
-                    for (var c = target; c != start; c = parent[c])
-                        path.Add(c);
-                    path.Reverse();
-                    return path;
-                }
-
-                foreach (var n in p.Neighbours())
-                {
-                    if (seen.Contains(n) || !CanStand(unit, n))
-                        continue;
-                    seen.Add(n);
-                    parent[n] = p;
-                    frontier.Enqueue(n);
-                }
-            }
-
-            return null;
+            var (cost, parent) = CheapestRoutes(unit, int.MaxValue);
+            if (!cost.ContainsKey(target) || target == unit.Pos)
+                return null;
+            var path = new List<GridPos>();
+            for (var c = target; c != unit.Pos; c = parent[c])
+                path.Add(c);
+            path.Reverse();
+            return path;
         }
 
         /// <summary>Whether the attacker's basic attack could hit the target from a given anchor, ignoring AP.</summary>
@@ -909,7 +947,7 @@ namespace ArmyRoguelike.Core
             if (!CanMove(unit))
                 return null;
             var path = FindPath(unit, target);
-            if (path == null || path.Count == 0 || MoveCostFor(unit, path.Count) > unit.Ap)
+            if (path == null || path.Count == 0 || PathCost(unit, path) > unit.Ap)
                 return null;
 
             Mine triggered = null;
@@ -926,12 +964,14 @@ namespace ArmyRoguelike.Core
             }
 
             var from = unit.Pos;
-            unit.Ap -= MoveCostFor(unit, path.Count);
+            var cost = PathCost(unit, path);
+            var zoc = ZocSteps(unit, path);
+            unit.Ap -= cost;
             if (unit.Has(Ability.SpringBoots))
                 unit.FreeStepUsed = true;
             unit.MovedThisTurn = true;
             unit.Pos = path[path.Count - 1];
-            var events = new List<BattleEvent> { new MoveEvent(unit, from, path) };
+            var events = new List<BattleEvent> { new MoveEvent(unit, from, path, cost, zoc) };
             if (triggered != null)
                 Explode(triggered.Tile, triggered.Damage, "mine", triggered.Owner, events);
             return events;

@@ -55,6 +55,7 @@ A roguelike army-builder: lead a small squad across a Slay the Spire–style map
 ## Turns and action points
 
 - **Side phases:** all of your units act, then all enemies act. No initiative order.
+- **Zone of control:** each step out of a tile next to an enemy costs +2 AP *(placeholder)*, for both sides. Stops cheap hit-and-run.
 - Within your phase each unit finishes its turn before the next unit starts, like DOS1.
 - Action points per unit, like DOS1. Example *(placeholder)*:
   - 4 AP per turn

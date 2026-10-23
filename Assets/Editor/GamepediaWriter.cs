@@ -197,6 +197,7 @@ public static class GamepediaWriter
         html.Append("<section id=\"rules\"><h2>Battle rules</h2><ul>");
         html.Append($"<li>Moving costs {Battle.MoveCost} AP per tile (4 directions, no diagonals). A basic attack costs {Battle.AttackCost} AP. Up to {Battle.MaxCarriedAp} unused AP carry over.</li>");
         html.Append("<li>Side phases: all your units act (one at a time), then all enemies.</li>");
+        html.Append($"<li><b>Zone of control</b>: each step out of a tile next to an enemy costs +{Battle.ZocCost} AP, for both sides. Hit-and-run is possible but expensive.</li>");
         html.Append("<li>Ranged attacks need line of sight (rocks block); Arcane Bolt ignores it. Bombs, boulders and fireballs are lobbed.</li>");
         html.Append($"<li>Mines: {Battle.MineDamage} damage ({Battle.BigMineDamage} with Big Mines) to everyone in the 3x3, set off when an enemy steps on one. Bombs explode at the start of the next enemy turn. Blasts set each other off.</li>");
         html.Append($"<li>Push: a unit pushed into a rock, unit or the edge takes {Battle.CollisionDamage} damage. An enemy pushed onto a mine sets it off.</li>");

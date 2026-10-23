@@ -73,7 +73,7 @@ namespace ArmyRoguelike.View
                     {
                         turn = turn, team = move.Unit.Team.ToString(), unit = Name(move.Unit), type = "move",
                         fromX = move.From.X, fromY = move.From.Y, toX = move.To.X, toY = move.To.Y, tiles = move.Path.Count,
-                        apAfter = ApAfter(move.Unit), autoApproach = autoApproach,
+                        apAfter = ApAfter(move.Unit), autoApproach = autoApproach, amount = move.Cost, zocSteps = move.ZocSteps,
                     });
                     break;
                 case AttackEvent attack:
@@ -500,6 +500,9 @@ namespace ArmyRoguelike.View
 
             /// <summary>Move or attack done by clicking a distant enemy (walk up and attack).</summary>
             public bool autoApproach;
+
+            /// <summary>Move: steps that left an enemy's reach (zone of control, +2 AP each). "amount" is the AP spent.</summary>
+            public int zocSteps;
 
             /// <summary>
             /// End turn prompt: "asked", "confirmed" or "cancelled" ("target" lists the units that could still act).

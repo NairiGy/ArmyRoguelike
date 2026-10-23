@@ -226,6 +226,38 @@ namespace ArmyRoguelike.Tests
             Assert.GreaterOrEqual(Battle.Distance(Enemy(b), Player(b)), 2);
         }
 
+        // ---------- Zone of control ----------
+
+        [Test]
+        public void ZoneOfControl_LeavingEnemyReachCostsExtra()
+        {
+            var b = Started(new[] { M(UnitStats.Rogue) }, new[] { P(3, 1) }, new[] { (UnitStats.Ogre, P(3, 2)) });
+            var rogue = Player(b);
+            var reach = b.GetReachable(rogue);
+            Assert.AreEqual(Battle.MoveCost + Battle.ZocCost, reach[P(2, 1)], "first step out of the ogre's reach");
+            var events = b.PlayerMove(rogue, P(2, 0));
+            var move = events.OfType<MoveEvent>().Single();
+            Assert.AreEqual(1, move.ZocSteps);
+            Assert.AreEqual(5 - move.Cost, rogue.Ap);
+        }
+
+        [Test]
+        public void ZoneOfControl_MovingAwayFromNobodyIsNormal()
+        {
+            var b = Started(new[] { M(UnitStats.Rogue) }, new[] { P(3, 1) }, new[] { (UnitStats.Wolf, P(7, 7)) });
+            Assert.AreEqual(1, b.GetReachable(Player(b))[P(2, 1)]);
+        }
+
+        [Test]
+        public void ZoneOfControl_AppliesToEnemiesToo()
+        {
+            var b = Started(new[] { M(UnitStats.Warrior) }, new[] { P(3, 1) }, new[] { (UnitStats.Wolf, P(3, 2)) });
+            var wolf = Enemy(b);
+            wolf.Ap = wolf.MaxAp;
+            var reach = b.GetReachable(wolf);
+            Assert.AreEqual(Battle.MoveCost + Battle.ZocCost, reach[P(3, 3)]);
+        }
+
         [Test]
         public void DebugWin_WinsWithWholeArmy_EvenDuringPlacement()
         {

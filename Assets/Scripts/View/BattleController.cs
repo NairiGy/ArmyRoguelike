@@ -1234,7 +1234,9 @@ namespace ArmyRoguelike.View
                 if (Battle.RemainsAt(p) is Unit bones)
                     return $"Bone pile ({bones.Stats.Name}). The Necromancer can raise it.\nStand on it to stop that.";
                 if (_selected != null && !_action.HasValue && Battle.GetReachable(_selected).TryGetValue(p, out var cost))
-                    return $"Move here: {cost} AP";
+                    return Battle.InEnemyReach(_selected, _selected.Pos)
+                        ? $"Move here: {cost} AP (includes +{Battle.ZocCost} for leaving an enemy's reach)"
+                        : $"Move here: {cost} AP";
             }
 
             return null;

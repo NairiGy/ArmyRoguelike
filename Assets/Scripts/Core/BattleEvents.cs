@@ -34,11 +34,18 @@ namespace ArmyRoguelike.Core
         /// <summary>Tiles stepped onto, in order. Does not include the starting tile.</summary>
         public readonly IReadOnlyList<GridPos> Path;
 
-        public MoveEvent(Unit unit, GridPos from, IReadOnlyList<GridPos> path)
+        /// <summary>AP spent, and how many steps left an enemy's reach (zone of control, each +2 AP).</summary>
+        public readonly int Cost;
+
+        public readonly int ZocSteps;
+
+        public MoveEvent(Unit unit, GridPos from, IReadOnlyList<GridPos> path, int cost = 0, int zocSteps = 0)
         {
             Unit = unit;
             From = from;
             Path = path;
+            Cost = cost;
+            ZocSteps = zocSteps;
         }
 
         public override Unit Actor => Unit;
