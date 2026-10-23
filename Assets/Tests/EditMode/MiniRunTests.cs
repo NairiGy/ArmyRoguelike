@@ -296,6 +296,34 @@ namespace ArmyRoguelike.Tests
             Assert.Greater(Battle.Distance(necro, Player(b)), before);
         }
 
+        [Test]
+        public void Necromancer_WithNothingToRaise_WalksToBoltRangeAndShoots()
+        {
+            var b = Started(Army(UnitStats.Warrior), new[] { new GridPos(4, 1) },
+                new[] { (UnitStats.Necromancer, new GridPos(4, 7)) });
+            var necro = Enemy(b);
+            var warrior = Player(b);
+            warrior.Pos = new GridPos(4, 3);
+            var events = b.EndPlayerTurn();
+            Assert.AreEqual(3, Battle.Distance(necro, warrior), "stops at bolt range, not closer");
+            var bolt = events.OfType<AttackEvent>().Single();
+            Assert.AreEqual(warrior, bolt.Target);
+        }
+
+        [Test]
+        public void Necromancer_FarAway_ApproachesButNeverCloserThanBoltRange()
+        {
+            var b = Started(Army(UnitStats.Warrior), new[] { new GridPos(4, 0) },
+                new[] { (UnitStats.Necromancer, new GridPos(4, 7)) });
+            var necro = Enemy(b);
+            var warrior = Player(b);
+            var before = Battle.Distance(necro, warrior);
+            b.EndPlayerTurn();
+            var after = Battle.Distance(necro, warrior);
+            Assert.Less(after, before, "it comes closer");
+            Assert.GreaterOrEqual(after, 3, "but keeps its distance");
+        }
+
         // ---------- Ogre ----------
 
         [Test]

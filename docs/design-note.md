@@ -123,7 +123,7 @@ Goal: find out whether building up the army across fights feels good.
 | Unit | HP | Damage | Range | AP | Rule |
 |---|---|---|---|---|---|
 | Skeleton (x4) | 4 | 2 | 1 | 3 | Leaves a **bone pile** when killed |
-| Necromancer | 6 | 2 (bolt, needs line of sight) | 3 | 3 | Raises a bone pile within 4 tiles to a full-HP skeleton (costs 3 AP). Stays at the back and backs away from units closer than 3 tiles. |
+| Necromancer | 6 | 2 (bolt, needs line of sight) | 3 | 3 | Raises a bone pile within 4 tiles to a full-HP skeleton (costs 3 AP). Backs away from units closer than 3 tiles. With nothing to raise, walks up to bolt range (3) but never closer, and shoots. |
 
 - A statue standing on a bone pile stops it being raised. Piles don't block movement.
 - Kill the necromancer and the piles stay dead.

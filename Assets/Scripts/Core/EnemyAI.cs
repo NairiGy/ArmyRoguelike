@@ -153,10 +153,14 @@ namespace ArmyRoguelike.Core
             }
         }
 
-        /// <summary>Raise bone piles first, back away from anyone close, then fire bolts. Never advances.</summary>
+        /// <summary>
+        /// Raise bone piles first, back away from anyone close, then fire bolts. With nothing to raise
+        /// and nobody in range it walks up to bolt range, but never closer than its comfort distance.
+        /// </summary>
         private static void NecromancerTurn(Battle battle, Unit necro, List<BattleEvent> events)
         {
             var retreated = false;
+            var advanced = false;
             while (!battle.IsOver && necro.IsAlive)
             {
                 var remains = ChooseRemains(battle, necro);
@@ -183,8 +187,52 @@ namespace ArmyRoguelike.Core
                     continue;
                 }
 
+                if (!advanced)
+                {
+                    advanced = true;
+                    if (AdvanceToBoltRange(battle, necro, target, events))
+                        continue;
+                }
+
                 return;
             }
+        }
+
+        /// <summary>
+        /// Moves to a tile from which the bolt can hit the target with AP to spare, staying at least the
+        /// comfort distance from every player unit. If no such tile is reachable this turn, gets as close
+        /// to the target as that distance allows. False if no move helps.
+        /// </summary>
+        private static bool AdvanceToBoltRange(Battle battle, Unit necro, Unit target, List<BattleEvent> events)
+        {
+            int Safety(GridPos anchor) =>
+                battle.Living(Team.Player).Select(u => Battle.Distance(anchor, necro.Size, u)).DefaultIfEmpty(int.MaxValue).Min();
+
+            var reachable = battle.GetReachable(necro)
+                .Where(kv => Safety(kv.Key) >= NecromancerComfortDistance)
+                .ToList();
+
+            var shootingSpot = reachable
+                .Where(kv => necro.Ap - kv.Value >= Battle.AttackCost && battle.CanHitFrom(necro, kv.Key, target))
+                .OrderBy(kv => kv.Value)
+                .Select(kv => (GridPos?)kv.Key)
+                .FirstOrDefault();
+
+            var current = Battle.Distance(necro, target);
+            var destination = shootingSpot ?? reachable
+                .Where(kv => Battle.Distance(kv.Key, necro.Size, target) < current)
+                .OrderBy(kv => Battle.Distance(kv.Key, necro.Size, target))
+                .ThenBy(kv => kv.Value)
+                .Select(kv => (GridPos?)kv.Key)
+                .FirstOrDefault();
+            if (destination == null)
+                return false;
+
+            var move = battle.DoMove(necro, destination.Value);
+            if (move == null)
+                return false;
+            events.Add(move);
+            return true;
         }
 
         // ---------- Movement helpers ----------
