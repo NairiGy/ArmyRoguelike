@@ -24,6 +24,7 @@ namespace ArmyRoguelike.View
         {
             Board = BoardView.Create(Battle.CreatePrototype(), transform);
             FrameCamera(Camera.main, Board);
+            gameObject.AddComponent<BattleController>().Init(Board, Camera.main);
         }
 
         public static void FrameCamera(Camera cam, BoardView board)

@@ -10,6 +10,7 @@ namespace ArmyRoguelike.View
         private static readonly Color TileColor = new Color(0.56f, 0.52f, 0.44f);
 
         private readonly Dictionary<GridPos, SpriteRenderer> _tiles = new Dictionary<GridPos, SpriteRenderer>();
+        private readonly Dictionary<GridPos, SpriteRenderer> _highlights = new Dictionary<GridPos, SpriteRenderer>();
         private readonly Dictionary<Unit, UnitView> _units = new Dictionary<Unit, UnitView>();
 
         public Battle Battle { get; private set; }
@@ -36,6 +37,15 @@ namespace ArmyRoguelike.View
                 // Tiles sit underneath everything standing on the board.
                 tile.sortingOrder = -1000 + IsoMath.SortingOrder(p) - 1000;
                 _tiles[p] = tile;
+
+                var highlight = new GameObject($"Highlight {p}").AddComponent<SpriteRenderer>();
+                highlight.transform.SetParent(transform, false);
+                highlight.transform.position = IsoMath.GridToWorld(p);
+                highlight.transform.localScale = Vector3.one * 0.9f;
+                highlight.sprite = PlaceholderArt.Tile;
+                highlight.sortingOrder = tile.sortingOrder + 1;
+                highlight.enabled = false;
+                _highlights[p] = highlight;
 
                 if (!battle.Board.IsObstacle(p))
                     continue;
@@ -64,6 +74,20 @@ namespace ArmyRoguelike.View
         }
 
         public UnitView ViewOf(Unit unit) => _units.TryGetValue(unit, out var v) ? v : null;
+
+        public void SetHighlight(GridPos p, Color color)
+        {
+            if (!_highlights.TryGetValue(p, out var h))
+                return;
+            h.color = color;
+            h.enabled = true;
+        }
+
+        public void ClearHighlights()
+        {
+            foreach (var h in _highlights.Values)
+                h.enabled = false;
+        }
 
         /// <summary>World-space centre of the board, for framing the camera.</summary>
         public Vector3 Centre => IsoMath.GridToWorld((Battle.Board.Width - 1) * 0.5f, (Battle.Board.Height - 1) * 0.5f);
