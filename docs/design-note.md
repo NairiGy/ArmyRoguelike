@@ -1,7 +1,7 @@
 # Grid Tactics Roguelike — Design Note
 
 Working title: "Army Roguelike" (placeholder; a better name will come later). Separate project from Nardatro. Unity project: `Desktop/Unity projects/ArmyRoguelike`. This file (`docs/design-note.md`) is the canonical copy.
-Status: Prototype 1 (one battle) in progress. Numbers marked *(placeholder)* are only examples.
+Status: Prototype 1 (one battle) is playable: placement, player turn, wolf AI, intent on hover, pack leader visuals, restart. Numbers marked *(placeholder)* are only examples.
 
 ## Pitch
 
