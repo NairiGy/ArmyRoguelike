@@ -72,6 +72,7 @@ namespace ArmyRoguelike.View
         private Unit _hoveredUnit;
         private GridPos? _hovered;
         private bool _busy;
+        private bool _enemyTurnPlaying;
         private bool _confirmEndTurn;
         private bool _mineMode;
         private string _hint = "";
@@ -130,6 +131,47 @@ namespace ArmyRoguelike.View
                     _board.ClearHighlights();
                     break;
             }
+
+            RefreshApPips();
+        }
+
+        /// <summary>
+        /// AP pips on every player statue during the player's turn; the selected one also previews
+        /// what the hovered action would cost. Hidden while the enemies play out their turn.
+        /// </summary>
+        private void RefreshApPips()
+        {
+            var show = Battle.Phase == Phase.PlayerTurn && !_enemyTurnPlaying;
+            var cost = show && !_busy ? PreviewCost() : 0;
+            foreach (var u in Battle.Units.Where(u => u.Team == Team.Player && u.IsPlaced && u.IsAlive))
+            {
+                var view = _board.ViewOf(u);
+                if (view == null)
+                    continue;
+                if (show)
+                    view.ShowAp(u.Ap, u.MaxAp, u == _selected ? cost : 0);
+                else
+                    view.HideAp();
+            }
+        }
+
+        /// <summary>AP the selected unit would spend if the player clicked the hovered tile now (0 if nothing).</summary>
+        private int PreviewCost()
+        {
+            if (_selected == null || !_hovered.HasValue || !Battle.CanAct(_selected))
+                return 0;
+            var tile = _hovered.Value;
+            if (_mineMode)
+                return Battle.CanPlaceMine(_selected, tile) ? Battle.MineCost : 0;
+            if (_hoveredUnit != null && _hoveredUnit.Team == Team.Enemy)
+            {
+                if (Battle.CanAttack(_selected, _hoveredUnit))
+                    return Battle.AttackCost;
+                var spot = Battle.FindAttackSpot(_selected, _hoveredUnit);
+                return spot.HasValue ? spot.Value.cost + Battle.AttackCost : 0;
+            }
+
+            return Battle.GetReachable(_selected).TryGetValue(tile, out var move) ? move : 0;
         }
 
         // ---------- Placement ----------
@@ -348,6 +390,7 @@ namespace ArmyRoguelike.View
         private IEnumerator PlayEnemyTurn()
         {
             _busy = true;
+            _enemyTurnPlaying = true;
             _board.ClearHighlights();
             foreach (var u in Battle.Living(Team.Player))
                 _board.ViewOf(u)?.SetDimmed(true);
@@ -364,6 +407,7 @@ namespace ArmyRoguelike.View
             _board.SyncHazards();
             if (Battle.IsOver)
                 _logger.Save();
+            _enemyTurnPlaying = false;
             _busy = false;
         }
 
@@ -816,8 +860,14 @@ namespace ArmyRoguelike.View
             if (_selected != null)
             {
                 GUILayout.Label(UnitLine(_selected));
+                var apStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold };
+                apStyle.normal.textColor = new Color(1f, 0.85f, 0.25f);
+                GUILayout.Label($"AP {_selected.Ap} / {_selected.MaxAp}", apStyle);
+                var cost = playerTurn ? PreviewCost() : 0;
+                GUILayout.Label(cost > 0
+                    ? $"This action: -{cost} AP  ->  {_selected.Ap - cost} left"
+                    : $"Move {Battle.MoveCost} per tile, attack {Battle.AttackCost}, carry up to {Battle.MaxCarriedAp} to next turn");
                 GUILayout.Label(AbilityLines(_selected));
-                GUILayout.Label($"AP {_selected.Ap}   (move {Battle.MoveCost} per tile, attack {Battle.AttackCost})");
             }
 
             var hoverText = HoverText();

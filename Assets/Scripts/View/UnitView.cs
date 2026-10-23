@@ -127,6 +127,53 @@ namespace ArmyRoguelike.View
         /// <summary>Big units get a wider HP bar.</summary>
         private float BarScale => Unit.Size;
 
+        // ---------- AP pips ----------
+
+        private const float PipSize = 0.05f;
+        private const float PipSpacing = 0.068f;
+        private static readonly Color PipFull = new Color(1f, 0.85f, 0.25f);
+        private static readonly Color PipSpend = new Color(1f, 0.4f, 0.15f);
+        private static readonly Color PipEmpty = new Color(0.15f, 0.15f, 0.17f, 0.85f);
+
+        private readonly List<SpriteRenderer> _pips = new List<SpriteRenderer>();
+
+        /// <summary>
+        /// A row of dots under the HP bar: yellow for AP the unit has, orange for AP the hovered action
+        /// would spend, dark for AP already used this turn (up to its normal maximum).
+        /// </summary>
+        public void ShowAp(int ap, int maxAp, int cost)
+        {
+            var count = Mathf.Max(ap, maxAp);
+            while (_pips.Count < count)
+            {
+                var sr = new GameObject("ApPip").AddComponent<SpriteRenderer>();
+                sr.transform.SetParent(transform, false);
+                sr.sprite = PlaceholderArt.Pixel;
+                sr.transform.localScale = new Vector3(PipSize, PipSize, 1f);
+                _pips.Add(sr);
+            }
+
+            var y = _barBack.transform.localPosition.y - 0.07f;
+            var left = -(count - 1) * PipSpacing * 0.5f;
+            var keep = ap - Mathf.Clamp(cost, 0, ap);
+            for (var i = 0; i < _pips.Count; i++)
+            {
+                var pip = _pips[i];
+                pip.enabled = i < count;
+                if (!pip.enabled)
+                    continue;
+                pip.transform.localPosition = new Vector3(left + i * PipSpacing, y, 0f);
+                pip.color = i < keep ? PipFull : i < ap ? PipSpend : PipEmpty;
+                pip.sortingOrder = _barFill.sortingOrder + 1;
+            }
+        }
+
+        public void HideAp()
+        {
+            foreach (var pip in _pips)
+                pip.enabled = false;
+        }
+
         /// <summary>Top of the statue in world space, for pop-ups.</summary>
         public Vector3 TopWorld => _barBack.transform.position;
 
@@ -276,6 +323,8 @@ namespace ArmyRoguelike.View
         {
             _barBack.enabled = visible;
             _barFill.enabled = visible;
+            if (!visible)
+                HideAp();
             if (_labelRenderer != null)
                 _labelRenderer.enabled = visible;
         }
