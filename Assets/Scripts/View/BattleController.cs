@@ -15,11 +15,18 @@ namespace ArmyRoguelike.View
         private static readonly Color MoveColor = new Color(0.45f, 0.75f, 1f, 0.4f);
         private static readonly Color AttackColor = new Color(1f, 0.3f, 0.25f, 0.55f);
         private static readonly Color SelectedColor = new Color(1f, 0.9f, 0.4f, 0.5f);
+        private static readonly Color IntentTargetColor = new Color(1f, 0.55f, 0.2f, 0.6f);
+        private static readonly Color AuraColor = new Color(0.9f, 0.35f, 0.3f, 0.25f);
+
+        // Wolf tints: warm while the leader's aura reaches them, pale and cold once the leader is dead.
+        private static readonly Color NearLeaderTint = new Color(1.25f, 0.8f, 0.75f);
+        private static readonly Color LeaderlessTint = new Color(0.8f, 0.9f, 1.15f);
 
         private const float ReferenceHeight = 720f;
         private const float PauseBetweenEnemies = 0.25f;
 
         private BoardView _board;
+        private IntentView _intent;
         private Camera _camera;
         private Unit _toPlace;
         private Unit _selected;
@@ -35,7 +42,9 @@ namespace ArmyRoguelike.View
         {
             _board = board;
             _camera = cam;
+            _intent = IntentView.Create(transform);
             _toPlace = NextUnplaced();
+            RefreshUnitStates();
         }
 
         private void Update()
@@ -47,6 +56,7 @@ namespace ArmyRoguelike.View
             _hoveredUnit = _hovered.HasValue ? Battle.UnitAt(_hovered.Value) : null;
             var clicked = !_busy && Mouse.current.leftButton.wasPressedThisFrame && _hovered.HasValue;
 
+            _intent.Hide();
             switch (Battle.Phase)
             {
                 case Phase.Placement:
@@ -221,6 +231,7 @@ namespace ArmyRoguelike.View
         private void DrawPlayerHighlights()
         {
             _board.ClearHighlights();
+            DrawEnemyHover();
             if (_selected == null)
                 return;
 
@@ -234,6 +245,26 @@ namespace ArmyRoguelike.View
 
             if (_hovered.HasValue && reachable.ContainsKey(_hovered.Value))
                 _board.SetHighlight(_hovered.Value, HoverColor);
+        }
+
+        /// <summary>While hovering an enemy: its intended target, and for the pack leader its aura.</summary>
+        private void DrawEnemyHover()
+        {
+            var enemy = _hoveredUnit;
+            if (enemy == null || enemy.Team != Team.Enemy)
+                return;
+
+            if (enemy.IsPackLeader)
+                foreach (var p in Battle.Board.AllTiles())
+                    if (p.StepsTo(enemy.Pos) <= Battle.LeaderAuraRange && !Battle.Board.IsObstacle(p))
+                        _board.SetHighlight(p, AuraColor);
+
+            var target = EnemyAI.ChooseTarget(Battle, enemy);
+            if (target == null)
+                return;
+            _board.SetHighlight(target.Pos, IntentTargetColor);
+            var lift = Vector3.up * 0.15f;
+            _intent.Show(IsoMath.GridToWorld(enemy.Pos) + lift, IsoMath.GridToWorld(target.Pos) + lift);
         }
 
         // ---------- Animation ----------
@@ -264,11 +295,28 @@ namespace ArmyRoguelike.View
             }
         }
 
-        /// <summary>Dims statues that have finished their turn.</summary>
+        /// <summary>Dims statues that have finished their turn and tints wolves by their pack state.</summary>
         private void RefreshUnitStates()
         {
             foreach (var u in Battle.Units.Where(u => u.IsPlaced && u.IsAlive))
-                _board.ViewOf(u)?.SetDimmed(u.Team == Team.Player && Battle.Phase == Phase.PlayerTurn && u.IsDone);
+            {
+                var view = _board.ViewOf(u);
+                if (view == null)
+                    continue;
+                view.SetDimmed(u.Team == Team.Player && Battle.Phase == Phase.PlayerTurn && u.IsDone);
+                switch (Battle.GetPackState(u))
+                {
+                    case PackState.NearLeader:
+                        view.SetTint(NearLeaderTint);
+                        break;
+                    case PackState.Leaderless:
+                        view.SetTint(LeaderlessTint);
+                        break;
+                    default:
+                        view.SetTint(Color.white);
+                        break;
+                }
+            }
         }
 
         // ---------- Input helpers ----------
@@ -309,8 +357,7 @@ namespace ArmyRoguelike.View
                     DrawTurnHud();
                     break;
                 default:
-                    _hudRect = new Rect(10, 10, 230, 40);
-                    GUI.Box(_hudRect, Battle.Phase == Phase.Victory ? "Victory!" : "Defeat");
+                    DrawEndHud();
                     break;
             }
         }
@@ -340,7 +387,7 @@ namespace ArmyRoguelike.View
         private void DrawTurnHud()
         {
             var playerTurn = Battle.Phase == Phase.PlayerTurn && !_busy;
-            _hudRect = new Rect(10, 10, 250, 250);
+            _hudRect = new Rect(10, 10, 280, 300);
             GUILayout.BeginArea(_hudRect, GUI.skin.box);
             GUILayout.Label($"Turn {Battle.TurnNumber}: {(playerTurn ? "your turn" : "enemy turn")}");
 
@@ -368,10 +415,39 @@ namespace ArmyRoguelike.View
             GUILayout.EndArea();
         }
 
+        private void DrawEndHud()
+        {
+            const float w = 220, h = 90;
+            _hudRect = new Rect((Screen.width / (Screen.height / ReferenceHeight) - w) * 0.5f, 120, w, h);
+            GUILayout.BeginArea(_hudRect, GUI.skin.box);
+            var style = new GUIStyle(GUI.skin.label) { fontSize = 22, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
+            GUILayout.Label(Battle.Phase == Phase.Victory ? "Victory!" : "Defeat", style);
+            if (GUILayout.Button("Restart"))
+                GameBootstrap.Restart();
+            GUILayout.EndArea();
+        }
+
         private string HoverText()
         {
             if (_hoveredUnit != null && _hoveredUnit != _selected)
-                return "Hover: " + UnitLine(_hoveredUnit);
+            {
+                var text = "Hover: " + UnitLine(_hoveredUnit);
+                switch (Battle.GetPackState(_hoveredUnit))
+                {
+                    case PackState.NearLeader:
+                        text += $"\n+1 damage: near the Pack Leader";
+                        break;
+                    case PackState.Leaderless:
+                        text += "\n-1 damage: the Pack Leader is dead";
+                        break;
+                }
+
+                if (_hoveredUnit.IsPackLeader)
+                    text += $"\nWolves within {Battle.LeaderAuraRange} tiles get +1 damage";
+                if (_hoveredUnit.Team == Team.Enemy && EnemyAI.ChooseTarget(Battle, _hoveredUnit) is Unit target)
+                    text += $"\nWants to attack: {target.Stats.Name}";
+                return text;
+            }
             if (_selected != null && _hovered.HasValue && Battle.GetReachable(_selected).TryGetValue(_hovered.Value, out var cost))
                 return $"Move here: {cost} AP";
             return null;

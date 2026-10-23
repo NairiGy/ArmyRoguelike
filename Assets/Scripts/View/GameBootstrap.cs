@@ -20,6 +20,15 @@ namespace ArmyRoguelike.View
             new GameObject("Game").AddComponent<GameBootstrap>();
         }
 
+        /// <summary>Throws away the current battle and builds a fresh one.</summary>
+        public static void Restart()
+        {
+            var current = FindAnyObjectByType<GameBootstrap>();
+            if (current != null)
+                Destroy(current.gameObject);
+            new GameObject("Game").AddComponent<GameBootstrap>();
+        }
+
         private void Awake()
         {
             Board = BoardView.Create(Battle.CreatePrototype(), transform);
