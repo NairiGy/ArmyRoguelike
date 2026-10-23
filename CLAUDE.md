@@ -18,6 +18,7 @@ A single-player roguelike army-builder. You lead a small squad of living statues
 - `Assets/Scripts/Core`: battle rules in pure C#, with no Unity references (`ArmyRoguelike.Core` assembly). The board, units, AP, movement, attacks, enemy AI and win/lose all live here.
 - `Assets/Scripts/View`: Unity side (`ArmyRoguelike.View` assembly). It shows the battle and handles input, and only reads state and calls into Core.
 - `Assets/Tests/EditMode`: NUnit tests for Core.
+- `Playtests/` (git-ignored): one JSON log per battle, written by `PlaytestLogger`. F9 in game saves a marker with a board snapshot. Read these to summarize playtests instead of asking the user for numbers.
 - The scene stays nearly empty. `GameBootstrap` builds the battle at runtime, and placeholder art is generated in code.
 
 ## Version control
