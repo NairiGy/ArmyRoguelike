@@ -288,9 +288,10 @@ namespace ArmyRoguelike.Core
             var path = FindPath(unit, target);
             if (path == null || path.Count * MoveCost > unit.Ap)
                 return null;
+            var from = unit.Pos;
             unit.Ap -= path.Count * MoveCost;
             unit.Pos = target;
-            return new MoveEvent(unit, path);
+            return new MoveEvent(unit, from, path);
         }
 
         internal AttackEvent DoAttack(Unit attacker, Unit target)

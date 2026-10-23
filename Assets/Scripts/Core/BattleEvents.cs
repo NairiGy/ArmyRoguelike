@@ -10,15 +10,19 @@ namespace ArmyRoguelike.Core
     public sealed class MoveEvent : BattleEvent
     {
         public readonly Unit Unit;
+        public readonly GridPos From;
 
         /// <summary>Tiles stepped onto, in order. Does not include the starting tile.</summary>
         public readonly IReadOnlyList<GridPos> Path;
 
-        public MoveEvent(Unit unit, IReadOnlyList<GridPos> path)
+        public MoveEvent(Unit unit, GridPos from, IReadOnlyList<GridPos> path)
         {
             Unit = unit;
+            From = from;
             Path = path;
         }
+
+        public GridPos To => Path.Count > 0 ? Path[Path.Count - 1] : From;
     }
 
     public sealed class AttackEvent : BattleEvent

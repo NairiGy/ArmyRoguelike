@@ -42,3 +42,6 @@ crashlytics-build.properties
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# --- Playtest logs (written by PlaytestLogger)
+/[Pp]laytests/

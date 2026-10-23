@@ -34,6 +34,9 @@ namespace ArmyRoguelike.View
         private GridPos? _hovered;
         private bool _busy;
         private string _hint = "";
+        private PlaytestLogger _logger;
+        private string _markerNote;
+        private float _markerNoteUntil;
         private Rect _hudRect;
 
         private Battle Battle => _board.Battle;
@@ -43,6 +46,7 @@ namespace ArmyRoguelike.View
             _board = board;
             _camera = cam;
             _intent = IntentView.Create(transform);
+            _logger = new PlaytestLogger(board.Battle);
             _toPlace = NextUnplaced();
             RefreshUnitStates();
         }
@@ -51,6 +55,12 @@ namespace ArmyRoguelike.View
         {
             if (_board == null || _camera == null || Mouse.current == null)
                 return;
+
+            if (Keyboard.current != null && Keyboard.current.f9Key.wasPressedThisFrame)
+            {
+                _markerNote = $"Marker {_logger.AddMarker()} saved";
+                _markerNoteUntil = Time.unscaledTime + 2f;
+            }
 
             _hovered = HoveredTile();
             _hoveredUnit = _hovered.HasValue ? Battle.UnitAt(_hovered.Value) : null;
@@ -104,6 +114,7 @@ namespace ArmyRoguelike.View
         {
             if (!Battle.StartBattle())
                 return;
+            _logger.BattleStarted();
             _toPlace = null;
             _hint = "Click a statue to select it.";
             RefreshUnitStates();
@@ -142,7 +153,10 @@ namespace ArmyRoguelike.View
             {
                 var attack = Battle.PlayerAttack(_selected, target);
                 if (attack != null)
+                {
+                    _logger.Record(attack, Battle.TurnNumber);
                     StartCoroutine(PlayPlayerAction(attack));
+                }
                 return;
             }
 
@@ -150,7 +164,10 @@ namespace ArmyRoguelike.View
             {
                 var move = Battle.PlayerMove(_selected, tile);
                 if (move != null)
+                {
+                    _logger.Record(move, Battle.TurnNumber);
                     StartCoroutine(PlayPlayerAction(move));
+                }
                 return;
             }
 
@@ -187,6 +204,8 @@ namespace ArmyRoguelike.View
             if (_selected != null && _selected.IsAlive && _selected.Ap == 0)
                 FinishSelectedUnit();
             RefreshUnitStates();
+            if (Battle.IsOver)
+                _logger.Save();
             _busy = false;
         }
 
@@ -194,6 +213,7 @@ namespace ArmyRoguelike.View
         {
             if (_selected == null)
                 return;
+            _logger.RecordUnitDone(_selected, Battle.TurnNumber);
             Battle.EndUnitTurn(_selected);
             Select(null);
             RefreshUnitStates();
@@ -212,7 +232,11 @@ namespace ArmyRoguelike.View
             foreach (var u in Battle.Living(Team.Player))
                 _board.ViewOf(u)?.SetDimmed(true);
 
+            var turn = Battle.TurnNumber;
+            _logger.RecordEndTurn(turn);
             var events = Battle.EndPlayerTurn();
+            foreach (var ev in events)
+                _logger.Record(ev, turn);
             Unit lastActor = null;
             foreach (var ev in events)
             {
@@ -225,8 +249,13 @@ namespace ArmyRoguelike.View
 
             _hint = "Your turn. Click a statue to select it.";
             RefreshUnitStates();
+            if (Battle.IsOver)
+                _logger.Save();
             _busy = false;
         }
+
+        /// <summary>Saves a battle that was left before it ended (restart, leaving Play mode).</summary>
+        private void OnDestroy() => _logger?.Save();
 
         private void DrawPlayerHighlights()
         {
@@ -346,6 +375,9 @@ namespace ArmyRoguelike.View
                 return;
             var scale = Screen.height / ReferenceHeight;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
+
+            if (_markerNote != null && Time.unscaledTime < _markerNoteUntil)
+                GUI.Box(new Rect(10, ReferenceHeight - 40, 180, 30), _markerNote);
 
             switch (Battle.Phase)
             {
