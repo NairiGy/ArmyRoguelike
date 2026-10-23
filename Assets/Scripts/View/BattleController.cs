@@ -80,7 +80,6 @@ namespace ArmyRoguelike.View
         private PlaytestLogger _logger;
         private string _markerNote;
         private float _markerNoteUntil;
-        private Rect _hudRect;
 
         private Battle Battle => _board.Battle;
 
@@ -964,14 +963,50 @@ namespace ArmyRoguelike.View
             return Battle.Board.InBounds(p) ? p : (GridPos?)null;
         }
 
+        // ---------- HUD ----------
+        //
+        // The board is a diamond, so the screen corners around it are empty. The HUD lives in four
+        // small panels there: selected unit (top-left), hover info (top-right), commands (bottom-right)
+        // and hints (bottom-left). Clicks are only blocked where a panel actually is.
+
+        private const float PanelWidth = 330f;
+        private const float CommandWidth = 240f;
+        private const float Margin = 10f;
+        private const float ButtonHeight = 24f;
+
+        private readonly List<Rect> _panels = new List<Rect>();
+
         private bool IsOverHud(Vector2 screen)
         {
             var scale = Screen.height / ReferenceHeight;
             var gui = new Vector2(screen.x / scale, (Screen.height - screen.y) / scale);
-            return _hudRect.Contains(gui);
+            return _panels.Any(r => r.Contains(gui));
         }
 
-        // ---------- HUD ----------
+        private static GUIStyle TextStyle => new GUIStyle(GUI.skin.label) { wordWrap = true, fontSize = 12 };
+
+        private float GuiWidth => Screen.width / (Screen.height / ReferenceHeight);
+
+        private Rect Panel(float x, float y, float w, float h)
+        {
+            var r = new Rect(x, y, w, h);
+            _panels.Add(r);
+            return r;
+        }
+
+        /// <summary>A word-wrapped text box sized to its content (capped), at a corner.</summary>
+        private void TextPanel(string text, bool right, bool bottom, float maxHeight)
+        {
+            if (string.IsNullOrEmpty(text))
+                return;
+            var style = TextStyle;
+            var h = Mathf.Min(maxHeight, style.CalcHeight(new GUIContent(text), PanelWidth - 12f) + 12f);
+            var x = right ? GuiWidth - PanelWidth - Margin : Margin;
+            var y = bottom ? ReferenceHeight - h - Margin : Margin;
+            GUILayout.BeginArea(Panel(x, y, PanelWidth, h), GUI.skin.box);
+            GUILayout.Label(text, style);
+            GUILayout.EndArea();
+        }
 
         private void OnGUI()
         {
@@ -979,9 +1014,8 @@ namespace ArmyRoguelike.View
                 return;
             var scale = Screen.height / ReferenceHeight;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
-
-            if (_markerNote != null && Time.unscaledTime < _markerNoteUntil)
-                GUI.Box(new Rect(10, ReferenceHeight - 40, 180, 30), _markerNote);
+            if (Event.current.type == EventType.Layout)
+                _panels.Clear();
 
             switch (Battle.Phase)
             {
@@ -996,6 +1030,9 @@ namespace ArmyRoguelike.View
                     DrawEndHud();
                     break;
             }
+
+            if (_markerNote != null && Time.unscaledTime < _markerNoteUntil)
+                GUI.Box(new Rect(Margin, ReferenceHeight - 80, 180, 30), _markerNote);
         }
 
         private string Header =>
@@ -1004,121 +1041,141 @@ namespace ArmyRoguelike.View
         private void DrawPlacementHud()
         {
             var army = Battle.Units.Where(u => u.Team == Team.Player).ToList();
-            var hoverText = HoverText();
-            _hudRect = new Rect(10, 10, 300, 100 + army.Count * 30 + 40 + (DebugToolsEnabled ? 34 : 0) + (hoverText != null ? 90 : 0));
-            GUILayout.BeginArea(_hudRect, GUI.skin.box);
+            var h = 70 + army.Count * (ButtonHeight + 2) + 10;
+            GUILayout.BeginArea(Panel(Margin, Margin, PanelWidth, h), GUI.skin.box);
             GUILayout.Label(Header);
-            GUILayout.Label("Place your army in the blue tiles.");
-            GUILayout.Label("Click a placed statue to move it.");
+            GUILayout.Label("Place your army in the blue tiles. Click a placed statue to move it.", TextStyle);
             foreach (var u in army)
             {
                 var item = u.Equipment != null ? $" [{u.Equipment.Name}]" : "";
                 var label = $"{u.Stats.Name}{item}{(u.IsPlaced ? "  (placed)" : "")}{(u == _toPlace ? "  <" : "")}";
-                if (GUILayout.Button(label))
+                if (GUILayout.Button(label, GUILayout.Height(ButtonHeight)))
                     _toPlace = u;
             }
 
-            GUILayout.Space(6);
+            GUILayout.EndArea();
+
+            var buttons = 1 + (DebugToolsEnabled ? 1 : 0);
+            var ch = buttons * (ButtonHeight + 4) + 16;
+            GUILayout.BeginArea(Panel(GuiWidth - CommandWidth - Margin, ReferenceHeight - ch - Margin, CommandWidth, ch), GUI.skin.box);
             GUI.enabled = Battle.AllPlaced;
-            if (GUILayout.Button("Start battle"))
+            if (GUILayout.Button("Start battle", GUILayout.Height(ButtonHeight)))
                 StartBattle();
             GUI.enabled = true;
             DrawDebugButton();
-            if (hoverText != null)
-                GUILayout.Label(hoverText);
             GUILayout.EndArea();
+
+            TextPanel(HoverText(), true, false, 280f);
         }
 
         private void DrawTurnHud()
         {
             var playerTurn = Battle.Phase == Phase.PlayerTurn && !_busy;
-            _hudRect = new Rect(10, 10, 340, 470);
-            GUILayout.BeginArea(_hudRect, GUI.skin.box);
-            GUILayout.Label(Header);
-            GUILayout.Label($"Turn {Battle.TurnNumber}: {(playerTurn ? "your turn" : "enemy turn")}");
 
+            // Top-left: turn and the selected unit.
+            var info = $"{Header}\nTurn {Battle.TurnNumber}: {(playerTurn ? "your turn" : "enemy turn")}";
+            var apLine = "";
             if (_selected != null)
             {
-                GUILayout.Label(UnitLine(_selected));
-                var apStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold };
-                apStyle.normal.textColor = new Color(1f, 0.85f, 0.25f);
-                GUILayout.Label($"AP {_selected.Ap} / {_selected.MaxAp}", apStyle);
+                info += "\n" + UnitLine(_selected);
                 var cost = playerTurn ? PreviewCost() : 0;
-                GUILayout.Label(cost > 0
-                    ? $"This action: -{cost} AP  ->  {_selected.Ap - cost} left"
-                    : $"Move {Battle.MoveCost} per tile, attack {Battle.AttackCost}, carry up to {Battle.MaxCarriedAp} to next turn");
-                GUILayout.Label(AbilityLines(_selected));
+                apLine = cost > 0 ? $"AP {_selected.Ap} / {_selected.MaxAp}   this action: -{cost} -> {_selected.Ap - cost} left"
+                    : $"AP {_selected.Ap} / {_selected.MaxAp}";
+                var abilities = AbilityLines(_selected);
+                if (abilities.Length > 0)
+                    info += "\n" + abilities;
             }
 
-            var hoverText = HoverText();
-            if (hoverText != null)
-                GUILayout.Label(hoverText);
+            var style = TextStyle;
+            var apStyle = new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold };
+            apStyle.normal.textColor = new Color(1f, 0.85f, 0.25f);
+            var infoHeight = Mathf.Min(280f, style.CalcHeight(new GUIContent(info), PanelWidth - 12f) + (apLine.Length > 0 ? 24f : 0f) + 14f);
+            GUILayout.BeginArea(Panel(Margin, Margin, PanelWidth, infoHeight), GUI.skin.box);
+            if (apLine.Length > 0)
+                GUILayout.Label(apLine, apStyle);
+            GUILayout.Label(info, style);
+            GUILayout.EndArea();
 
-            if (playerTurn && _confirmEndTurn)
+            // Top-right: whatever is under the mouse.
+            TextPanel(HoverText(), true, false, 280f);
+
+            // Bottom-left: the current hint, or the description of the hovered action button.
+            if (playerTurn && !_confirmEndTurn)
+                TextPanel(string.IsNullOrEmpty(_actionTooltip) ? _hint : _actionTooltip, false, true, 90f);
+
+            if (playerTurn)
+                DrawCommands();
+        }
+
+        private string _actionTooltip;
+
+        /// <summary>Bottom-right: action buttons, Done and End turn. Always fully visible.</summary>
+        private void DrawCommands()
+        {
+            var actions = _selected != null && Battle.CanAct(_selected) ? _selected.Stats.Actions : new ActionKind[0];
+            float h;
+            if (_confirmEndTurn)
+                h = 110f;
+            else
+                h = (actions.Count + 2 + (DebugToolsEnabled ? 1 : 0)) * (ButtonHeight + 4) + 30f;
+
+            GUILayout.BeginArea(Panel(GuiWidth - CommandWidth - Margin, ReferenceHeight - h - Margin, CommandWidth, h), GUI.skin.box);
+            if (_confirmEndTurn)
             {
                 var names = string.Join(", ", UnitsThatCanStillAct().Select(u => u.Stats.Name));
-                GUILayout.Label($"{names} can still act. End the turn anyway?");
-                GUILayout.BeginHorizontal();
-                if (GUILayout.Button("Yes, end turn"))
+                GUILayout.Label($"{names} can still act. End the turn anyway?", TextStyle);
+                if (GUILayout.Button("Yes, end turn", GUILayout.Height(ButtonHeight)))
                 {
                     _logger.RecordEndTurnPrompt(UnitsThatCanStillAct(), Battle.TurnNumber, "confirmed");
                     EndTurn();
                 }
 
-                if (GUILayout.Button("No, keep playing"))
+                if (GUILayout.Button("No, keep playing", GUILayout.Height(ButtonHeight)))
                 {
                     _logger.RecordEndTurnPrompt(UnitsThatCanStillAct(), Battle.TurnNumber, "cancelled");
                     _confirmEndTurn = false;
                 }
 
-                GUILayout.EndHorizontal();
+                GUILayout.EndArea();
+                return;
             }
-            else if (playerTurn)
+
+            for (var i = 0; i < actions.Count; i++)
             {
-                GUILayout.Label(_hint);
-                if (_selected != null && Battle.CanAct(_selected))
-                {
-                    var actions = _selected.Stats.Actions;
-                    for (var i = 0; i < actions.Count; i++)
-                    {
-                        var action = actions[i];
-                        GUI.enabled = Battle.ActionTargets(_selected, action).Count > 0;
-                        var label = _action == action
-                            ? $"Cancel {Abilities.Name(action)} ({i + 1})"
-                            : $"{Abilities.Name(action)}: {Battle.ActionCost(action)} AP ({i + 1})";
-                        if (GUILayout.Button(new GUIContent(label, Abilities.Describe(action))))
-                            ToggleAction(action);
-                        GUI.enabled = true;
-                    }
-
-                    if (!string.IsNullOrEmpty(GUI.tooltip))
-                        GUILayout.Label(GUI.tooltip);
-                }
-
-                GUI.enabled = _selected != null;
-                if (GUILayout.Button(_selected != null ? $"Done with {_selected.Stats.Name}" : "Done"))
-                    FinishSelectedUnit();
+                var action = actions[i];
+                GUI.enabled = Battle.ActionTargets(_selected, action).Count > 0;
+                var label = _action == action
+                    ? $"Cancel {Abilities.Name(action)} ({i + 1})"
+                    : $"{Abilities.Name(action)}: {Battle.ActionCost(action)} AP ({i + 1})";
+                if (GUILayout.Button(new GUIContent(label, $"{Abilities.Name(action)}: {Abilities.Describe(action)}"), GUILayout.Height(ButtonHeight)))
+                    ToggleAction(action);
                 GUI.enabled = true;
-                // Extra space so End turn is harder to hit by accident.
-                GUILayout.Space(14);
-                if (GUILayout.Button("End turn"))
-                    RequestEndTurn();
-                DrawDebugButton();
             }
 
+            if (Event.current.type == EventType.Repaint)
+                _actionTooltip = GUI.tooltip;
+
+            GUI.enabled = _selected != null;
+            if (GUILayout.Button(_selected != null ? $"Done with {_selected.Stats.Name}" : "Done (select a unit)", GUILayout.Height(ButtonHeight)))
+                FinishSelectedUnit();
+            GUI.enabled = true;
+            // Extra space so End turn is harder to hit by accident.
+            GUILayout.Space(12);
+            if (GUILayout.Button("End turn", GUILayout.Height(ButtonHeight)))
+                RequestEndTurn();
+            DrawDebugButton();
             GUILayout.EndArea();
         }
 
         private void DrawEndHud()
         {
             const float w = 260, h = 120;
-            _hudRect = new Rect((Screen.width / (Screen.height / ReferenceHeight) - w) * 0.5f, 120, w, h);
-            GUILayout.BeginArea(_hudRect, GUI.skin.box);
+            GUILayout.BeginArea(Panel((GuiWidth - w) * 0.5f, 120, w, h), GUI.skin.box);
             var style = new GUIStyle(GUI.skin.label) { fontSize = 22, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
             var centred = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter };
             if (Battle.Phase == Phase.Victory)
             {
-                var survivors = Battle.Living(Team.Player).Count();
+                var survivors = Battle.LivingArmy.Count();
                 GUILayout.Label("Victory!", style);
                 GUILayout.Label($"{survivors} survived: +{_context.GoldIfWon(survivors)} gold", centred);
             }
