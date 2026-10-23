@@ -32,3 +32,4 @@ A single-player roguelike army-builder. You lead a small squad of living statues
 - Don't add features, text or visuals that weren't asked for. Ask first.
 - For tuning and game-feel issues, keep iterations small: one diagnosis and one fix, then let the user test.
 - Ask about unknowns rather than guessing.
+- Keep `PlaytestLogger` up to date whenever gameplay changes: log whatever new data is needed to judge it. The user reports how it feels; the logs cover the numbers.
