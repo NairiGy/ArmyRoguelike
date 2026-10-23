@@ -33,6 +33,13 @@ namespace ArmyRoguelike.Core
                 _obstacles[p.X, p.Y] = true;
         }
 
+        /// <summary>Clears a tile, e.g. when an ice wall melts or a barricade blows up.</summary>
+        public void RemoveObstacle(GridPos p)
+        {
+            if (InBounds(p))
+                _obstacles[p.X, p.Y] = false;
+        }
+
         public IEnumerable<GridPos> AllTiles()
         {
             for (var y = 0; y < Height; y++)

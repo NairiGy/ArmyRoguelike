@@ -50,12 +50,15 @@ namespace ArmyRoguelike.View
             _body = new GameObject("Body").AddComponent<SpriteRenderer>();
             _body.transform.SetParent(transform, false);
             _body.sprite = PlaceholderArt.Statue(unit.Stats.Kind);
-            _baseColor = unit.Team == Team.Player ? PlaceholderArt.PlayerStone : PlaceholderArt.EnemyStone;
+            _baseColor = unit.Team == Team.Player ? TierStone(unit.Stats.Tier) : PlaceholderArt.EnemyStone;
             _body.color = _baseColor;
             if (unit.IsPackLeader)
                 _body.transform.localScale = Vector3.one * 1.25f;
             else if (unit.Size > 1)
                 _body.transform.localScale = Vector3.one * 1.3f;
+            else if (unit.Stats.Tier > 1)
+                // Evolved statues stand a little taller.
+                _body.transform.localScale = Vector3.one * (1f + 0.06f * (unit.Stats.Tier - 1));
             _bodyRest = _body.transform.localPosition;
 
             var top = _body.sprite.bounds.max.y * _body.transform.localScale.y;
@@ -66,8 +69,8 @@ namespace ArmyRoguelike.View
                 _label.transform.SetParent(transform, false);
                 _label.transform.localPosition = new Vector3(0f, 0.27f, 0f);
                 _label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                _label.text = unit.Stats.Name.Substring(0, 1);
-                _label.fontSize = 48;
+                _label.text = unit.Stats.Label;
+                _label.fontSize = unit.Stats.Label.Length > 1 ? 36 : 48;
                 _label.characterSize = 0.05f;
                 _label.anchor = TextAnchor.MiddleCenter;
                 _label.alignment = TextAlignment.Center;
@@ -126,6 +129,68 @@ namespace ArmyRoguelike.View
 
         /// <summary>Big units get a wider HP bar.</summary>
         private float BarScale => Unit.Size;
+
+        /// <summary>Player statues get richer stone as they evolve: marble, bronze, gold.</summary>
+        public static Color TierStone(int tier)
+        {
+            switch (tier)
+            {
+                case 2: return new Color(0.95f, 0.78f, 0.55f);
+                case 3: return new Color(1f, 0.86f, 0.3f);
+                default: return PlaceholderArt.PlayerStone;
+            }
+        }
+
+        // ---------- Status markers ----------
+
+        private static readonly Color ShieldColor = new Color(0.4f, 0.9f, 1f);
+        private static readonly Color SnareColor = new Color(0.45f, 0.85f, 0.3f);
+        private static readonly Color SlowColor = new Color(0.65f, 0.8f, 1f);
+        private static readonly Color PoisonColor = new Color(0.75f, 0.35f, 0.95f);
+
+        private readonly List<SpriteRenderer> _statusIcons = new List<SpriteRenderer>();
+
+        /// <summary>
+        /// Small coloured squares to the right of the HP bar: cyan = ward shield, green = snared,
+        /// light blue = slowed, purple = poisoned. The HUD hover text spells them out.
+        /// </summary>
+        public void RefreshStatus()
+        {
+            var colors = new List<Color>();
+            if (Unit.IsAlive)
+            {
+                if (Unit.Shield > 0)
+                    colors.Add(ShieldColor);
+                if (Unit.IsSnared)
+                    colors.Add(SnareColor);
+                if (Unit.IsSlowed)
+                    colors.Add(SlowColor);
+                if (Unit.PoisonTurns > 0)
+                    colors.Add(PoisonColor);
+            }
+
+            while (_statusIcons.Count < colors.Count)
+            {
+                var sr = new GameObject("Status").AddComponent<SpriteRenderer>();
+                sr.transform.SetParent(transform, false);
+                sr.sprite = PlaceholderArt.Pixel;
+                sr.transform.localScale = new Vector3(0.07f, 0.07f, 1f);
+                _statusIcons.Add(sr);
+            }
+
+            var y = _barBack.transform.localPosition.y;
+            var x = BarWidth * BarScale * 0.5f + 0.07f;
+            for (var i = 0; i < _statusIcons.Count; i++)
+            {
+                var icon = _statusIcons[i];
+                icon.enabled = i < colors.Count;
+                if (!icon.enabled)
+                    continue;
+                icon.color = colors[i];
+                icon.transform.localPosition = new Vector3(x + i * 0.09f, y, 0f);
+                icon.sortingOrder = _barFill.sortingOrder + 1;
+            }
+        }
 
         // ---------- AP pips ----------
 
@@ -239,6 +304,27 @@ namespace ArmyRoguelike.View
             _body.transform.localPosition = _bodyRest;
         }
 
+        /// <summary>Shoved: a fast slide with no hop. If it was blocked, a short bump towards the obstacle and back.</summary>
+        public IEnumerator Slide(GridPos from, GridPos to, GridPos? blockedDir)
+        {
+            if (from == to)
+            {
+                if (blockedDir.HasValue)
+                    yield return Lunge(WorldOf(from + blockedDir.Value), null);
+                yield break;
+            }
+
+            var a = WorldOf(from);
+            var b = WorldOf(to);
+            for (var t = 0f; t < 1f; t += Time.deltaTime / 0.12f)
+            {
+                SetWorldPosition(Vector3.Lerp(a, b, t));
+                yield return null;
+            }
+
+            SetWorldPosition(b);
+        }
+
         /// <summary>Quick lunge towards the target and back. <paramref name="onImpact"/> runs at the furthest point.</summary>
         public IEnumerator Lunge(Vector3 target, System.Action onImpact)
         {
@@ -324,7 +410,11 @@ namespace ArmyRoguelike.View
             _barBack.enabled = visible;
             _barFill.enabled = visible;
             if (!visible)
+            {
                 HideAp();
+                foreach (var icon in _statusIcons)
+                    icon.enabled = false;
+            }
             if (_labelRenderer != null)
                 _labelRenderer.enabled = visible;
         }

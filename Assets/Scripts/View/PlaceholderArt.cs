@@ -61,6 +61,12 @@ namespace ArmyRoguelike.View
                 case UnitKind.Sapper:
                     sprite = MakeSapper();
                     break;
+                case UnitKind.Mage:
+                    sprite = MakeMage();
+                    break;
+                case UnitKind.Turret:
+                    sprite = MakeTurret();
+                    break;
                 case UnitKind.Goblin:
                 case UnitKind.GoblinBomber:
                     sprite = MakeGoblin(kind == UnitKind.GoblinBomber);
@@ -331,6 +337,50 @@ namespace ArmyRoguelike.View
             // Pickaxe over the right shoulder.
             Fill(tex, 22, 26, 23, 44);
             Fill(tex, 18, 43, 28, 44);
+            Shade(tex, w, h);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);
+        }
+
+        /// <summary>Robed figure with a pointed hat and an orb-topped staff.</summary>
+        private static Sprite MakeMage()
+        {
+            const int w = 32, h = 58;
+            var tex = NewTexture(w, h);
+            Plinth(tex, w, 10);
+            // Robe widening to the floor.
+            for (var y = 7; y <= 30; y++)
+            {
+                var half = 4 + (30 - y) / 5;
+                Fill(tex, 15 - half, y, 16 + half, y);
+            }
+
+            Disc(tex, 16, 34, 4);
+            // Wide brim and tall pointed hat.
+            Fill(tex, 9, 38, 23, 39);
+            for (var i = 0; i < 9; i++)
+                Fill(tex, 16 - (5 - i / 2), 40 + i, 16 + (5 - i / 2) - 1, 40 + i);
+            // Staff with an orb, on the left.
+            Fill(tex, 5, 8, 6, 40);
+            Disc(tex, 6, 44, 3);
+            Shade(tex, w, h);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);
+        }
+
+        /// <summary>A squat tower on a plinth with a crossbow on top.</summary>
+        private static Sprite MakeTurret()
+        {
+            const int w = 32, h = 36;
+            var tex = NewTexture(w, h);
+            Plinth(tex, w, 10);
+            Fill(tex, 10, 7, 21, 22);
+            // Battlements.
+            for (var x = 10; x <= 20; x += 4)
+                Fill(tex, x, 23, x + 1, 25);
+            // Crossbow arms and bolt.
+            Fill(tex, 7, 27, 24, 28);
+            Fill(tex, 15, 24, 16, 31);
             Shade(tex, w, h);
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);

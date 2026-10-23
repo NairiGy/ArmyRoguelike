@@ -48,6 +48,15 @@ namespace ArmyRoguelike.Core
         /// </summary>
         public static Unit ChooseTarget(Battle battle, Unit enemy)
         {
+            // A taunting unit within range overrides everything.
+            var taunter = battle.Living(Team.Player)
+                .Where(u => u.Has(Ability.Taunt) && Battle.Distance(enemy, u) <= Battle.TauntRange)
+                .OrderBy(u => Battle.Distance(enemy, u))
+                .ThenBy(u => u.Id)
+                .FirstOrDefault();
+            if (taunter != null)
+                return taunter;
+
             return battle.Living(Team.Player)
                 .OrderBy(u => Battle.Distance(enemy, u))
                 .ThenBy(u => u.Hp)

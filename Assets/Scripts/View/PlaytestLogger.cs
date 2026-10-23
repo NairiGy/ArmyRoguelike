@@ -56,7 +56,7 @@ namespace ArmyRoguelike.View
                 _log.placements.Add(new PlacementEntry
                 {
                     unit = Name(u), x = u.Pos.X, y = u.Pos.Y, equipment = u.Equipment?.Name ?? "", maxHp = u.MaxHp,
-                    damage = u.BaseDamage, range = u.Range, maxAp = u.MaxAp,
+                    damage = u.BaseDamage, range = u.Range, maxAp = u.MaxAp, tier = u.Stats.Tier, line = u.Stats.Root.Name,
                 });
         }
 
@@ -140,6 +140,66 @@ namespace ArmyRoguelike.View
                     }
 
                     break;
+                case AreaAttackEvent area:
+                    // One entry per unit hit; type is the shape ("sweep", "pierce", "volley", "long reach", "fireball").
+                    foreach (var hit in area.Hits)
+                    {
+                        var entry = HitEntry(turn, area.Attacker, area.Kind, hit);
+                        entry.toX = area.Center.X;
+                        entry.toY = area.Center.Y;
+                        entry.friendlyFire = hit.Target.Team == area.Attacker.Team;
+                        entry.smashTargets = area.Hits.Count;
+                        entry.autoApproach = autoApproach;
+                        _log.actions.Add(entry);
+                    }
+
+                    break;
+                case PushEvent push:
+                {
+                    var entry = new ActionEntry
+                    {
+                        turn = turn, team = push.Pusher?.Team.ToString() ?? "", unit = push.Pusher != null ? Name(push.Pusher) : "",
+                        type = "push", target = Name(push.Unit), fromX = push.From.X, fromY = push.From.Y, toX = push.To.X, toY = push.To.Y,
+                    };
+                    if (push.Collision.HasValue)
+                    {
+                        entry.note = "collision";
+                        entry.damage = push.Collision.Value.Damage;
+                        entry.targetHpAfter = push.Collision.Value.HpAfter;
+                        entry.killed = push.Collision.Value.Killed;
+                    }
+
+                    _log.actions.Add(entry);
+                    break;
+                }
+                case StatusEvent status:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = status.Source.Team.ToString(), unit = Name(status.Source),
+                        type = "status", note = status.Kind.ToString().ToLowerInvariant(), target = Name(status.Target), amount = status.Amount,
+                    });
+                    break;
+                case TickEvent tick:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = "", unit = "", type = "tick", note = tick.Cause, target = Name(tick.Hit.Target),
+                        damage = tick.Hit.Damage, targetHpAfter = tick.Hit.HpAfter, killed = tick.Hit.Killed,
+                    });
+                    break;
+                case TileEvent tile:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = tile.Source?.Team.ToString() ?? "", unit = tile.Source != null ? Name(tile.Source) : "",
+                        type = tile.Added ? "tile added" : "tile removed", note = tile.Kind, toX = tile.Tile.X, toY = tile.Tile.Y,
+                    });
+                    break;
+                case SummonEvent summon:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = summon.Summoner.Team.ToString(), unit = Name(summon.Summoner), type = "summon",
+                        target = Name(summon.Summoned), toX = summon.Summoned.Pos.X, toY = summon.Summoned.Pos.Y,
+                    });
+                    break;
                 case EffectEvent effect:
                     _log.actions.Add(new ActionEntry
                     {
@@ -164,7 +224,11 @@ namespace ArmyRoguelike.View
                 case EffectKind.Heal: return "heal";
                 case EffectKind.Thorns: return "thorns";
                 case EffectKind.Bloodthirst: return "bloodthirst";
-                default: return "last stand";
+                case EffectKind.LastStand: return "last stand";
+                case EffectKind.Dodge: return "dodge";
+                case EffectKind.Absorb: return "shield absorb";
+                case EffectKind.Refund: return "ap refund";
+                default: return "guard";
             }
         }
 
@@ -263,7 +327,26 @@ namespace ArmyRoguelike.View
             foreach (var a in _log.actions)
             {
                 if (a.unit == null || !summaries.TryGetValue(a.unit, out var s))
+                {
+                    // No source (poison, burning ground): still count what the target took.
+                    if (a.type == "tick" && summaries.TryGetValue(a.target ?? "", out var ticked))
+                    {
+                        ticked.damageTaken += a.damage;
+                        ticked.tickDamageTaken += a.damage;
+                        if (a.killed)
+                            ticked.deaths++;
+                    }
+
                     continue;
+                }
+
+                if (a.type == "push")
+                    s.pushesDone++;
+                if (a.type == "status")
+                    s.statusesApplied++;
+                if (a.type == "status" || a.type == "tile added" || a.type == "summon" || a.type == "place mine" || a.type == "throw bomb")
+                    s.actionsUsed++;
+
                 switch (a.type)
                 {
                     case "move":
@@ -282,6 +365,13 @@ namespace ArmyRoguelike.View
                     case "boulder":
                     case "explosion":
                     case "thorns":
+                    case "sweep":
+                    case "pierce":
+                    case "volley":
+                    case "long reach":
+                    case "fireball":
+                    case "push":
+                    case "tick":
                         if (string.IsNullOrEmpty(a.target))
                             break;
                         if (a.type == "explosion")
@@ -373,6 +463,8 @@ namespace ArmyRoguelike.View
             public int damage;
             public int range;
             public int maxAp;
+            public int tier;
+            public string line;
         }
 
         [Serializable]
@@ -495,6 +587,13 @@ namespace ArmyRoguelike.View
             public int healed;
             public int bloodthirstGained;
             public int lastStands;
+
+            /// <summary>Damage from poison and burning ground.</summary>
+            public int tickDamageTaken;
+
+            public int pushesDone;
+            public int statusesApplied;
+            public int actionsUsed;
         }
     }
 

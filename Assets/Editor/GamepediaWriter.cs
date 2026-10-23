@@ -1,0 +1,243 @@
+using System;
+using System.Linq;
+using System.Text;
+using ArmyRoguelike.Core;
+
+/// <summary>
+/// Writes the gamepedia HTML from the game's data: every evolution tree, enemy, item, action,
+/// ability, encounter, map node and event. Plain C# with no Unity dependency, so it can also run
+/// outside the editor; <see cref="GamepediaExporter"/> calls it with statue images.
+/// </summary>
+public static class GamepediaWriter
+{
+    private static Func<UnitStats, string> _image;
+
+    /// <summary>Builds the page. <paramref name="image"/> returns a data URI for a unit's statue, or null for none.</summary>
+    public static string Build(Func<UnitStats, string> image, string generatedBy)
+    {
+        _image = image;
+        var html = new StringBuilder();
+        html.Append(Head());
+        html.Append("<header><h1>ArmyRoguelike Gamepedia</h1>");
+        html.Append($"<p class=\"muted\">Generated from the game data on {DateTime.Now:yyyy-MM-dd HH:mm} ({generatedBy}). All numbers are placeholders. ");
+        html.Append("Re-export with <b>Tools → Export Gamepedia</b>.</p>");
+        html.Append("<nav><a href=\"#trees\">Evolution trees</a><a href=\"#enemies\">Enemies</a><a href=\"#encounters\">Encounters</a>");
+        html.Append("<a href=\"#items\">Items</a><a href=\"#actions\">Actions</a><a href=\"#abilities\">Abilities</a>");
+        html.Append("<a href=\"#run\">Run &amp; map</a><a href=\"#rules\">Battle rules</a></nav></header><main>");
+
+        Trees(html);
+        Enemies(html);
+        Encounters(html);
+        Items(html);
+        ActionsSection(html);
+        AbilitiesSection(html);
+        RunSection(html);
+        Rules(html);
+
+        html.Append("</main></body></html>");
+        _image = null;
+        return html.ToString();
+    }
+
+    // ---------- Sections ----------
+
+    private static void Trees(StringBuilder html)
+    {
+        html.Append("<section id=\"trees\"><h2>Evolution trees</h2>");
+        html.Append("<p>You draft 3 of these 5 base units. At a Trainer every unit can go up one tier, choosing a branch. ");
+        html.Append("Higher tiers are stronger; units on the same tier play differently. Stone colour shows the tier: marble, bronze, gold.</p>");
+        foreach (var root in UnitStats.BaseUnits)
+        {
+            html.Append($"<div class=\"tree\"><h3>{Esc(root.Name)} line</h3>");
+            Node(html, root);
+            html.Append("</div>");
+        }
+
+        html.Append("<h3>Summons</h3><div class=\"grid\">");
+        UnitCard(html, UnitStats.Turret);
+        html.Append("</div></section>");
+    }
+
+    /// <summary>A unit card, with its evolutions laid out underneath it.</summary>
+    private static void Node(StringBuilder html, UnitStats unit)
+    {
+        html.Append("<div class=\"node\">");
+        UnitCard(html, unit);
+        if (unit.Evolutions.Count > 0)
+        {
+            html.Append("<div class=\"children\">");
+            foreach (var child in unit.Evolutions)
+                Node(html, child);
+            html.Append("</div>");
+        }
+
+        html.Append("</div>");
+    }
+
+    private static void UnitCard(StringBuilder html, UnitStats unit)
+    {
+        html.Append($"<div class=\"card tier{unit.Tier}\" id=\"{Id(unit.Name)}\">");
+        var image = _image?.Invoke(unit);
+        html.Append(image != null
+            ? $"<img src=\"{image}\" alt=\"{Esc(unit.Name)}\">"
+            : $"<div class=\"noimg\">{Esc(unit.Label)}</div>");
+        html.Append("<div class=\"body\">");
+        var tier = unit.Tier > 0 ? $"<span class=\"badge\">Tier {unit.Tier}</span>" : "";
+        html.Append($"<h4>{Esc(unit.Name)} {tier}</h4>");
+        html.Append($"<p class=\"stats\">HP {unit.MaxHp} · DMG {unit.Damage} · RNG {unit.Range} · AP {unit.MaxAp}");
+        if (unit.Size > 1)
+            html.Append($" · {unit.Size}x{unit.Size}");
+        html.Append("</p>");
+        if (!string.IsNullOrEmpty(unit.Role))
+            html.Append($"<p class=\"role\">{Esc(unit.Role)}</p>");
+        if (unit.Abilities.Count + unit.Actions.Count > 0)
+        {
+            html.Append("<ul>");
+            foreach (var a in unit.Abilities)
+            {
+                var isNew = unit.EvolvesFrom == null || !unit.EvolvesFrom.Has(a);
+                html.Append($"<li class=\"{(isNew ? "new" : "")}\"><b>{Esc(Abilities.Name(a))}</b>: {Esc(Abilities.Describe(a))}</li>");
+            }
+
+            foreach (var a in unit.Actions)
+            {
+                var isNew = unit.EvolvesFrom == null || !unit.EvolvesFrom.HasAction(a);
+                html.Append($"<li class=\"action {(isNew ? "new" : "")}\"><b>{Esc(Abilities.Name(a))}</b> ({Battle.ActionCost(a)} AP): {Esc(Abilities.Describe(a))}</li>");
+            }
+
+            html.Append("</ul>");
+        }
+
+        html.Append("</div></div>");
+    }
+
+    private static void Enemies(StringBuilder html)
+    {
+        html.Append("<section id=\"enemies\"><h2>Enemies</h2><div class=\"grid\">");
+        foreach (var e in UnitStats.Enemies)
+            UnitCard(html, e);
+        html.Append("</div></section>");
+    }
+
+    private static void Encounters(StringBuilder html)
+    {
+        html.Append("<section id=\"encounters\"><h2>Encounters</h2><p>Battles are on an 8x8 board; you place your army in the back two rows. ");
+        html.Append("Kill every enemy to win. The ogre is always the final boss.</p><div class=\"grid\">");
+        foreach (var enc in Encounter.Regular.Append(Encounter.Ogre))
+        {
+            var counts = enc.Enemies.GroupBy(e => e.stats.Name).Select(g => g.Count() > 1 ? $"{g.Key} x{g.Count()}" : g.Key);
+            html.Append($"<div class=\"card\"><div class=\"body\"><h4>{Esc(enc.Name)}</h4><p>{Esc(string.Join(", ", counts))}</p></div></div>");
+        }
+
+        html.Append("</div></section>");
+    }
+
+    private static void Items(StringBuilder html)
+    {
+        html.Append("<section id=\"items\"><h2>Items</h2><p>One slot per unit; a new item replaces the old one. ");
+        html.Append("Items only bend rules: each grants an ability. Sold in shops and found in carts.</p>");
+        html.Append("<table><tr><th>Item</th><th>Price</th><th>Effect</th></tr>");
+        foreach (var item in Equipment.Catalog)
+            html.Append($"<tr><td>{Esc(item.Name)}</td><td>{item.Price} gold</td><td>{Esc(item.Effect)}</td></tr>");
+        html.Append("</table></section>");
+    }
+
+    private static void ActionsSection(StringBuilder html)
+    {
+        html.Append("<section id=\"actions\"><h2>Special actions</h2><p>Used from the HUD buttons or number keys 1-4.</p>");
+        html.Append("<table><tr><th>Action</th><th>AP</th><th>Effect</th><th>Used by</th></tr>");
+        foreach (ActionKind a in Enum.GetValues(typeof(ActionKind)))
+        {
+            var users = UnitStats.AllPlayerTypes.Where(u => u.HasAction(a)).Select(u => Link(u.Name));
+            html.Append($"<tr><td>{Esc(Abilities.Name(a))}</td><td>{Battle.ActionCost(a)}</td><td>{Esc(Abilities.Describe(a))}</td><td>{string.Join(", ", users)}</td></tr>");
+        }
+
+        html.Append("</table></section>");
+    }
+
+    private static void AbilitiesSection(StringBuilder html)
+    {
+        html.Append("<section id=\"abilities\"><h2>Abilities</h2>");
+        html.Append("<table><tr><th>Ability</th><th>Effect</th><th>From</th></tr>");
+        foreach (Ability a in Enum.GetValues(typeof(Ability)))
+        {
+            if (a == Ability.None)
+                continue;
+            var from = UnitStats.AllPlayerTypes.Where(u => u.Has(a)).Select(u => Link(u.Name))
+                .Concat(Equipment.Catalog.Where(e => e.Ability == a).Select(e => $"<i>{Esc(e.Name)}</i>"))
+                .Concat(a == Ability.Immobile ? new[] { "Turret" } : new string[0]);
+            html.Append($"<tr><td>{Esc(Abilities.Name(a))}</td><td>{Esc(Abilities.Describe(a))}</td><td>{string.Join(", ", from)}</td></tr>");
+        }
+
+        html.Append("</table></section>");
+    }
+
+    private static void RunSection(StringBuilder html)
+    {
+        html.Append("<section id=\"run\"><h2>Run &amp; map</h2><ul>");
+        html.Append($"<li>Draft {Run.DraftSize} different base units. Army size up to {Run.MaxArmySize}.</li>");
+        html.Append($"<li>The road has {Run.Steps} steps; each step offers 2 nodes. Step 1 is two battles; the last step is the ogre. ");
+        html.Append($"Steps {string.Join(" and ", Run.TrainerSteps.Select(s => s + 1))} always offer a Trainer.</li>");
+        html.Append("<li>Other steps: battle (50%), shop (25%) or ? event (25%).</li>");
+        html.Append($"<li>Won battle: {Run.BaseGold} gold + {Run.GoldPerSurvivor} per surviving unit (+{Run.AmbushBonusGold} for an ambush).</li>");
+        html.Append($"<li><b>Trainer</b>: free; every unit can evolve one tier per visit.</li>");
+        html.Append($"<li><b>Shop</b>: {Run.ShopSize} items and a random base-unit recruit for {Run.RecruitPrice} gold (if the army has room).</li>");
+        html.Append("<li>Every battle starts at full HP and dead units come back. Evolutions, items, Bloodthirst damage and shrine HP last the whole run.</li>");
+        html.Append("</ul><h3>? events</h3><table><tr><th>Event</th><th>What happens</th></tr>");
+        html.Append($"<tr><td>Wandering Recruit</td><td>A random base unit joins for free ({Run.FullArmyGold} gold instead if the army is full).</td></tr>");
+        html.Append("<tr><td>Abandoned Cart</td><td>A random item for any unit, or leave it.</td></tr>");
+        html.Append($"<tr><td>Gambler</td><td>Pay {Run.GambleCost} gold for a 50% chance at {Run.GambleWin}.</td></tr>");
+        html.Append($"<tr><td>Ambush</td><td>A wolf pack fight that pays +{Run.AmbushBonusGold} gold.</td></tr>");
+        html.Append($"<tr><td>Shrine</td><td>One unit gets +{Run.ShrineHp} max HP for the run.</td></tr>");
+        html.Append("</table></section>");
+    }
+
+    private static void Rules(StringBuilder html)
+    {
+        html.Append("<section id=\"rules\"><h2>Battle rules</h2><ul>");
+        html.Append($"<li>Moving costs {Battle.MoveCost} AP per tile (4 directions, no diagonals). A basic attack costs {Battle.AttackCost} AP. Up to {Battle.MaxCarriedAp} unused AP carry over.</li>");
+        html.Append("<li>Side phases: all your units act (one at a time), then all enemies.</li>");
+        html.Append("<li>Ranged attacks need line of sight (rocks block); Arcane Bolt ignores it. Bombs, boulders and fireballs are lobbed.</li>");
+        html.Append($"<li>Mines: {Battle.MineDamage} damage ({Battle.BigMineDamage} with Big Mines) to everyone in the 3x3, set off when an enemy steps on one. Bombs explode at the start of the next enemy turn. Blasts set each other off.</li>");
+        html.Append($"<li>Push: a unit pushed into a rock, unit or the edge takes {Battle.CollisionDamage} damage. An enemy pushed onto a mine sets it off.</li>");
+        html.Append($"<li>Poison: {Battle.PoisonDamage} damage at the start of the target's turn, {Battle.PoisonTurns} times. Burning ground: {Battle.BurnDamage} damage at the start of the turn of whoever stands on it.</li>");
+        html.Append("<li>Snared units can't move on their next turn. Slowed units start their next turn with less AP.</li>");
+        html.Append("<li>Hover any enemy to see what it plans to do next.</li>");
+        html.Append("</ul></section>");
+    }
+
+    // ---------- Helpers ----------
+
+    private static string Esc(string s) => (s ?? "").Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+
+    private static string Id(string name) => "u-" + new string(name.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
+
+    private static string Link(string name) => $"<a href=\"#{Id(name)}\">{Esc(name)}</a>";
+
+    private static string Head() => @"<!doctype html>
+<html lang=""en""><head><meta charset=""utf-8""><meta name=""viewport"" content=""width=device-width, initial-scale=1"">
+<title>ArmyRoguelike Gamepedia</title>
+<style>
+:root { --bg:#16161b; --panel:#212129; --line:#34343f; --text:#e8e6e0; --muted:#9c9aa3; --accent:#f2c14e; --new:#8fd694; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 system-ui, sans-serif; }
+header { padding:24px 32px 8px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:2; }
+h1 { margin:0 0 4px; font-size:26px; } h2 { margin:32px 0 12px; font-size:21px; border-bottom:1px solid var(--line); padding-bottom:6px; }
+h3 { margin:18px 0 10px; font-size:17px; color:var(--accent); } h4 { margin:0 0 4px; font-size:15px; }
+nav { display:flex; flex-wrap:wrap; gap:14px; margin:10px 0; } nav a, a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
+main { padding:0 32px 48px; } .muted { color:var(--muted); margin:0; }
+.tree { overflow-x:auto; padding-bottom:8px; }
+.node { display:flex; flex-direction:column; align-items:center; }
+.children { display:flex; gap:12px; margin-top:12px; padding-top:12px; border-top:2px solid var(--line); align-items:flex-start; }
+.card { display:flex; gap:10px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px; width:300px; }
+.card.tier2 { border-color:#7a6040; } .card.tier3 { border-color:#a08a30; }
+.card img { image-rendering:pixelated; width:72px; height:auto; align-self:flex-start; }
+.noimg { width:56px; height:56px; flex:none; border-radius:6px; background:var(--line); display:flex; align-items:center; justify-content:center; font-weight:bold; color:var(--accent); }
+.card .body { min-width:0; } .stats { margin:0 0 4px; color:var(--muted); font-size:13px; } .role { margin:0 0 6px; font-style:italic; }
+.card ul { margin:0; padding-left:16px; font-size:13px; } .card li.new b { color:var(--new); }
+.badge { font-size:11px; background:var(--line); border-radius:4px; padding:1px 6px; margin-left:4px; color:var(--muted); }
+.grid { display:flex; flex-wrap:wrap; gap:12px; }
+table { border-collapse:collapse; width:100%; max-width:1100px; } th, td { border:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top; }
+th { background:var(--panel); }
+</style></head><body>";
+}

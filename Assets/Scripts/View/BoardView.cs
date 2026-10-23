@@ -123,14 +123,70 @@ namespace ArmyRoguelike.View
                 Destroy(sr.gameObject);
         }
 
-        /// <summary>Draws a rock on a tile. Also used when a boulder lands during the battle.</summary>
+        private static readonly Color IceTint = new Color(0.7f, 0.9f, 1f, 0.9f);
+        private static readonly Color BarricadeTint = new Color(0.8f, 0.58f, 0.36f);
+        private static readonly Color BurnTint = new Color(1f, 0.35f, 0.1f, 0.45f);
+
+        private readonly Dictionary<GridPos, SpriteRenderer> _rocks = new Dictionary<GridPos, SpriteRenderer>();
+        private readonly Dictionary<GridPos, SpriteRenderer> _burns = new Dictionary<GridPos, SpriteRenderer>();
+
+        /// <summary>Draws a rock on a tile (once). Also used when a boulder lands during the battle.</summary>
         public void AddRock(GridPos p)
         {
+            if (_rocks.ContainsKey(p))
+                return;
             var rock = new GameObject($"Rock {p}").AddComponent<SpriteRenderer>();
             rock.transform.SetParent(transform, false);
             rock.transform.position = IsoMath.GridToWorld(p);
             rock.sprite = PlaceholderArt.Rock;
             rock.sortingOrder = IsoMath.SortingOrder(p) + 5;
+            _rocks[p] = rock;
+        }
+
+        /// <summary>
+        /// Makes rocks, ice walls, barricades and burning ground match the rules: ice is pale blue,
+        /// barricades are wood-brown, burning tiles glow orange.
+        /// </summary>
+        public void SyncTiles()
+        {
+            foreach (var p in Battle.Board.AllTiles())
+            {
+                if (Battle.Board.IsObstacle(p))
+                {
+                    AddRock(p);
+                    _rocks[p].color = Battle.Ice.ContainsKey(p) ? IceTint : Battle.IsBarricade(p) ? BarricadeTint : Color.white;
+                }
+                else if (_rocks.TryGetValue(p, out var rock))
+                {
+                    Destroy(rock.gameObject);
+                    _rocks.Remove(p);
+                }
+
+                var burning = Battle.BurningTiles.ContainsKey(p);
+                if (burning && !_burns.ContainsKey(p))
+                {
+                    var sr = new GameObject($"Burn {p}").AddComponent<SpriteRenderer>();
+                    sr.transform.SetParent(transform, false);
+                    sr.transform.position = IsoMath.GridToWorld(p);
+                    sr.sprite = PlaceholderArt.Tile;
+                    sr.color = BurnTint;
+                    sr.sortingOrder = _tiles[p].sortingOrder + 2;
+                    _burns[p] = sr;
+                }
+                else if (!burning && _burns.TryGetValue(p, out var burn))
+                {
+                    Destroy(burn.gameObject);
+                    _burns.Remove(p);
+                }
+            }
+        }
+
+        private void Update()
+        {
+            // Burning ground flickers.
+            var a = 0.35f + 0.15f * Mathf.Sin(Time.time * 9f);
+            foreach (var burn in _burns.Values)
+                burn.color = new Color(BurnTint.r, BurnTint.g, BurnTint.b, a);
         }
 
         /// <summary>Creates views for newly placed units and moves every view to its unit's tile.</summary>
@@ -142,8 +198,14 @@ namespace ArmyRoguelike.View
                     continue;
                 if (!_units.TryGetValue(unit, out var view))
                     _units[unit] = view = UnitView.Create(unit, transform);
+                if (!unit.IsAlive && !unit.IsRemains)
+                    continue;
                 view.SetGridPosition(unit.Pos);
-                view.RefreshHp(unit.Hp);
+                if (unit.IsAlive)
+                {
+                    view.RefreshHp(unit.Hp);
+                    view.RefreshStatus();
+                }
             }
         }
 

@@ -12,6 +12,9 @@ namespace ArmyRoguelike.Core
         /// <summary>The army member this unit was made from (player units only), for run-long bonuses.</summary>
         public readonly ArmyMember Member;
 
+        /// <summary>For summons: the unit that built it.</summary>
+        public readonly Unit Summoner;
+
         public int Hp { get; internal set; }
         public int Ap { get; internal set; }
 
@@ -23,11 +26,42 @@ namespace ArmyRoguelike.Core
         /// <summary>True once the unit has finished its turn in the current phase.</summary>
         public bool IsDone { get; internal set; }
 
+        // ---------- Per-turn flags ----------
+
         /// <summary>Moved at least one tile this turn (for Steady Aim).</summary>
         public bool MovedThisTurn { get; internal set; }
 
         /// <summary>The free first step of Spring Boots has been used this turn.</summary>
         public bool FreeStepUsed { get; internal set; }
+
+        /// <summary>Has attacked this turn (for the Deadeye's opening shot).</summary>
+        public bool AttackedThisTurn { get; internal set; }
+
+        /// <summary>Riposte already used this enemy turn.</summary>
+        public bool CounterUsed { get; internal set; }
+
+        /// <summary>Dodge already used this enemy turn.</summary>
+        public bool DodgeUsed { get; internal set; }
+
+        // ---------- Statuses ----------
+
+        /// <summary>Snared: can't move on its next turn.</summary>
+        public int SnareTurns { get; internal set; }
+
+        /// <summary>Can't move this turn (a snare took effect).</summary>
+        public bool RootedThisTurn { get; internal set; }
+
+        /// <summary>AP taken away at the start of its next turn (Chill).</summary>
+        public int SlowNext { get; internal set; }
+
+        /// <summary>Started this turn with less AP because of Chill.</summary>
+        public bool SlowedThisTurn { get; internal set; }
+
+        /// <summary>Poison ticks left; each deals poison damage at the start of the unit's turn.</summary>
+        public int PoisonTurns { get; internal set; }
+
+        /// <summary>Ward shield: absorbs this much damage before HP.</summary>
+        public int Shield { get; internal set; }
 
         /// <summary>The Lucky Charm has already saved this unit in this battle.</summary>
         public bool LastStandUsed { get; internal set; }
@@ -35,40 +69,47 @@ namespace ArmyRoguelike.Core
         /// <summary>Damage gained in this battle (Bloodthirst). Added to the army member when the battle ends.</summary>
         public int GainedDamage { get; internal set; }
 
-        public Unit(int id, Team team, UnitStats stats, ArmyMember member = null)
+        public Unit(int id, Team team, UnitStats stats, ArmyMember member = null, Unit summoner = null)
         {
             Id = id;
             Team = team;
             Stats = stats;
             Member = member;
+            Summoner = summoner;
             Hp = MaxHp;
         }
 
         /// <summary>The item in this unit's single slot, or null.</summary>
         public Equipment Equipment => Member?.Equipment;
 
-        // Stats after equipment and run-long bonuses.
-        public int MaxHp => Math.Max(1, Stats.MaxHp + (Equipment?.Hp ?? 0) + (Member?.BonusMaxHp ?? 0));
-        public int BaseDamage => Math.Max(1, Stats.Damage + (Equipment?.Damage ?? 0) + (Member?.BonusDamage ?? 0) + GainedDamage);
-        public int Range => Math.Max(1, Stats.Range + (Equipment?.Range ?? 0));
-        public int MaxAp => Math.Max(1, Stats.MaxAp + (Equipment?.Ap ?? 0));
+        // Stats after run-long bonuses.
+        public int MaxHp => Math.Max(1, Stats.MaxHp + (Member?.BonusMaxHp ?? 0));
+        public int BaseDamage => Math.Max(1, Stats.Damage + (Member?.BonusDamage ?? 0) + GainedDamage);
+        public int Range => Math.Max(1, Stats.Range);
+        public int MaxAp => Math.Max(1, Stats.MaxAp);
 
         public int Size => Stats.Size;
 
-        public bool IsRanged => Range > 1;
+        public bool IsRanged => Stats.IsRanged;
 
         public bool IsAlive => Hp > 0;
+
+        public bool IsSummon => Stats.IsSummon;
 
         public bool IsWolf => Stats.Kind == UnitKind.Wolf;
 
         public bool IsPackLeader => Stats.Kind == UnitKind.PackLeader;
 
+        public bool IsSnared => SnareTurns > 0 || RootedThisTurn;
+
+        public bool IsSlowed => SlowNext > 0 || SlowedThisTurn;
+
         /// <summary>A dead unit that left a bone pile behind.</summary>
         public bool IsRemains => IsPlaced && !IsAlive && Stats.LeavesRemains;
 
-        /// <summary>Has the ability, built in or from its item.</summary>
+        /// <summary>Has the ability, from its type or from its item.</summary>
         public bool Has(Ability ability) =>
-            ability != Ability.None && (Stats.Ability == ability || Equipment?.Ability == ability);
+            ability != Ability.None && (Stats.Has(ability) || Equipment?.Ability == ability);
 
         public override string ToString() => $"{Stats.Name}#{Id} {Pos} hp {Hp} ap {Ap}";
     }

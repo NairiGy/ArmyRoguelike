@@ -87,6 +87,31 @@ namespace ArmyRoguelike.View
             _shop = null;
         }
 
+        public void RecordDraft(IEnumerable<UnitStats> picks)
+        {
+            _log.draft = picks.Select(p => p.Name).ToList();
+        }
+
+        private TrainerVisit _trainer;
+
+        public void OpenTrainer()
+        {
+            _trainer = new TrainerVisit { step = Step };
+        }
+
+        public void RecordEvolution(UnitStats from, UnitStats into)
+        {
+            _trainer?.evolutions.Add(new Evolution { from = from.Name, into = into.Name, tier = into.Tier });
+        }
+
+        public void CloseTrainer()
+        {
+            if (_trainer == null)
+                return;
+            _log.trainers.Add(_trainer);
+            _trainer = null;
+        }
+
         private EventVisit _event;
 
         public void OpenEvent()
@@ -116,13 +141,15 @@ namespace ArmyRoguelike.View
                 return;
             _saved = true;
             CloseShop();
+            CloseTrainer();
             _log.endedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             _log.result = _run.State == RunState.Won ? "won" : _run.State == RunState.Lost ? "lost" : "abandoned";
             _log.stepReached = _run.StepIndex + 1;
             _log.goldLeft = _run.Gold;
             _log.finalArmy = _run.Army.Select(m => new ArmyEntry
             {
-                unit = m.Stats.Name, equipment = m.Equipment?.Name ?? "", bonusDamage = m.BonusDamage, bonusMaxHp = m.BonusMaxHp,
+                unit = m.Stats.Name, tier = m.Stats.Tier, line = m.Stats.Root.Name, equipment = m.Equipment?.Name ?? "",
+                bonusDamage = m.BonusDamage, bonusMaxHp = m.BonusMaxHp,
             }).ToList();
             PlaytestFiles.Write($"run-{_created:yyyyMMdd-HHmmss}.json", JsonUtility.ToJson(_log, true));
         }
@@ -138,7 +165,9 @@ namespace ArmyRoguelike.View
             public string result;
             public int stepReached;
             public int goldLeft;
+            public List<string> draft = new List<string>();
             public List<MapStep> map = new List<MapStep>();
+            public List<TrainerVisit> trainers = new List<TrainerVisit>();
             public List<Choice> choices = new List<Choice>();
             public List<BattleResult> battles = new List<BattleResult>();
             public List<ShopVisit> shops = new List<ShopVisit>();
@@ -218,9 +247,28 @@ namespace ArmyRoguelike.View
         }
 
         [Serializable]
+        private sealed class TrainerVisit
+        {
+            public int step;
+            public List<Evolution> evolutions = new List<Evolution>();
+        }
+
+        [Serializable]
+        private sealed class Evolution
+        {
+            public string from;
+            public string into;
+            public int tier;
+        }
+
+        [Serializable]
         private sealed class ArmyEntry
         {
             public string unit;
+            public int tier;
+
+            /// <summary>The base unit of its tree, e.g. "Warrior" for a Juggernaut.</summary>
+            public string line;
             public string equipment;
             public int bonusDamage;
             public int bonusMaxHp;

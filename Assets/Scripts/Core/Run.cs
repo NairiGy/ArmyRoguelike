@@ -7,7 +7,8 @@ namespace ArmyRoguelike.Core
     /// <summary>A unit in the player's army between battles: its type, its item and run-long bonuses.</summary>
     public sealed class ArmyMember
     {
-        public readonly UnitStats Stats;
+        /// <summary>The unit's current type. Changes when it evolves at a Trainer.</summary>
+        public UnitStats Stats { get; internal set; }
 
         public Equipment Equipment { get; internal set; }
 
@@ -23,6 +24,7 @@ namespace ArmyRoguelike.Core
             Equipment = equipment;
         }
 
+        /// <summary>A default army (warrior, archer, rogue) for tests and tools.</summary>
         public static List<ArmyMember> StartingArmy() => new List<ArmyMember>
         {
             new ArmyMember(UnitStats.Warrior),
@@ -44,6 +46,8 @@ namespace ArmyRoguelike.Core
             _obstacles = obstacles;
             _enemies = enemies;
         }
+
+        public IEnumerable<(UnitStats stats, GridPos pos)> Enemies => _enemies;
 
         public Battle CreateBattle(IEnumerable<ArmyMember> army) => new Battle(new Board(8, 8, _obstacles), army, _enemies);
 
@@ -95,13 +99,14 @@ namespace ArmyRoguelike.Core
         Battle,
         Shop,
         Event,
+        Trainer,
         Boss,
     }
 
     public enum EventKind
     {
-        /// <summary>Recruit a sapper for free (or take gold if the army is full).</summary>
-        WanderingSapper,
+        /// <summary>A random base unit offers to join for free (or pays gold if the army is full).</summary>
+        WanderingRecruit,
 
         /// <summary>A random free item for one unit.</summary>
         AbandonedCart,
@@ -139,6 +144,7 @@ namespace ArmyRoguelike.Core
                     case NodeKind.Battle: return $"Battle: {Encounter.Name}";
                     case NodeKind.Boss: return $"Boss: {Encounter.Name}";
                     case NodeKind.Shop: return "Shop";
+                    case NodeKind.Trainer: return "Trainer";
                     default: return "?";
                 }
             }
@@ -147,48 +153,58 @@ namespace ArmyRoguelike.Core
 
     public enum RunState
     {
+        /// <summary>Picking the starting army.</summary>
+        Draft,
+
         /// <summary>Choosing the next node on the map.</summary>
         Map,
         Battle,
         Shop,
         Event,
+        Trainer,
         Won,
         Lost,
     }
 
     /// <summary>
-    /// A run across a small branching map: at each step the player picks one of two nodes (battle,
-    /// shop or ? event); the last step is always the ogre. Gold depends on how many units survived.
-    /// Every battle starts with the whole army at full HP; equipment and run-long bonuses carry over.
+    /// A run: draft a starting army, then cross a branching map where each step offers two nodes
+    /// (battle, shop, ? event or trainer); the last step is always the ogre. Gold depends on how many
+    /// units survived. Every battle starts with the whole army at full HP; evolutions, items and
+    /// run-long bonuses carry over.
     /// </summary>
     public sealed class Run
     {
         public const int BaseGold = 10;
         public const int GoldPerSurvivor = 5;
         public const int ShopSize = 3;
+        public const int DraftSize = 3;
         public const int MaxArmySize = 4;
         public const int RecruitPrice = 15;
-        public const int Steps = 6;
+        public const int Steps = 9;
         public const int GambleCost = 10;
         public const int GambleWin = 25;
         public const int AmbushBonusGold = 5;
         public const int FullArmyGold = 15;
         public const int ShrineHp = 2;
 
+        /// <summary>Map steps (0-based) that always offer a Trainer as one of the two choices.</summary>
+        public static readonly IReadOnlyList<int> TrainerSteps = new[] { 3, 6 };
+
         private readonly Random _rng;
         private readonly List<Equipment> _offers = new List<Equipment>();
         private readonly List<IReadOnlyList<MapNode>> _map = new List<IReadOnlyList<MapNode>>();
         private readonly List<int> _chosen = new List<int>();
+        private readonly HashSet<ArmyMember> _evolvedThisVisit = new HashSet<ArmyMember>();
 
         public readonly int Seed;
-        public readonly List<ArmyMember> Army;
+        public readonly List<ArmyMember> Army = new List<ArmyMember>();
 
         public int Gold { get; private set; }
 
         /// <summary>The map step the player is on or choosing from (0-based).</summary>
         public int StepIndex { get; private set; }
 
-        public RunState State { get; private set; } = RunState.Map;
+        public RunState State { get; private set; } = RunState.Draft;
         public Battle CurrentBattle { get; private set; }
         public Encounter CurrentEncounter { get; private set; }
         public MapNode CurrentNode { get; private set; }
@@ -201,6 +217,12 @@ namespace ArmyRoguelike.Core
         /// <summary>The item an Abandoned Cart event offers.</summary>
         public Equipment CartItem { get; private set; }
 
+        /// <summary>The base unit a Wandering Recruit event offers.</summary>
+        public UnitStats EventRecruit { get; private set; }
+
+        /// <summary>The base unit for sale in the current shop, or null.</summary>
+        public UnitStats ShopRecruit { get; private set; }
+
         /// <summary>Text describing how the last event turned out, for the screen.</summary>
         public string EventOutcome { get; private set; }
 
@@ -210,23 +232,39 @@ namespace ArmyRoguelike.Core
         /// <summary>Index of the node chosen at each past step.</summary>
         public IReadOnlyList<int> Chosen => _chosen;
 
-        public bool ShopHasRecruit { get; private set; }
+        public bool ShopHasRecruit => ShopRecruit != null;
 
         public Run(int seed)
         {
             Seed = seed;
             _rng = new Random(seed);
-            Army = ArmyMember.StartingArmy();
             GenerateMap();
         }
 
         public IReadOnlyList<MapNode> CurrentChoices => _map[StepIndex];
 
+        // ---------- Draft ----------
+
+        public IReadOnlyList<UnitStats> DraftPool => UnitStats.BaseUnits;
+
+        /// <summary>Starts the run with the chosen base units (3 different ones from the pool).</summary>
+        public bool Draft(IReadOnlyList<UnitStats> picks)
+        {
+            if (State != RunState.Draft || picks.Count != DraftSize || picks.Distinct().Count() != DraftSize ||
+                picks.Any(p => !DraftPool.Contains(p)))
+                return false;
+            Army.AddRange(picks.Select(p => new ArmyMember(p)));
+            State = RunState.Map;
+            return true;
+        }
+
+        public bool Draft(params UnitStats[] picks) => Draft((IReadOnlyList<UnitStats>)picks);
+
         // ---------- Map ----------
 
         /// <summary>
-        /// Step 1 offers two different battles. Steps 2 to 5 mix battles, shops and events, never two
-        /// identical nodes side by side. Step 6 is the ogre.
+        /// Step 1 offers two different battles. The middle steps mix battles, shops and events, never two
+        /// identical nodes side by side; the trainer steps always include a Trainer. The last step is the ogre.
         /// </summary>
         private void GenerateMap()
         {
@@ -236,6 +274,8 @@ namespace ArmyRoguelike.Core
             for (var step = 1; step < Steps - 1; step++)
             {
                 var pair = new List<MapNode>();
+                if (TrainerSteps.Contains(step))
+                    pair.Add(new MapNode(NodeKind.Trainer));
                 while (pair.Count < 2)
                 {
                     var node = RandomNode();
@@ -244,7 +284,7 @@ namespace ArmyRoguelike.Core
                     pair.Add(node);
                 }
 
-                _map.Add(pair);
+                _map.Add(pair.OrderBy(_ => _rng.Next()).ToList());
             }
 
             _map.Add(new[] { new MapNode(NodeKind.Boss, Encounter.Ogre) });
@@ -280,6 +320,10 @@ namespace ArmyRoguelike.Core
                 case NodeKind.Event:
                     State = RunState.Event;
                     RollEvent();
+                    break;
+                case NodeKind.Trainer:
+                    State = RunState.Trainer;
+                    _evolvedThisVisit.Clear();
                     break;
             }
         }
@@ -325,7 +369,7 @@ namespace ArmyRoguelike.Core
                 return 0;
             }
 
-            var earned = RewardFor(battle.Living(Team.Player).Count());
+            var earned = RewardFor(battle.LivingArmy.Count());
             Gold += earned;
             if (IsFinalStep)
             {
@@ -335,6 +379,32 @@ namespace ArmyRoguelike.Core
 
             NextStep();
             return earned;
+        }
+
+        // ---------- Trainer ----------
+
+        /// <summary>Each unit can go up one tier per Trainer visit, into one of its listed evolutions.</summary>
+        public bool CanEvolve(ArmyMember member, UnitStats into) =>
+            State == RunState.Trainer && Army.Contains(member) && !_evolvedThisVisit.Contains(member) &&
+            member.Stats.Evolutions.Contains(into);
+
+        public bool HasEvolvedThisVisit(ArmyMember member) => _evolvedThisVisit.Contains(member);
+
+        public bool Evolve(ArmyMember member, UnitStats into)
+        {
+            if (!CanEvolve(member, into))
+                return false;
+            member.Stats = into;
+            _evolvedThisVisit.Add(member);
+            return true;
+        }
+
+        public void LeaveTrainer()
+        {
+            if (State != RunState.Trainer)
+                return;
+            _evolvedThisVisit.Clear();
+            NextStep();
         }
 
         // ---------- Shop ----------
@@ -354,15 +424,15 @@ namespace ArmyRoguelike.Core
             return true;
         }
 
-        public bool CanBuyRecruit => State == RunState.Shop && ShopHasRecruit && Gold >= RecruitPrice && Army.Count < MaxArmySize;
+        public bool CanBuyRecruit => State == RunState.Shop && ShopRecruit != null && Gold >= RecruitPrice && Army.Count < MaxArmySize;
 
         public bool BuyRecruit()
         {
             if (!CanBuyRecruit)
                 return false;
             Gold -= RecruitPrice;
-            Army.Add(new ArmyMember(UnitStats.Sapper));
-            ShopHasRecruit = false;
+            Army.Add(new ArmyMember(ShopRecruit));
+            ShopRecruit = null;
             return true;
         }
 
@@ -371,7 +441,7 @@ namespace ArmyRoguelike.Core
             if (State != RunState.Shop)
                 return;
             _offers.Clear();
-            ShopHasRecruit = false;
+            ShopRecruit = null;
             NextStep();
         }
 
@@ -386,7 +456,7 @@ namespace ArmyRoguelike.Core
                 pool.RemoveAt(i);
             }
 
-            ShopHasRecruit = Army.Count < MaxArmySize;
+            ShopRecruit = Army.Count < MaxArmySize ? UnitStats.BaseUnits[_rng.Next(UnitStats.BaseUnits.Count)] : null;
         }
 
         // ---------- Events ----------
@@ -396,23 +466,24 @@ namespace ArmyRoguelike.Core
             var kinds = (EventKind[])Enum.GetValues(typeof(EventKind));
             CurrentEvent = kinds[_rng.Next(kinds.Length)];
             CartItem = CurrentEvent == EventKind.AbandonedCart ? Equipment.Catalog[_rng.Next(Equipment.Catalog.Count)] : null;
+            EventRecruit = CurrentEvent == EventKind.WanderingRecruit ? UnitStats.BaseUnits[_rng.Next(UnitStats.BaseUnits.Count)] : null;
             EventOutcome = null;
         }
 
-        /// <summary>Wandering Sapper: joins the army, or pays gold if the army is full.</summary>
+        /// <summary>Wandering Recruit: joins the army, or pays gold if the army is full.</summary>
         public void AcceptRecruit()
         {
-            if (State != RunState.Event || CurrentEvent != EventKind.WanderingSapper)
+            if (State != RunState.Event || CurrentEvent != EventKind.WanderingRecruit)
                 return;
             if (Army.Count < MaxArmySize)
             {
-                Army.Add(new ArmyMember(UnitStats.Sapper));
-                EventOutcome = "The sapper joins your army.";
+                Army.Add(new ArmyMember(EventRecruit));
+                EventOutcome = $"The {EventRecruit.Name} joins your army.";
             }
             else
             {
                 Gold += FullArmyGold;
-                EventOutcome = $"Your army is full. The sapper pays you {FullArmyGold} gold for directions.";
+                EventOutcome = $"Your army is full. The {EventRecruit.Name} pays you {FullArmyGold} gold for directions.";
             }
 
             NextStep();

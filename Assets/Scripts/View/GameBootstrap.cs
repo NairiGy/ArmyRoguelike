@@ -80,7 +80,44 @@ namespace ArmyRoguelike.View
                 case RunState.Event:
                     _runLog.OpenEvent();
                     break;
+                case RunState.Trainer:
+                    _runLog.OpenTrainer();
+                    break;
             }
+        }
+
+        // ---------- Draft ----------
+
+        private readonly System.Collections.Generic.List<UnitStats> _draftPicks = new System.Collections.Generic.List<UnitStats>();
+
+        private void ToggleDraftPick(UnitStats unit)
+        {
+            if (_draftPicks.Contains(unit))
+                _draftPicks.Remove(unit);
+            else if (_draftPicks.Count < Run.DraftSize)
+                _draftPicks.Add(unit);
+        }
+
+        private void ConfirmDraft()
+        {
+            if (_run.Draft(_draftPicks.ToList()))
+                _runLog.RecordDraft(_draftPicks);
+        }
+
+        // ---------- Trainer ----------
+
+        private void Evolve(ArmyMember member, UnitStats into)
+        {
+            var from = member.Stats;
+            if (_run.Evolve(member, into))
+                _runLog.RecordEvolution(from, into);
+        }
+
+        private void LeaveTrainer()
+        {
+            _runLog.CloseTrainer();
+            _run.LeaveTrainer();
+            _lastNote = null;
         }
 
         private void StartBattle()
@@ -150,6 +187,12 @@ namespace ArmyRoguelike.View
 
             switch (_run.State)
             {
+                case RunState.Draft:
+                    DrawDraft(width);
+                    break;
+                case RunState.Trainer:
+                    DrawTrainer(width);
+                    break;
                 case RunState.Map:
                     DrawMap(width);
                     break;
@@ -179,8 +222,85 @@ namespace ArmyRoguelike.View
                     bonus += $", +{m.BonusDamage} damage";
                 if (m.BonusMaxHp > 0)
                     bonus += $", +{m.BonusMaxHp} max HP";
-                GUILayout.Label($"  {m.Stats.Name}: {item}{bonus}");
+                GUILayout.Label($"  {m.Stats.Name} (tier {m.Stats.Tier}): {item}{bonus}");
             }
+        }
+
+        /// <summary>One line describing a unit type: stats, abilities and actions.</summary>
+        private static string Describe(UnitStats s)
+        {
+            var text = $"{s.Name}  HP {s.MaxHp}  DMG {s.Damage}  RNG {s.Range}  AP {s.MaxAp}\n{s.Role}";
+            foreach (var a in s.Abilities)
+                text += $"\n  - {Abilities.Name(a)}: {Abilities.Describe(a)}";
+            foreach (var a in s.Actions)
+                text += $"\n  - {Abilities.Name(a)} ({Battle.ActionCost(a)} AP): {Abilities.Describe(a)}";
+            return text;
+        }
+
+        private Vector2 _scroll;
+
+        private void DrawDraft(float screenWidth)
+        {
+            const float w = 600;
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 20, w, 680), GUI.skin.box);
+            GUILayout.Label("Choose your army", Title);
+            GUILayout.Label($"Pick {Run.DraftSize} different units. Each can evolve twice at Trainers along the road.");
+            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(540));
+            foreach (var unit in _run.DraftPool)
+            {
+                var picked = _draftPicks.Contains(unit);
+                var style = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.UpperLeft, wordWrap = true };
+                if (GUILayout.Button((picked ? "[X] " : "[  ] ") + Describe(unit), style))
+                    Do(() => ToggleDraftPick(unit));
+            }
+
+            GUILayout.EndScrollView();
+            GUI.enabled = _draftPicks.Count == Run.DraftSize;
+            if (GUILayout.Button($"Start the run ({_draftPicks.Count}/{Run.DraftSize})", GUILayout.Height(34)))
+                Do(ConfirmDraft);
+            GUI.enabled = true;
+            GUILayout.EndArea();
+        }
+
+        private void DrawTrainer(float screenWidth)
+        {
+            const float w = 700;
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 20, w, 680), GUI.skin.box);
+            GUILayout.Label("Trainer", Title);
+            GUILayout.Label("Every unit may go up one tier this visit, into one of its two paths. It's free.");
+            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(560));
+            var style = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.UpperLeft, wordWrap = true };
+            foreach (var member in _run.Army)
+            {
+                GUILayout.Label($"{member.Stats.Name} (tier {member.Stats.Tier})", new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold });
+                if (_run.HasEvolvedThisVisit(member))
+                {
+                    GUILayout.Label("  Evolved this visit.");
+                    continue;
+                }
+
+                if (member.Stats.Evolutions.Count == 0)
+                {
+                    GUILayout.Label("  Fully evolved.");
+                    continue;
+                }
+
+                GUILayout.BeginHorizontal();
+                foreach (var into in member.Stats.Evolutions)
+                {
+                    var m = member;
+                    var target = into;
+                    if (GUILayout.Button(Describe(into), style, GUILayout.Width((w - 40) / member.Stats.Evolutions.Count)))
+                        Do(() => Evolve(m, target));
+                }
+
+                GUILayout.EndHorizontal();
+            }
+
+            GUILayout.EndScrollView();
+            if (GUILayout.Button("Leave the trainer", GUILayout.Height(32)))
+                Do(LeaveTrainer);
+            GUILayout.EndArea();
         }
 
         private void DrawMap(float screenWidth)
@@ -221,7 +341,7 @@ namespace ArmyRoguelike.View
             }
 
             GUILayout.Space(8);
-            GUILayout.Label("? = something unexpected. Shops sell items and sometimes a recruit.");
+            GUILayout.Label("? = something unexpected. Shops sell items and a recruit. Trainers evolve every unit one tier, for free.");
             DrawArmy();
             GUILayout.EndArea();
         }
@@ -251,12 +371,12 @@ namespace ArmyRoguelike.View
             {
                 GUILayout.Space(6);
                 GUI.enabled = _run.CanBuyRecruit;
-                var sapper = UnitStats.Sapper;
-                if (GUILayout.Button($"Recruit a Sapper ({sapper.MaxHp} HP, places mines)   {Run.RecruitPrice} gold"))
+                var recruit = _run.ShopRecruit;
+                if (GUILayout.Button($"Recruit a {recruit.Name} ({recruit.Role})   {Run.RecruitPrice} gold"))
                     Do(() =>
                     {
                         if (_run.BuyRecruit())
-                            _runLog.RecordRecruit("Sapper", Run.RecruitPrice);
+                            _runLog.RecordRecruit(recruit.Name, Run.RecruitPrice);
                     });
 
                 GUI.enabled = true;
@@ -306,12 +426,12 @@ namespace ArmyRoguelike.View
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 60, w, 560), GUI.skin.box);
             switch (_run.CurrentEvent)
             {
-                case EventKind.WanderingSapper:
-                    GUILayout.Label("A Wandering Sapper", Title);
-                    GUILayout.Label("A dusty statue with a pickaxe and a satchel of charges offers to join you.");
+                case EventKind.WanderingRecruit:
+                    GUILayout.Label($"A Wandering {_run.EventRecruit.Name}", Title);
+                    GUILayout.Label("A dusty statue offers to join you.\n" + Describe(_run.EventRecruit));
                     if (_run.Army.Count < Run.MaxArmySize)
                     {
-                        if (GUILayout.Button("Welcome aboard (the Sapper joins)", GUILayout.Height(32)))
+                        if (GUILayout.Button($"Welcome aboard (the {_run.EventRecruit.Name} joins)", GUILayout.Height(32)))
                             Do(() =>
                             {
                                 _run.AcceptRecruit();

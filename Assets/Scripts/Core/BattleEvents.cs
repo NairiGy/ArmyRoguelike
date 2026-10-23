@@ -170,6 +170,144 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Lucky Charm kept the unit alive at 1 HP.</summary>
         LastStand,
+
+        /// <summary>Dodge turned a hit into 0 damage.</summary>
+        Dodge,
+
+        /// <summary>A ward shield soaked up <see cref="EffectEvent.Amount"/> damage.</summary>
+        Absorb,
+
+        /// <summary>Momentum: a kill gave back <see cref="EffectEvent.Amount"/> AP.</summary>
+        Refund,
+
+        /// <summary>Guard: <see cref="EffectEvent.Unit"/> stepped in to take a hit for an ally.</summary>
+        Guard,
+    }
+
+    /// <summary>A unit was shoved one or more tiles. If it slammed into something it took <see cref="Collision"/> damage.</summary>
+    public sealed class PushEvent : BattleEvent
+    {
+        public readonly Unit Unit;
+        public readonly Unit Pusher;
+        public readonly GridPos From;
+        public readonly GridPos To;
+        public readonly Hit? Collision;
+
+        public PushEvent(Unit unit, Unit pusher, GridPos from, GridPos to, Hit? collision)
+        {
+            Unit = unit;
+            Pusher = pusher;
+            From = from;
+            To = to;
+            Collision = collision;
+        }
+
+        public override Unit Actor => Pusher;
+    }
+
+    /// <summary>One action that hit several units at once: sweep, pierce, volley, fireball.</summary>
+    public sealed class AreaAttackEvent : BattleEvent
+    {
+        public readonly Unit Attacker;
+
+        /// <summary>"sweep", "pierce", "volley", "long reach", "double strike" or "fireball".</summary>
+        public readonly string Kind;
+
+        /// <summary>Where the attack was aimed (the fireball's centre, or the main target's tile).</summary>
+        public readonly GridPos Center;
+
+        public readonly IReadOnlyList<GridPos> Area;
+        public readonly IReadOnlyList<Hit> Hits;
+
+        public AreaAttackEvent(Unit attacker, string kind, GridPos center, IReadOnlyList<GridPos> area, IReadOnlyList<Hit> hits)
+        {
+            Attacker = attacker;
+            Kind = kind;
+            Center = center;
+            Area = area;
+            Hits = hits;
+        }
+
+        public override Unit Actor => Attacker;
+    }
+
+    public enum StatusKind
+    {
+        Snare,
+        Slow,
+        Poison,
+        Ward,
+        Heal,
+    }
+
+    /// <summary>A status or support effect was put on a unit by an action or a hit.</summary>
+    public sealed class StatusEvent : BattleEvent
+    {
+        public readonly Unit Source;
+        public readonly Unit Target;
+        public readonly StatusKind Kind;
+        public readonly int Amount;
+
+        public StatusEvent(Unit source, Unit target, StatusKind kind, int amount)
+        {
+            Source = source;
+            Target = target;
+            Kind = kind;
+            Amount = amount;
+        }
+
+        public override Unit Actor => Source;
+    }
+
+    /// <summary>Damage over time at the start of a turn: "poison" or "burn".</summary>
+    public sealed class TickEvent : BattleEvent
+    {
+        public readonly string Cause;
+        public readonly Hit Hit;
+
+        public TickEvent(string cause, Hit hit)
+        {
+            Cause = cause;
+            Hit = hit;
+        }
+
+        public override Unit Actor => null;
+    }
+
+    /// <summary>A temporary or built obstacle appeared or vanished, or a tile started/stopped burning.</summary>
+    public sealed class TileEvent : BattleEvent
+    {
+        /// <summary>"ice", "barricade" or "burn".</summary>
+        public readonly string Kind;
+
+        public readonly GridPos Tile;
+        public readonly bool Added;
+        public readonly Unit Source;
+
+        public TileEvent(string kind, GridPos tile, bool added, Unit source)
+        {
+            Kind = kind;
+            Tile = tile;
+            Added = added;
+            Source = source;
+        }
+
+        public override Unit Actor => Source;
+    }
+
+    /// <summary>A unit was created during the battle (a turret).</summary>
+    public sealed class SummonEvent : BattleEvent
+    {
+        public readonly Unit Summoner;
+        public readonly Unit Summoned;
+
+        public SummonEvent(Unit summoner, Unit summoned)
+        {
+            Summoner = summoner;
+            Summoned = summoned;
+        }
+
+        public override Unit Actor => Summoner;
     }
 
     /// <summary>An ability went off. <see cref="Unit"/> is the unit it affected.</summary>

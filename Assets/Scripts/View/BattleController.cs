@@ -74,7 +74,8 @@ namespace ArmyRoguelike.View
         private bool _busy;
         private bool _enemyTurnPlaying;
         private bool _confirmEndTurn;
-        private bool _mineMode;
+        /// <summary>The special action being aimed (mine, fireball, snare...), or null for move/attack.</summary>
+        private ActionKind? _action;
         private string _hint = "";
         private PlaytestLogger _logger;
         private string _markerNote;
@@ -111,8 +112,15 @@ namespace ArmyRoguelike.View
                 _markerNoteUntil = Time.unscaledTime + 2f;
             }
 
-            if (keyboard != null && keyboard.mKey.wasPressedThisFrame && !_busy && CanUseMines(_selected))
-                _mineMode = !_mineMode;
+            // Number keys pick the selected unit's special actions in the order the HUD lists them.
+            if (keyboard != null && !_busy && _selected != null && Battle.CanAct(_selected))
+            {
+                var keys = new[] { keyboard.digit1Key, keyboard.digit2Key, keyboard.digit3Key, keyboard.digit4Key };
+                var actions = _selected.Stats.Actions;
+                for (var i = 0; i < actions.Count && i < keys.Length; i++)
+                    if (keys[i].wasPressedThisFrame)
+                        ToggleAction(actions[i]);
+            }
 
             _hovered = HoveredTile();
             _hoveredUnit = _hovered.HasValue ? Battle.UnitAt(_hovered.Value) : null;
@@ -161,8 +169,8 @@ namespace ArmyRoguelike.View
             if (_selected == null || !_hovered.HasValue || !Battle.CanAct(_selected))
                 return 0;
             var tile = _hovered.Value;
-            if (_mineMode)
-                return Battle.CanPlaceMine(_selected, tile) ? Battle.MineCost : 0;
+            if (_action.HasValue)
+                return Battle.CanUseAction(_selected, _action.Value, tile) ? Battle.ActionCost(_action.Value) : 0;
             if (_hoveredUnit != null && _hoveredUnit.Team == Team.Enemy)
             {
                 if (Battle.CanAttack(_selected, _hoveredUnit))
@@ -216,7 +224,43 @@ namespace ArmyRoguelike.View
 
         // ---------- Player turn ----------
 
-        private bool CanUseMines(Unit unit) => unit != null && unit.Has(Ability.Mines) && Battle.CanAct(unit);
+        /// <summary>
+        /// Picks a special action to aim, or drops it if it was already picked. Detonate needs no target,
+        /// so it fires straight away.
+        /// </summary>
+        private void ToggleAction(ActionKind action)
+        {
+            if (_selected == null || !Battle.CanAct(_selected))
+                return;
+            if (_action == action)
+            {
+                _action = null;
+                return;
+            }
+
+            if (action == ActionKind.Detonate)
+            {
+                _action = null;
+                UseAction(action, _selected.Pos);
+                return;
+            }
+
+            _action = action;
+            _hint = $"{Abilities.Name(action)}: click a yellow tile. Press its key again to cancel.";
+        }
+
+        private void UseAction(ActionKind action, GridPos tile)
+        {
+            var events = Battle.PlayerUseAction(_selected, action, tile);
+            if (events == null)
+            {
+                _hint = $"Can't use {Abilities.Name(action)} there.";
+                return;
+            }
+
+            Record(events);
+            StartCoroutine(PlayPlayerAction(events));
+        }
 
         private void UpdatePlayerTurn(bool clicked)
         {
@@ -231,20 +275,14 @@ namespace ArmyRoguelike.View
         {
             var target = _hoveredUnit;
 
-            if (_mineMode && _selected != null)
+            if (_action.HasValue && _selected != null)
             {
-                if (Battle.CanPlaceMine(_selected, tile))
-                {
-                    var placed = Battle.PlayerPlaceMine(_selected, tile);
-                    Record(placed);
-                    StartCoroutine(PlayPlayerAction(placed));
-                }
+                var action = _action.Value;
+                _action = null;
+                if (Battle.CanUseAction(_selected, action, tile))
+                    UseAction(action, tile);
                 else
-                {
-                    _hint = "Mine placement cancelled.";
-                }
-
-                _mineMode = false;
+                    _hint = $"{Abilities.Name(action)} cancelled.";
                 return;
             }
 
@@ -331,7 +369,7 @@ namespace ArmyRoguelike.View
             if (_selected != null)
                 _board.ViewOf(_selected)?.SetSelected(false);
             _selected = unit;
-            _mineMode = false;
+            _action = null;
             if (_selected != null)
                 _board.ViewOf(_selected)?.SetSelected(true);
             _hint = unit == null ? "Click a statue to select it." : "Click a blue tile to move or a red one to attack.";
@@ -348,6 +386,8 @@ namespace ArmyRoguelike.View
                 FinishSelectedUnit();
             RefreshUnitStates();
             _board.SyncHazards();
+            _board.SyncTiles();
+            _board.SyncUnits();
             if (Battle.IsOver)
                 _logger.Save();
             _busy = false;
@@ -405,6 +445,8 @@ namespace ArmyRoguelike.View
             _hint = "Your turn. Click a statue to select it.";
             RefreshUnitStates();
             _board.SyncHazards();
+            _board.SyncTiles();
+            _board.SyncUnits();
             if (Battle.IsOver)
                 _logger.Save();
             _enemyTurnPlaying = false;
@@ -450,11 +492,20 @@ namespace ArmyRoguelike.View
 
             _board.SetHighlight(_selected.Pos, SelectedColor);
 
-            if (_mineMode)
+            if (_action.HasValue)
             {
-                foreach (var p in _selected.Pos.Neighbours())
-                    if (Battle.CanPlaceMine(_selected, p))
-                        _board.SetHighlight(p, _hovered == p ? HoverColor : MineSpotColor);
+                var action = _action.Value;
+                foreach (var p in Battle.ActionTargets(_selected, action))
+                    _board.SetHighlight(p, MineSpotColor);
+                if (_hovered.HasValue && Battle.CanUseAction(_selected, action, _hovered.Value))
+                {
+                    // Area actions preview the 3x3 they will hit.
+                    if (action == ActionKind.Fireball || action == ActionKind.ThrowBomb)
+                        foreach (var p in Battle.BlastArea(_hovered.Value))
+                            _board.SetHighlight(p, BombZoneColor);
+                    _board.SetHighlight(_hovered.Value, HoverColor);
+                }
+
                 return;
             }
 
@@ -659,6 +710,121 @@ namespace ArmyRoguelike.View
                 case EffectEvent effect:
                     yield return PlayEffect(effect);
                     break;
+                case AreaAttackEvent area:
+                {
+                    var attacker = _board.ViewOf(area.Attacker);
+                    var aim = IsoMath.GridToWorld(area.Center);
+                    if (area.Kind == "fireball")
+                    {
+                        yield return attacker.Lunge(aim, null);
+                        attacker.SetGridPosition(area.Attacker.Pos);
+                        yield return FlyProjectile(PlaceholderArt.Pixel, 6f, attacker.TopWorld, aim);
+                        StartCoroutine(_board.Flash(area.Area, BlastTime));
+                        StartCoroutine(Shake(0.05f, BlastTime));
+                        foreach (var hit in area.Hits)
+                            ShowHit(hit);
+                    }
+                    else
+                    {
+                        if (area.Kind == "volley" || area.Kind == "pierce")
+                            StartCoroutine(_board.Flash(area.Area, BlastTime * 0.6f));
+                        yield return attacker.Lunge(aim, () =>
+                        {
+                            foreach (var hit in area.Hits)
+                                ShowHit(hit);
+                        });
+                        attacker.SetGridPosition(area.Attacker.Pos);
+                    }
+
+                    yield return PlayHitReactions(area.Hits);
+                    break;
+                }
+                case PushEvent push:
+                {
+                    var view = _board.ViewOf(push.Unit);
+                    GridPos? dir = null;
+                    if (push.To == push.From && push.Pusher != null)
+                    {
+                        // Blocked: bump away from the pusher.
+                        var p = push.Pusher.Pos;
+                        dir = new GridPos(Math.Sign(push.From.X - p.X), Math.Sign(push.From.Y - p.Y));
+                    }
+
+                    yield return view.Slide(push.From, push.To, dir);
+                    if (push.Collision.HasValue)
+                    {
+                        ShowHit(push.Collision.Value);
+                        yield return push.Collision.Value.Killed ? view.Die() : view.Hit();
+                    }
+
+                    break;
+                }
+                case StatusEvent status:
+                {
+                    var source = _board.ViewOf(status.Source);
+                    var target = _board.ViewOf(status.Target);
+                    // Statuses applied by a hit show without an extra lunge; actions lunge at their target.
+                    if (status.Kind == StatusKind.Snare || status.Kind == StatusKind.Ward || status.Kind == StatusKind.Heal)
+                    {
+                        yield return source.Lunge(target.transform.position, null);
+                        source.SetGridPosition(status.Source.Pos);
+                    }
+
+                    var at = target.TopWorld + Vector3.up * 0.25f;
+                    switch (status.Kind)
+                    {
+                        case StatusKind.Snare:
+                            DamagePopup.Spawn(at, "Snared", DamagePopup.AbilityColor, 44);
+                            break;
+                        case StatusKind.Slow:
+                            DamagePopup.Spawn(at, $"Slowed -{status.Amount} AP", DamagePopup.AbilityColor, 40);
+                            break;
+                        case StatusKind.Poison:
+                            DamagePopup.Spawn(at, "Poisoned", DamagePopup.AbilityColor, 44);
+                            break;
+                        case StatusKind.Ward:
+                            DamagePopup.Spawn(at, $"Shield {status.Amount}", DamagePopup.HealColor, 44);
+                            break;
+                        case StatusKind.Heal:
+                            DamagePopup.Spawn(at, $"+{status.Amount}", DamagePopup.HealColor);
+                            target.RefreshHp(status.Target.Hp);
+                            break;
+                    }
+
+                    target.RefreshStatus();
+                    yield return new WaitForSeconds(0.2f);
+                    break;
+                }
+                case TickEvent tick:
+                {
+                    var view = _board.ViewOf(tick.Hit.Target);
+                    DamagePopup.Spawn(view.TopWorld + Vector3.up * 0.1f, $"-{tick.Hit.Damage} {tick.Cause}",
+                        tick.Cause == "burn" ? DamagePopup.DamageColor : DamagePopup.AbilityColor, 44);
+                    view.RefreshHp(tick.Hit.HpAfter);
+                    view.RefreshStatus();
+                    yield return tick.Hit.Killed ? view.Die() : view.Hit();
+                    break;
+                }
+                case TileEvent tile:
+                {
+                    if (tile.Added && tile.Source != null && tile.Kind != "burn")
+                    {
+                        var source = _board.ViewOf(tile.Source);
+                        yield return source.Lunge(IsoMath.GridToWorld(tile.Tile), null);
+                        source.SetGridPosition(tile.Source.Pos);
+                    }
+
+                    _board.SyncTiles();
+                    break;
+                }
+                case SummonEvent summon:
+                {
+                    var builder = _board.ViewOf(summon.Summoner);
+                    yield return builder.Lunge(IsoMath.GridToWorld(summon.Summoned.Pos), null);
+                    builder.SetGridPosition(summon.Summoner.Pos);
+                    _board.SyncUnits();
+                    break;
+                }
             }
         }
 
@@ -685,6 +851,19 @@ namespace ArmyRoguelike.View
                 case EffectKind.LastStand:
                     DamagePopup.Spawn(at, "Last Stand!", DamagePopup.AbilityColor, 48);
                     view.RefreshHp(effect.HpAfter);
+                    break;
+                case EffectKind.Dodge:
+                    DamagePopup.Spawn(at, "Dodge!", DamagePopup.AbilityColor, 48);
+                    break;
+                case EffectKind.Absorb:
+                    DamagePopup.Spawn(at, $"Shield -{effect.Amount}", DamagePopup.HealColor, 44);
+                    view.RefreshStatus();
+                    break;
+                case EffectKind.Refund:
+                    DamagePopup.Spawn(at, $"+{effect.Amount} AP", DamagePopup.AbilityColor, 48);
+                    break;
+                case EffectKind.Guard:
+                    DamagePopup.Spawn(at, "Guard!", DamagePopup.AbilityColor, 48);
                     break;
             }
 
@@ -757,6 +936,7 @@ namespace ArmyRoguelike.View
                 if (view == null)
                     continue;
                 view.SetDimmed(u.Team == Team.Player && Battle.Phase == Phase.PlayerTurn && u.IsDone);
+                view.RefreshStatus();
                 switch (Battle.GetPackState(u))
                 {
                     case PackState.NearLeader:
@@ -852,7 +1032,7 @@ namespace ArmyRoguelike.View
         private void DrawTurnHud()
         {
             var playerTurn = Battle.Phase == Phase.PlayerTurn && !_busy;
-            _hudRect = new Rect(10, 10, 320, 400);
+            _hudRect = new Rect(10, 10, 340, 470);
             GUILayout.BeginArea(_hudRect, GUI.skin.box);
             GUILayout.Label(Header);
             GUILayout.Label($"Turn {Battle.TurnNumber}: {(playerTurn ? "your turn" : "enemy turn")}");
@@ -895,14 +1075,24 @@ namespace ArmyRoguelike.View
             }
             else if (playerTurn)
             {
-                GUILayout.Label(_mineMode ? "Click a yellow tile to place the mine (M or any other tile cancels)." : _hint);
-                if (CanUseMines(_selected))
+                GUILayout.Label(_hint);
+                if (_selected != null && Battle.CanAct(_selected))
                 {
-                    var left = Battle.MaxMinesPerUnit - Battle.MinesOf(_selected);
-                    GUI.enabled = _selected.Pos.Neighbours().Any(p => Battle.CanPlaceMine(_selected, p));
-                    if (GUILayout.Button(_mineMode ? "Cancel mine (M)" : $"Place mine: {Battle.MineCost} AP, {left} left (M)"))
-                        _mineMode = !_mineMode;
-                    GUI.enabled = true;
+                    var actions = _selected.Stats.Actions;
+                    for (var i = 0; i < actions.Count; i++)
+                    {
+                        var action = actions[i];
+                        GUI.enabled = Battle.ActionTargets(_selected, action).Count > 0;
+                        var label = _action == action
+                            ? $"Cancel {Abilities.Name(action)} ({i + 1})"
+                            : $"{Abilities.Name(action)}: {Battle.ActionCost(action)} AP ({i + 1})";
+                        if (GUILayout.Button(new GUIContent(label, Abilities.Describe(action))))
+                            ToggleAction(action);
+                        GUI.enabled = true;
+                    }
+
+                    if (!string.IsNullOrEmpty(GUI.tooltip))
+                        GUILayout.Label(GUI.tooltip);
                 }
 
                 GUI.enabled = _selected != null;
@@ -986,7 +1176,7 @@ namespace ArmyRoguelike.View
                     return $"Your mine: an enemy stepping here sets it off ({Battle.MineDamage} damage to everyone around, your units too).";
                 if (Battle.RemainsAt(p) is Unit bones)
                     return $"Bone pile ({bones.Stats.Name}). The Necromancer can raise it.\nStand on it to stop that.";
-                if (_selected != null && !_mineMode && Battle.GetReachable(_selected).TryGetValue(p, out var cost))
+                if (_selected != null && !_action.HasValue && Battle.GetReachable(_selected).TryGetValue(p, out var cost))
                     return $"Move here: {cost} AP";
             }
 
@@ -1022,13 +1212,24 @@ namespace ArmyRoguelike.View
         private static string AbilityLines(Unit u)
         {
             var lines = new List<string>();
-            if (u.Stats.Ability != Ability.None)
-                lines.Add($"{Abilities.Name(u.Stats.Ability)}: {Abilities.Describe(u.Stats.Ability)}");
+            foreach (var ability in u.Stats.Abilities)
+                lines.Add($"{Abilities.Name(ability)}: {Abilities.Describe(ability)}");
             var itemAbility = u.Equipment?.Ability ?? Ability.None;
             if (itemAbility != Ability.None)
                 lines.Add($"{Abilities.Name(itemAbility)} ({u.Equipment.Name}): {Abilities.Describe(itemAbility)}");
             if (u.Member != null && u.Member.BonusDamage + u.GainedDamage > 0)
                 lines.Add($"Bloodthirst so far: +{u.Member.BonusDamage + u.GainedDamage} damage");
+            var status = new List<string>();
+            if (u.Shield > 0)
+                status.Add($"shield {u.Shield}");
+            if (u.IsSnared)
+                status.Add("snared (can't move)");
+            if (u.IsSlowed)
+                status.Add("slowed");
+            if (u.PoisonTurns > 0)
+                status.Add($"poisoned ({u.PoisonTurns} more)");
+            if (status.Count > 0)
+                lines.Add("Status: " + string.Join(", ", status));
             return string.Join("\n", lines);
         }
     }
