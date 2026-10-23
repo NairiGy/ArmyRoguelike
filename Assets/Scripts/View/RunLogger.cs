@@ -43,6 +43,7 @@ namespace ArmyRoguelike.View
                 step = _run.State == RunState.Map ? _run.StepIndex : _run.StepIndex + 1,
                 encounter = battle == null ? "" : _run.CurrentEncounter?.Name,
                 ambush = ambush,
+                skipped = battle != null && battle.WasSkipped,
                 result = battle != null && battle.Phase == Phase.Victory ? "victory" : "defeat",
                 turns = battle?.TurnNumber ?? 0,
                 survivors = battle?.Living(Team.Player).Count() ?? 0,
@@ -166,6 +167,7 @@ namespace ArmyRoguelike.View
             public int step;
             public string encounter;
             public bool ambush;
+            public bool skipped;
             public string result;
             public int turns;
             public int survivors;

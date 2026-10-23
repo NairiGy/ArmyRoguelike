@@ -42,6 +42,13 @@ namespace ArmyRoguelike.View
         /// <summary>The file name once saved, otherwise null.</summary>
         public string SavedFile { get; private set; }
 
+        /// <summary>For a battle skipped before it started: record the placements so it still gets a log.</summary>
+        public void BattleStartedIfNeeded()
+        {
+            if (_battleStartTime < 0f)
+                BattleStarted();
+        }
+
         public void BattleStarted()
         {
             _battleStartTime = Time.realtimeSinceStartup;
@@ -235,6 +242,7 @@ namespace ArmyRoguelike.View
             _log.durationSeconds = _battleStartTime < 0f ? 0f : Time.realtimeSinceStartup - _battleStartTime;
             _log.result = _battle.Phase == Phase.Victory ? "victory" : _battle.Phase == Phase.Defeat ? "defeat" : "abandoned";
             _log.turns = _battle.TurnNumber;
+            _log.skipped = _battle.WasSkipped;
             _log.survivors = _battle.Living(Team.Player).Count();
             _log.goldEarned = _battle.Phase == Phase.Victory ? _goldIfWon(_log.survivors) : 0;
             _log.units = Summarise();
@@ -343,6 +351,9 @@ namespace ArmyRoguelike.View
             public int turns;
             public int survivors;
             public bool ambush;
+
+            /// <summary>Ended with the debug "Win battle" button instead of being played.</summary>
+            public bool skipped;
             public int goldAtStart;
             public int goldEarned;
             public List<PlacementEntry> placements = new List<PlacementEntry>();

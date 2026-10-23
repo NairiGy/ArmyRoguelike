@@ -227,6 +227,17 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void DebugWin_WinsWithWholeArmy_EvenDuringPlacement()
+        {
+            var b = Battle.CreatePrototype();
+            b.DebugWin();
+            Assert.AreEqual(Phase.Victory, b.Phase);
+            Assert.IsTrue(b.WasSkipped);
+            Assert.AreEqual(3, b.Living(Team.Player).Count());
+            Assert.AreEqual(0, b.Living(Team.Enemy).Count());
+        }
+
+        [Test]
         public void CanStillAct_CountsMinePlacement()
         {
             var b = Started(new[] { M(UnitStats.Sapper) }, new[] { P(0, 0) }, new[] { (UnitStats.Wolf, P(7, 7)) },

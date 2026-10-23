@@ -367,6 +367,32 @@ namespace ArmyRoguelike.View
             _busy = false;
         }
 
+        /// <summary>The debug Win battle button only exists in the editor and development builds.</summary>
+        private static bool DebugToolsEnabled => Application.isEditor || Debug.isDebugBuild;
+
+        /// <summary>Playtest shortcut: skip this battle as a win with the whole army alive.</summary>
+        private void DebugWin()
+        {
+            Select(null);
+            _confirmEndTurn = false;
+            Battle.DebugWin();
+            _board.SyncUnits();
+            foreach (var enemy in Battle.Units.Where(u => u.Team == Team.Enemy))
+                _board.ViewOf(enemy)?.gameObject.SetActive(false);
+            _board.ClearHighlights();
+            _logger.BattleStartedIfNeeded();
+            _logger.Save();
+        }
+
+        private void DrawDebugButton()
+        {
+            if (!DebugToolsEnabled)
+                return;
+            GUILayout.Space(6);
+            if (GUILayout.Button("Win battle (debug skip)"))
+                DebugWin();
+        }
+
         /// <summary>Saves a battle that was left before it ended (leaving Play mode).</summary>
         private void OnDestroy() => _logger?.Save();
 
@@ -755,7 +781,7 @@ namespace ArmyRoguelike.View
         {
             var army = Battle.Units.Where(u => u.Team == Team.Player).ToList();
             var hoverText = HoverText();
-            _hudRect = new Rect(10, 10, 300, 100 + army.Count * 30 + 40 + (hoverText != null ? 90 : 0));
+            _hudRect = new Rect(10, 10, 300, 100 + army.Count * 30 + 40 + (DebugToolsEnabled ? 34 : 0) + (hoverText != null ? 90 : 0));
             GUILayout.BeginArea(_hudRect, GUI.skin.box);
             GUILayout.Label(Header);
             GUILayout.Label("Place your army in the blue tiles.");
@@ -773,6 +799,7 @@ namespace ArmyRoguelike.View
             if (GUILayout.Button("Start battle"))
                 StartBattle();
             GUI.enabled = true;
+            DrawDebugButton();
             if (hoverText != null)
                 GUILayout.Label(hoverText);
             GUILayout.EndArea();
@@ -836,6 +863,7 @@ namespace ArmyRoguelike.View
                 GUILayout.Space(14);
                 if (GUILayout.Button("End turn"))
                     RequestEndTurn();
+                DrawDebugButton();
             }
 
             GUILayout.EndArea();

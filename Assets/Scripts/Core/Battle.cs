@@ -701,6 +701,33 @@ namespace ArmyRoguelike.Core
             events.AddRange(after);
         }
 
+        /// <summary>True if the battle was ended with <see cref="DebugWin"/> instead of being played.</summary>
+        public bool WasSkipped { get; private set; }
+
+        /// <summary>
+        /// Playtest shortcut: every enemy dies and the battle is won, with the whole army surviving.
+        /// Units not placed yet are put on free tiles in the player zone so they count as survivors.
+        /// </summary>
+        public void DebugWin()
+        {
+            if (IsOver)
+                return;
+            foreach (var u in _units.Where(u => u.Team == Team.Player && !u.IsPlaced))
+            {
+                var free = Board.AllTiles().FirstOrDefault(p => IsPlayerZone(p) && IsFree(p));
+                u.Pos = free;
+                u.IsPlaced = true;
+            }
+
+            foreach (var e in _units.Where(u => u.Team == Team.Enemy))
+                e.Hp = 0;
+            if (TurnNumber == 0)
+                TurnNumber = 1;
+            WasSkipped = true;
+            ActiveUnit = null;
+            Phase = Phase.Victory;
+        }
+
         private void BeginTurn(Team team)
         {
             foreach (var u in Living(team))
