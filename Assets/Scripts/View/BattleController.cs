@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using ArmyRoguelike.Core;
 using UnityEngine;
@@ -5,17 +7,26 @@ using UnityEngine.InputSystem;
 
 namespace ArmyRoguelike.View
 {
-    /// <summary>Turns mouse input into battle actions and draws the HUD.</summary>
+    /// <summary>Turns mouse input into battle actions, plays the animations and draws the HUD.</summary>
     public sealed class BattleController : MonoBehaviour
     {
         private static readonly Color ZoneColor = new Color(0.45f, 0.75f, 1f, 0.35f);
         private static readonly Color HoverColor = new Color(1f, 1f, 1f, 0.55f);
+        private static readonly Color MoveColor = new Color(0.45f, 0.75f, 1f, 0.4f);
+        private static readonly Color AttackColor = new Color(1f, 0.3f, 0.25f, 0.55f);
+        private static readonly Color SelectedColor = new Color(1f, 0.9f, 0.4f, 0.5f);
 
         private const float ReferenceHeight = 720f;
+        private const float PauseBetweenEnemies = 0.25f;
 
         private BoardView _board;
         private Camera _camera;
         private Unit _toPlace;
+        private Unit _selected;
+        private Unit _hoveredUnit;
+        private GridPos? _hovered;
+        private bool _busy;
+        private string _hint = "";
         private Rect _hudRect;
 
         private Battle Battle => _board.Battle;
@@ -32,27 +43,35 @@ namespace ArmyRoguelike.View
             if (_board == null || _camera == null || Mouse.current == null)
                 return;
 
-            var hovered = HoveredTile();
-            var clicked = Mouse.current.leftButton.wasPressedThisFrame && hovered.HasValue;
+            _hovered = HoveredTile();
+            _hoveredUnit = _hovered.HasValue ? Battle.UnitAt(_hovered.Value) : null;
+            var clicked = !_busy && Mouse.current.leftButton.wasPressedThisFrame && _hovered.HasValue;
 
-            if (Battle.Phase == Phase.Placement)
-                UpdatePlacement(hovered, clicked);
-            else
-                _board.ClearHighlights();
+            switch (Battle.Phase)
+            {
+                case Phase.Placement:
+                    UpdatePlacement(clicked);
+                    break;
+                case Phase.PlayerTurn when !_busy:
+                    UpdatePlayerTurn(clicked);
+                    break;
+                default:
+                    _board.ClearHighlights();
+                    break;
+            }
         }
 
         // ---------- Placement ----------
 
-        private void UpdatePlacement(GridPos? hovered, bool clicked)
+        private void UpdatePlacement(bool clicked)
         {
             if (clicked)
             {
-                var tile = hovered.Value;
-                var occupant = Battle.UnitAt(tile);
-                if (occupant != null && occupant.Team == Team.Player && occupant != _toPlace)
+                var tile = _hovered.Value;
+                if (_hoveredUnit != null && _hoveredUnit.Team == Team.Player && _hoveredUnit != _toPlace)
                 {
                     // Clicking a placed statue picks it up again.
-                    _toPlace = occupant;
+                    _toPlace = _hoveredUnit;
                 }
                 else if (_toPlace != null && Battle.Place(_toPlace, tile))
                 {
@@ -65,11 +84,192 @@ namespace ArmyRoguelike.View
             foreach (var p in Battle.Board.AllTiles())
                 if (Battle.IsPlayerZone(p) && !Battle.Board.IsObstacle(p))
                     _board.SetHighlight(p, ZoneColor);
-            if (hovered.HasValue && _toPlace != null && Battle.CanPlace(_toPlace, hovered.Value))
-                _board.SetHighlight(hovered.Value, HoverColor);
+            if (_hovered.HasValue && _toPlace != null && Battle.CanPlace(_toPlace, _hovered.Value))
+                _board.SetHighlight(_hovered.Value, HoverColor);
         }
 
         private Unit NextUnplaced() => Battle.Units.FirstOrDefault(u => u.Team == Team.Player && !u.IsPlaced);
+
+        private void StartBattle()
+        {
+            if (!Battle.StartBattle())
+                return;
+            _toPlace = null;
+            _hint = "Click a statue to select it.";
+            RefreshUnitStates();
+        }
+
+        // ---------- Player turn ----------
+
+        private void UpdatePlayerTurn(bool clicked)
+        {
+            if (clicked)
+                HandlePlayerClick(_hovered.Value);
+            if (_busy || Battle.Phase != Phase.PlayerTurn)
+                return;
+            DrawPlayerHighlights();
+        }
+
+        private void HandlePlayerClick(GridPos tile)
+        {
+            var target = _hoveredUnit;
+
+            if (target != null && target.Team == Team.Player)
+            {
+                if (Battle.CanAct(target))
+                    Select(target);
+                else if (target.IsDone)
+                    _hint = $"{target.Stats.Name} has finished its turn.";
+                else if (Battle.ActiveUnit != null)
+                    _hint = $"Finish the {Battle.ActiveUnit.Stats.Name}'s turn first (Done).";
+                return;
+            }
+
+            if (_selected == null)
+                return;
+
+            if (target != null && Battle.CanAttack(_selected, target))
+            {
+                var attack = Battle.PlayerAttack(_selected, target);
+                if (attack != null)
+                    StartCoroutine(PlayPlayerAction(attack));
+                return;
+            }
+
+            if (Battle.GetReachable(_selected).ContainsKey(tile))
+            {
+                var move = Battle.PlayerMove(_selected, tile);
+                if (move != null)
+                    StartCoroutine(PlayPlayerAction(move));
+                return;
+            }
+
+            if (target != null && target.Team == Team.Enemy)
+            {
+                _hint = _selected.Ap < Battle.AttackCost
+                    ? $"Attacking needs {Battle.AttackCost} AP."
+                    : "Out of range.";
+                return;
+            }
+
+            // Clicking elsewhere drops the selection, unless that unit is mid-turn.
+            if (Battle.ActiveUnit != _selected)
+                Select(null);
+        }
+
+        private void Select(Unit unit)
+        {
+            if (_selected != null)
+                _board.ViewOf(_selected)?.SetSelected(false);
+            _selected = unit;
+            if (_selected != null)
+                _board.ViewOf(_selected)?.SetSelected(true);
+            _hint = unit == null ? "Click a statue to select it." : "Click a blue tile to move or a red one to attack.";
+        }
+
+        private IEnumerator PlayPlayerAction(BattleEvent ev)
+        {
+            _busy = true;
+            _board.ClearHighlights();
+            yield return PlayEvent(ev);
+
+            // A unit with no AP left has nothing more to do.
+            if (_selected != null && _selected.IsAlive && _selected.Ap == 0)
+                FinishSelectedUnit();
+            RefreshUnitStates();
+            _busy = false;
+        }
+
+        private void FinishSelectedUnit()
+        {
+            if (_selected == null)
+                return;
+            Battle.EndUnitTurn(_selected);
+            Select(null);
+            RefreshUnitStates();
+        }
+
+        private void EndTurn()
+        {
+            Select(null);
+            StartCoroutine(PlayEnemyTurn());
+        }
+
+        private IEnumerator PlayEnemyTurn()
+        {
+            _busy = true;
+            _board.ClearHighlights();
+            foreach (var u in Battle.Living(Team.Player))
+                _board.ViewOf(u)?.SetDimmed(true);
+
+            var events = Battle.EndPlayerTurn();
+            Unit lastActor = null;
+            foreach (var ev in events)
+            {
+                var actor = ev is MoveEvent m ? m.Unit : ((AttackEvent)ev).Attacker;
+                if (lastActor != null && actor != lastActor)
+                    yield return new WaitForSeconds(PauseBetweenEnemies);
+                lastActor = actor;
+                yield return PlayEvent(ev);
+            }
+
+            _hint = "Your turn. Click a statue to select it.";
+            RefreshUnitStates();
+            _busy = false;
+        }
+
+        private void DrawPlayerHighlights()
+        {
+            _board.ClearHighlights();
+            if (_selected == null)
+                return;
+
+            _board.SetHighlight(_selected.Pos, SelectedColor);
+            var reachable = Battle.GetReachable(_selected);
+            foreach (var p in reachable.Keys)
+                _board.SetHighlight(p, MoveColor);
+            foreach (var enemy in Battle.Living(Team.Enemy))
+                if (Battle.CanAttack(_selected, enemy))
+                    _board.SetHighlight(enemy.Pos, AttackColor);
+
+            if (_hovered.HasValue && reachable.ContainsKey(_hovered.Value))
+                _board.SetHighlight(_hovered.Value, HoverColor);
+        }
+
+        // ---------- Animation ----------
+
+        private IEnumerator PlayEvent(BattleEvent ev)
+        {
+            switch (ev)
+            {
+                case MoveEvent move:
+                {
+                    var view = _board.ViewOf(move.Unit);
+                    yield return view.MoveAlong(move.Path);
+                    break;
+                }
+                case AttackEvent attack:
+                {
+                    var attacker = _board.ViewOf(attack.Attacker);
+                    var target = _board.ViewOf(attack.Target);
+                    yield return attacker.Lunge(target.transform.position, () =>
+                    {
+                        DamagePopup.Spawn(target.TopWorld + Vector3.up * 0.1f, attack.Damage);
+                        target.RefreshHp(attack.TargetHpAfter);
+                    });
+                    attacker.SetGridPosition(attack.Attacker.Pos);
+                    yield return attack.Killed ? target.Die() : target.Hit();
+                    break;
+                }
+            }
+        }
+
+        /// <summary>Dims statues that have finished their turn.</summary>
+        private void RefreshUnitStates()
+        {
+            foreach (var u in Battle.Units.Where(u => u.IsPlaced && u.IsAlive))
+                _board.ViewOf(u)?.SetDimmed(u.Team == Team.Player && Battle.Phase == Phase.PlayerTurn && u.IsDone);
+        }
 
         // ---------- Input helpers ----------
 
@@ -99,15 +299,18 @@ namespace ArmyRoguelike.View
             var scale = Screen.height / ReferenceHeight;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
 
-            _hudRect = new Rect(10, 10, 230, 0);
             switch (Battle.Phase)
             {
                 case Phase.Placement:
                     DrawPlacementHud();
                     break;
+                case Phase.PlayerTurn:
+                case Phase.EnemyTurn:
+                    DrawTurnHud();
+                    break;
                 default:
-                    _hudRect.height = 40;
-                    GUI.Box(_hudRect, $"Turn {Battle.TurnNumber}: {Battle.Phase}");
+                    _hudRect = new Rect(10, 10, 230, 40);
+                    GUI.Box(_hudRect, Battle.Phase == Phase.Victory ? "Victory!" : "Defeat");
                     break;
             }
         }
@@ -115,7 +318,7 @@ namespace ArmyRoguelike.View
         private void DrawPlacementHud()
         {
             var army = Battle.Units.Where(u => u.Team == Team.Player).ToList();
-            _hudRect.height = 70 + army.Count * 30 + 40;
+            _hudRect = new Rect(10, 10, 230, 70 + army.Count * 30 + 40);
             GUILayout.BeginArea(_hudRect, GUI.skin.box);
             GUILayout.Label("Place your army in the blue tiles.");
             GUILayout.Label("Click a placed statue to move it.");
@@ -129,13 +332,52 @@ namespace ArmyRoguelike.View
             GUILayout.Space(6);
             GUI.enabled = Battle.AllPlaced;
             if (GUILayout.Button("Start battle"))
-            {
-                Battle.StartBattle();
-                _toPlace = null;
-            }
-
+                StartBattle();
             GUI.enabled = true;
             GUILayout.EndArea();
         }
+
+        private void DrawTurnHud()
+        {
+            var playerTurn = Battle.Phase == Phase.PlayerTurn && !_busy;
+            _hudRect = new Rect(10, 10, 250, 250);
+            GUILayout.BeginArea(_hudRect, GUI.skin.box);
+            GUILayout.Label($"Turn {Battle.TurnNumber}: {(playerTurn ? "your turn" : "enemy turn")}");
+
+            if (_selected != null)
+            {
+                GUILayout.Label(UnitLine(_selected));
+                GUILayout.Label($"AP {_selected.Ap}   (move {Battle.MoveCost} per tile, attack {Battle.AttackCost})");
+            }
+
+            var hoverText = HoverText();
+            if (hoverText != null)
+                GUILayout.Label(hoverText);
+
+            if (playerTurn)
+            {
+                GUILayout.Label(_hint);
+                GUI.enabled = _selected != null;
+                if (GUILayout.Button(_selected != null ? $"Done with {_selected.Stats.Name}" : "Done"))
+                    FinishSelectedUnit();
+                GUI.enabled = true;
+                if (GUILayout.Button("End turn"))
+                    EndTurn();
+            }
+
+            GUILayout.EndArea();
+        }
+
+        private string HoverText()
+        {
+            if (_hoveredUnit != null && _hoveredUnit != _selected)
+                return "Hover: " + UnitLine(_hoveredUnit);
+            if (_selected != null && _hovered.HasValue && Battle.GetReachable(_selected).TryGetValue(_hovered.Value, out var cost))
+                return $"Move here: {cost} AP";
+            return null;
+        }
+
+        private string UnitLine(Unit u) =>
+            $"{u.Stats.Name}  HP {u.Hp}/{u.Stats.MaxHp}  DMG {Battle.EffectiveDamage(u)}  RNG {u.Stats.Range}";
     }
 }
