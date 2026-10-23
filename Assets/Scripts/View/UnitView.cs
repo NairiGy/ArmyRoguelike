@@ -29,6 +29,7 @@ namespace ArmyRoguelike.View
         private SpriteRenderer _body;
         private TextMesh _label;
         private MeshRenderer _labelRenderer;
+        private SpriteRenderer _labelPlate;
         private SpriteRenderer _barBack;
         private SpriteRenderer _barFill;
         private int _shownHp;
@@ -74,9 +75,17 @@ namespace ArmyRoguelike.View
                 _label.characterSize = 0.05f;
                 _label.anchor = TextAnchor.MiddleCenter;
                 _label.alignment = TextAlignment.Center;
-                _label.color = new Color(0.08f, 0.08f, 0.1f);
+                // Light text on a dark plate, so it reads on every stone colour.
+                _label.color = new Color(0.97f, 0.95f, 0.9f);
                 _labelRenderer = _label.GetComponent<MeshRenderer>();
                 _labelRenderer.sharedMaterial = _label.font.material;
+
+                _labelPlate = new GameObject("LabelPlate").AddComponent<SpriteRenderer>();
+                _labelPlate.transform.SetParent(transform, false);
+                _labelPlate.transform.localPosition = _label.transform.localPosition;
+                _labelPlate.transform.localScale = new Vector3(unit.Stats.Label.Length > 1 ? 0.3f : 0.2f, 0.19f, 1f);
+                _labelPlate.sprite = PlaceholderArt.Pixel;
+                _labelPlate.color = new Color(0.1f, 0.1f, 0.12f, 0.85f);
             }
 
             _barBack = MakeBar("HpBack", new Color(0.1f, 0.1f, 0.1f, 0.85f), top + 0.08f);
@@ -112,10 +121,12 @@ namespace ArmyRoguelike.View
             var order = IsoMath.SortingOrder(world) + 5;
             // Bones lie flat on the tile, under anything standing there.
             _body.sortingOrder = _showingBones ? order - 4 : order;
+            if (_labelPlate != null)
+                _labelPlate.sortingOrder = order + 1;
             if (_labelRenderer != null)
-                _labelRenderer.sortingOrder = order + 1;
-            _barBack.sortingOrder = order + 2;
-            _barFill.sortingOrder = order + 3;
+                _labelRenderer.sortingOrder = order + 2;
+            _barBack.sortingOrder = order + 3;
+            _barFill.sortingOrder = order + 4;
         }
 
         public void RefreshHp(int hp)
@@ -136,7 +147,7 @@ namespace ArmyRoguelike.View
             switch (tier)
             {
                 case 2: return new Color(0.95f, 0.78f, 0.55f);
-                case 3: return new Color(1f, 0.86f, 0.3f);
+                case 3: return new Color(0.96f, 0.88f, 0.58f);
                 default: return PlaceholderArt.PlayerStone;
             }
         }
@@ -417,6 +428,8 @@ namespace ArmyRoguelike.View
             }
             if (_labelRenderer != null)
                 _labelRenderer.enabled = visible;
+            if (_labelPlate != null)
+                _labelPlate.enabled = visible;
         }
     }
 }
