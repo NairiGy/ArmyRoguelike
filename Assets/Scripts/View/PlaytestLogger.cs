@@ -49,8 +49,11 @@ namespace ArmyRoguelike.View
                 });
         }
 
-        /// <summary>Call right after the action happened in the rules, before it is animated.</summary>
-        public void Record(BattleEvent ev, int turn)
+        /// <summary>
+        /// Call right after the action happened in the rules, before it is animated.
+        /// <paramref name="autoApproach"/>: part of a click-an-enemy "walk up and attack".
+        /// </summary>
+        public void Record(BattleEvent ev, int turn, bool autoApproach = false)
         {
             switch (ev)
             {
@@ -59,12 +62,16 @@ namespace ArmyRoguelike.View
                     {
                         turn = turn, team = move.Unit.Team.ToString(), unit = Name(move.Unit), type = "move",
                         fromX = move.From.X, fromY = move.From.Y, toX = move.To.X, toY = move.To.Y, tiles = move.Path.Count,
-                        apAfter = ApAfter(move.Unit),
+                        apAfter = ApAfter(move.Unit), autoApproach = autoApproach,
                     });
                     break;
                 case AttackEvent attack:
-                    _log.actions.Add(HitEntry(turn, attack.Attacker, "attack", new Hit(attack.Target, attack.Damage, attack.TargetHpAfter)));
+                {
+                    var entry = HitEntry(turn, attack.Attacker, "attack", new Hit(attack.Target, attack.Damage, attack.TargetHpAfter));
+                    entry.autoApproach = autoApproach;
+                    _log.actions.Add(entry);
                     break;
+                }
                 case SmashEvent smash:
                     // One entry per unit hit, so per-unit damage adds up; "smashTargets" tells them apart from single attacks.
                     if (smash.Hits.Count == 0)
@@ -120,6 +127,19 @@ namespace ArmyRoguelike.View
                 turn = turn, team = Team.Player.ToString(), type = "end turn",
                 bonePiles = piles.Count,
                 bonePilesBlocked = piles.Count(p => _battle.UnitAt(p.Pos) is Unit u && u.Team == Team.Player),
+            });
+        }
+
+        /// <summary>
+        /// The "units can still act, end turn anyway?" prompt. <paramref name="outcome"/> is "asked",
+        /// "confirmed" or "cancelled"; a cancel means the prompt likely caught a misclick.
+        /// </summary>
+        public void RecordEndTurnPrompt(IEnumerable<Unit> canStillAct, int turn, string outcome)
+        {
+            _log.actions.Add(new ActionEntry
+            {
+                turn = turn, team = Team.Player.ToString(), type = "end turn prompt", note = outcome,
+                target = string.Join(", ", canStillAct.Select(Name)),
             });
         }
 
@@ -182,6 +202,8 @@ namespace ArmyRoguelike.View
                     case "move":
                         s.moves++;
                         s.tilesMoved += a.tiles;
+                        if (a.autoApproach)
+                            s.walkUpAttacks++;
                         break;
                     case "raise":
                         s.raises++;
@@ -278,6 +300,12 @@ namespace ArmyRoguelike.View
             public int bonePiles;
 
             public int bonePilesBlocked;
+
+            /// <summary>Move or attack done by clicking a distant enemy (walk up and attack).</summary>
+            public bool autoApproach;
+
+            /// <summary>End turn prompt: "asked", "confirmed" or "cancelled". "target" lists the units that could still act.</summary>
+            public string note;
         }
 
         [Serializable]
@@ -331,6 +359,9 @@ namespace ArmyRoguelike.View
             public int tilesMoved;
             public int raises;
             public int timesRaised;
+
+            /// <summary>Times the player clicked a distant enemy and the unit walked up to attack.</summary>
+            public int walkUpAttacks;
         }
     }
 

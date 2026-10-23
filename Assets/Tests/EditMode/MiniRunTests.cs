@@ -177,6 +177,54 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(3, b.Units.Count(u => u.Team == Team.Player));
         }
 
+        // ---------- Walk up and attack ----------
+
+        [Test]
+        public void AttackSpot_CheapestTileThatLeavesAttackAp()
+        {
+            var b = Started(Army(UnitStats.Rogue), new[] { new GridPos(3, 1) },
+                new[] { (UnitStats.Wolf, new GridPos(3, 5)) });
+            var rogue = Player(b);
+            var wolf = Enemy(b);
+            var spot = b.FindAttackSpot(rogue, wolf);
+            Assert.IsTrue(spot.HasValue);
+            Assert.AreEqual(new GridPos(3, 4), spot.Value.tile);
+            Assert.AreEqual(3, spot.Value.cost);
+        }
+
+        [Test]
+        public void AttackSpot_NullWhenAttackCantBeAfforded()
+        {
+            var b = Started(Army(UnitStats.Warrior), new[] { new GridPos(3, 1) },
+                new[] { (UnitStats.Wolf, new GridPos(3, 5)) });
+            // Warrior has 3 AP: 3 tiles to reach (3,4) would leave nothing for the attack.
+            Assert.IsNull(b.FindAttackSpot(Player(b), Enemy(b)));
+        }
+
+        [Test]
+        public void AttackSpot_OwnTileWhenAlreadyInRange()
+        {
+            var b = Started(Army(UnitStats.Archer), new[] { new GridPos(3, 1) },
+                new[] { (UnitStats.Wolf, new GridPos(3, 4)) });
+            var spot = b.FindAttackSpot(Player(b), Enemy(b));
+            Assert.AreEqual(new GridPos(3, 1), spot.Value.tile);
+            Assert.AreEqual(0, spot.Value.cost);
+        }
+
+        [Test]
+        public void CanStillAct_FalseWhenDoneOrOutOfAp()
+        {
+            var b = Started(Army(UnitStats.Warrior, UnitStats.Rogue), new[] { new GridPos(0, 0), new GridPos(5, 0) },
+                new[] { (UnitStats.Wolf, new GridPos(7, 7)) });
+            var warrior = Player(b, 0);
+            var rogue = Player(b, 1);
+            Assert.IsTrue(b.CanStillAct(warrior));
+            b.EndUnitTurn(warrior);
+            Assert.IsFalse(b.CanStillAct(warrior));
+            rogue.Ap = 0;
+            Assert.IsFalse(b.CanStillAct(rogue));
+        }
+
         // ---------- Necromancer ----------
 
         [Test]

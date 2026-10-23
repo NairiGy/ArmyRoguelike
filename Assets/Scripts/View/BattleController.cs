@@ -34,6 +34,9 @@ namespace ArmyRoguelike.View
         private static readonly Color HoverColor = new Color(1f, 1f, 1f, 0.55f);
         private static readonly Color MoveColor = new Color(0.45f, 0.75f, 1f, 0.4f);
         private static readonly Color AttackColor = new Color(1f, 0.3f, 0.25f, 0.55f);
+
+        // Enemies the selected unit can walk up to and still attack this turn.
+        private static readonly Color ReachAttackColor = new Color(1f, 0.55f, 0.4f, 0.3f);
         private static readonly Color SelectedColor = new Color(1f, 0.9f, 0.4f, 0.5f);
         private static readonly Color IntentTargetColor = new Color(1f, 0.55f, 0.2f, 0.6f);
         private static readonly Color AuraColor = new Color(0.9f, 0.35f, 0.3f, 0.25f);
@@ -59,6 +62,7 @@ namespace ArmyRoguelike.View
         private Unit _hoveredUnit;
         private GridPos? _hovered;
         private bool _busy;
+        private bool _confirmEndTurn;
         private string _hint = "";
         private PlaytestLogger _logger;
         private string _markerNote;
@@ -95,7 +99,7 @@ namespace ArmyRoguelike.View
 
             _hovered = HoveredTile();
             _hoveredUnit = _hovered.HasValue ? Battle.UnitAt(_hovered.Value) : null;
-            var clicked = !_busy && Mouse.current.leftButton.wasPressedThisFrame && _hovered.HasValue;
+            var clicked = !_busy && !_confirmEndTurn && Mouse.current.leftButton.wasPressedThisFrame && _hovered.HasValue;
 
             _intent.Hide();
             switch (Battle.Phase)
@@ -192,6 +196,20 @@ namespace ArmyRoguelike.View
                 return;
             }
 
+            // A distant enemy: walk to the cheapest tile to hit it from, then attack.
+            if (target != null && target.Team == Team.Enemy && Battle.FindAttackSpot(_selected, target) is var spot && spot.HasValue)
+            {
+                var move = Battle.PlayerMove(_selected, spot.Value.tile);
+                var attack = move != null ? Battle.PlayerAttack(_selected, target) : null;
+                if (move != null)
+                    _logger.Record(move, Battle.TurnNumber, autoApproach: true);
+                if (attack != null)
+                    _logger.Record(attack, Battle.TurnNumber, autoApproach: true);
+                if (move != null)
+                    StartCoroutine(attack != null ? PlayPlayerAction(move, attack) : PlayPlayerAction(move));
+                return;
+            }
+
             if (Battle.GetReachable(_selected).ContainsKey(tile))
             {
                 var move = Battle.PlayerMove(_selected, tile);
@@ -207,7 +225,7 @@ namespace ArmyRoguelike.View
             {
                 _hint = _selected.Ap < Battle.AttackCost
                     ? $"Attacking needs {Battle.AttackCost} AP."
-                    : "Out of range.";
+                    : "Too far to walk up and attack this turn.";
                 return;
             }
 
@@ -226,11 +244,12 @@ namespace ArmyRoguelike.View
             _hint = unit == null ? "Click a statue to select it." : "Click a blue tile to move or a red one to attack.";
         }
 
-        private IEnumerator PlayPlayerAction(BattleEvent ev)
+        private IEnumerator PlayPlayerAction(params BattleEvent[] events)
         {
             _busy = true;
             _board.ClearHighlights();
-            yield return PlayEvent(ev);
+            foreach (var ev in events)
+                yield return PlayEvent(ev);
 
             // A unit with no AP left has nothing more to do.
             if (_selected != null && _selected.IsAlive && _selected.Ap == 0)
@@ -251,8 +270,26 @@ namespace ArmyRoguelike.View
             RefreshUnitStates();
         }
 
+        /// <summary>Player units that could still move or attack: ending the turn now wastes their actions.</summary>
+        private List<Unit> UnitsThatCanStillAct() => Battle.Living(Team.Player).Where(Battle.CanStillAct).ToList();
+
+        /// <summary>The End turn button. Asks first if some units still have something to do.</summary>
+        private void RequestEndTurn()
+        {
+            var idle = UnitsThatCanStillAct();
+            if (idle.Count == 0)
+            {
+                EndTurn();
+                return;
+            }
+
+            _confirmEndTurn = true;
+            _logger.RecordEndTurnPrompt(idle, Battle.TurnNumber, "asked");
+        }
+
         private void EndTurn()
         {
+            _confirmEndTurn = false;
             Select(null);
             StartCoroutine(PlayEnemyTurn());
         }
@@ -300,12 +337,26 @@ namespace ArmyRoguelike.View
             foreach (var p in reachable.Keys)
                 _board.SetHighlight(p, MoveColor);
             foreach (var enemy in Battle.Living(Team.Enemy))
+            {
                 if (Battle.CanAttack(_selected, enemy))
+                {
                     foreach (var c in Battle.Cells(enemy))
                         _board.SetHighlight(c, AttackColor);
+                }
+                else if (Battle.FindAttackSpot(_selected, enemy).HasValue)
+                {
+                    foreach (var c in Battle.Cells(enemy))
+                        _board.SetHighlight(c, ReachAttackColor);
+                }
+            }
 
             if (_hovered.HasValue && reachable.ContainsKey(_hovered.Value))
                 _board.SetHighlight(_hovered.Value, HoverColor);
+
+            // Hovering a reachable enemy shows where the unit will stand to hit it.
+            if (_hoveredUnit != null && _hoveredUnit.Team == Team.Enemy && !Battle.CanAttack(_selected, _hoveredUnit) &&
+                Battle.FindAttackSpot(_selected, _hoveredUnit) is var spot && spot.HasValue)
+                _board.SetHighlight(spot.Value.tile, HoverColor);
         }
 
         /// <summary>While hovering an enemy: what it plans to do next, and for the pack leader its aura.</summary>
@@ -583,15 +634,36 @@ namespace ArmyRoguelike.View
             if (hoverText != null)
                 GUILayout.Label(hoverText);
 
-            if (playerTurn)
+            if (playerTurn && _confirmEndTurn)
+            {
+                var names = string.Join(", ", UnitsThatCanStillAct().Select(u => u.Stats.Name));
+                GUILayout.Label($"{names} can still act. End the turn anyway?");
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button("Yes, end turn"))
+                {
+                    _logger.RecordEndTurnPrompt(UnitsThatCanStillAct(), Battle.TurnNumber, "confirmed");
+                    EndTurn();
+                }
+
+                if (GUILayout.Button("No, keep playing"))
+                {
+                    _logger.RecordEndTurnPrompt(UnitsThatCanStillAct(), Battle.TurnNumber, "cancelled");
+                    _confirmEndTurn = false;
+                }
+
+                GUILayout.EndHorizontal();
+            }
+            else if (playerTurn)
             {
                 GUILayout.Label(_hint);
                 GUI.enabled = _selected != null;
                 if (GUILayout.Button(_selected != null ? $"Done with {_selected.Stats.Name}" : "Done"))
                     FinishSelectedUnit();
                 GUI.enabled = true;
+                // Extra space so End turn is harder to hit by accident.
+                GUILayout.Space(14);
                 if (GUILayout.Button("End turn"))
-                    EndTurn();
+                    RequestEndTurn();
             }
 
             GUILayout.EndArea();
@@ -644,6 +716,9 @@ namespace ArmyRoguelike.View
                     text += $"\nSmash hits everyone next to it. Throws boulders up to {_hoveredUnit.Stats.ThrowRange} tiles; they stay as rocks";
                 if (_hoveredUnit.Team == Team.Enemy)
                     text += "\n" + IntentText(EnemyAI.PredictIntent(Battle, _hoveredUnit));
+                if (_selected != null && _hoveredUnit.Team == Team.Enemy && !Battle.CanAttack(_selected, _hoveredUnit) &&
+                    Battle.FindAttackSpot(_selected, _hoveredUnit) is var spot && spot.HasValue)
+                    text += $"\nClick: walk {spot.Value.cost} AP + attack {Battle.AttackCost} AP";
                 return text;
             }
 

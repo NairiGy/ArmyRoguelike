@@ -223,6 +223,39 @@ namespace ArmyRoguelike.Core
             !IsOver && attacker.IsAlive && target != null && target.IsAlive && attacker.Team != target.Team &&
             attacker.Ap >= AttackCost && CanHitFrom(attacker, attacker.Pos, target);
 
+        /// <summary>
+        /// The cheapest tile from which the unit can walk up and still afford to attack the target,
+        /// with its move cost. Ties go to the tile next to the fewest other enemies. Null if out of reach
+        /// this turn. Returns the unit's own tile at cost 0 if it can already attack.
+        /// </summary>
+        public (GridPos tile, int cost)? FindAttackSpot(Unit unit, Unit target)
+        {
+            if (IsOver || target == null || !target.IsAlive || target.Team == unit.Team)
+                return null;
+            if (CanAttack(unit, target))
+                return (unit.Pos, 0);
+
+            var best = GetReachable(unit)
+                .Where(kv => unit.Ap - kv.Value >= AttackCost && CanHitFrom(unit, kv.Key, target))
+                .OrderBy(kv => kv.Value)
+                .ThenBy(kv => _units.Count(u => u.IsPlaced && u.IsAlive && u.Team != unit.Team && Distance(kv.Key, unit.Size, u) == 1))
+                .ThenBy(kv => kv.Key.Y)
+                .ThenBy(kv => kv.Key.X)
+                .Select(kv => ((GridPos, int)?)(kv.Key, kv.Value))
+                .FirstOrDefault();
+            return best;
+        }
+
+        /// <summary>Whether a player unit that hasn't finished could still move or attack this turn.</summary>
+        public bool CanStillAct(Unit unit)
+        {
+            if (!unit.IsAlive || unit.IsDone || unit.Team != Team.Player)
+                return false;
+            if (unit.Ap >= AttackCost && Living(Team.Enemy).Any(e => CanAttack(unit, e)))
+                return true;
+            return unit.Ap >= MoveCost && GetReachable(unit).Count > 0;
+        }
+
         // ---------- Enemy abilities ----------
 
         /// <summary>Living enemies of the unit standing next to it: the targets of an area smash.</summary>
