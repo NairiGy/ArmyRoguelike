@@ -19,22 +19,25 @@ public static class PreviewCapture
         var args = System.Environment.GetCommandLineArgs();
         var output = "battle-preview.png";
         var placeArmy = false;
+        var encounter = 0;
         for (var i = 0; i < args.Length; i++)
         {
             if (args[i] == "-previewOut" && i + 1 < args.Length)
                 output = args[i + 1];
             if (args[i] == "-previewPlaceArmy")
                 placeArmy = true;
+            if (args[i] == "-previewEncounter" && i + 1 < args.Length)
+                int.TryParse(args[i + 1], out encounter);
         }
 
         EditorSceneManager.OpenScene("Assets/Scenes/SampleScene.unity");
-        Capture(output, placeArmy);
+        Capture(output, placeArmy, encounter);
         EditorApplication.Exit(0);
     }
 
-    private static void Capture(string output, bool placeArmy)
+    private static void Capture(string output, bool placeArmy, int encounter = 0)
     {
-        var battle = Battle.CreatePrototype();
+        var battle = Encounter.MiniRun[Mathf.Clamp(encounter, 0, Encounter.MiniRun.Count - 1)].CreateBattle(ArmyMember.StartingArmy());
         if (placeArmy)
         {
             var x = 2;

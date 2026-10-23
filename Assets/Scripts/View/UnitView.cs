@@ -22,6 +22,7 @@ namespace ArmyRoguelike.View
         private Color _tint = Color.white;
         private bool _selected;
         private bool _dimmed;
+        private bool _showingBones;
         private float _bobTime;
         private Vector3 _bodyRest;
 
@@ -53,6 +54,8 @@ namespace ArmyRoguelike.View
             _body.color = _baseColor;
             if (unit.IsPackLeader)
                 _body.transform.localScale = Vector3.one * 1.25f;
+            else if (unit.Size > 1)
+                _body.transform.localScale = Vector3.one * 1.3f;
             _bodyRest = _body.transform.localPosition;
 
             var top = _body.sprite.bounds.max.y * _body.transform.localScale.y;
@@ -87,17 +90,25 @@ namespace ArmyRoguelike.View
             sr.sprite = PlaceholderArt.Pixel;
             sr.color = color;
             sr.transform.localPosition = new Vector3(0f, y, 0f);
-            sr.transform.localScale = new Vector3(BarWidth, BarHeight, 1f);
+            sr.transform.localScale = new Vector3(BarWidth * BarScale, BarHeight, 1f);
             return sr;
         }
 
-        public void SetGridPosition(GridPos p) => SetWorldPosition(IsoMath.GridToWorld(p));
+        public void SetGridPosition(GridPos p) => SetWorldPosition(WorldOf(p));
+
+        /// <summary>Where the statue stands for an anchor tile: the tile centre, or the centre of a 2x2 footprint.</summary>
+        public Vector3 WorldOf(GridPos anchor)
+        {
+            var offset = (Unit.Size - 1) * 0.5f;
+            return IsoMath.GridToWorld(anchor.X + offset, anchor.Y + offset);
+        }
 
         public void SetWorldPosition(Vector3 world)
         {
             transform.position = world;
             var order = IsoMath.SortingOrder(world) + 5;
-            _body.sortingOrder = order;
+            // Bones lie flat on the tile, under anything standing there.
+            _body.sortingOrder = _showingBones ? order - 4 : order;
             if (_labelRenderer != null)
                 _labelRenderer.sortingOrder = order + 1;
             _barBack.sortingOrder = order + 2;
@@ -107,11 +118,14 @@ namespace ArmyRoguelike.View
         public void RefreshHp(int hp)
         {
             _shownHp = Mathf.Max(0, hp);
-            var frac = (float)_shownHp / Unit.Stats.MaxHp;
+            var frac = (float)_shownHp / Unit.MaxHp;
             var t = _barFill.transform;
-            t.localScale = new Vector3(BarWidth * frac, BarHeight, 1f);
-            t.localPosition = new Vector3(-BarWidth * (1f - frac) * 0.5f, _barBack.transform.localPosition.y, 0f);
+            t.localScale = new Vector3(BarWidth * frac * BarScale, BarHeight, 1f);
+            t.localPosition = new Vector3(-BarWidth * BarScale * (1f - frac) * 0.5f, _barBack.transform.localPosition.y, 0f);
         }
+
+        /// <summary>Big units get a wider HP bar.</summary>
+        private float BarScale => Unit.Size;
 
         /// <summary>Top of the statue in world space, for pop-ups.</summary>
         public Vector3 TopWorld => _barBack.transform.position;
@@ -162,7 +176,7 @@ namespace ArmyRoguelike.View
             var from = transform.position;
             foreach (var tile in path)
             {
-                var to = IsoMath.GridToWorld(tile);
+                var to = WorldOf(tile);
                 for (var t = 0f; t < 1f; t += Time.deltaTime / StepTime)
                 {
                     var p = Vector3.Lerp(from, to, t);
@@ -213,13 +227,11 @@ namespace ArmyRoguelike.View
             ApplyColor();
         }
 
+        /// <summary>Sinks and fades out. Units that leave remains turn into a bone pile instead of vanishing.</summary>
         public IEnumerator Die()
         {
             SetSelected(false);
-            _barBack.enabled = false;
-            _barFill.enabled = false;
-            if (_labelRenderer != null)
-                _labelRenderer.enabled = false;
+            SetBarsVisible(false);
             var start = _body.color;
             for (var t = 0f; t < 1f; t += Time.deltaTime / 0.45f)
             {
@@ -228,7 +240,44 @@ namespace ArmyRoguelike.View
                 yield return null;
             }
 
-            gameObject.SetActive(false);
+            if (!Unit.Stats.LeavesRemains)
+            {
+                gameObject.SetActive(false);
+                yield break;
+            }
+
+            _body.sprite = PlaceholderArt.Bones;
+            _body.transform.localPosition = _bodyRest;
+            _showingBones = true;
+            ApplyColor();
+            SetGridPosition(Unit.Pos);
+        }
+
+        /// <summary>A bone pile pulls itself back up into a statue.</summary>
+        public IEnumerator Raise()
+        {
+            _body.sprite = PlaceholderArt.Statue(Unit.Stats.Kind);
+            _showingBones = false;
+            SetGridPosition(Unit.Pos);
+            _body.color = new Color(0.75f, 0.55f, 1f);
+            for (var t = 0f; t < 1f; t += Time.deltaTime / 0.5f)
+            {
+                _body.transform.localPosition = _bodyRest + Vector3.down * ((1f - t) * 0.25f);
+                yield return null;
+            }
+
+            _body.transform.localPosition = _bodyRest;
+            ApplyColor();
+            RefreshHp(Unit.Hp);
+            SetBarsVisible(true);
+        }
+
+        private void SetBarsVisible(bool visible)
+        {
+            _barBack.enabled = visible;
+            _barFill.enabled = visible;
+            if (_labelRenderer != null)
+                _labelRenderer.enabled = visible;
         }
     }
 }

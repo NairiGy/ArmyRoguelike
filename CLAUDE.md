@@ -4,7 +4,7 @@ A single-player roguelike army-builder. You lead a small squad of living statues
 
 ## Status
 
-- **Prototype 1:** one battle only. Warrior, archer and rogue against a wolf pack. There is no run layer yet.
+- **Prototype 2 (mini-run):** three fixed battles (wolf pack → necromancer → ogre) with an equipment shop between them. `Core/Run.cs` holds the run, gold, shop and encounter layouts.
 - Full design and placeholder numbers: [docs/design-note.md](docs/design-note.md). Keep it updated when design decisions change.
 
 ## Tech

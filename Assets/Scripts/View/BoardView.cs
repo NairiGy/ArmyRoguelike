@@ -47,16 +47,21 @@ namespace ArmyRoguelike.View
                 highlight.enabled = false;
                 _highlights[p] = highlight;
 
-                if (!battle.Board.IsObstacle(p))
-                    continue;
-                var rock = new GameObject($"Rock {p}").AddComponent<SpriteRenderer>();
-                rock.transform.SetParent(transform, false);
-                rock.transform.position = IsoMath.GridToWorld(p);
-                rock.sprite = PlaceholderArt.Rock;
-                rock.sortingOrder = IsoMath.SortingOrder(p) + 5;
+                if (battle.Board.IsObstacle(p))
+                    AddRock(p);
             }
 
             SyncUnits();
+        }
+
+        /// <summary>Draws a rock on a tile. Also used when a boulder lands during the battle.</summary>
+        public void AddRock(GridPos p)
+        {
+            var rock = new GameObject($"Rock {p}").AddComponent<SpriteRenderer>();
+            rock.transform.SetParent(transform, false);
+            rock.transform.position = IsoMath.GridToWorld(p);
+            rock.sprite = PlaceholderArt.Rock;
+            rock.sortingOrder = IsoMath.SortingOrder(p) + 5;
         }
 
         /// <summary>Creates views for newly placed units and moves every view to its unit's tile.</summary>

@@ -26,6 +26,13 @@ namespace ArmyRoguelike.Core
 
         public bool IsObstacle(GridPos p) => InBounds(p) && _obstacles[p.X, p.Y];
 
+        /// <summary>Adds a rock during a battle, e.g. where an ogre's boulder lands.</summary>
+        public void AddObstacle(GridPos p)
+        {
+            if (InBounds(p))
+                _obstacles[p.X, p.Y] = true;
+        }
+
         public IEnumerable<GridPos> AllTiles()
         {
             for (var y = 0; y < Height; y++)

@@ -1,7 +1,7 @@
 # Grid Tactics Roguelike — Design Note
 
 Working title: "Army Roguelike" (placeholder; a better name will come later). Separate project from Nardatro. Unity project: `Desktop/Unity projects/ArmyRoguelike`. This file (`docs/design-note.md`) is the canonical copy.
-Status: Prototype 1 (one battle) is playable: placement, player turn, wolf AI, intent on hover, pack leader visuals, restart. Numbers marked *(placeholder)* are only examples.
+Status: Prototype 2 (mini-run) built, not yet playtested: 3 fixed battles (wolves → necromancer → ogre) with a shop after each of the first two. Prototype 1 (one battle) was playtested: no bugs, felt OK, won 2/2, "not super easy". Numbers marked *(placeholder)* are only examples.
 
 ## Pitch
 
@@ -13,7 +13,8 @@ A roguelike army-builder: lead a small squad across a Slay the Spire–style map
 - Generic animation shared by every unit, with no per-unit animation:
   - selected: bobs up and down
   - attack: quick lunge forward and back
-  - (others, like hit and death, to be decided)
+  - hit: red flash and shake; death: sink and fade (skeletons turn into a bone pile)
+  - boulder: arcs through the air; raise: the bone pile pulls itself back up
 - Enemies are living statues too.
 - The board should **not** look like a chessboard.
 - Engine: Unity 6.
@@ -29,7 +30,7 @@ A roguelike army-builder: lead a small squad across a Slay the Spire–style map
 - New run = new army.
 - A map of nodes, as in Slay the Spire. You go from objective to objective.
 - The army carries over between fights.
-- Node types beyond battles (shop, camp, events…): not decided.
+- Node types beyond battles (camp, events…): not decided. Shops exist (see Prototype 2).
 
 ## Army
 
@@ -98,6 +99,45 @@ Goal: find out whether a single battle is fun. There's no map, rewards, shop or 
 - Intent: hovering over an enemy shows which unit it plans to attack.
 - AI targeting: each enemy goes for the **nearest** player unit.
 
+## Prototype 2: mini-run
+
+Goal: find out whether building up the army across fights feels good.
+
+**Run** — a fixed chain, no map yet: Wolf Pack → shop → Necromancer → shop → Ogre → "Run won!". A defeat ends the run.
+
+**Gold** — after a won battle: 10 + 5 per surviving unit *(placeholder)*. More survivors = more gold.
+
+**Shop** — 3 random items from the catalog. No rerolls, no selling. One slot per unit; buying replaces (and loses) the old item. Decisions come from limited gold, the single slot, and items with downsides.
+
+| Item | Effect | Price *(placeholder)* |
+|---|---|---|
+| Iron Helm | +3 HP | 6 |
+| Heavy Armor | +6 HP, -1 AP | 8 |
+| Whetstone Blade | +1 damage | 10 |
+| Longbow | +1 range (ranged units only) | 8 |
+| Swift Boots | +1 AP | 12 |
+| Berserker Axe | +2 damage, -3 HP | 9 |
+
+**Battle 2: Necromancer** *(placeholder numbers)*
+
+| Unit | HP | Damage | Range | AP | Rule |
+|---|---|---|---|---|---|
+| Skeleton (x4) | 4 | 2 | 1 | 3 | Leaves a **bone pile** when killed |
+| Necromancer | 6 | 2 (bolt, needs line of sight) | 3 | 3 | Raises a bone pile within 4 tiles to a full-HP skeleton (costs 3 AP). Stays at the back and backs away from units closer than 3 tiles. |
+
+- A statue standing on a bone pile stops it being raised. Piles don't block movement.
+- Kill the necromancer and the piles stay dead.
+- A raised skeleton waits until the next enemy turn before acting.
+
+**Battle 3: Ogre** *(placeholder numbers)* — alone, 2x2 tiles.
+
+| Unit | HP | Smash | Boulder | AP |
+|---|---|---|---|---|
+| Ogre | 30 | 5 damage to **every** adjacent unit, 2 AP | 3 damage, range 2–5, 3 AP, once per turn, ignores line of sight | 4 |
+
+- The boulder comes to rest on the free tile next to the target closest to the ogre and **stays there as a rock**.
+- Hovering the ogre shows the smash ring, the boulder target and the tile the rock will land on.
+
 ## Later / maybe
 
 - Drawn spell cards during battle.
@@ -106,7 +146,6 @@ Goal: find out whether a single battle is fun. There's no map, rewards, shop or 
 
 ## Open questions
 
-- What rewards are, and how exactly they scale with survivors.
 - Is an unusual identity rule needed for the first prototype? Leaning towards: prototype the plain core first, then decide.
 - Board size (playtest).
 - Which node types exist besides battles.

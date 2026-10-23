@@ -43,10 +43,34 @@ namespace ArmyRoguelike.View
         {
             if (Statues.TryGetValue(kind, out var sprite))
                 return sprite;
-            sprite = kind == UnitKind.Wolf || kind == UnitKind.PackLeader ? MakeWolf(kind) : MakeFigure(kind);
+            switch (kind)
+            {
+                case UnitKind.Wolf:
+                case UnitKind.PackLeader:
+                    sprite = MakeWolf(kind);
+                    break;
+                case UnitKind.Skeleton:
+                    sprite = MakeSkeleton();
+                    break;
+                case UnitKind.Necromancer:
+                    sprite = MakeNecromancer();
+                    break;
+                case UnitKind.Ogre:
+                    sprite = MakeOgre();
+                    break;
+                default:
+                    sprite = MakeFigure(kind);
+                    break;
+            }
+
             Statues[kind] = sprite;
             return sprite;
         }
+
+        private static Sprite _bones;
+
+        /// <summary>A small heap of stone bones: what a skeleton leaves behind.</summary>
+        public static Sprite Bones => _bones != null ? _bones : _bones = MakeBones();
 
         // ---------- Drawing ----------
 
@@ -188,6 +212,109 @@ namespace ArmyRoguelike.View
             Shade(tex, w, h);
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);
+        }
+
+        /// <summary>Thin figure with visible ribs and a skull, holding a short sword.</summary>
+        private static Sprite MakeSkeleton()
+        {
+            const int w = 32, h = 50;
+            var tex = NewTexture(w, h);
+            Plinth(tex, w, 10);
+            // Legs and spine.
+            Fill(tex, 13, 7, 14, 17);
+            Fill(tex, 18, 7, 19, 17);
+            Fill(tex, 15, 17, 17, 31);
+            // Ribs.
+            for (var y = 21; y <= 29; y += 3)
+                Fill(tex, 11, y, 21, y + 1);
+            // Arms and sword.
+            Fill(tex, 9, 18, 10, 29);
+            Fill(tex, 22, 18, 23, 29);
+            Fill(tex, 24, 22, 25, 36);
+            // Skull with eye holes.
+            Disc(tex, 16, 36, 5);
+            Fill(tex, 13, 36, 14, 37, 0.25f);
+            Fill(tex, 18, 36, 19, 37, 0.25f);
+            Shade(tex, w, h);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);
+        }
+
+        /// <summary>Hooded, robed figure with a tall staff.</summary>
+        private static Sprite MakeNecromancer()
+        {
+            const int w = 32, h = 60;
+            var tex = NewTexture(w, h);
+            Plinth(tex, w, 11);
+            // Robe widening to the floor.
+            for (var y = 7; y <= 32; y++)
+            {
+                var half = 4 + (32 - y) / 4;
+                Fill(tex, 15 - half, y, 16 + half, y);
+            }
+
+            // Hood.
+            Disc(tex, 16, 37, 5);
+            for (var i = 0; i < 5; i++)
+                Fill(tex, 16 - (4 - i), 42 + i, 16 + (4 - i), 42 + i);
+            Fill(tex, 14, 35, 18, 38, 0.3f);
+            // Staff with a skull-ish knob.
+            Fill(tex, 25, 7, 26, 50);
+            Disc(tex, 26, 52, 3);
+            Shade(tex, w, h);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);
+        }
+
+        /// <summary>Huge hunched brute on a wide plinth, club raised. Drawn to cover a 2x2 area.</summary>
+        private static Sprite MakeOgre()
+        {
+            const int w = 80, h = 96;
+            var tex = NewTexture(w, h);
+            Plinth(tex, w, 34);
+            // Legs.
+            Fill(tex, 24, 7, 34, 26);
+            Fill(tex, 46, 7, 56, 26);
+            // Belly and chest.
+            for (var y = 24; y <= 62; y++)
+            {
+                var t = (y - 43) / 19f;
+                var half = Mathf.RoundToInt(22 - 8 * t * t);
+                Fill(tex, 40 - half, y, 39 + half, y);
+            }
+
+            // Head sunk between the shoulders, with a heavy brow.
+            Disc(tex, 40, 68, 9);
+            Fill(tex, 32, 70, 48, 72, 0.8f);
+            Fill(tex, 35, 66, 37, 67, 0.25f);
+            Fill(tex, 43, 66, 45, 67, 0.25f);
+            // Left arm hanging, right arm holding the club up.
+            Fill(tex, 10, 30, 17, 56);
+            Fill(tex, 63, 46, 70, 62);
+            Fill(tex, 64, 60, 72, 88);
+            Disc(tex, 68, 86, 7);
+            Shade(tex, w, h);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);
+        }
+
+        private static Sprite MakeBones()
+        {
+            const int w = 32, h = 16;
+            var tex = NewTexture(w, h);
+            // Two crossed bones and a skull on the ground.
+            for (var i = 0; i < 18; i++)
+            {
+                Fill(tex, 6 + i, 3 + i / 3, 7 + i, 4 + i / 3);
+                Fill(tex, 24 - i, 3 + i / 3, 25 - i, 4 + i / 3);
+            }
+
+            Disc(tex, 16, 9, 4);
+            Fill(tex, 14, 9, 14, 10, 0.25f);
+            Fill(tex, 17, 9, 17, 10, 0.25f);
+            Shade(tex, w, h);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 3f / h), PixelsPerUnit);
         }
 
         private static void Plinth(Texture2D tex, int w, int halfWidth)

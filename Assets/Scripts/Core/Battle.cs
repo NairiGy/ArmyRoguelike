@@ -48,41 +48,71 @@ namespace ArmyRoguelike.Core
 
         public bool IsOver => Phase == Phase.Victory || Phase == Phase.Defeat;
 
-        public Battle(Board board, IEnumerable<UnitStats> playerArmy, IEnumerable<(UnitStats stats, GridPos pos)> enemies)
+        public Battle(Board board, IEnumerable<ArmyMember> playerArmy, IEnumerable<(UnitStats stats, GridPos pos)> enemies)
         {
             Board = board;
             var id = 0;
-            foreach (var stats in playerArmy)
-                _units.Add(new Unit(id++, Team.Player, stats));
+            foreach (var member in playerArmy)
+                _units.Add(new Unit(id++, Team.Player, member.Stats, member.Equipment));
             foreach (var (stats, pos) in enemies)
                 _units.Add(new Unit(id++, Team.Enemy, stats) { Pos = pos, IsPlaced = true });
         }
 
-        /// <summary>The fixed Prototype 1 battle: warrior, archer and rogue against a wolf pack on 8x8.</summary>
-        public static Battle CreatePrototype()
+        public Battle(Board board, IEnumerable<UnitStats> playerArmy, IEnumerable<(UnitStats stats, GridPos pos)> enemies)
+            : this(board, playerArmy.Select(s => new ArmyMember(s)), enemies)
         {
-            var board = new Board(8, 8, new[]
-            {
-                new GridPos(1, 3), new GridPos(2, 3), new GridPos(5, 4), new GridPos(6, 4),
-            });
-            var army = new[] { UnitStats.Warrior, UnitStats.Archer, UnitStats.Rogue };
-            var pack = new[]
-            {
-                (UnitStats.PackLeader, new GridPos(3, 7)),
-                (UnitStats.Wolf, new GridPos(2, 6)),
-                (UnitStats.Wolf, new GridPos(4, 6)),
-                (UnitStats.Wolf, new GridPos(5, 7)),
-            };
-            return new Battle(board, army, pack);
         }
+
+        /// <summary>The first battle of the run: warrior, archer and rogue against a wolf pack.</summary>
+        public static Battle CreatePrototype() => Encounter.Wolves.CreateBattle(ArmyMember.StartingArmy());
+
+        // ---------- Footprints and distance ----------
+
+        /// <summary>The tiles covered by a unit of the given size standing at anchor.</summary>
+        public static IEnumerable<GridPos> Footprint(GridPos anchor, int size)
+        {
+            for (var dy = 0; dy < size; dy++)
+            for (var dx = 0; dx < size; dx++)
+                yield return new GridPos(anchor.X + dx, anchor.Y + dy);
+        }
+
+        public static IEnumerable<GridPos> Cells(Unit unit) => Footprint(unit.Pos, unit.Size);
+
+        /// <summary>Fewest orthogonal steps between any tile of one footprint and any tile of a unit.</summary>
+        public static int Distance(GridPos anchor, int size, Unit target) =>
+            Footprint(anchor, size).Min(a => Cells(target).Min(b => a.StepsTo(b)));
+
+        public static int Distance(Unit a, Unit b) => Distance(a.Pos, a.Size, b);
 
         // ---------- Queries ----------
 
         public IEnumerable<Unit> Living(Team team) => _units.Where(u => u.Team == team && u.IsAlive && u.IsPlaced);
 
-        public Unit UnitAt(GridPos p) => _units.FirstOrDefault(u => u.IsPlaced && u.IsAlive && u.Pos == p);
+        public Unit UnitAt(GridPos p) =>
+            _units.FirstOrDefault(u => u.IsPlaced && u.IsAlive && Cells(u).Contains(p));
 
+        /// <summary>The bone pile on a tile, if any.</summary>
+        public Unit RemainsAt(GridPos p) => _units.FirstOrDefault(u => u.IsRemains && u.Pos == p);
+
+        public IEnumerable<Unit> Remains(Team team) => _units.Where(u => u.Team == team && u.IsRemains);
+
+        /// <summary>A tile with no rock and no living unit. Bone piles don't block.</summary>
         public bool IsFree(GridPos p) => Board.InBounds(p) && !Board.IsObstacle(p) && UnitAt(p) == null;
+
+        /// <summary>Whether the unit could stand with its anchor on this tile.</summary>
+        public bool CanStand(Unit unit, GridPos anchor)
+        {
+            foreach (var c in Footprint(anchor, unit.Size))
+            {
+                if (!Board.InBounds(c) || Board.IsObstacle(c))
+                    return false;
+                var occupant = UnitAt(c);
+                if (occupant != null && occupant != unit)
+                    return false;
+            }
+
+            return true;
+        }
 
         public bool IsPlayerZone(GridPos p) => Board.InBounds(p) && p.Y < PlayerZoneRows;
 
@@ -95,12 +125,12 @@ namespace ArmyRoguelike.Core
                 return PackState.None;
             if (!leader.IsAlive)
                 return PackState.Leaderless;
-            return leader.Pos.StepsTo(unit.Pos) <= LeaderAuraRange ? PackState.NearLeader : PackState.None;
+            return Distance(leader, unit) <= LeaderAuraRange ? PackState.NearLeader : PackState.None;
         }
 
         public int EffectiveDamage(Unit unit)
         {
-            var damage = unit.Stats.Damage;
+            var damage = unit.BaseDamage;
             switch (GetPackState(unit))
             {
                 case PackState.NearLeader:
@@ -114,7 +144,7 @@ namespace ArmyRoguelike.Core
             return Math.Max(1, damage);
         }
 
-        /// <summary>Every tile the unit can walk to with its current AP, with the AP cost. Excludes its own tile.</summary>
+        /// <summary>Every anchor tile the unit can walk to with its current AP, with the AP cost. Excludes its own tile.</summary>
         public Dictionary<GridPos, int> GetReachable(Unit unit)
         {
             var costs = new Dictionary<GridPos, int>();
@@ -130,7 +160,7 @@ namespace ArmyRoguelike.Core
                     continue;
                 foreach (var n in p.Neighbours())
                 {
-                    if (seen.ContainsKey(n) || !IsFree(n))
+                    if (seen.ContainsKey(n) || !CanStand(unit, n))
                         continue;
                     seen[n] = cost;
                     costs[n] = cost;
@@ -141,7 +171,7 @@ namespace ArmyRoguelike.Core
             return costs;
         }
 
-        /// <summary>Shortest walkable path to a free tile, without the start tile. Null if unreachable.</summary>
+        /// <summary>Shortest walkable path to an anchor tile, without the start tile. Null if unreachable.</summary>
         public List<GridPos> FindPath(Unit unit, GridPos target)
         {
             var start = unit.Pos;
@@ -163,7 +193,7 @@ namespace ArmyRoguelike.Core
 
                 foreach (var n in p.Neighbours())
                 {
-                    if (seen.Contains(n) || !IsFree(n))
+                    if (seen.Contains(n) || !CanStand(unit, n))
                         continue;
                     seen.Add(n);
                     parent[n] = p;
@@ -174,18 +204,67 @@ namespace ArmyRoguelike.Core
             return null;
         }
 
-        /// <summary>Whether the attacker could hit the target from a given tile, ignoring AP.</summary>
+        /// <summary>Whether the attacker's basic attack could hit the target from a given anchor, ignoring AP.</summary>
         public bool CanHitFrom(Unit attacker, GridPos from, Unit target)
         {
-            var steps = from.StepsTo(target.Pos);
-            if (steps < 1 || steps > attacker.Stats.Range)
+            var steps = Distance(from, attacker.Size, target);
+            if (steps < 1 || steps > attacker.Range)
                 return false;
-            return !attacker.Stats.IsRanged || Board.HasLineOfSight(from, target.Pos);
+            if (!attacker.IsRanged)
+                return true;
+            foreach (var a in Footprint(from, attacker.Size))
+            foreach (var b in Cells(target))
+                if (Board.HasLineOfSight(a, b))
+                    return true;
+            return false;
         }
 
         public bool CanAttack(Unit attacker, Unit target) =>
             !IsOver && attacker.IsAlive && target != null && target.IsAlive && attacker.Team != target.Team &&
             attacker.Ap >= AttackCost && CanHitFrom(attacker, attacker.Pos, target);
+
+        // ---------- Enemy abilities ----------
+
+        /// <summary>Living enemies of the unit standing next to it: the targets of an area smash.</summary>
+        public List<Unit> AdjacentFoes(Unit unit) =>
+            _units.Where(u => u.IsPlaced && u.IsAlive && u.Team != unit.Team && Distance(unit, u) == 1).ToList();
+
+        public bool CanRaise(Unit raiser, Unit remains) =>
+            !IsOver && raiser.IsAlive && raiser.Stats.CanRaise && raiser.Ap >= raiser.Stats.RaiseCost &&
+            remains != null && remains.IsRemains && remains.Team == raiser.Team &&
+            Distance(raiser, remains) <= raiser.Stats.RaiseRange && UnitAt(remains.Pos) == null;
+
+        public bool CanThrow(Unit thrower, Unit target)
+        {
+            if (IsOver || !thrower.IsAlive || !thrower.Stats.CanThrow || thrower.Ap < thrower.Stats.ThrowCost)
+                return false;
+            if (target == null || !target.IsAlive || target.Team == thrower.Team)
+                return false;
+            var steps = Distance(thrower, target);
+            return steps >= 2 && steps <= thrower.Stats.ThrowRange;
+        }
+
+        /// <summary>
+        /// Where a boulder thrown at the target comes to rest: the free tile next to the target that is
+        /// closest to the thrower. Null if there is no free tile.
+        /// </summary>
+        public GridPos? RockTileFor(Unit thrower, Unit target)
+        {
+            GridPos? best = null;
+            var bestSteps = int.MaxValue;
+            foreach (var n in target.Pos.Neighbours())
+            {
+                if (!IsFree(n))
+                    continue;
+                var steps = Footprint(thrower.Pos, thrower.Size).Min(c => c.StepsTo(n));
+                if (steps >= bestSteps)
+                    continue;
+                bestSteps = steps;
+                best = n;
+            }
+
+            return best;
+        }
 
         // ---------- Placement ----------
 
@@ -267,7 +346,8 @@ namespace ArmyRoguelike.Core
             {
                 if (IsOver)
                     break;
-                if (enemy.IsAlive)
+                // A skeleton raised earlier this phase waits until the next enemy turn.
+                if (enemy.IsAlive && !enemy.IsDone)
                     EnemyAI.TakeTurn(this, enemy, events);
                 enemy.IsDone = true;
             }
@@ -303,11 +383,47 @@ namespace ArmyRoguelike.Core
             return new AttackEvent(attacker, target, damage, target.Hp);
         }
 
+        internal SmashEvent DoSmash(Unit attacker)
+        {
+            var damage = EffectiveDamage(attacker);
+            attacker.Ap -= AttackCost;
+            var hits = new List<Hit>();
+            foreach (var target in AdjacentFoes(attacker))
+            {
+                target.Hp = Math.Max(0, target.Hp - damage);
+                hits.Add(new Hit(target, damage, target.Hp));
+            }
+
+            CheckEnd();
+            return new SmashEvent(attacker, hits);
+        }
+
+        internal BoulderEvent DoThrow(Unit thrower, Unit target)
+        {
+            var damage = thrower.Stats.ThrowDamage;
+            thrower.Ap -= thrower.Stats.ThrowCost;
+            var rock = RockTileFor(thrower, target);
+            target.Hp = Math.Max(0, target.Hp - damage);
+            if (rock.HasValue)
+                Board.AddObstacle(rock.Value);
+            CheckEnd();
+            return new BoulderEvent(thrower, new Hit(target, damage, target.Hp), rock);
+        }
+
+        internal RaiseEvent DoRaise(Unit raiser, Unit remains)
+        {
+            raiser.Ap -= raiser.Stats.RaiseCost;
+            remains.Hp = remains.MaxHp;
+            remains.Ap = 0;
+            remains.IsDone = true;
+            return new RaiseEvent(raiser, remains);
+        }
+
         private void BeginTurn(Team team)
         {
             foreach (var u in Living(team))
             {
-                u.Ap = u.Stats.MaxAp + Math.Min(u.Ap, MaxCarriedAp);
+                u.Ap = u.MaxAp + Math.Min(u.Ap, MaxCarriedAp);
                 u.IsDone = false;
             }
         }
