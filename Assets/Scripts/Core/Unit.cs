@@ -9,8 +9,8 @@ namespace ArmyRoguelike.Core
         public readonly Team Team;
         public readonly UnitStats Stats;
 
-        /// <summary>The item in this unit's single slot, or null.</summary>
-        public readonly Equipment Equipment;
+        /// <summary>The army member this unit was made from (player units only), for run-long bonuses.</summary>
+        public readonly ArmyMember Member;
 
         public int Hp { get; internal set; }
         public int Ap { get; internal set; }
@@ -23,18 +23,33 @@ namespace ArmyRoguelike.Core
         /// <summary>True once the unit has finished its turn in the current phase.</summary>
         public bool IsDone { get; internal set; }
 
-        public Unit(int id, Team team, UnitStats stats, Equipment equipment = null)
+        /// <summary>Moved at least one tile this turn (for Steady Aim).</summary>
+        public bool MovedThisTurn { get; internal set; }
+
+        /// <summary>The free first step of Spring Boots has been used this turn.</summary>
+        public bool FreeStepUsed { get; internal set; }
+
+        /// <summary>The Lucky Charm has already saved this unit in this battle.</summary>
+        public bool LastStandUsed { get; internal set; }
+
+        /// <summary>Damage gained in this battle (Bloodthirst). Added to the army member when the battle ends.</summary>
+        public int GainedDamage { get; internal set; }
+
+        public Unit(int id, Team team, UnitStats stats, ArmyMember member = null)
         {
             Id = id;
             Team = team;
             Stats = stats;
-            Equipment = equipment;
+            Member = member;
             Hp = MaxHp;
         }
 
-        // Stats after equipment.
-        public int MaxHp => Math.Max(1, Stats.MaxHp + (Equipment?.Hp ?? 0));
-        public int BaseDamage => Math.Max(1, Stats.Damage + (Equipment?.Damage ?? 0));
+        /// <summary>The item in this unit's single slot, or null.</summary>
+        public Equipment Equipment => Member?.Equipment;
+
+        // Stats after equipment and run-long bonuses.
+        public int MaxHp => Math.Max(1, Stats.MaxHp + (Equipment?.Hp ?? 0) + (Member?.BonusMaxHp ?? 0));
+        public int BaseDamage => Math.Max(1, Stats.Damage + (Equipment?.Damage ?? 0) + (Member?.BonusDamage ?? 0) + GainedDamage);
         public int Range => Math.Max(1, Stats.Range + (Equipment?.Range ?? 0));
         public int MaxAp => Math.Max(1, Stats.MaxAp + (Equipment?.Ap ?? 0));
 
@@ -50,6 +65,10 @@ namespace ArmyRoguelike.Core
 
         /// <summary>A dead unit that left a bone pile behind.</summary>
         public bool IsRemains => IsPlaced && !IsAlive && Stats.LeavesRemains;
+
+        /// <summary>Has the ability, built in or from its item.</summary>
+        public bool Has(Ability ability) =>
+            ability != Ability.None && (Stats.Ability == ability || Equipment?.Ability == ability);
 
         public override string ToString() => $"{Stats.Name}#{Id} {Pos} hp {Hp} ap {Ap}";
     }

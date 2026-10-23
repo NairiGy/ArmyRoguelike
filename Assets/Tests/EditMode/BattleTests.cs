@@ -64,7 +64,7 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(4, reach[new GridPos(0, 2)]);
             Assert.IsFalse(reach.ContainsKey(new GridPos(0, 1)));
 
-            var move = b.PlayerMove(rogue, new GridPos(0, 2));
+            var move = b.PlayerMove(rogue, new GridPos(0, 2))?.OfType<MoveEvent>().Single();
             Assert.IsNotNull(move);
             Assert.AreEqual(4, move.Path.Count);
             Assert.AreEqual(1, rogue.Ap);
@@ -85,7 +85,7 @@ namespace ArmyRoguelike.Tests
                 new[] { (UnitStats.Wolf, new GridPos(3, 2)) });
             var rogue = Player(b);
             var wolf = Enemy(b);
-            var hit = b.PlayerAttack(rogue, wolf);
+            var hit = b.PlayerAttack(rogue, wolf)?.OfType<AttackEvent>().Single();
             Assert.AreEqual(4, hit.Damage);
             Assert.AreEqual(2, wolf.Hp);
             Assert.AreEqual(3, rogue.Ap);

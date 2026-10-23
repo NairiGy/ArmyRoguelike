@@ -10,6 +10,7 @@ namespace ArmyRoguelike.Core
         Smash,
         Throw,
         Raise,
+        Bomb,
     }
 
     /// <summary>What an enemy plans to do next, for the hover display.</summary>
@@ -20,25 +21,27 @@ namespace ArmyRoguelike.Core
         /// <summary>The player unit it wants to hit, or the bone pile it wants to raise.</summary>
         public readonly Unit Target;
 
-        /// <summary>For a throw: where the boulder will come to rest.</summary>
-        public readonly GridPos? RockTile;
+        /// <summary>For a throw: where the boulder will come to rest. For a bomb: where it will land.</summary>
+        public readonly GridPos? Tile;
 
-        public Intent(IntentKind kind, Unit target, GridPos? rockTile = null)
+        public Intent(IntentKind kind, Unit target, GridPos? tile = null)
         {
             Kind = kind;
             Target = target;
-            RockTile = rockTile;
+            Tile = tile;
         }
     }
 
     /// <summary>
-    /// Enemy behaviour. Wolves and skeletons walk to the nearest player unit and attack while AP lasts.
-    /// The necromancer stays back, raises bone piles and fires bolts. The ogre throws boulders from
-    /// afar and smashes everything next to it up close.
+    /// Enemy behaviour. Wolves, skeletons and goblins walk to the nearest player unit and attack while
+    /// AP lasts. The necromancer stays back, raises bone piles and fires bolts. The ogre throws boulders
+    /// from afar and smashes everything next to it up close. Goblin bombers keep their distance and lob
+    /// bombs that go off next enemy turn.
     /// </summary>
     public static class EnemyAI
     {
         private const int NecromancerComfortDistance = 3;
+        private const int BomberComfortDistance = 2;
 
         /// <summary>
         /// The player unit this enemy wants to attack: nearest in steps, then lowest HP, then lowest id.
@@ -79,6 +82,14 @@ namespace ArmyRoguelike.Core
             if (target == null)
                 return new Intent(IntentKind.None, null);
 
+            if (enemy.Stats.CanBomb)
+            {
+                var steps = Battle.Distance(enemy, target);
+                if (steps >= 2 && steps <= enemy.Stats.BombRange && battle.BombAt(target.Pos) == null)
+                    return new Intent(IntentKind.Bomb, target, target.Pos);
+                return new Intent(IntentKind.Attack, target);
+            }
+
             if (enemy.Stats.AreaMelee && Battle.Distance(enemy, target) == 1)
                 return new Intent(IntentKind.Smash, target);
             if (enemy.Stats.CanThrow)
@@ -95,6 +106,8 @@ namespace ArmyRoguelike.Core
         {
             if (enemy.Stats.CanRaise)
                 NecromancerTurn(battle, enemy, events);
+            else if (enemy.Stats.CanBomb)
+                BomberTurn(battle, enemy, events);
             else if (enemy.Stats.AreaMelee)
                 OgreTurn(battle, enemy, events);
             else
@@ -114,7 +127,7 @@ namespace ArmyRoguelike.Core
 
                 if (battle.CanAttack(enemy, target))
                 {
-                    events.Add(battle.DoAttack(enemy, target));
+                    events.AddRange(battle.DoAttack(enemy, target));
                     continue;
                 }
 
@@ -133,7 +146,7 @@ namespace ArmyRoguelike.Core
                 {
                     if (ogre.Ap < Battle.AttackCost)
                         return;
-                    events.Add(battle.DoSmash(ogre));
+                    events.AddRange(battle.DoSmash(ogre));
                     continue;
                 }
 
@@ -143,7 +156,7 @@ namespace ArmyRoguelike.Core
 
                 if (!thrown && battle.CanThrow(ogre, target))
                 {
-                    events.Add(battle.DoThrow(ogre, target));
+                    events.AddRange(battle.DoThrow(ogre, target));
                     thrown = true;
                     continue;
                 }
@@ -166,7 +179,7 @@ namespace ArmyRoguelike.Core
                 var remains = ChooseRemains(battle, necro);
                 if (remains != null)
                 {
-                    events.Add(battle.DoRaise(necro, remains));
+                    events.AddRange(battle.DoRaise(necro, remains));
                     continue;
                 }
 
@@ -183,14 +196,15 @@ namespace ArmyRoguelike.Core
 
                 if (battle.CanAttack(necro, target))
                 {
-                    events.Add(battle.DoAttack(necro, target));
+                    events.AddRange(battle.DoAttack(necro, target));
                     continue;
                 }
 
                 if (!advanced)
                 {
                     advanced = true;
-                    if (AdvanceToBoltRange(battle, necro, target, events))
+                    if (AdvanceToRange(battle, necro, target, NecromancerComfortDistance, Battle.AttackCost,
+                            tile => battle.CanHitFrom(necro, tile, target), events))
                         continue;
                 }
 
@@ -199,39 +213,99 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>
-        /// Moves to a tile from which the bolt can hit the target with AP to spare, staying at least the
-        /// comfort distance from every player unit. If no such tile is reachable this turn, gets as close
-        /// to the target as that distance allows. False if no move helps.
+        /// Back away from anyone adjacent, lob one bomb per turn at the nearest unit 2+ tiles away,
+        /// otherwise walk up to bomb range (never closer than 2). Stabs only when cornered.
         /// </summary>
-        private static bool AdvanceToBoltRange(Battle battle, Unit necro, Unit target, List<BattleEvent> events)
+        private static void BomberTurn(Battle battle, Unit bomber, List<BattleEvent> events)
+        {
+            var retreated = false;
+            var advanced = false;
+            var thrown = false;
+            while (!battle.IsOver && bomber.IsAlive)
+            {
+                var target = ChooseTarget(battle, bomber);
+                if (target == null)
+                    return;
+
+                if (!retreated && Battle.Distance(bomber, target) < BomberComfortDistance)
+                {
+                    retreated = true;
+                    if (Retreat(battle, bomber, events))
+                        continue;
+                }
+
+                if (!thrown)
+                {
+                    // Prefer the nearest unit, but any unit in range without a bomb on it will do.
+                    var bombTarget = battle.CanBomb(bomber, target)
+                        ? target
+                        : battle.Living(Team.Player).Where(u => battle.CanBomb(bomber, u)).OrderBy(u => Battle.Distance(bomber, u)).FirstOrDefault();
+                    if (bombTarget != null)
+                    {
+                        events.AddRange(battle.DoBomb(bomber, bombTarget));
+                        thrown = true;
+                        continue;
+                    }
+                }
+
+                if (battle.CanAttack(bomber, target))
+                {
+                    events.AddRange(battle.DoAttack(bomber, target));
+                    continue;
+                }
+
+                if (!thrown && !advanced)
+                {
+                    advanced = true;
+                    var range = bomber.Stats.BombRange;
+                    if (AdvanceToRange(battle, bomber, target, BomberComfortDistance, bomber.Stats.BombCost,
+                            tile =>
+                            {
+                                var steps = Battle.Distance(tile, bomber.Size, target);
+                                return steps >= 2 && steps <= range;
+                            }, events))
+                        continue;
+                }
+
+                return;
+            }
+        }
+
+        /// <summary>
+        /// Moves to a tile from which <paramref name="canHitFrom"/> holds with <paramref name="keepAp"/> to
+        /// spare, staying at least <paramref name="comfort"/> tiles from every player unit. If no such tile
+        /// is reachable this turn, gets as close to the target as that distance allows. False if no move helps.
+        /// </summary>
+        private static bool AdvanceToRange(Battle battle, Unit unit, Unit target, int comfort, int keepAp,
+            System.Func<GridPos, bool> canHitFrom, List<BattleEvent> events)
         {
             int Safety(GridPos anchor) =>
-                battle.Living(Team.Player).Select(u => Battle.Distance(anchor, necro.Size, u)).DefaultIfEmpty(int.MaxValue).Min();
+                battle.Living(Team.Player).Select(u => Battle.Distance(anchor, unit.Size, u)).DefaultIfEmpty(int.MaxValue).Min();
 
-            var reachable = battle.GetReachable(necro)
-                .Where(kv => Safety(kv.Key) >= NecromancerComfortDistance)
+            var reachable = battle.GetReachable(unit)
+                .Where(kv => Safety(kv.Key) >= comfort)
                 .ToList();
 
             var shootingSpot = reachable
-                .Where(kv => necro.Ap - kv.Value >= Battle.AttackCost && battle.CanHitFrom(necro, kv.Key, target))
+                .Where(kv => unit.Ap - kv.Value >= keepAp && canHitFrom(kv.Key))
                 .OrderBy(kv => kv.Value)
                 .Select(kv => (GridPos?)kv.Key)
                 .FirstOrDefault();
 
-            var current = Battle.Distance(necro, target);
+            var current = Battle.Distance(unit, target);
             var destination = shootingSpot ?? reachable
-                .Where(kv => Battle.Distance(kv.Key, necro.Size, target) < current)
-                .OrderBy(kv => Battle.Distance(kv.Key, necro.Size, target))
+                .Where(kv => Battle.Distance(kv.Key, unit.Size, target) < current)
+                .OrderBy(kv => Battle.Distance(kv.Key, unit.Size, target))
                 .ThenBy(kv => kv.Value)
                 .Select(kv => (GridPos?)kv.Key)
                 .FirstOrDefault();
             if (destination == null)
                 return false;
 
-            var move = battle.DoMove(necro, destination.Value);
+            var move = battle.DoMove(unit, destination.Value);
             if (move == null)
                 return false;
-            events.Add(move);
+            events.AddRange(move);
             return true;
         }
 
@@ -249,7 +323,7 @@ namespace ArmyRoguelike.Core
             var move = battle.DoMove(enemy, destination.Value);
             if (move == null)
                 return false;
-            events.Add(move);
+            events.AddRange(move);
             return true;
         }
 
@@ -297,7 +371,7 @@ namespace ArmyRoguelike.Core
             var move = battle.DoMove(enemy, best[0].pos);
             if (move == null)
                 return false;
-            events.Add(move);
+            events.AddRange(move);
             return true;
         }
 

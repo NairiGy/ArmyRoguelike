@@ -58,6 +58,13 @@ namespace ArmyRoguelike.View
                 case UnitKind.Ogre:
                     sprite = MakeOgre();
                     break;
+                case UnitKind.Sapper:
+                    sprite = MakeSapper();
+                    break;
+                case UnitKind.Goblin:
+                case UnitKind.GoblinBomber:
+                    sprite = MakeGoblin(kind == UnitKind.GoblinBomber);
+                    break;
                 default:
                     sprite = MakeFigure(kind);
                     break;
@@ -68,9 +75,17 @@ namespace ArmyRoguelike.View
         }
 
         private static Sprite _bones;
+        private static Sprite _mine;
+        private static Sprite _bomb;
 
         /// <summary>A small heap of stone bones: what a skeleton leaves behind.</summary>
         public static Sprite Bones => _bones != null ? _bones : _bones = MakeBones();
+
+        /// <summary>A flat spiked plate lying on a tile. Drawn in colour, not tinted.</summary>
+        public static Sprite Mine => _mine != null ? _mine : _mine = MakeMine();
+
+        /// <summary>A round bomb with a lit fuse.</summary>
+        public static Sprite Bomb => _bomb != null ? _bomb : _bomb = MakeBomb();
 
         // ---------- Drawing ----------
 
@@ -296,6 +311,117 @@ namespace ArmyRoguelike.View
             Shade(tex, w, h);
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);
+        }
+
+        /// <summary>Stocky figure with a helmet, a pickaxe over the shoulder and a satchel of charges.</summary>
+        private static Sprite MakeSapper()
+        {
+            const int w = 32, h = 50;
+            var tex = NewTexture(w, h);
+            Plinth(tex, w, 11);
+            // Legs and body.
+            Fill(tex, 12, 7, 14, 15);
+            Fill(tex, 18, 7, 20, 15);
+            Fill(tex, 10, 15, 22, 30);
+            // Satchel on the hip.
+            Fill(tex, 6, 14, 11, 21, 0.85f);
+            // Head and round helmet with a brim.
+            Disc(tex, 16, 35, 5);
+            Fill(tex, 9, 37, 23, 38);
+            // Pickaxe over the right shoulder.
+            Fill(tex, 22, 26, 23, 44);
+            Fill(tex, 18, 43, 28, 44);
+            Shade(tex, w, h);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);
+        }
+
+        /// <summary>Small hunched goblin with big ears. The bomber holds a bomb overhead instead of a knife.</summary>
+        private static Sprite MakeGoblin(bool bomber)
+        {
+            const int w = 32, h = 44;
+            var tex = NewTexture(w, h);
+            Plinth(tex, w, 9);
+            // Short legs, round body.
+            Fill(tex, 12, 7, 13, 12);
+            Fill(tex, 18, 7, 19, 12);
+            Disc(tex, 16, 18, 6);
+            // Big head with long ears.
+            Disc(tex, 16, 28, 5);
+            for (var i = 0; i < 6; i++)
+            {
+                Fill(tex, 10 - i, 29 + i / 2, 11 - i, 29 + i / 2);
+                Fill(tex, 21 + i, 29 + i / 2, 22 + i, 29 + i / 2);
+            }
+
+            Fill(tex, 13, 28, 14, 29, 0.25f);
+            Fill(tex, 18, 28, 19, 29, 0.25f);
+            if (bomber)
+            {
+                // Arm up holding a bomb.
+                Fill(tex, 21, 22, 22, 33);
+                Disc(tex, 22, 37, 4);
+            }
+            else
+            {
+                // Knife held out.
+                Fill(tex, 22, 16, 23, 20);
+                Fill(tex, 24, 18, 28, 19);
+            }
+
+            Shade(tex, w, h);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);
+        }
+
+        private static Sprite MakeMine()
+        {
+            const int w = 24, h = 14;
+            var tex = NewTexture(w, h);
+            var body = new Color(0.35f, 0.33f, 0.3f);
+            var spike = new Color(0.75f, 0.7f, 0.6f);
+            var light = new Color(1f, 0.25f, 0.2f);
+            for (var y = 0; y < h; y++)
+            for (var x = 0; x < w; x++)
+            {
+                if (InDiamond(x + 0.5f, y + 0.5f, 12f, 6f, 9f, 4.5f))
+                    tex.SetPixel(x, y, body);
+            }
+
+            // Spikes around the rim and a red light in the middle.
+            foreach (var (x, y) in new[] { (2, 6), (21, 6), (12, 1), (12, 11), (6, 3), (18, 3), (6, 9), (18, 9) })
+                tex.SetPixel(x, y, spike);
+            Fill(tex, 11, 6, 12, 7);
+            tex.SetPixel(11, 6, light);
+            tex.SetPixel(12, 6, light);
+            tex.SetPixel(11, 7, light);
+            tex.SetPixel(12, 7, light);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.45f), PixelsPerUnit);
+        }
+
+        private static Sprite MakeBomb()
+        {
+            const int w = 20, h = 24;
+            var tex = NewTexture(w, h);
+            var body = new Color(0.15f, 0.15f, 0.17f);
+            for (var y = 0; y < h; y++)
+            for (var x = 0; x < w; x++)
+            {
+                var dx = x - 10;
+                var dy = y - 8;
+                if (dx * dx + dy * dy <= 49)
+                    tex.SetPixel(x, y, dx < -2 && dy > 1 ? new Color(0.35f, 0.35f, 0.4f) : body);
+            }
+
+            // Fuse and spark.
+            for (var i = 0; i < 6; i++)
+                tex.SetPixel(10 + i / 2, 15 + i, new Color(0.6f, 0.5f, 0.35f));
+            tex.SetPixel(13, 21, new Color(1f, 0.85f, 0.3f));
+            tex.SetPixel(13, 22, new Color(1f, 0.5f, 0.2f));
+            tex.SetPixel(12, 22, new Color(1f, 0.85f, 0.3f));
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.1f), PixelsPerUnit);
         }
 
         private static Sprite MakeBones()

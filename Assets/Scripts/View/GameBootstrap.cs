@@ -6,8 +6,8 @@ using UnityEngine;
 namespace ArmyRoguelike.View
 {
     /// <summary>
-    /// Builds and runs the mini-run at runtime, so the scene only needs its camera and light:
-    /// battle, shop, battle, shop, battle, then a run-end screen.
+    /// Builds and runs a whole run at runtime, so the scene only needs its camera and light:
+    /// the map screen, battles, shops, ? events and the run-end screen.
     /// </summary>
     public sealed class GameBootstrap : MonoBehaviour
     {
@@ -19,7 +19,7 @@ namespace ArmyRoguelike.View
         private GameObject _battleRoot;
         private BattleController _controller;
         private Equipment _selectedOffer;
-        private int _lastEarned;
+        private string _lastNote;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoStart()
@@ -42,43 +42,88 @@ namespace ArmyRoguelike.View
         {
             _run = new Run(Environment.TickCount);
             _runLog = new RunLogger(_run);
-            StartBattle();
         }
 
         private void OnDestroy() => _runLog?.Save();
 
+        // Button presses change what the screens show, so they run in Update rather than mid-OnGUI,
+        // where IMGUI would complain about the layout changing between its passes.
+        private Action _pending;
+
+        private void Do(Action action) => _pending = action;
+
+        private void Update()
+        {
+            if (_pending == null)
+                return;
+            var action = _pending;
+            _pending = null;
+            action();
+        }
+
+        // ---------- Flow ----------
+
+        private void ChooseNode(int index)
+        {
+            var other = _run.CurrentChoices.Count > 1 ? _run.CurrentChoices[1 - index] : null;
+            _runLog.RecordChoice(_run.CurrentChoices[index], other);
+            _run.ChooseNode(index);
+            _selectedOffer = null;
+            switch (_run.State)
+            {
+                case RunState.Battle:
+                    StartBattle();
+                    break;
+                case RunState.Shop:
+                    _runLog.OpenShop();
+                    break;
+                case RunState.Event:
+                    _runLog.OpenEvent();
+                    break;
+            }
+        }
+
         private void StartBattle()
         {
             var battle = _run.StartBattle();
-            _battleRoot = new GameObject($"Battle {_run.BattleIndex + 1}");
+            _battleRoot = new GameObject($"Battle step {_run.StepIndex + 1}");
             _battleRoot.transform.SetParent(transform, false);
             var board = BoardView.Create(battle, _battleRoot.transform);
             FrameCamera(Camera.main, board);
-            var context = new BattleContext(_run.BattleIndex + 1, _run.Encounters.Count, _run.CurrentEncounter.Name, _run.Gold, _run.Seed);
+            var context = new BattleContext(_run.StepIndex + 1, Run.Steps, _run.CurrentEncounter.Name, _run.Gold, _run.Seed,
+                _run.IsAmbush, _run.CurrentNode?.Kind == NodeKind.Boss);
             _controller = _battleRoot.AddComponent<BattleController>();
-            _controller.Init(board, Camera.main, context, FinishBattle);
+            _controller.Init(board, Camera.main, context, () => Do(FinishBattle));
         }
 
         private void FinishBattle()
         {
             var battle = _run.CurrentBattle;
-            _lastEarned = _run.FinishBattle();
-            _runLog.RecordBattle(battle, _lastEarned, _controller.LogFile);
+            var ambush = _run.IsAmbush;
+            var earned = _run.FinishBattle();
+            _runLog.RecordBattle(battle, earned, _controller.LogFile, ambush);
             Destroy(_battleRoot);
             _battleRoot = null;
             _controller = null;
-            _selectedOffer = null;
-            if (_run.State == RunState.Shop)
-                _runLog.OpenShop();
-            else
+            _lastNote = battle.Phase == Phase.Victory ? $"Battle won: +{earned} gold." : null;
+            if (_run.State == RunState.Won || _run.State == RunState.Lost)
                 _runLog.Save();
+        }
+
+        /// <summary>After an event choice: log it, then follow wherever the run went (map or ambush battle).</summary>
+        private void AfterEvent(string choice)
+        {
+            _runLog.RecordEvent(choice, _run.EventOutcome);
+            _lastNote = _run.EventOutcome;
+            if (_run.State == RunState.Battle)
+                StartBattle();
         }
 
         private void LeaveShop()
         {
             _runLog.CloseShop();
             _run.LeaveShop();
-            StartBattle();
+            _lastNote = null;
         }
 
         public static void FrameCamera(Camera cam, BoardView board)
@@ -93,7 +138,7 @@ namespace ArmyRoguelike.View
             cam.transform.position = new Vector3(c.x, c.y + 0.2f, -10f);
         }
 
-        // ---------- Shop and run-end screens ----------
+        // ---------- Screens ----------
 
         private void OnGUI()
         {
@@ -105,8 +150,14 @@ namespace ArmyRoguelike.View
 
             switch (_run.State)
             {
+                case RunState.Map:
+                    DrawMap(width);
+                    break;
                 case RunState.Shop:
                     DrawShop(width);
+                    break;
+                case RunState.Event:
+                    DrawEvent(width);
                     break;
                 case RunState.Won:
                 case RunState.Lost:
@@ -115,13 +166,72 @@ namespace ArmyRoguelike.View
             }
         }
 
+        private static GUIStyle Title => new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+
+        private void DrawArmy()
+        {
+            GUILayout.Label("Your army:");
+            foreach (var m in _run.Army)
+            {
+                var item = m.Equipment != null ? $"{m.Equipment.Name} ({m.Equipment.Effect})" : "no item";
+                var bonus = "";
+                if (m.BonusDamage > 0)
+                    bonus += $", +{m.BonusDamage} damage";
+                if (m.BonusMaxHp > 0)
+                    bonus += $", +{m.BonusMaxHp} max HP";
+                GUILayout.Label($"  {m.Stats.Name}: {item}{bonus}");
+            }
+        }
+
+        private void DrawMap(float screenWidth)
+        {
+            const float w = 560;
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 20, w, 680), GUI.skin.box);
+            GUILayout.Label("The Road", Title);
+            GUILayout.Label($"Gold: {_run.Gold}");
+            if (!string.IsNullOrEmpty(_lastNote))
+                GUILayout.Label(_lastNote);
+            GUILayout.Space(6);
+
+            // Furthest step at the top, like climbing a tower.
+            for (var step = Run.Steps - 1; step >= 0; step--)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label($"{step + 1}.", GUILayout.Width(24));
+                var nodes = _run.Map[step];
+                for (var i = 0; i < nodes.Count; i++)
+                {
+                    var node = nodes[i];
+                    var past = step < _run.StepIndex;
+                    var chosen = past && _run.Chosen[step] == i;
+                    var current = step == _run.StepIndex;
+                    var label = chosen ? $"> {node.Label}" : node.Label;
+                    GUI.enabled = current;
+                    var oldColor = GUI.color;
+                    if (past && !chosen)
+                        GUI.color = new Color(1f, 1f, 1f, 0.35f);
+                    var index = i;
+                    if (GUILayout.Button(label, GUILayout.Height(current ? 34 : 26)) && current)
+                        Do(() => ChooseNode(index));
+                    GUI.color = oldColor;
+                    GUI.enabled = true;
+                }
+
+                GUILayout.EndHorizontal();
+            }
+
+            GUILayout.Space(8);
+            GUILayout.Label("? = something unexpected. Shops sell items and sometimes a recruit.");
+            DrawArmy();
+            GUILayout.EndArea();
+        }
+
         private void DrawShop(float screenWidth)
         {
-            const float w = 520;
-            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 40, w, 620), GUI.skin.box);
-            var title = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            GUILayout.Label("Shop", title);
-            GUILayout.Label($"Battle won: +{_lastEarned} gold.   Gold: {_run.Gold}");
+            const float w = 560;
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 30, w, 660), GUI.skin.box);
+            GUILayout.Label("Shop", Title);
+            GUILayout.Label($"Gold: {_run.Gold}");
             GUILayout.Label("Each unit has one slot. Buying replaces (and loses) the old item.");
             GUILayout.Space(8);
 
@@ -131,10 +241,24 @@ namespace ArmyRoguelike.View
             foreach (var offer in _run.Offers.ToList())
             {
                 var marker = offer == _selectedOffer ? "> " : "";
-                var label = $"{marker}{offer.Name}   {offer.Effect}   {offer.Price} gold";
                 GUI.enabled = _run.Gold >= offer.Price;
-                if (GUILayout.Button(label))
+                if (GUILayout.Button($"{marker}{offer.Name}   {offer.Effect}   {offer.Price} gold"))
                     _selectedOffer = offer;
+                GUI.enabled = true;
+            }
+
+            if (_run.ShopHasRecruit)
+            {
+                GUILayout.Space(6);
+                GUI.enabled = _run.CanBuyRecruit;
+                var sapper = UnitStats.Sapper;
+                if (GUILayout.Button($"Recruit a Sapper ({sapper.MaxHp} HP, places mines)   {Run.RecruitPrice} gold"))
+                    Do(() =>
+                    {
+                        if (_run.BuyRecruit())
+                            _runLog.RecordRecruit("Sapper", Run.RecruitPrice);
+                    });
+
                 GUI.enabled = true;
             }
 
@@ -149,12 +273,17 @@ namespace ArmyRoguelike.View
                     GUI.enabled = _run.CanBuy(_selectedOffer, member);
                     if (GUILayout.Button($"{member.Stats.Name}   ({current}){reason}"))
                     {
-                        var replaced = member.Equipment;
-                        if (_run.Buy(_selectedOffer, member))
+                        var buyer = member;
+                        var offer = _selectedOffer;
+                        Do(() =>
                         {
-                            _runLog.RecordPurchase(_selectedOffer, member, replaced);
-                            _selectedOffer = null;
-                        }
+                            var replaced = buyer.Equipment;
+                            if (_run.Buy(offer, buyer))
+                            {
+                                _runLog.RecordPurchase(offer, buyer, replaced);
+                                _selectedOffer = null;
+                            }
+                        });
                     }
 
                     GUI.enabled = true;
@@ -162,31 +291,143 @@ namespace ArmyRoguelike.View
             }
             else
             {
-                GUILayout.Label("Your army:");
-                foreach (var member in _run.Army)
-                    GUILayout.Label($"  {member.Stats.Name}: {(member.Equipment != null ? $"{member.Equipment.Name} ({member.Equipment.Effect})" : "nothing")}");
+                DrawArmy();
             }
 
             GUILayout.FlexibleSpace();
-            var next = _run.Encounters[_run.BattleIndex + 1];
-            if (GUILayout.Button($"Continue to battle {_run.BattleIndex + 2}: {next.Name}", GUILayout.Height(32)))
-                LeaveShop();
+            if (GUILayout.Button("Leave the shop", GUILayout.Height(32)))
+                Do(LeaveShop);
+            GUILayout.EndArea();
+        }
+
+        private void DrawEvent(float screenWidth)
+        {
+            const float w = 520;
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 60, w, 560), GUI.skin.box);
+            switch (_run.CurrentEvent)
+            {
+                case EventKind.WanderingSapper:
+                    GUILayout.Label("A Wandering Sapper", Title);
+                    GUILayout.Label("A dusty statue with a pickaxe and a satchel of charges offers to join you.");
+                    if (_run.Army.Count < Run.MaxArmySize)
+                    {
+                        if (GUILayout.Button("Welcome aboard (the Sapper joins)", GUILayout.Height(32)))
+                            Do(() =>
+                            {
+                                _run.AcceptRecruit();
+                                AfterEvent("recruit");
+                            });
+                    }
+                    else if (GUILayout.Button($"Your army is full. Point the way (+{Run.FullArmyGold} gold)", GUILayout.Height(32)))
+                    {
+                        Do(() =>
+                        {
+                            _run.AcceptRecruit();
+                            AfterEvent("gold");
+                        });
+                    }
+
+                    break;
+
+                case EventKind.AbandonedCart:
+                    GUILayout.Label("An Abandoned Cart", Title);
+                    GUILayout.Label($"Inside: {_run.CartItem.Name} ({_run.CartItem.Effect}).");
+                    foreach (var member in _run.Army)
+                    {
+                        var current = member.Equipment != null ? $"replaces {member.Equipment.Name}" : "empty slot";
+                        GUI.enabled = _run.CartItem.CanEquip(member.Stats);
+                        if (GUILayout.Button($"Give it to the {member.Stats.Name} ({current})"))
+                        {
+                            var taker = member;
+                            Do(() =>
+                            {
+                                var item = _run.CartItem.Name;
+                                _run.TakeCartItem(taker);
+                                AfterEvent($"{item} -> {taker.Stats.Name}");
+                            });
+                        }
+
+                        GUI.enabled = true;
+                    }
+
+                    if (GUILayout.Button("Leave it"))
+                        Do(() =>
+                        {
+                            _run.TakeCartItem(null);
+                            AfterEvent("leave");
+                        });
+
+                    break;
+
+                case EventKind.Gambler:
+                    GUILayout.Label("The Gambler", Title);
+                    GUILayout.Label($"\"Flip a coin? {Run.GambleCost} gold in, {Run.GambleWin} out if you win.\"   You have {_run.Gold} gold.");
+                    GUI.enabled = _run.CanGamble;
+                    if (GUILayout.Button($"Play ({Run.GambleCost} gold)", GUILayout.Height(32)))
+                        Do(() =>
+                        {
+                            var won = _run.Gamble(true);
+                            AfterEvent(won ? "play: won" : "play: lost");
+                        });
+
+                    GUI.enabled = true;
+                    if (GUILayout.Button("Walk away"))
+                        Do(() =>
+                        {
+                            _run.Gamble(false);
+                            AfterEvent("walk away");
+                        });
+
+                    break;
+
+                case EventKind.Ambush:
+                    GUILayout.Label("Ambush!", Title);
+                    GUILayout.Label($"Wolves burst out of the trees. Win and they drop an extra {Run.AmbushBonusGold} gold.");
+                    if (GUILayout.Button("Fight!", GUILayout.Height(32)))
+                        Do(() =>
+                        {
+                            _run.StartAmbush();
+                            AfterEvent("fight");
+                        });
+
+                    break;
+
+                case EventKind.Shrine:
+                    GUILayout.Label("A Quiet Shrine", Title);
+                    GUILayout.Label($"One statue may kneel here and come away sturdier (+{Run.ShrineHp} max HP for the run).");
+                    foreach (var member in _run.Army)
+                    {
+                        if (GUILayout.Button($"The {member.Stats.Name} kneels"))
+                        {
+                            var kneeler = member;
+                            Do(() =>
+                            {
+                                _run.PrayAtShrine(kneeler);
+                                AfterEvent(kneeler.Stats.Name);
+                            });
+                        }
+                    }
+
+                    break;
+            }
+
+            GUILayout.FlexibleSpace();
+            DrawArmy();
             GUILayout.EndArea();
         }
 
         private void DrawRunEnd(float screenWidth)
         {
-            const float w = 320;
-            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 140, w, 200), GUI.skin.box);
-            var title = new GUIStyle(GUI.skin.label) { fontSize = 24, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            const float w = 340;
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 140, w, 220), GUI.skin.box);
             var centred = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter };
-            GUILayout.Label(_run.State == RunState.Won ? "Run won!" : "Run lost", title);
+            GUILayout.Label(_run.State == RunState.Won ? "Run won!" : "Run lost", Title);
             GUILayout.Label(_run.State == RunState.Won
-                ? $"All {_run.Encounters.Count} battles beaten. Gold left: {_run.Gold}"
-                : $"Defeated in battle {_run.BattleIndex + 1}: {_run.CurrentEncounter.Name}", centred);
+                ? $"The ogre is rubble. Gold left: {_run.Gold}"
+                : $"Defeated at step {_run.StepIndex + 1}: {_run.CurrentEncounter?.Name}", centred);
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("New run", GUILayout.Height(32)))
-                Restart();
+                Do(Restart);
             GUILayout.EndArea();
         }
     }

@@ -1,7 +1,7 @@
 # Grid Tactics Roguelike — Design Note
 
 Working title: "Army Roguelike" (placeholder; a better name will come later). Separate project from Nardatro. Unity project: `Desktop/Unity projects/ArmyRoguelike`. This file (`docs/design-note.md`) is the canonical copy.
-Status: Prototype 2 (mini-run) built, not yet playtested: 3 fixed battles (wolves → necromancer → ogre) with a shop after each of the first two. Prototype 1 (one battle) was playtested: no bugs, felt OK, won 2/2, "not super easy". Numbers marked *(placeholder)* are only examples.
+Status: Prototype 3 built, not yet playtested: branching 6-step map (battles, shops, ? events, ogre boss), built-in unit abilities, ability items, the sapper recruit with mines, and a goblin bomber battle. Prototype 2 (fixed mini-run) was playtested once: won, about 5.5 minutes. Fixes from it: walk-up attacks, End turn confirmation, necromancer no longer idle. Prototype 1 (one battle): no bugs, felt OK, won 2/2, "not super easy". Numbers marked *(placeholder)* are only examples.
 
 ## Pitch
 
@@ -39,7 +39,7 @@ A roguelike army-builder: lead a small squad across a Slay the Spire–style map
 - A unit is a "card" in the army-builder sense, but there is no drawing in battle.
 - **Battle effects stay in the battle.** Every unit starts every fight at full HP. Damage, death and other effects reset afterwards.
 - **Run-persistent growth comes only from explicit abilities**, for example "this unit gets +1 damage after killing an enemy, persists for the run". There is no universal leveling.
-- Identity direction: each unit carries its own rule, like Balatro's jokers.
+- Identity direction: each unit carries its own rule, like Balatro's jokers. Abilities come from the unit type (one built-in each) and from items; there are no separately earned abilities.
 - **Equipment:** units can wear equipment, possibly bought at shops.
 - **Rewards scale with how many units survived the fight.** This is the cost of death.
 - Difficulty modifiers may change these rules later.
@@ -137,6 +137,44 @@ Goal: find out whether building up the army across fights feels good.
 
 - The boulder comes to rest on the free tile next to the target closest to the ogre and **stays there as a rock**.
 - Hovering the ogre shows the smash ring, the boulder target and the tile the rock will land on.
+
+## Prototype 3: abilities, recruit, map
+
+**Map** — 6 steps; pick 1 of 2 nodes per step (Slay the Spire style). Step 1 is always two different battles; steps 2–5 mix battle (50%), shop (25%) and ? event (25%), never two identical nodes side by side; step 6 is always the ogre. Shops only appear as map nodes now (no automatic shop after battles). Gold after a won battle: 10 + 5 per survivor (+5 for an ambush).
+
+**Built-in abilities** — one per unit type:
+
+| Unit | Ability *(placeholder)* |
+|---|---|
+| Warrior | **Shield Wall:** allies next to it take 1 less damage (min 1), from any source |
+| Archer | **Steady Aim:** +1 damage if it hasn't moved this turn |
+| Rogue | **Bloodthirst:** +1 damage per enemy kill, kept for the run |
+| Sapper | **Mines** (see below) |
+
+**Items with abilities** (in the shop/cart pool next to the 6 stat items): Vampire Fang (heal 2 on a kill, 9g), Thorned Mail (melee attackers take 1, 8g), Spring Boots (first tile each turn is free, 7g), Lucky Charm (once per battle, survive a killing blow at 1 HP, 10g). There are no other "earned" abilities: abilities come from unit types and items only.
+
+**Sapper (recruit)** — 6 HP, 2 damage melee, 4 AP. Army max is 4. Recruited for 15 gold in a shop (when the army has room) or free from the Wandering Sapper event.
+- **Place mine:** 2 AP, on a free tile next to it; max 3 of its mines on the board.
+- An **enemy** stepping onto a mine stops there and sets it off: 4 damage to every unit in the 3x3 around it, **friendly fire included**. Player units walk over their own mines safely.
+- A blast sets off any other mine or bomb inside it: **chain reactions**. Kills by a mine count for the sapper (Bloodthirst, Vampire Fang).
+- Enemies don't see mines and walk into them.
+
+**Battle: Goblin Bombers** *(placeholder numbers)*
+
+| Unit | HP | Damage | AP | Rule |
+|---|---|---|---|---|
+| Goblin Bomber (x3) | 4 | 1 (stab) | 3 | Lobs a bomb (2 AP, range 2–4, ignores line of sight) onto the nearest unit's tile, once per turn. Keeps 2+ tiles away. |
+| Goblin (x2) | 5 | 2 | 4 | Melee runner |
+
+- A bomb sits on its tile with its 3x3 blast area shown, and **explodes at the start of the next enemy turn** for 3 damage to everyone in the area. You get one turn to step out.
+- Bomb blasts set off mines and vice versa.
+
+**? events** (one at random):
+- **Wandering Sapper:** joins for free (15 gold instead if the army is full).
+- **Abandoned Cart:** a random catalog item for any unit, or leave it.
+- **Gambler:** pay 10 gold, 50% to get 25 back.
+- **Ambush:** a wolf pack fight that pays +5 gold.
+- **Shrine:** one unit gets +2 max HP for the run.
 
 ## Later / maybe
 

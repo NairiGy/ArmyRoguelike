@@ -26,16 +26,16 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Equipment_ChangesStats()
         {
-            var armored = new Unit(0, Team.Player, UnitStats.Warrior, Equipment.HeavyArmor);
+            var armored = new Unit(0, Team.Player, UnitStats.Warrior, new ArmyMember(UnitStats.Warrior, Equipment.HeavyArmor));
             Assert.AreEqual(18, armored.MaxHp);
             Assert.AreEqual(18, armored.Hp);
             Assert.AreEqual(2, armored.MaxAp);
 
-            var berserk = new Unit(1, Team.Player, UnitStats.Rogue, Equipment.BerserkerAxe);
+            var berserk = new Unit(1, Team.Player, UnitStats.Rogue, new ArmyMember(UnitStats.Rogue, Equipment.BerserkerAxe));
             Assert.AreEqual(2, berserk.MaxHp);
             Assert.AreEqual(6, berserk.BaseDamage);
 
-            var archer = new Unit(2, Team.Player, UnitStats.Archer, Equipment.Longbow);
+            var archer = new Unit(2, Team.Player, UnitStats.Archer, new ArmyMember(UnitStats.Archer, Equipment.Longbow));
             Assert.AreEqual(5, archer.Range);
         }
 
@@ -84,24 +84,143 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(Phase.Victory, b.Phase);
         }
 
+        /// <summary>A run whose second map step offers a shop, after winning the first battle with all units.</summary>
+        private static Run RunInShop()
+        {
+            for (var seed = 0; seed < 500; seed++)
+            {
+                var run = new Run(seed);
+                var shop = run.Map[1].ToList().FindIndex(n => n.Kind == NodeKind.Shop);
+                if (shop < 0)
+                    continue;
+                run.ChooseNode(0);
+                WinCurrentBattle(run, 3);
+                run.FinishBattle();
+                run.ChooseNode(shop);
+                return run;
+            }
+
+            Assert.Fail("no seed with a shop at step 2");
+            return null;
+        }
+
+        /// <summary>A run currently at the given ? event (found by trying seeds).</summary>
+        private static Run RunAtEvent(EventKind kind)
+        {
+            for (var seed = 0; seed < 2000; seed++)
+            {
+                var run = new Run(seed);
+                var ev = run.Map[1].ToList().FindIndex(n => n.Kind == NodeKind.Event);
+                if (ev < 0)
+                    continue;
+                run.ChooseNode(0);
+                WinCurrentBattle(run, 3);
+                run.FinishBattle();
+                run.ChooseNode(ev);
+                if (run.CurrentEvent == kind)
+                    return run;
+            }
+
+            Assert.Fail($"no seed with {kind} at step 2");
+            return null;
+        }
+
+        /// <summary>Resolves whatever node the run is on in the simplest way.</summary>
+        private static void PlayThroughNode(Run run)
+        {
+            switch (run.State)
+            {
+                case RunState.Battle:
+                    WinCurrentBattle(run, 3);
+                    run.FinishBattle();
+                    break;
+                case RunState.Shop:
+                    run.LeaveShop();
+                    break;
+                case RunState.Event:
+                    switch (run.CurrentEvent)
+                    {
+                        case EventKind.WanderingSapper:
+                            run.AcceptRecruit();
+                            break;
+                        case EventKind.AbandonedCart:
+                            run.TakeCartItem(null);
+                            break;
+                        case EventKind.Gambler:
+                            run.Gamble(false);
+                            break;
+                        case EventKind.Ambush:
+                            run.StartAmbush();
+                            PlayThroughNode(run);
+                            break;
+                        case EventKind.Shrine:
+                            run.PrayAtShrine(run.Army[0]);
+                            break;
+                    }
+
+                    break;
+            }
+        }
+
         [Test]
-        public void Run_GoldScalesWithSurvivors_AndOpensShop()
+        public void Map_SixSteps_TwoChoicesEach_OgreLast()
+        {
+            for (var seed = 0; seed < 50; seed++)
+            {
+                var run = new Run(seed);
+                Assert.AreEqual(Run.Steps, run.Map.Count);
+                Assert.IsTrue(run.Map[0].All(n => n.Kind == NodeKind.Battle), "the run opens with a fight");
+                Assert.AreNotEqual(run.Map[0][0].Encounter, run.Map[0][1].Encounter);
+                for (var i = 0; i < Run.Steps - 1; i++)
+                {
+                    Assert.AreEqual(2, run.Map[i].Count);
+                    var a = run.Map[i][0];
+                    var b = run.Map[i][1];
+                    Assert.IsFalse(a.Kind == b.Kind && a.Encounter == b.Encounter, "no identical pair");
+                }
+
+                var last = run.Map[Run.Steps - 1].Single();
+                Assert.AreEqual(NodeKind.Boss, last.Kind);
+                Assert.AreEqual(Encounter.Ogre, last.Encounter);
+            }
+        }
+
+        [Test]
+        public void Run_GoldScalesWithSurvivors_ThenBackToMap()
         {
             var run = new Run(1);
+            run.ChooseNode(0);
             WinCurrentBattle(run, 2);
             Assert.AreEqual(Run.GoldFor(2), run.FinishBattle());
             Assert.AreEqual(20, run.Gold);
-            Assert.AreEqual(RunState.Shop, run.State);
+            Assert.AreEqual(RunState.Map, run.State);
+            Assert.AreEqual(1, run.StepIndex);
+        }
+
+        [Test]
+        public void Shop_HasDistinctOffersAndARecruit()
+        {
+            var run = RunInShop();
             Assert.AreEqual(Run.ShopSize, run.Offers.Count);
             Assert.AreEqual(Run.ShopSize, run.Offers.Distinct().Count());
+            Assert.IsTrue(run.ShopHasRecruit);
+        }
+
+        [Test]
+        public void Shop_RecruitAddsSapper_UpToFour()
+        {
+            var run = RunInShop();
+            Assert.IsTrue(run.Gold >= Run.RecruitPrice);
+            Assert.IsTrue(run.BuyRecruit());
+            Assert.AreEqual(4, run.Army.Count);
+            Assert.AreEqual(UnitStats.Sapper, run.Army[3].Stats);
+            Assert.IsFalse(run.CanBuyRecruit, "only one recruit per shop, and the army is full");
         }
 
         [Test]
         public void Shop_BuyReplacesSlot_AndSpendsGold()
         {
-            var run = new Run(3);
-            WinCurrentBattle(run, 3);
-            run.FinishBattle();
+            var run = RunInShop();
             var warrior = run.Army[0];
             var affordable = run.Offers.Where(o => o.CanEquip(warrior.Stats)).OrderBy(o => o.Price).ToList();
             Assume.That(affordable.Count >= 2);
@@ -119,9 +238,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Shop_CantBuyWithoutGold()
         {
-            var run = new Run(5);
-            WinCurrentBattle(run, 1);
-            run.FinishBattle();
+            var run = RunInShop();
             // Spend gold until nothing more fits, then every remaining offer must be refused.
             var archer = run.Army[1];
             while (run.Offers.Any(o => run.CanBuy(o, archer)))
@@ -131,28 +248,27 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Run_ThreeBattles_ThenWon()
+        public void Run_WholeMap_ThenWonAfterOgre()
         {
-            var run = new Run(7);
-            for (var i = 0; i < 3; i++)
+            for (var seed = 0; seed < 30; seed++)
             {
-                Assert.AreEqual(Encounter.MiniRun[i], run.CurrentEncounter);
-                WinCurrentBattle(run, 3);
-                run.FinishBattle();
-                if (i < 2)
+                var run = new Run(seed);
+                for (var step = 0; step < Run.Steps; step++)
                 {
-                    Assert.AreEqual(RunState.Shop, run.State);
-                    run.LeaveShop();
+                    Assert.AreEqual(RunState.Map, run.State);
+                    run.ChooseNode(step % run.CurrentChoices.Count);
+                    PlayThroughNode(run);
                 }
-            }
 
-            Assert.AreEqual(RunState.Won, run.State);
+                Assert.AreEqual(RunState.Won, run.State, $"seed {seed}");
+            }
         }
 
         [Test]
         public void Run_DefeatEndsRun()
         {
             var run = new Run(9);
+            run.ChooseNode(0);
             var b = run.StartBattle();
             var x = 0;
             foreach (var u in b.Units.Where(u => u.Team == Team.Player))
@@ -169,12 +285,97 @@ namespace ArmyRoguelike.Tests
         public void FreshBattle_FullHpAndDeadUnitsBack()
         {
             var run = new Run(11);
+            run.ChooseNode(0);
             WinCurrentBattle(run, 1);
             run.FinishBattle();
-            run.LeaveShop();
+            // Second fight of the run, wherever it comes up.
+            while (run.State == RunState.Map)
+            {
+                var battle = run.CurrentChoices.ToList().FindIndex(n => n.Kind != NodeKind.Shop && n.Kind != NodeKind.Event);
+                run.ChooseNode(battle >= 0 ? battle : 0);
+                if (run.State != RunState.Battle)
+                    PlayThroughNode(run);
+            }
+
             var b = run.StartBattle();
             Assert.IsTrue(b.Units.Where(u => u.Team == Team.Player).All(u => u.Hp == u.MaxHp));
-            Assert.AreEqual(3, b.Units.Count(u => u.Team == Team.Player));
+            Assert.AreEqual(run.Army.Count, b.Units.Count(u => u.Team == Team.Player));
+        }
+
+        // ---------- Events ----------
+
+        [Test]
+        public void Event_Shrine_AddsMaxHpForTheRun()
+        {
+            var run = RunAtEvent(EventKind.Shrine);
+            var warrior = run.Army[0];
+            Assert.IsTrue(run.PrayAtShrine(warrior));
+            Assert.AreEqual(Run.ShrineHp, warrior.BonusMaxHp);
+            Assert.AreEqual(RunState.Map, run.State);
+            Assert.AreEqual(UnitStats.Warrior.MaxHp + Run.ShrineHp, new Unit(0, Team.Player, warrior.Stats, warrior).MaxHp);
+        }
+
+        [Test]
+        public void Event_WanderingSapper_Joins()
+        {
+            var run = RunAtEvent(EventKind.WanderingSapper);
+            run.AcceptRecruit();
+            Assert.AreEqual(4, run.Army.Count);
+        }
+
+        [Test]
+        public void Event_Gambler_CostsGoldToPlay()
+        {
+            var run = RunAtEvent(EventKind.Gambler);
+            var before = run.Gold;
+            var won = run.Gamble(true);
+            Assert.AreEqual(before - Run.GambleCost + (won ? Run.GambleWin : 0), run.Gold);
+        }
+
+        [Test]
+        public void Event_Cart_EquipsItem()
+        {
+            var run = RunAtEvent(EventKind.AbandonedCart);
+            var member = run.Army.First(m => run.CartItem.CanEquip(m.Stats));
+            Assert.IsTrue(run.TakeCartItem(member));
+            Assert.AreEqual(run.CartItem, member.Equipment);
+        }
+
+        [Test]
+        public void Event_Ambush_IsAWolfFightThatPaysExtra()
+        {
+            var run = RunAtEvent(EventKind.Ambush);
+            run.StartAmbush();
+            Assert.AreEqual(RunState.Battle, run.State);
+            Assert.AreEqual(Encounter.Wolves, run.CurrentEncounter);
+            var before = run.Gold;
+            WinCurrentBattle(run, 3);
+            run.FinishBattle();
+            Assert.AreEqual(before + Run.GoldFor(3) + Run.AmbushBonusGold, run.Gold);
+        }
+
+        [Test]
+        public void Bloodthirst_DamageCarriesToNextBattle()
+        {
+            var run = new Run(4);
+            run.ChooseNode(0);
+            var b = run.StartBattle();
+            var x = 0;
+            foreach (var u in b.Units.Where(u => u.Team == Team.Player))
+                b.Place(u, new GridPos(x++, 0));
+            b.StartBattle();
+            var rogue = b.Units.Single(u => u.Stats == UnitStats.Rogue);
+            foreach (var e in b.Units.Where(u => u.Team == Team.Enemy).ToList())
+            {
+                e.Hp = 1;
+                rogue.Ap = 99;
+                rogue.Pos = new GridPos(e.Pos.X, e.Pos.Y - 1);
+                b.PlayerAttack(rogue, e);
+            }
+
+            var kills = b.Units.Count(u => u.Team == Team.Enemy);
+            run.FinishBattle();
+            Assert.AreEqual(kills, run.Army.Single(m => m.Stats == UnitStats.Rogue).BonusDamage);
         }
 
         // ---------- Walk up and attack ----------
@@ -362,7 +563,7 @@ namespace ArmyRoguelike.Tests
             var ogre = Enemy(b);
             var intent = EnemyAI.PredictIntent(b, ogre);
             Assert.AreEqual(IntentKind.Throw, intent.Kind);
-            Assert.AreEqual(new GridPos(3, 2), intent.RockTile, "the rock lands on the target's ogre side");
+            Assert.AreEqual(new GridPos(3, 2), intent.Tile, "the rock lands on the target's ogre side");
 
             var events = b.EndPlayerTurn();
             var boulder = events.OfType<BoulderEvent>().Single();
@@ -386,7 +587,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void MiniRun_EveryBattleTerminates()
         {
-            foreach (var encounter in Encounter.MiniRun)
+            foreach (var encounter in Encounter.Regular.Append(Encounter.Ogre))
             {
                 var b = encounter.CreateBattle(ArmyMember.StartingArmy());
                 var x = 2;

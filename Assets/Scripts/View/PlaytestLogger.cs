@@ -25,10 +25,14 @@ namespace ArmyRoguelike.View
             _battle = battle;
             _log.startedAt = _created.ToString("yyyy-MM-dd HH:mm:ss");
             _log.runSeed = context.RunSeed;
-            _log.battleNumber = context.Number;
+            _log.battleNumber = context.Step;
             _log.encounter = context.Encounter;
+            _log.ambush = context.Ambush;
             _log.goldAtStart = context.Gold;
+            _goldIfWon = context.GoldIfWon;
         }
+
+        private readonly Func<int, int> _goldIfWon;
 
         public static string Folder =>
             Application.isEditor
@@ -99,6 +103,61 @@ namespace ArmyRoguelike.View
                         target = Name(raise.Raised), toX = raise.Raised.Pos.X, toY = raise.Raised.Pos.Y,
                     });
                     break;
+                case PlaceMineEvent mine:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = mine.Sapper.Team.ToString(), unit = Name(mine.Sapper), type = "place mine",
+                        toX = mine.Tile.X, toY = mine.Tile.Y, apAfter = ApAfter(mine.Sapper),
+                    });
+                    break;
+                case BombThrowEvent bomb:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = bomb.Thrower.Team.ToString(), unit = Name(bomb.Thrower), type = "throw bomb",
+                        toX = bomb.Tile.X, toY = bomb.Tile.Y,
+                    });
+                    break;
+                case ExplosionEvent blast:
+                    // One entry per unit hit (or one with no target if it hit nobody). "unit" is whoever placed or threw it.
+                    if (blast.Hits.Count == 0)
+                        _log.actions.Add(BlastEntry(turn, blast));
+                    foreach (var hit in blast.Hits)
+                    {
+                        var entry = BlastEntry(turn, blast);
+                        entry.target = Name(hit.Target);
+                        entry.damage = hit.Damage;
+                        entry.targetHpAfter = hit.HpAfter;
+                        entry.killed = hit.Killed;
+                        entry.friendlyFire = blast.Owner != null && blast.Owner.Team == hit.Target.Team;
+                        _log.actions.Add(entry);
+                    }
+
+                    break;
+                case EffectEvent effect:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = effect.Source.Team.ToString(), unit = Name(effect.Source),
+                        type = EffectType(effect.Kind), target = Name(effect.Unit), damage = effect.Kind == EffectKind.Thorns ? effect.Amount : 0,
+                        amount = effect.Amount, targetHpAfter = effect.HpAfter, killed = effect.Kind == EffectKind.Thorns && effect.HpAfter <= 0,
+                    });
+                    break;
+            }
+        }
+
+        private static ActionEntry BlastEntry(int turn, ExplosionEvent blast) => new ActionEntry
+        {
+            turn = turn, team = blast.Owner?.Team.ToString() ?? "", unit = blast.Owner != null ? Name(blast.Owner) : "",
+            type = "explosion", note = blast.Cause, toX = blast.Center.X, toY = blast.Center.Y, chainDepth = blast.ChainDepth,
+        };
+
+        private static string EffectType(EffectKind kind)
+        {
+            switch (kind)
+            {
+                case EffectKind.Heal: return "heal";
+                case EffectKind.Thorns: return "thorns";
+                case EffectKind.Bloodthirst: return "bloodthirst";
+                default: return "last stand";
             }
         }
 
@@ -177,7 +236,7 @@ namespace ArmyRoguelike.View
             _log.result = _battle.Phase == Phase.Victory ? "victory" : _battle.Phase == Phase.Defeat ? "defeat" : "abandoned";
             _log.turns = _battle.TurnNumber;
             _log.survivors = _battle.Living(Team.Player).Count();
-            _log.goldEarned = _battle.Phase == Phase.Victory ? Run.GoldFor(_log.survivors) : 0;
+            _log.goldEarned = _battle.Phase == Phase.Victory ? _goldIfWon(_log.survivors) : 0;
             _log.units = Summarise();
 
             var name = $"battle-{_created:yyyyMMdd-HHmmss}-{_log.battleNumber}.json";
@@ -213,19 +272,53 @@ namespace ArmyRoguelike.View
                     case "attack":
                     case "smash":
                     case "boulder":
-                        if (a.target == null)
+                    case "explosion":
+                    case "thorns":
+                        if (string.IsNullOrEmpty(a.target))
                             break;
-                        s.attacks++;
+                        if (a.type == "explosion")
+                        {
+                            s.explosionDamage += a.damage;
+                            if (a.friendlyFire)
+                                s.friendlyFireDealt += a.damage;
+                        }
+                        else if (a.type == "thorns")
+                        {
+                            s.thornsDamage += a.damage;
+                        }
+                        else
+                        {
+                            s.attacks++;
+                        }
+
                         s.damageDealt += a.damage;
                         if (a.killed)
                             s.kills++;
                         if (summaries.TryGetValue(a.target, out var t))
                         {
                             t.damageTaken += a.damage;
+                            if (a.friendlyFire)
+                                t.friendlyFireTaken += a.damage;
                             if (a.killed)
                                 t.deaths++;
                         }
 
+                        break;
+                    case "place mine":
+                        s.minesPlaced++;
+                        break;
+                    case "throw bomb":
+                        s.bombsThrown++;
+                        break;
+                    case "heal":
+                        s.healed += a.amount;
+                        break;
+                    case "bloodthirst":
+                        s.bloodthirstGained += a.amount;
+                        break;
+                    case "last stand":
+                        if (summaries.TryGetValue(a.target, out var saved))
+                            saved.lastStands++;
                         break;
                 }
             }
@@ -249,6 +342,7 @@ namespace ArmyRoguelike.View
             public string result;
             public int turns;
             public int survivors;
+            public bool ambush;
             public int goldAtStart;
             public int goldEarned;
             public List<PlacementEntry> placements = new List<PlacementEntry>();
@@ -304,8 +398,20 @@ namespace ArmyRoguelike.View
             /// <summary>Move or attack done by clicking a distant enemy (walk up and attack).</summary>
             public bool autoApproach;
 
-            /// <summary>End turn prompt: "asked", "confirmed" or "cancelled". "target" lists the units that could still act.</summary>
+            /// <summary>
+            /// End turn prompt: "asked", "confirmed" or "cancelled" ("target" lists the units that could still act).
+            /// Explosion: "mine" or "bomb".
+            /// </summary>
             public string note;
+
+            /// <summary>Explosion: 0 for the first blast, 1+ for blasts it set off.</summary>
+            public int chainDepth;
+
+            /// <summary>Explosion hit a unit on the same team as whoever placed or threw it.</summary>
+            public bool friendlyFire;
+
+            /// <summary>Heal, bloodthirst and thorns: how much.</summary>
+            public int amount;
         }
 
         [Serializable]
@@ -362,6 +468,22 @@ namespace ArmyRoguelike.View
 
             /// <summary>Times the player clicked a distant enemy and the unit walked up to attack.</summary>
             public int walkUpAttacks;
+
+            public int minesPlaced;
+            public int bombsThrown;
+
+            /// <summary>Damage this unit's mines/bombs dealt (to anyone), and how much of that hit its own side.</summary>
+            public int explosionDamage;
+
+            public int friendlyFireDealt;
+
+            /// <summary>Damage this unit took from its own side's explosions.</summary>
+            public int friendlyFireTaken;
+
+            public int thornsDamage;
+            public int healed;
+            public int bloodthirstGained;
+            public int lastStands;
         }
     }
 

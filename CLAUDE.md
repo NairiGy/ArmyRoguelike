@@ -4,7 +4,7 @@ A single-player roguelike army-builder. You lead a small squad of living statues
 
 ## Status
 
-- **Prototype 2 (mini-run):** three fixed battles (wolf pack → necromancer → ogre) with an equipment shop between them. `Core/Run.cs` holds the run, gold, shop and encounter layouts.
+- **Prototype 3:** a 6-step branching map (battles, shops, ? events, ogre boss), built-in unit abilities, ability items, a sapper recruit with mines and chain explosions, and a goblin bomber battle. `Core/Run.cs` holds the run, map, shop, events and encounter layouts; `Core/Battle.cs` routes all damage through one `Damage` method so abilities apply to every source.
 - Full design and placeholder numbers: [docs/design-note.md](docs/design-note.md). Keep it updated when design decisions change.
 
 ## Tech

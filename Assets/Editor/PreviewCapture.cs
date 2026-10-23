@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using ArmyRoguelike.Core;
 using ArmyRoguelike.View;
 using UnityEditor;
@@ -37,7 +38,10 @@ public static class PreviewCapture
 
     private static void Capture(string output, bool placeArmy, int encounter = 0)
     {
-        var battle = Encounter.MiniRun[Mathf.Clamp(encounter, 0, Encounter.MiniRun.Count - 1)].CreateBattle(ArmyMember.StartingArmy());
+        var encounters = new[] { Encounter.Wolves, Encounter.Necromancer, Encounter.Ogre, Encounter.Goblins };
+        var army = ArmyMember.StartingArmy();
+        army.Add(new ArmyMember(UnitStats.Sapper));
+        var battle = encounters[Mathf.Clamp(encounter, 0, encounters.Length - 1)].CreateBattle(army);
         if (placeArmy)
         {
             var x = 2;
@@ -46,10 +50,24 @@ public static class PreviewCapture
                     battle.Place(u, new GridPos(x++, 1));
         }
 
+        // -previewPlayTurn: the sapper lays a mine and the enemies take one turn, to show mines and bombs.
+        var playTurn = System.Environment.GetCommandLineArgs().Contains("-previewPlayTurn");
+        if (placeArmy && playTurn && battle.StartBattle())
+        {
+            var sapper = battle.Units.FirstOrDefault(u => u.Has(Ability.Mines));
+            if (sapper != null)
+                battle.PlayerPlaceMine(sapper, new GridPos(sapper.Pos.X, sapper.Pos.Y + 1));
+            battle.EndPlayerTurn();
+        }
+
         var root = new GameObject("PreviewRoot");
         try
         {
             var board = BoardView.Create(battle, root.transform);
+            board.SyncHazards();
+            foreach (var bomb in battle.Bombs)
+            foreach (var p in battle.BlastArea(bomb.Tile))
+                board.SetHighlight(p, new Color(1f, 0.45f, 0.1f, 0.4f));
             var cam = Camera.main;
             GameBootstrap.FrameCamera(cam, board);
             var rt = new RenderTexture(1280, 720, 24);

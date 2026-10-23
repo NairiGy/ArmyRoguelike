@@ -11,20 +11,26 @@ namespace ArmyRoguelike.View
     /// <summary>Where a battle sits in the run, for the HUD and the playtest log.</summary>
     public readonly struct BattleContext
     {
-        public readonly int Number;
-        public readonly int Count;
+        public readonly int Step;
+        public readonly int Steps;
         public readonly string Encounter;
         public readonly int Gold;
         public readonly int RunSeed;
+        public readonly bool Ambush;
+        public readonly bool Boss;
 
-        public BattleContext(int number, int count, string encounter, int gold, int runSeed)
+        public BattleContext(int step, int steps, string encounter, int gold, int runSeed, bool ambush, bool boss)
         {
-            Number = number;
-            Count = count;
+            Step = step;
+            Steps = steps;
             Encounter = encounter;
             Gold = gold;
             RunSeed = runSeed;
+            Ambush = ambush;
+            Boss = boss;
         }
+
+        public int GoldIfWon(int survivors) => Run.GoldFor(survivors) + (Ambush ? Run.AmbushBonusGold : 0);
     }
 
     /// <summary>Turns mouse input into battle actions, plays the animations and draws the HUD.</summary>
@@ -43,6 +49,8 @@ namespace ArmyRoguelike.View
         private static readonly Color SmashZoneColor = new Color(1f, 0.3f, 0.25f, 0.3f);
         private static readonly Color RockLandingColor = new Color(0.15f, 0.12f, 0.1f, 0.6f);
         private static readonly Color RaiseColor = new Color(0.7f, 0.4f, 1f, 0.6f);
+        private static readonly Color BombZoneColor = new Color(1f, 0.45f, 0.1f, 0.4f);
+        private static readonly Color MineSpotColor = new Color(1f, 0.9f, 0.3f, 0.5f);
 
         // Wolf tints: warm while the leader's aura reaches them, pale and cold once the leader is dead.
         private static readonly Color NearLeaderTint = new Color(1.25f, 0.8f, 0.75f);
@@ -51,10 +59,12 @@ namespace ArmyRoguelike.View
         private const float ReferenceHeight = 720f;
         private const float PauseBetweenEnemies = 0.25f;
         private const float BoulderFlightTime = 0.45f;
+        private const float BlastTime = 0.35f;
 
         private BoardView _board;
         private IntentView _intent;
         private Camera _camera;
+        private Vector3 _cameraHome;
         private BattleContext _context;
         private Action _onContinue;
         private Unit _toPlace;
@@ -63,6 +73,7 @@ namespace ArmyRoguelike.View
         private GridPos? _hovered;
         private bool _busy;
         private bool _confirmEndTurn;
+        private bool _mineMode;
         private string _hint = "";
         private PlaytestLogger _logger;
         private string _markerNote;
@@ -75,6 +86,7 @@ namespace ArmyRoguelike.View
         {
             _board = board;
             _camera = cam;
+            _cameraHome = cam.transform.position;
             _context = context;
             _onContinue = onContinue;
             _intent = IntentView.Create(transform);
@@ -91,11 +103,15 @@ namespace ArmyRoguelike.View
             if (_board == null || _camera == null || Mouse.current == null)
                 return;
 
-            if (Keyboard.current != null && Keyboard.current.f9Key.wasPressedThisFrame)
+            var keyboard = Keyboard.current;
+            if (keyboard != null && keyboard.f9Key.wasPressedThisFrame)
             {
                 _markerNote = $"Marker {_logger.AddMarker()} saved";
                 _markerNoteUntil = Time.unscaledTime + 2f;
             }
+
+            if (keyboard != null && keyboard.mKey.wasPressedThisFrame && !_busy && CanUseMines(_selected))
+                _mineMode = !_mineMode;
 
             _hovered = HoveredTile();
             _hoveredUnit = _hovered.HasValue ? Battle.UnitAt(_hovered.Value) : null;
@@ -158,6 +174,8 @@ namespace ArmyRoguelike.View
 
         // ---------- Player turn ----------
 
+        private bool CanUseMines(Unit unit) => unit != null && unit.Has(Ability.Mines) && Battle.CanAct(unit);
+
         private void UpdatePlayerTurn(bool clicked)
         {
             if (clicked)
@@ -170,6 +188,23 @@ namespace ArmyRoguelike.View
         private void HandlePlayerClick(GridPos tile)
         {
             var target = _hoveredUnit;
+
+            if (_mineMode && _selected != null)
+            {
+                if (Battle.CanPlaceMine(_selected, tile))
+                {
+                    var placed = Battle.PlayerPlaceMine(_selected, tile);
+                    Record(placed);
+                    StartCoroutine(PlayPlayerAction(placed));
+                }
+                else
+                {
+                    _hint = "Mine placement cancelled.";
+                }
+
+                _mineMode = false;
+                return;
+            }
 
             if (target != null && target.Team == Team.Player)
             {
@@ -190,23 +225,29 @@ namespace ArmyRoguelike.View
                 var attack = Battle.PlayerAttack(_selected, target);
                 if (attack != null)
                 {
-                    _logger.Record(attack, Battle.TurnNumber);
+                    Record(attack);
                     StartCoroutine(PlayPlayerAction(attack));
                 }
+
                 return;
             }
 
             // A distant enemy: walk to the cheapest tile to hit it from, then attack.
             if (target != null && target.Team == Team.Enemy && Battle.FindAttackSpot(_selected, target) is var spot && spot.HasValue)
             {
-                var move = Battle.PlayerMove(_selected, spot.Value.tile);
-                var attack = move != null ? Battle.PlayerAttack(_selected, target) : null;
-                if (move != null)
-                    _logger.Record(move, Battle.TurnNumber, autoApproach: true);
-                if (attack != null)
-                    _logger.Record(attack, Battle.TurnNumber, autoApproach: true);
-                if (move != null)
-                    StartCoroutine(attack != null ? PlayPlayerAction(move, attack) : PlayPlayerAction(move));
+                var events = Battle.PlayerMove(_selected, spot.Value.tile);
+                if (events == null)
+                    return;
+                Record(events, autoApproach: true);
+                // The walk itself may have changed things; attack only if it still works.
+                if (target.IsAlive && Battle.CanAttack(_selected, target))
+                {
+                    var attack = Battle.PlayerAttack(_selected, target);
+                    Record(attack, autoApproach: true);
+                    events.AddRange(attack);
+                }
+
+                StartCoroutine(PlayPlayerAction(events));
                 return;
             }
 
@@ -215,9 +256,10 @@ namespace ArmyRoguelike.View
                 var move = Battle.PlayerMove(_selected, tile);
                 if (move != null)
                 {
-                    _logger.Record(move, Battle.TurnNumber);
+                    Record(move);
                     StartCoroutine(PlayPlayerAction(move));
                 }
+
                 return;
             }
 
@@ -234,27 +276,36 @@ namespace ArmyRoguelike.View
                 Select(null);
         }
 
+        private void Record(List<BattleEvent> events, bool autoApproach = false)
+        {
+            if (events == null)
+                return;
+            foreach (var ev in events)
+                _logger.Record(ev, Battle.TurnNumber, autoApproach);
+        }
+
         private void Select(Unit unit)
         {
             if (_selected != null)
                 _board.ViewOf(_selected)?.SetSelected(false);
             _selected = unit;
+            _mineMode = false;
             if (_selected != null)
                 _board.ViewOf(_selected)?.SetSelected(true);
             _hint = unit == null ? "Click a statue to select it." : "Click a blue tile to move or a red one to attack.";
         }
 
-        private IEnumerator PlayPlayerAction(params BattleEvent[] events)
+        private IEnumerator PlayPlayerAction(List<BattleEvent> events)
         {
             _busy = true;
             _board.ClearHighlights();
-            foreach (var ev in events)
-                yield return PlayEvent(ev);
+            yield return PlayEvents(events);
 
             // A unit with no AP left has nothing more to do.
-            if (_selected != null && _selected.IsAlive && _selected.Ap == 0)
+            if (_selected != null && (!_selected.IsAlive || _selected.Ap == 0))
                 FinishSelectedUnit();
             RefreshUnitStates();
+            _board.SyncHazards();
             if (Battle.IsOver)
                 _logger.Save();
             _busy = false;
@@ -270,7 +321,7 @@ namespace ArmyRoguelike.View
             RefreshUnitStates();
         }
 
-        /// <summary>Player units that could still move or attack: ending the turn now wastes their actions.</summary>
+        /// <summary>Player units that could still act: ending the turn now wastes their actions.</summary>
         private List<Unit> UnitsThatCanStillAct() => Battle.Living(Team.Player).Where(Battle.CanStillAct).ToList();
 
         /// <summary>The End turn button. Asks first if some units still have something to do.</summary>
@@ -306,17 +357,11 @@ namespace ArmyRoguelike.View
             var events = Battle.EndPlayerTurn();
             foreach (var ev in events)
                 _logger.Record(ev, turn);
-            Unit lastActor = null;
-            foreach (var ev in events)
-            {
-                if (lastActor != null && ev.Actor != lastActor)
-                    yield return new WaitForSeconds(PauseBetweenEnemies);
-                lastActor = ev.Actor;
-                yield return PlayEvent(ev);
-            }
+            yield return PlayEvents(events);
 
             _hint = "Your turn. Click a statue to select it.";
             RefreshUnitStates();
+            _board.SyncHazards();
             if (Battle.IsOver)
                 _logger.Save();
             _busy = false;
@@ -328,11 +373,21 @@ namespace ArmyRoguelike.View
         private void DrawPlayerHighlights()
         {
             _board.ClearHighlights();
+            DrawBombZones();
             DrawEnemyHover();
             if (_selected == null)
                 return;
 
             _board.SetHighlight(_selected.Pos, SelectedColor);
+
+            if (_mineMode)
+            {
+                foreach (var p in _selected.Pos.Neighbours())
+                    if (Battle.CanPlaceMine(_selected, p))
+                        _board.SetHighlight(p, _hovered == p ? HoverColor : MineSpotColor);
+                return;
+            }
+
             var reachable = Battle.GetReachable(_selected);
             foreach (var p in reachable.Keys)
                 _board.SetHighlight(p, MoveColor);
@@ -357,6 +412,14 @@ namespace ArmyRoguelike.View
             if (_hoveredUnit != null && _hoveredUnit.Team == Team.Enemy && !Battle.CanAttack(_selected, _hoveredUnit) &&
                 Battle.FindAttackSpot(_selected, _hoveredUnit) is var spot && spot.HasValue)
                 _board.SetHighlight(spot.Value.tile, HoverColor);
+        }
+
+        /// <summary>Every waiting bomb shows its blast area, so it can be dodged.</summary>
+        private void DrawBombZones()
+        {
+            foreach (var bomb in Battle.Bombs)
+            foreach (var p in Battle.BlastArea(bomb.Tile))
+                _board.SetHighlight(p, BombZoneColor);
         }
 
         /// <summary>While hovering an enemy: what it plans to do next, and for the pack leader its aura.</summary>
@@ -393,8 +456,14 @@ namespace ArmyRoguelike.View
                     break;
                 case IntentKind.Throw:
                     _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
-                    if (intent.RockTile.HasValue)
-                        _board.SetHighlight(intent.RockTile.Value, RockLandingColor);
+                    if (intent.Tile.HasValue)
+                        _board.SetHighlight(intent.Tile.Value, RockLandingColor);
+                    _intent.Show(from, to);
+                    break;
+                case IntentKind.Bomb:
+                    foreach (var p in Battle.BlastArea(intent.Target.Pos))
+                        _board.SetHighlight(p, BombZoneColor);
+                    _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
                     _intent.Show(from, to);
                     break;
                 default:
@@ -414,6 +483,21 @@ namespace ArmyRoguelike.View
         }
 
         // ---------- Animation ----------
+
+        /// <summary>Plays events in order, with a short pause whenever a different enemy starts acting.</summary>
+        private IEnumerator PlayEvents(List<BattleEvent> events)
+        {
+            Unit lastActor = null;
+            foreach (var ev in events)
+            {
+                var enemyActing = ev.Actor != null && ev.Actor.Team == Team.Enemy && !(ev is EffectEvent) && !(ev is ExplosionEvent);
+                if (enemyActing && lastActor != null && ev.Actor != lastActor)
+                    yield return new WaitForSeconds(PauseBetweenEnemies);
+                if (enemyActing)
+                    lastActor = ev.Actor;
+                yield return PlayEvent(ev);
+            }
+        }
 
         private IEnumerator PlayEvent(BattleEvent ev)
         {
@@ -455,10 +539,14 @@ namespace ArmyRoguelike.View
                     var target = _board.ViewOf(boulder.Hit.Target);
                     yield return thrower.Lunge(target.transform.position, null);
                     thrower.SetGridPosition(boulder.Thrower.Pos);
-                    yield return FlyBoulder(thrower.TopWorld, target.transform.position);
+                    yield return FlyProjectile(PlaceholderArt.Rock, 0.45f, thrower.TopWorld, target.transform.position);
                     ShowHit(boulder.Hit);
                     if (boulder.RockTile.HasValue)
+                    {
+                        _board.RemoveHazard(boulder.RockTile.Value);
                         _board.AddRock(boulder.RockTile.Value);
+                    }
+
                     yield return boulder.Hit.Killed ? target.Die() : target.Hit();
                     break;
                 }
@@ -471,7 +559,66 @@ namespace ArmyRoguelike.View
                     yield return raised.Raise();
                     break;
                 }
+                case PlaceMineEvent mine:
+                {
+                    var sapper = _board.ViewOf(mine.Sapper);
+                    yield return sapper.Lunge(IsoMath.GridToWorld(mine.Tile), () => _board.AddHazard(mine.Tile, false));
+                    sapper.SetGridPosition(mine.Sapper.Pos);
+                    break;
+                }
+                case BombThrowEvent bomb:
+                {
+                    var thrower = _board.ViewOf(bomb.Thrower);
+                    var to = IsoMath.GridToWorld(bomb.Tile);
+                    yield return thrower.Lunge(to, null);
+                    thrower.SetGridPosition(bomb.Thrower.Pos);
+                    yield return FlyProjectile(PlaceholderArt.Bomb, 1f, thrower.TopWorld, to);
+                    _board.AddHazard(bomb.Tile, true);
+                    break;
+                }
+                case ExplosionEvent blast:
+                {
+                    _board.RemoveHazard(blast.Center);
+                    StartCoroutine(_board.Flash(blast.Area, BlastTime));
+                    StartCoroutine(Shake(0.06f + 0.02f * blast.ChainDepth, BlastTime));
+                    foreach (var hit in blast.Hits)
+                        ShowHit(hit);
+                    yield return PlayHitReactions(blast.Hits);
+                    break;
+                }
+                case EffectEvent effect:
+                    yield return PlayEffect(effect);
+                    break;
             }
+        }
+
+        private IEnumerator PlayEffect(EffectEvent effect)
+        {
+            var view = _board.ViewOf(effect.Unit);
+            if (view == null)
+                yield break;
+            var at = view.TopWorld + Vector3.up * 0.25f;
+            switch (effect.Kind)
+            {
+                case EffectKind.Heal:
+                    DamagePopup.Spawn(at, $"+{effect.Amount}", DamagePopup.HealColor);
+                    view.RefreshHp(effect.HpAfter);
+                    break;
+                case EffectKind.Thorns:
+                    DamagePopup.Spawn(at, $"-{effect.Amount} thorns", DamagePopup.DamageColor, 48);
+                    view.RefreshHp(effect.HpAfter);
+                    yield return effect.HpAfter <= 0 ? view.Die() : view.Hit();
+                    yield break;
+                case EffectKind.Bloodthirst:
+                    DamagePopup.Spawn(at, "+1 DMG", DamagePopup.AbilityColor, 48);
+                    break;
+                case EffectKind.LastStand:
+                    DamagePopup.Spawn(at, "Last Stand!", DamagePopup.AbilityColor, 48);
+                    view.RefreshHp(effect.HpAfter);
+                    break;
+            }
+
+            yield return new WaitForSeconds(0.25f);
         }
 
         private void ShowHit(Hit hit)
@@ -501,20 +648,34 @@ namespace ArmyRoguelike.View
             done();
         }
 
-        private IEnumerator FlyBoulder(Vector3 from, Vector3 to)
+        private IEnumerator FlyProjectile(Sprite sprite, float scale, Vector3 from, Vector3 to)
         {
-            var rock = new GameObject("Boulder").AddComponent<SpriteRenderer>();
-            rock.sprite = PlaceholderArt.Rock;
-            rock.transform.localScale = Vector3.one * 0.45f;
-            rock.sortingOrder = 15000;
+            var projectile = new GameObject("Projectile").AddComponent<SpriteRenderer>();
+            projectile.sprite = sprite;
+            projectile.transform.localScale = Vector3.one * scale;
+            projectile.sortingOrder = 15000;
             var height = 0.6f + Vector3.Distance(from, to) * 0.15f;
             for (var t = 0f; t < 1f; t += Time.deltaTime / BoulderFlightTime)
             {
-                rock.transform.position = Vector3.Lerp(from, to, t) + Vector3.up * (Mathf.Sin(t * Mathf.PI) * height);
+                projectile.transform.position = Vector3.Lerp(from, to, t) + Vector3.up * (Mathf.Sin(t * Mathf.PI) * height);
                 yield return null;
             }
 
-            Destroy(rock.gameObject);
+            Destroy(projectile.gameObject);
+        }
+
+        private IEnumerator Shake(float strength, float duration)
+        {
+            // Chain blasts overlap their shakes, so always settle back on the framed position.
+            var home = _cameraHome;
+            for (var t = 0f; t < 1f; t += Time.deltaTime / duration)
+            {
+                var falloff = 1f - t;
+                _camera.transform.position = home + (Vector3)(UnityEngine.Random.insideUnitCircle * strength * falloff);
+                yield return null;
+            }
+
+            _camera.transform.position = home;
         }
 
         /// <summary>Dims statues that have finished their turn and tints wolves by their pack state.</summary>
@@ -587,13 +748,14 @@ namespace ArmyRoguelike.View
             }
         }
 
-        private string Header => $"Battle {_context.Number}/{_context.Count}: {_context.Encounter}    Gold {_context.Gold}";
+        private string Header =>
+            $"Step {_context.Step}/{_context.Steps}: {(_context.Boss ? "Boss " : "")}{(_context.Ambush ? "Ambush! " : "")}{_context.Encounter}    Gold {_context.Gold}";
 
         private void DrawPlacementHud()
         {
             var army = Battle.Units.Where(u => u.Team == Team.Player).ToList();
             var hoverText = HoverText();
-            _hudRect = new Rect(10, 10, 280, 100 + army.Count * 30 + 40 + (hoverText != null ? 70 : 0));
+            _hudRect = new Rect(10, 10, 300, 100 + army.Count * 30 + 40 + (hoverText != null ? 90 : 0));
             GUILayout.BeginArea(_hudRect, GUI.skin.box);
             GUILayout.Label(Header);
             GUILayout.Label("Place your army in the blue tiles.");
@@ -619,7 +781,7 @@ namespace ArmyRoguelike.View
         private void DrawTurnHud()
         {
             var playerTurn = Battle.Phase == Phase.PlayerTurn && !_busy;
-            _hudRect = new Rect(10, 10, 300, 330);
+            _hudRect = new Rect(10, 10, 320, 400);
             GUILayout.BeginArea(_hudRect, GUI.skin.box);
             GUILayout.Label(Header);
             GUILayout.Label($"Turn {Battle.TurnNumber}: {(playerTurn ? "your turn" : "enemy turn")}");
@@ -627,6 +789,7 @@ namespace ArmyRoguelike.View
             if (_selected != null)
             {
                 GUILayout.Label(UnitLine(_selected));
+                GUILayout.Label(AbilityLines(_selected));
                 GUILayout.Label($"AP {_selected.Ap}   (move {Battle.MoveCost} per tile, attack {Battle.AttackCost})");
             }
 
@@ -655,7 +818,16 @@ namespace ArmyRoguelike.View
             }
             else if (playerTurn)
             {
-                GUILayout.Label(_hint);
+                GUILayout.Label(_mineMode ? "Click a yellow tile to place the mine (M or any other tile cancels)." : _hint);
+                if (CanUseMines(_selected))
+                {
+                    var left = Battle.MaxMinesPerUnit - Battle.MinesOf(_selected);
+                    GUI.enabled = _selected.Pos.Neighbours().Any(p => Battle.CanPlaceMine(_selected, p));
+                    if (GUILayout.Button(_mineMode ? "Cancel mine (M)" : $"Place mine: {Battle.MineCost} AP, {left} left (M)"))
+                        _mineMode = !_mineMode;
+                    GUI.enabled = true;
+                }
+
                 GUI.enabled = _selected != null;
                 if (GUILayout.Button(_selected != null ? $"Done with {_selected.Stats.Name}" : "Done"))
                     FinishSelectedUnit();
@@ -680,7 +852,7 @@ namespace ArmyRoguelike.View
             {
                 var survivors = Battle.Living(Team.Player).Count();
                 GUILayout.Label("Victory!", style);
-                GUILayout.Label($"{survivors} survived: +{Run.GoldFor(survivors)} gold", centred);
+                GUILayout.Label($"{survivors} survived: +{_context.GoldIfWon(survivors)} gold", centred);
             }
             else
             {
@@ -698,6 +870,9 @@ namespace ArmyRoguelike.View
             if (_hoveredUnit != null && _hoveredUnit != _selected)
             {
                 var text = "Hover: " + UnitLine(_hoveredUnit);
+                var abilities = AbilityLines(_hoveredUnit);
+                if (abilities.Length > 0)
+                    text += "\n" + abilities;
                 switch (Battle.GetPackState(_hoveredUnit))
                 {
                     case PackState.NearLeader:
@@ -714,6 +889,8 @@ namespace ArmyRoguelike.View
                     text += $"\nRaises a bone pile within {_hoveredUnit.Stats.RaiseRange} tiles instead of attacking";
                 if (_hoveredUnit.Stats.AreaMelee)
                     text += $"\nSmash hits everyone next to it. Throws boulders up to {_hoveredUnit.Stats.ThrowRange} tiles; they stay as rocks";
+                if (_hoveredUnit.Stats.CanBomb)
+                    text += $"\nLobs a bomb ({_hoveredUnit.Stats.BombDamage} damage, 3x3) that explodes next enemy turn";
                 if (_hoveredUnit.Team == Team.Enemy)
                     text += "\n" + IntentText(EnemyAI.PredictIntent(Battle, _hoveredUnit));
                 if (_selected != null && _hoveredUnit.Team == Team.Enemy && !Battle.CanAttack(_selected, _hoveredUnit) &&
@@ -722,10 +899,19 @@ namespace ArmyRoguelike.View
                 return text;
             }
 
-            if (_hovered.HasValue && Battle.RemainsAt(_hovered.Value) is Unit bones)
-                return $"Bone pile ({bones.Stats.Name}). The Necromancer can raise it.\nStand on it to stop that.";
-            if (_selected != null && _hovered.HasValue && Battle.GetReachable(_selected).TryGetValue(_hovered.Value, out var cost))
-                return $"Move here: {cost} AP";
+            if (_hovered.HasValue)
+            {
+                var p = _hovered.Value;
+                if (Battle.BombAt(p) is Bomb bomb)
+                    return $"Bomb: explodes at the start of the enemy turn for {bomb.Damage} damage to everyone in the orange 3x3.";
+                if (Battle.MineAt(p) != null)
+                    return $"Your mine: an enemy stepping here sets it off ({Battle.MineDamage} damage to everyone around, your units too).";
+                if (Battle.RemainsAt(p) is Unit bones)
+                    return $"Bone pile ({bones.Stats.Name}). The Necromancer can raise it.\nStand on it to stop that.";
+                if (_selected != null && !_mineMode && Battle.GetReachable(_selected).TryGetValue(p, out var cost))
+                    return $"Move here: {cost} AP";
+            }
+
             return null;
         }
 
@@ -742,6 +928,8 @@ namespace ArmyRoguelike.View
                     return $"Wants to: smash, going for the {name}";
                 case IntentKind.Throw:
                     return $"Wants to: throw a boulder at the {name} (rock lands on the dark tile)";
+                case IntentKind.Bomb:
+                    return $"Wants to: bomb the {name}'s tile (goes off next enemy turn)";
                 default:
                     return $"Wants to attack: {name}";
             }
@@ -751,6 +939,19 @@ namespace ArmyRoguelike.View
         {
             var item = u.Equipment != null ? $"  [{u.Equipment.Name}]" : "";
             return $"{u.Stats.Name}  HP {u.Hp}/{u.MaxHp}  DMG {Battle.EffectiveDamage(u)}  RNG {u.Range}{item}";
+        }
+
+        private static string AbilityLines(Unit u)
+        {
+            var lines = new List<string>();
+            if (u.Stats.Ability != Ability.None)
+                lines.Add($"{Abilities.Name(u.Stats.Ability)}: {Abilities.Describe(u.Stats.Ability)}");
+            var itemAbility = u.Equipment?.Ability ?? Ability.None;
+            if (itemAbility != Ability.None)
+                lines.Add($"{Abilities.Name(itemAbility)} ({u.Equipment.Name}): {Abilities.Describe(itemAbility)}");
+            if (u.Member != null && u.Member.BonusDamage + u.GainedDamage > 0)
+                lines.Add($"Bloodthirst so far: +{u.Member.BonusDamage + u.GainedDamage} damage");
+            return string.Join("\n", lines);
         }
     }
 }

@@ -54,6 +54,75 @@ namespace ArmyRoguelike.View
             SyncUnits();
         }
 
+        private readonly Dictionary<GridPos, SpriteRenderer> _hazards = new Dictionary<GridPos, SpriteRenderer>();
+
+        /// <summary>Shows a mine or bomb on a tile (replacing whatever marker was there).</summary>
+        public void AddHazard(GridPos p, bool isBomb)
+        {
+            RemoveHazard(p);
+            var sr = new GameObject(isBomb ? $"Bomb {p}" : $"Mine {p}").AddComponent<SpriteRenderer>();
+            sr.transform.SetParent(transform, false);
+            sr.transform.position = IsoMath.GridToWorld(p);
+            sr.sprite = isBomb ? PlaceholderArt.Bomb : PlaceholderArt.Mine;
+            // Mines lie flat under statues; bombs sit on top so they're easy to spot.
+            sr.sortingOrder = isBomb ? IsoMath.SortingOrder(p) + 9 : IsoMath.SortingOrder(p) + 1;
+            _hazards[p] = sr;
+        }
+
+        public void RemoveHazard(GridPos p)
+        {
+            if (!_hazards.TryGetValue(p, out var sr))
+                return;
+            Destroy(sr.gameObject);
+            _hazards.Remove(p);
+        }
+
+        /// <summary>Makes the markers match the rules exactly, e.g. after a turn's animations finish.</summary>
+        public void SyncHazards()
+        {
+            var wanted = new Dictionary<GridPos, bool>();
+            foreach (var m in Battle.Mines)
+                wanted[m.Tile] = false;
+            foreach (var b in Battle.Bombs)
+                wanted[b.Tile] = true;
+            foreach (var p in new List<GridPos>(_hazards.Keys))
+                if (!wanted.ContainsKey(p))
+                    RemoveHazard(p);
+            foreach (var kv in wanted)
+                if (!_hazards.TryGetValue(kv.Key, out var sr) || (sr.sprite == PlaceholderArt.Bomb) != kv.Value)
+                    AddHazard(kv.Key, kv.Value);
+        }
+
+        /// <summary>A quick orange flash over a blast area.</summary>
+        public System.Collections.IEnumerator Flash(IEnumerable<GridPos> area, float duration)
+        {
+            var flashes = new List<SpriteRenderer>();
+            foreach (var p in area)
+            {
+                var sr = new GameObject("Blast").AddComponent<SpriteRenderer>();
+                sr.transform.SetParent(transform, false);
+                sr.transform.position = IsoMath.GridToWorld(p);
+                sr.sprite = PlaceholderArt.Tile;
+                sr.sortingOrder = 14000;
+                flashes.Add(sr);
+            }
+
+            for (var t = 0f; t < 1f; t += Time.deltaTime / duration)
+            {
+                var c = Color.Lerp(new Color(1f, 0.95f, 0.6f, 0.9f), new Color(1f, 0.35f, 0.1f, 0f), t);
+                foreach (var sr in flashes)
+                {
+                    sr.color = c;
+                    sr.transform.localScale = Vector3.one * (0.8f + 0.3f * t);
+                }
+
+                yield return null;
+            }
+
+            foreach (var sr in flashes)
+                Destroy(sr.gameObject);
+        }
+
         /// <summary>Draws a rock on a tile. Also used when a boulder lands during the battle.</summary>
         public void AddRock(GridPos p)
         {
