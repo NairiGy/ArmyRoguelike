@@ -25,6 +25,11 @@ namespace ArmyRoguelike.Core
         Ogre,
         Goblin,
         GoblinBomber,
+        Cutpurse,
+        Crossbowman,
+        Brute,
+        Elemental,
+        Shard,
     }
 
     /// <summary>A passive rule a unit has, from its type or from an item.</summary>
@@ -208,6 +213,18 @@ namespace ArmyRoguelike.Core
 
         /// <summary>A battle-only unit (turret): doesn't count for survival or defeat.</summary>
         public bool IsSummon { get; private set; }
+
+        /// <summary>When it dies it splits into two of these. Null = no split.</summary>
+        public UnitStats SplitsInto { get; private set; }
+
+        /// <summary>Gold stolen on a hit (then it flees). 0 = doesn't steal.</summary>
+        public int StealsGold { get; private set; }
+
+        /// <summary>Slam: shoves every unit within 2 tiles 1 tile away.</summary>
+        public bool Slams { get; private set; }
+
+        /// <summary>A raised version of another enemy (necromancer boss army).</summary>
+        public bool IsUndead { get; private set; }
 
         /// <summary>Raising a bone pile: AP cost and range in steps. 0 = can't raise.</summary>
         public int RaiseCost { get; private set; }
@@ -449,20 +466,76 @@ namespace ArmyRoguelike.Core
                 LeavesRemains = true, Role = "Leaves a bone pile when killed; a Necromancer can raise it. Stand on the pile to stop that.",
             };
 
-        /// <summary>Its basic attack is a weak bolt (range 3, needs line of sight).</summary>
+        /// <summary>
+        /// Act 1 boss. Its army is raised from the factions beaten earlier in the act. Its basic attack
+        /// is a bolt (range 3, needs line of sight).
+        /// </summary>
         public static readonly UnitStats Necromancer =
-            new UnitStats(UnitKind.Necromancer, "Necromancer", 6, 2, 3, 3)
+            new UnitStats(UnitKind.Necromancer, "Necromancer", 14, 3, 3, 3)
             {
-                RaiseCost = 3, RaiseRange = 4,
-                Role = "Raises a bone pile within 4 tiles (3 AP). Keeps 3 tiles away, walks up to bolt range and shoots (needs line of sight).",
+                RaiseCost = 3, RaiseRange = 5,
+                Role = "Boss. Brings raised versions of the factions you beat this act. Raises a bone pile within 5 tiles (3 AP). " +
+                       "Keeps 3 tiles away, walks up to bolt range and shoots (needs line of sight).",
             };
 
-        /// <summary>Its basic attack is the club smash, which hits everyone adjacent.</summary>
-        public static readonly UnitStats Ogre = new UnitStats(UnitKind.Ogre, "Ogre", 30, 5, 1, 4)
+        /// <summary>Act 1 boss (the ogre). Its basic attack is the club smash, which hits everyone adjacent.</summary>
+        public static readonly UnitStats Ogre = new UnitStats(UnitKind.Ogre, "Giant", 36, 5, 1, 4)
         {
-            Size = 2, AreaMelee = true, ThrowCost = 3, ThrowDamage = 3, ThrowRange = 5,
-            Role = "2x2 boss. Smash hits every adjacent unit. Once a turn throws a boulder 2-5 tiles away that stays as a rock.",
+            Size = 2, AreaMelee = true, ThrowCost = 3, ThrowDamage = 3, ThrowRange = 5, Slams = true,
+            Role = "Boss, 2x2. Slam shoves everyone within 2 tiles 1 tile away (2 AP). Smash hits every adjacent unit. " +
+                   "Once a turn throws a boulder 2-5 tiles away that stays as a rock.",
         };
+
+        // ---------- Bandits ----------
+
+        public static readonly UnitStats Cutpurse = new UnitStats(UnitKind.Cutpurse, "Cutpurse", 5, 2, 1, 5)
+        {
+            StealsGold = 5,
+            Role = "On a hit it steals 5 gold and runs for the far edge. If it gets away, the gold is gone. Kill it to get the gold back.",
+        };
+
+        public static readonly UnitStats Crossbowman = new UnitStats(UnitKind.Crossbowman, "Crossbowman", 6, 3, 4, 3)
+        {
+            Role = "Ranged (needs line of sight). Hides behind cover.",
+        };
+
+        public static readonly UnitStats Brute = new UnitStats(UnitKind.Brute, "Bandit Brute", 12, 3, 1, 3)
+        {
+            Abilities = A(Ability.Tough), Role = "Slow, heavy hitter that takes 1 less damage.",
+        };
+
+        // ---------- Elementals ----------
+
+        public static readonly UnitStats Shard = new UnitStats(UnitKind.Shard, "Shard", 5, 2, 1, 3)
+        {
+            Role = "Half of an Elemental.",
+        };
+
+        public static readonly UnitStats Elemental = new UnitStats(UnitKind.Elemental, "Elemental", 10, 3, 1, 3)
+        {
+            SplitsInto = Shard, Role = "When it dies it splits into 2 Shards (5 HP each).",
+        };
+
+        // ---------- Raised versions (necromancer boss) ----------
+
+        private static readonly Dictionary<UnitStats, UnitStats> RaisedCache = new Dictionary<UnitStats, UnitStats>();
+
+        /// <summary>
+        /// The undead version of an enemy type: same numbers and look, but it leaves a bone pile and can be
+        /// raised again. Splitting and stealing are dropped so the dead stay simple.
+        /// </summary>
+        public static UnitStats Raised(UnitStats s)
+        {
+            if (RaisedCache.TryGetValue(s, out var r))
+                return r;
+            r = new UnitStats(s.Kind, "Bone " + s.Name, s.MaxHp, s.Damage, s.Range, s.MaxAp)
+            {
+                Abilities = s.Abilities, LeavesRemains = true, BombCost = s.BombCost, BombDamage = s.BombDamage, BombRange = s.BombRange,
+                Role = $"Raised {s.Name}. Leaves a bone pile; the Necromancer can raise it again.", IsUndead = true,
+            };
+            RaisedCache[s] = r;
+            return r;
+        }
 
         public static readonly UnitStats Goblin = new UnitStats(UnitKind.Goblin, "Goblin", 5, 2, 1, 4) { Role = "Melee runner." };
 
@@ -475,7 +548,7 @@ namespace ArmyRoguelike.Core
 
         public static readonly IReadOnlyList<UnitStats> Enemies = new[]
         {
-            Wolf, PackLeader, Skeleton, Necromancer, Goblin, GoblinBomber, Ogre,
+            Wolf, PackLeader, Goblin, GoblinBomber, Cutpurse, Crossbowman, Brute, Elemental, Shard, Skeleton, Necromancer, Ogre,
         };
     }
 }

@@ -69,6 +69,12 @@ namespace ArmyRoguelike.Core
         /// <summary>Damage gained in this battle (Bloodthirst). Added to the army member when the battle ends.</summary>
         public int GainedDamage { get; internal set; }
 
+        /// <summary>Gold a cutpurse is carrying after a hit. It flees with it; killing it gets it back.</summary>
+        public int CarryingLoot { get; internal set; }
+
+        /// <summary>Left the board (a cutpurse that got away). No longer in the battle.</summary>
+        public bool Escaped { get; internal set; }
+
         public Unit(int id, Team team, UnitStats stats, ArmyMember member = null, Unit summoner = null)
         {
             Id = id;

@@ -38,7 +38,8 @@ public static class PreviewCapture
 
     private static void Capture(string output, bool placeArmy, int encounter = 0)
     {
-        var encounters = new[] { Encounter.Wolves, Encounter.Necromancer, Encounter.Ogre, Encounter.Goblins };
+        // -previewEncounter: 0 wolves, 1 goblins, 2 bandits, 3 elementals, 4 necromancer, 5 giant.
+        var encounters = Encounter.Regular.Concat(Encounter.Bosses).ToArray();
         var army = ArmyMember.StartingArmy();
         army.Add(new ArmyMember(UnitStats.Sapper));
 

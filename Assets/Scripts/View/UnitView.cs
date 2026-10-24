@@ -51,7 +51,8 @@ namespace ArmyRoguelike.View
             _body = new GameObject("Body").AddComponent<SpriteRenderer>();
             _body.transform.SetParent(transform, false);
             _body.sprite = PlaceholderArt.Statue(unit.Stats.Kind);
-            _baseColor = unit.Team == Team.Player ? TierStone(unit.Stats.Tier) : PlaceholderArt.EnemyStone;
+            // Raised (undead) enemies are pale bone instead of grey granite.
+            _baseColor = unit.Team == Team.Player ? TierStone(unit.Stats.Tier) : unit.Stats.IsUndead ? new Color(0.78f, 0.76f, 0.66f) : PlaceholderArt.EnemyStone;
             _body.color = _baseColor;
             if (unit.IsPackLeader)
                 _body.transform.localScale = Vector3.one * 1.25f;
@@ -158,12 +159,13 @@ namespace ArmyRoguelike.View
         private static readonly Color SnareColor = new Color(0.45f, 0.85f, 0.3f);
         private static readonly Color SlowColor = new Color(0.65f, 0.8f, 1f);
         private static readonly Color PoisonColor = new Color(0.75f, 0.35f, 0.95f);
+        private static readonly Color LootColor = new Color(1f, 0.82f, 0.1f);
 
         private readonly List<SpriteRenderer> _statusIcons = new List<SpriteRenderer>();
 
         /// <summary>
         /// Small coloured squares to the right of the HP bar: cyan = ward shield, green = snared,
-        /// light blue = slowed, purple = poisoned. The HUD hover text spells them out.
+        /// light blue = slowed, gold = carrying stolen gold, purple = poisoned. The HUD hover text spells them out.
         /// </summary>
         public void RefreshStatus()
         {
@@ -176,6 +178,8 @@ namespace ArmyRoguelike.View
                     colors.Add(SnareColor);
                 if (Unit.IsSlowed)
                     colors.Add(SlowColor);
+                if (Unit.CarryingLoot > 0)
+                    colors.Add(LootColor);
                 if (Unit.PoisonTurns > 0)
                     colors.Add(PoisonColor);
             }

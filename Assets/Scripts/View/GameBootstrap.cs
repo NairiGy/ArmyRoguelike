@@ -109,8 +109,9 @@ namespace ArmyRoguelike.View
         private void Evolve(ArmyMember member, UnitStats into)
         {
             var from = member.Stats;
+            var price = _run.NextEvolutionPrice;
             if (_run.Evolve(member, into))
-                _runLog.RecordEvolution(from, into);
+                _runLog.RecordEvolution(from, into, price);
         }
 
         private void LeaveTrainer()
@@ -128,7 +129,7 @@ namespace ArmyRoguelike.View
             var board = BoardView.Create(battle, _battleRoot.transform);
             FrameCamera(Camera.main, board);
             var context = new BattleContext(_run.StepIndex + 1, Run.Steps, _run.CurrentEncounter.Name, _run.Gold, _run.Seed,
-                _run.IsAmbush, _run.CurrentNode?.Kind == NodeKind.Boss);
+                _run.IsAmbush, _run.CurrentEncounter.IsBoss, _run.CurrentEncounter.Layout, _run.CurrentEncounter.LayoutRule);
             _controller = _battleRoot.AddComponent<BattleController>();
             _controller.Init(board, Camera.main, context, () => Do(FinishBattle));
         }
@@ -142,7 +143,9 @@ namespace ArmyRoguelike.View
             Destroy(_battleRoot);
             _battleRoot = null;
             _controller = null;
-            _lastNote = battle.Phase == Phase.Victory ? $"Battle won: +{earned} gold." : null;
+            _lastNote = battle.Phase != Phase.Victory ? null
+                : _run.LastStolen > 0 ? $"Battle won: +{earned} gold, but cutpurses got away with {_run.LastStolen}."
+                : $"Battle won: +{earned} gold.";
             if (_run.State == RunState.Won || _run.State == RunState.Lost)
                 _runLog.Save();
         }
@@ -267,7 +270,9 @@ namespace ArmyRoguelike.View
             const float w = 700;
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 20, w, 680), GUI.skin.box);
             GUILayout.Label("Trainer", Title);
-            GUILayout.Label("Every unit may go up one tier this visit, into one of its two paths. It's free.");
+            var price = _run.NextEvolutionPrice;
+            GUILayout.Label($"Each unit may go up one tier per visit, into one of its paths. The first evolution is free, then {Run.SecondEvolutionPrice} gold, then {Run.LaterEvolutionPrice} each.");
+            GUILayout.Label(price == 0 ? $"Next evolution: free.   Gold: {_run.Gold}" : $"Next evolution: {price} gold.   Gold: {_run.Gold}");
             _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(560));
             var style = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.UpperLeft, wordWrap = true };
             foreach (var member in _run.Army)
@@ -290,7 +295,10 @@ namespace ArmyRoguelike.View
                 {
                     var m = member;
                     var target = into;
-                    if (GUILayout.Button(Describe(into), style, GUILayout.Width((w - 40) / member.Stats.Evolutions.Count)))
+                    GUI.enabled = _run.CanEvolve(member, into);
+                    var pressed = GUILayout.Button(Describe(into), style, GUILayout.Width((w - 40) / member.Stats.Evolutions.Count));
+                    GUI.enabled = true;
+                    if (pressed)
                         Do(() => Evolve(m, target));
                 }
 
@@ -307,8 +315,8 @@ namespace ArmyRoguelike.View
         {
             const float w = 560;
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 20, w, 680), GUI.skin.box);
-            GUILayout.Label("The Road", Title);
-            GUILayout.Label($"Gold: {_run.Gold}");
+            GUILayout.Label("Act 1", Title);
+            GUILayout.Label($"Gold: {_run.Gold}    Beaten: {(_run.Fought.Count > 0 ? string.Join(", ", _run.Fought.Select(f => f.Name)) : "nobody yet")}");
             if (!string.IsNullOrEmpty(_lastNote))
                 GUILayout.Label(_lastNote);
             GUILayout.Space(6);
@@ -502,8 +510,10 @@ namespace ArmyRoguelike.View
 
                 case EventKind.Ambush:
                     GUILayout.Label("Ambush!", Title);
-                    GUILayout.Label($"Wolves burst out of the trees. Win and they drop an extra {Run.AmbushBonusGold} gold.");
-                    if (GUILayout.Button("Fight!", GUILayout.Height(32)))
+                    GUILayout.Label(_run.AmbushEncounter != null
+                        ? $"The {_run.AmbushEncounter.Name} jumps you on the road. Win and they drop an extra {Run.AmbushBonusGold} gold."
+                        : "Someone was lying in wait, but they look at your army and think better of it.");
+                    if (GUILayout.Button(_run.AmbushEncounter != null ? "Fight!" : $"Pick up the {Run.AmbushBonusGold * 2} gold", GUILayout.Height(32)))
                         Do(() =>
                         {
                             _run.StartAmbush();

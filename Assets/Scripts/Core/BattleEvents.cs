@@ -189,6 +189,39 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Guard: <see cref="EffectEvent.Unit"/> stepped in to take a hit for an ally.</summary>
         Guard,
+
+        /// <summary>A cutpurse (<see cref="EffectEvent.Unit"/>) grabbed <see cref="EffectEvent.Amount"/> gold.</summary>
+        Steal,
+    }
+
+    /// <summary>A unit left the board, e.g. a cutpurse escaping with stolen gold.</summary>
+    public sealed class EscapeEvent : BattleEvent
+    {
+        public readonly Unit Unit;
+        public readonly int Gold;
+
+        public EscapeEvent(Unit unit, int gold)
+        {
+            Unit = unit;
+            Gold = gold;
+        }
+
+        public override Unit Actor => Unit;
+    }
+
+    /// <summary>A dying unit split into smaller ones (Elemental into Shards).</summary>
+    public sealed class SplitEvent : BattleEvent
+    {
+        public readonly Unit Parent;
+        public readonly IReadOnlyList<Unit> Children;
+
+        public SplitEvent(Unit parent, IReadOnlyList<Unit> children)
+        {
+            Parent = parent;
+            Children = children;
+        }
+
+        public override Unit Actor => null;
     }
 
     /// <summary>A unit was shoved one or more tiles. If it slammed into something it took <see cref="Collision"/> damage.</summary>

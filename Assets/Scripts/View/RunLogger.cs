@@ -24,6 +24,7 @@ namespace ArmyRoguelike.View
             _run = run;
             _log.startedAt = _created.ToString("yyyy-MM-dd HH:mm:ss");
             _log.seed = run.Seed;
+            _log.boss = run.Map[run.Map.Count - 1][0].Encounter?.Name ?? "";
             for (var i = 0; i < run.Map.Count; i++)
                 _log.map.Add(new MapStep { step = i + 1, nodes = run.Map[i].Select(n => n.Label).ToList() });
         }
@@ -51,6 +52,7 @@ namespace ArmyRoguelike.View
                 goldEarned = goldEarned,
                 goldAfter = _run.Gold,
                 logFile = logFile ?? "",
+                stolenGold = _run.LastStolen,
             });
         }
 
@@ -99,9 +101,9 @@ namespace ArmyRoguelike.View
             _trainer = new TrainerVisit { step = Step };
         }
 
-        public void RecordEvolution(UnitStats from, UnitStats into)
+        public void RecordEvolution(UnitStats from, UnitStats into, int price)
         {
-            _trainer?.evolutions.Add(new Evolution { from = from.Name, into = into.Name, tier = into.Tier });
+            _trainer?.evolutions.Add(new Evolution { from = from.Name, into = into.Name, tier = into.Tier, price = price });
         }
 
         public void CloseTrainer()
@@ -146,6 +148,7 @@ namespace ArmyRoguelike.View
             _log.result = _run.State == RunState.Won ? "won" : _run.State == RunState.Lost ? "lost" : "abandoned";
             _log.stepReached = _run.StepIndex + 1;
             _log.goldLeft = _run.Gold;
+            _log.fought = _run.Fought.Select(f => f.Name).ToList();
             _log.finalArmy = _run.Army.Select(m => new ArmyEntry
             {
                 unit = m.Stats.Name, tier = m.Stats.Tier, line = m.Stats.Root.Name, equipment = m.Equipment?.Name ?? "",
@@ -162,6 +165,8 @@ namespace ArmyRoguelike.View
             public string startedAt;
             public string endedAt;
             public int seed;
+            public string boss;
+            public List<string> fought = new List<string>();
             public string result;
             public int stepReached;
             public int goldLeft;
@@ -204,6 +209,7 @@ namespace ArmyRoguelike.View
             public int goldEarned;
             public int goldAfter;
             public string logFile;
+            public int stolenGold;
         }
 
         [Serializable]
@@ -259,6 +265,7 @@ namespace ArmyRoguelike.View
             public string from;
             public string into;
             public int tier;
+            public int price;
         }
 
         [Serializable]

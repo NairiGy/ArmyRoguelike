@@ -64,6 +64,21 @@ namespace ArmyRoguelike.View
                 case UnitKind.Mage:
                     sprite = MakeMage();
                     break;
+                case UnitKind.Cutpurse:
+                    sprite = MakeBandit(BanditKind.Cutpurse);
+                    break;
+                case UnitKind.Crossbowman:
+                    sprite = MakeBandit(BanditKind.Crossbow);
+                    break;
+                case UnitKind.Brute:
+                    sprite = MakeBandit(BanditKind.Brute);
+                    break;
+                case UnitKind.Elemental:
+                    sprite = MakeElemental(false);
+                    break;
+                case UnitKind.Shard:
+                    sprite = MakeElemental(true);
+                    break;
                 case UnitKind.Turret:
                     sprite = MakeTurret();
                     break;
@@ -363,6 +378,75 @@ namespace ArmyRoguelike.View
             // Staff with an orb, on the left.
             Fill(tex, 5, 8, 6, 40);
             Disc(tex, 6, 44, 3);
+            Shade(tex, w, h);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);
+        }
+
+        private enum BanditKind
+        {
+            Cutpurse,
+            Crossbow,
+            Brute,
+        }
+
+        /// <summary>Masked bandits: a slim cutpurse with a sack, a crossbowman, a broad brute with a cudgel.</summary>
+        private static Sprite MakeBandit(BanditKind kind)
+        {
+            const int w = 32, h = 52;
+            var tex = NewTexture(w, h);
+            var brute = kind == BanditKind.Brute;
+            Plinth(tex, w, brute ? 12 : 10);
+            var half = brute ? 8 : kind == BanditKind.Cutpurse ? 4 : 5;
+            // Legs, body, head with a dark mask band.
+            Fill(tex, 16 - half + 1, 7, 16 - half + 3, 15);
+            Fill(tex, 16 + half - 4, 7, 16 + half - 2, 15);
+            Fill(tex, 16 - half, 15, 15 + half, 30);
+            Disc(tex, 16, 35, brute ? 6 : 5);
+            Fill(tex, 11, 35, 21, 36, 0.3f);
+            switch (kind)
+            {
+                case BanditKind.Cutpurse:
+                    // Hood point and a loot sack on the back.
+                    for (var i = 0; i < 4; i++)
+                        Fill(tex, 16 - (3 - i), 40 + i, 16 + (3 - i), 40 + i);
+                    Disc(tex, 7, 24, 4);
+                    break;
+                case BanditKind.Crossbow:
+                    // Crossbow held across the chest.
+                    Fill(tex, 6, 24, 26, 25);
+                    Fill(tex, 24, 19, 25, 30);
+                    break;
+                case BanditKind.Brute:
+                    // Cudgel raised on the right.
+                    Fill(tex, 25, 22, 27, 44);
+                    Disc(tex, 26, 45, 3);
+                    break;
+            }
+
+            Shade(tex, w, h);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);
+        }
+
+        /// <summary>A jagged crystal cluster; the shard is a smaller half of one.</summary>
+        private static Sprite MakeElemental(bool shard)
+        {
+            const int w = 36, h = 52;
+            var tex = NewTexture(w, h);
+            Plinth(tex, w, shard ? 9 : 13);
+            var spikes = shard ? new[] { (14, 26), (20, 20) } : new[] { (9, 22), (14, 34), (19, 40), (25, 30), (29, 18) };
+            foreach (var (x, top) in spikes)
+            {
+                // Each spike: a wide base tapering to a point.
+                for (var y = 7; y <= top; y++)
+                {
+                    var t = (float)(y - 7) / (top - 7);
+                    var half = Mathf.RoundToInt(Mathf.Lerp(4f, 0f, t));
+                    Fill(tex, x - half, y, x + half, y);
+                }
+            }
+
             Shade(tex, w, h);
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);

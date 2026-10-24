@@ -56,7 +56,7 @@ namespace ArmyRoguelike.Tests
         {
             var b = Setup(new[] { UnitStats.DualBlades }, new[] { P(3, 2) }, new[] { E(UnitStats.Ogre, 3, 3) });
             b.PlayerAttack(Player(b), Enemy(b));
-            Assert.AreEqual(30 - 2 * UnitStats.DualBlades.Damage, Enemy(b).Hp);
+            Assert.AreEqual(UnitStats.Ogre.MaxHp - 2 * UnitStats.DualBlades.Damage, Enemy(b).Hp);
         }
 
         [Test]
@@ -124,9 +124,9 @@ namespace ArmyRoguelike.Tests
             var ogre = Enemy(b);
             var normal = b.EffectiveDamage(deadeye);
             b.PlayerAttack(deadeye, ogre);
-            Assert.AreEqual(30 - 2 * normal, ogre.Hp);
+            Assert.AreEqual(UnitStats.Ogre.MaxHp - 2 * normal, ogre.Hp);
             b.PlayerAttack(deadeye, ogre);
-            Assert.AreEqual(30 - 3 * normal, ogre.Hp);
+            Assert.AreEqual(UnitStats.Ogre.MaxHp - 3 * normal, ogre.Hp);
         }
 
         [Test]

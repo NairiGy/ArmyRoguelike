@@ -33,67 +33,6 @@ namespace ArmyRoguelike.Core
         };
     }
 
-    /// <summary>One fixed battle: its board layout and enemy army.</summary>
-    public sealed class Encounter
-    {
-        public readonly string Name;
-        private readonly GridPos[] _obstacles;
-        private readonly (UnitStats stats, GridPos pos)[] _enemies;
-
-        public Encounter(string name, GridPos[] obstacles, (UnitStats, GridPos)[] enemies)
-        {
-            Name = name;
-            _obstacles = obstacles;
-            _enemies = enemies;
-        }
-
-        public IEnumerable<(UnitStats stats, GridPos pos)> Enemies => _enemies;
-
-        public Battle CreateBattle(IEnumerable<ArmyMember> army) => new Battle(new Board(8, 8, _obstacles), army, _enemies);
-
-        private static GridPos P(int x, int y) => new GridPos(x, y);
-
-        public static readonly Encounter Wolves = new Encounter("Wolf Pack",
-            new[] { P(1, 3), P(2, 3), P(5, 4), P(6, 4) },
-            new[]
-            {
-                (UnitStats.PackLeader, P(3, 7)),
-                (UnitStats.Wolf, P(2, 6)),
-                (UnitStats.Wolf, P(4, 6)),
-                (UnitStats.Wolf, P(5, 7)),
-            });
-
-        public static readonly Encounter Necromancer = new Encounter("Necromancer",
-            new[] { P(1, 4), P(4, 3), P(6, 5), P(3, 6) },
-            new[]
-            {
-                (UnitStats.Necromancer, P(4, 7)),
-                (UnitStats.Skeleton, P(1, 6)),
-                (UnitStats.Skeleton, P(3, 5)),
-                (UnitStats.Skeleton, P(5, 5)),
-                (UnitStats.Skeleton, P(6, 6)),
-            });
-
-        public static readonly Encounter Goblins = new Encounter("Goblin Bombers",
-            new[] { P(2, 3), P(5, 3), P(3, 5) },
-            new[]
-            {
-                (UnitStats.GoblinBomber, P(1, 7)),
-                (UnitStats.GoblinBomber, P(4, 7)),
-                (UnitStats.GoblinBomber, P(6, 7)),
-                (UnitStats.Goblin, P(2, 5)),
-                (UnitStats.Goblin, P(5, 5)),
-            });
-
-        /// <summary>The ogre is 2x2; its anchor (3,5) covers (3,5) to (4,6).</summary>
-        public static readonly Encounter Ogre = new Encounter("Ogre",
-            new[] { P(1, 3), P(6, 3) },
-            new[] { (UnitStats.Ogre, P(3, 5)) });
-
-        /// <summary>The ordinary battles the map draws from. The ogre is always the final boss.</summary>
-        public static readonly IReadOnlyList<Encounter> Regular = new[] { Wolves, Necromancer, Goblins };
-    }
-
     public enum NodeKind
     {
         Battle,
@@ -168,7 +107,7 @@ namespace ArmyRoguelike.Core
 
     /// <summary>
     /// A run: draft a starting army, then cross a branching map where each step offers two nodes
-    /// (battle, shop, ? event or trainer); the last step is always the ogre. Gold depends on how many
+    /// (battle, shop, ? event or trainer); the last step is one of the bosses. Gold depends on how many
     /// units survived. Every battle starts with the whole army at full HP; evolutions, items and
     /// run-long bonuses carry over.
     /// </summary>
@@ -180,7 +119,7 @@ namespace ArmyRoguelike.Core
         public const int DraftSize = 3;
         public const int MaxArmySize = 4;
         public const int RecruitPrice = 15;
-        public const int Steps = 9;
+        public const int Steps = 7;
         public const int GambleCost = 10;
         public const int GambleWin = 25;
         public const int AmbushBonusGold = 5;
@@ -188,7 +127,7 @@ namespace ArmyRoguelike.Core
         public const int ShrineHp = 2;
 
         /// <summary>Map steps (0-based) that always offer a Trainer as one of the two choices.</summary>
-        public static readonly IReadOnlyList<int> TrainerSteps = new[] { 3, 6 };
+        public static readonly IReadOnlyList<int> TrainerSteps = new[] { 3, 5 };
 
         private readonly Random _rng;
         private readonly List<Equipment> _offers = new List<Equipment>();
@@ -263,39 +202,37 @@ namespace ArmyRoguelike.Core
         // ---------- Map ----------
 
         /// <summary>
-        /// Step 1 offers two different battles. The middle steps mix battles, shops and events, never two
-        /// identical nodes side by side; the trainer steps always include a Trainer. The last step is the ogre.
+        /// Act 1, 7 steps. The four factions are shuffled and each appears on exactly one battle node, so
+        /// no faction can come up twice: step 1 offers two of them, steps 3 and 5 one each. Shops, ? events
+        /// and Trainers (steps 4 and 6) fill the rest, and step 7 is one of the two bosses.
         /// </summary>
         private void GenerateMap()
         {
-            var first = Encounter.Regular.OrderBy(_ => _rng.Next()).Take(2).Select(e => new MapNode(NodeKind.Battle, e)).ToList();
-            _map.Add(first);
+            var factions = Encounter.Regular.OrderBy(_ => _rng.Next()).ToList();
+            MapNode Fight(int i) => new MapNode(NodeKind.Battle, factions[i]);
+            var shop = new MapNode(NodeKind.Shop);
+            var unknown = new MapNode(NodeKind.Event);
+            var trainer = new MapNode(NodeKind.Trainer);
 
-            for (var step = 1; step < Steps - 1; step++)
-            {
-                var pair = new List<MapNode>();
-                if (TrainerSteps.Contains(step))
-                    pair.Add(new MapNode(NodeKind.Trainer));
-                while (pair.Count < 2)
-                {
-                    var node = RandomNode();
-                    if (pair.Any(n => n.Kind == node.Kind && n.Encounter == node.Encounter))
-                        continue;
-                    pair.Add(node);
-                }
-
-                _map.Add(pair.OrderBy(_ => _rng.Next()).ToList());
-            }
-
-            _map.Add(new[] { new MapNode(NodeKind.Boss, Encounter.Ogre) });
+            AddStep(Fight(0), Fight(1));
+            AddStep(shop, unknown);
+            AddStep(Fight(2), unknown);
+            AddStep(trainer, shop);
+            AddStep(Fight(3), unknown);
+            AddStep(trainer, unknown);
+            _map.Add(new[] { new MapNode(NodeKind.Boss, Encounter.Bosses[_rng.Next(Encounter.Bosses.Count)]) });
         }
 
-        private MapNode RandomNode()
+        private void AddStep(MapNode a, MapNode b) => _map.Add(new[] { a, b }.OrderBy(_ => _rng.Next()).ToList());
+
+        /// <summary>Factions beaten so far this act, in order. The Necromancer raises his army from them.</summary>
+        public List<Encounter> Fought { get; } = new List<Encounter>();
+
+        /// <summary>Factions not yet fought that don't appear on any map step still ahead (safe for an ambush).</summary>
+        private List<Encounter> FreshFactions()
         {
-            var roll = _rng.Next(100);
-            if (roll < 50)
-                return new MapNode(NodeKind.Battle, Encounter.Regular[_rng.Next(Encounter.Regular.Count)]);
-            return roll < 75 ? new MapNode(NodeKind.Shop) : new MapNode(NodeKind.Event);
+            var ahead = _map.Skip(StepIndex + 1).SelectMany(s => s).Select(n => n.Encounter).Where(e => e != null);
+            return Encounter.Regular.Where(e => !Fought.Contains(e) && !ahead.Contains(e)).ToList();
         }
 
         /// <summary>Picks a node at the current step and enters it.</summary>
@@ -343,11 +280,14 @@ namespace ArmyRoguelike.Core
         {
             if (State != RunState.Battle)
                 throw new InvalidOperationException($"Can't start a battle while in {State}.");
-            CurrentBattle = CurrentEncounter.CreateBattle(Army);
+            CurrentBattle = CurrentEncounter.CreateBattle(Army, _rng, Fought);
             return CurrentBattle;
         }
 
         public static int GoldFor(int survivors) => BaseGold + GoldPerSurvivor * survivors;
+
+        /// <summary>Gold lost to escaped cutpurses in the last battle.</summary>
+        public int LastStolen { get; private set; }
 
         /// <summary>Gold a victory in the current battle would pay with this many survivors.</summary>
         public int RewardFor(int survivors) => GoldFor(survivors) + (IsAmbush ? AmbushBonusGold : 0);
@@ -369,8 +309,13 @@ namespace ArmyRoguelike.Core
                 return 0;
             }
 
+            // Gold carried off by cutpurses that got away is lost first.
+            LastStolen = Math.Min(Gold, battle.StolenGold);
+            Gold -= LastStolen;
             var earned = RewardFor(battle.LivingArmy.Count());
             Gold += earned;
+            if (!CurrentEncounter.IsBoss && !Fought.Contains(CurrentEncounter))
+                Fought.Add(CurrentEncounter);
             if (IsFinalStep)
             {
                 State = RunState.Won;
@@ -383,10 +328,21 @@ namespace ArmyRoguelike.Core
 
         // ---------- Trainer ----------
 
-        /// <summary>Each unit can go up one tier per Trainer visit, into one of its listed evolutions.</summary>
+        /// <summary>Price of the next evolution this visit: the first is free, then 20, then 35 each.</summary>
+        public const int SecondEvolutionPrice = 20;
+
+        public const int LaterEvolutionPrice = 35;
+
+        public int NextEvolutionPrice =>
+            _evolvedThisVisit.Count == 0 ? 0 : _evolvedThisVisit.Count == 1 ? SecondEvolutionPrice : LaterEvolutionPrice;
+
+        /// <summary>
+        /// Each unit can go up one tier per Trainer visit, into one of its listed evolutions. The first
+        /// evolution of a visit is free; more cost gold.
+        /// </summary>
         public bool CanEvolve(ArmyMember member, UnitStats into) =>
             State == RunState.Trainer && Army.Contains(member) && !_evolvedThisVisit.Contains(member) &&
-            member.Stats.Evolutions.Contains(into);
+            member.Stats.Evolutions.Contains(into) && Gold >= NextEvolutionPrice;
 
         public bool HasEvolvedThisVisit(ArmyMember member) => _evolvedThisVisit.Contains(member);
 
@@ -394,6 +350,7 @@ namespace ArmyRoguelike.Core
         {
             if (!CanEvolve(member, into))
                 return false;
+            Gold -= NextEvolutionPrice;
             member.Stats = into;
             _evolvedThisVisit.Add(member);
             return true;
@@ -467,6 +424,8 @@ namespace ArmyRoguelike.Core
             CurrentEvent = kinds[_rng.Next(kinds.Length)];
             CartItem = CurrentEvent == EventKind.AbandonedCart ? Equipment.Catalog[_rng.Next(Equipment.Catalog.Count)] : null;
             EventRecruit = CurrentEvent == EventKind.WanderingRecruit ? UnitStats.BaseUnits[_rng.Next(UnitStats.BaseUnits.Count)] : null;
+            var fresh = FreshFactions();
+            AmbushEncounter = CurrentEvent == EventKind.Ambush && fresh.Count > 0 ? fresh[_rng.Next(fresh.Count)] : null;
             EventOutcome = null;
         }
 
@@ -540,11 +499,26 @@ namespace ArmyRoguelike.Core
         {
             if (State != RunState.Event || CurrentEvent != EventKind.Ambush)
                 return;
-            CurrentEncounter = Encounter.Wolves;
+            if (AmbushEncounter == null)
+            {
+                // Every faction is already used up this act: the ambushers think better of it.
+                Gold += AmbushBonusGold * 2;
+                EventOutcome = $"The ambushers see your army and flee, dropping {AmbushBonusGold * 2} gold.";
+                NextStep();
+                return;
+            }
+
+            CurrentEncounter = AmbushEncounter;
             IsAmbush = true;
             EventOutcome = "Ambush!";
             State = RunState.Battle;
         }
+
+        /// <summary>
+        /// Who ambushes you: a faction you haven't fought that isn't waiting further down the map,
+        /// so it never repeats. Null if there is none left.
+        /// </summary>
+        public Encounter AmbushEncounter { get; private set; }
 
         /// <summary>Shrine: one member gets +2 max HP for the rest of the run.</summary>
         public bool PrayAtShrine(ArmyMember member)

@@ -28,6 +28,7 @@ namespace ArmyRoguelike.View
             _log.battleNumber = context.Step;
             _log.encounter = context.Encounter;
             _log.ambush = context.Ambush;
+            _log.layout = context.Layout;
             _log.goldAtStart = context.Gold;
             _goldIfWon = context.GoldIfWon;
         }
@@ -193,6 +194,20 @@ namespace ArmyRoguelike.View
                         type = tile.Added ? "tile added" : "tile removed", note = tile.Kind, toX = tile.Tile.X, toY = tile.Tile.Y,
                     });
                     break;
+                case EscapeEvent escape:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = escape.Unit.Team.ToString(), unit = Name(escape.Unit), type = "escape", amount = escape.Gold,
+                        toX = escape.Unit.Pos.X, toY = escape.Unit.Pos.Y,
+                    });
+                    break;
+                case SplitEvent split:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = split.Parent.Team.ToString(), unit = Name(split.Parent), type = "split",
+                        target = string.Join(", ", split.Children.Select(Name)), amount = split.Children.Count,
+                    });
+                    break;
                 case SummonEvent summon:
                     _log.actions.Add(new ActionEntry
                     {
@@ -307,6 +322,7 @@ namespace ArmyRoguelike.View
             _log.result = _battle.Phase == Phase.Victory ? "victory" : _battle.Phase == Phase.Defeat ? "defeat" : "abandoned";
             _log.turns = _battle.TurnNumber;
             _log.skipped = _battle.WasSkipped;
+            _log.stolenGold = _battle.StolenGold;
             _log.survivors = _battle.Living(Team.Player).Count();
             _log.goldEarned = _battle.Phase == Phase.Victory ? _goldIfWon(_log.survivors) : 0;
             _log.units = Summarise();
@@ -444,6 +460,10 @@ namespace ArmyRoguelike.View
 
             /// <summary>Ended with the debug "Win battle" button instead of being played.</summary>
             public bool skipped;
+            public string layout;
+
+            /// <summary>Gold carried off by cutpurses that escaped.</summary>
+            public int stolenGold;
             public int goldAtStart;
             public int goldEarned;
             public List<PlacementEntry> placements = new List<PlacementEntry>();

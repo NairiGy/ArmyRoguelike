@@ -4,7 +4,7 @@ A single-player roguelike army-builder. You lead a small squad of living statues
 
 ## Status
 
-- **Prototype 4:** draft 3 of 5 base units, then a 9-step branching map (battles, shops, ? events, free Trainers at steps 4 and 7, ogre boss). Each base unit has a 3-tier evolution tree (38 unit types). Items only grant abilities. Not playtested yet.
+- **Prototype 5 (Act 1):** draft 3 of 5 base units, then a 7-step Act 1: each of four factions (wolves, goblins, bandits, elementals) appears at most once, each encounter uses a rule-based layout (`Core/Encounter.cs`), and the act ends with a rotating boss (Necromancer raising the factions you beat, or the Giant). Trainers allow one evolution per unit per visit (first free, then paid). 38 player unit types in 5 evolution trees; items only grant abilities. Not playtested yet.
 - Design and placeholder numbers: [docs/design-note.md](docs/design-note.md). Keep it updated when design decisions change.
 - Reference of every unit, ability, item, enemy and rule: [docs/gamepedia.html](docs/gamepedia.html), generated from the game data.
 
@@ -19,11 +19,12 @@ A single-player roguelike army-builder. You lead a small squad of living statues
 - `Assets/Scripts/Core`: rules in pure C#, with no Unity references (`ArmyRoguelike.Core` assembly).
   - `UnitStats.cs`: every unit type and the evolution trees. `Equipment.cs`: items, plus names and rule text for abilities and actions.
   - `Battle.cs`: board, AP, movement, attacks, special actions, statuses and tiles. All damage goes through one `Damage` method so abilities apply to every source. Actions return the events they caused, which the view animates.
-  - `EnemyAI.cs`: enemy behaviour and the intent shown on hover. `Run.cs`: draft, map, shop, trainer, events and encounter layouts.
+  - `EnemyAI.cs`: enemy behaviour and the intent shown on hover. `Run.cs`: draft, map, shop, trainer and events. `Encounter.cs`: factions, bosses and their layout templates.
   - `AssemblyInfo.cs` lets the tests set internal state directly.
 - `Assets/Scripts/View`: Unity side (`ArmyRoguelike.View` assembly). It shows the battle and handles input, and only reads state and calls into Core. Screens are IMGUI; buttons that change the screen run deferred via `GameBootstrap.Do` to avoid IMGUI layout errors.
 - `Assets/Editor`: `PreviewCapture` (renders a battle to PNG headlessly), `GamepediaExporter` + `GamepediaWriter` (the gamepedia; the writer is plain C#).
 - `Assets/Tests/EditMode`: NUnit tests for Core.
+- `tools/dev.sh compile|test|wiki`: compile, run the tests and write a text-only gamepedia with Unity's bundled compiler, with the Editor open or closed. See `tools/README.md`. The Pipeline package (`com.unity.pipeline`) lets `unity status` / `unity command` drive an open Editor.
 - `Playtests/` (git-ignored): a JSON log per battle (`PlaytestLogger`) and per run (`RunLogger`). F9 in game saves a marker with a board snapshot. Read these to summarize playtests instead of asking the user for numbers. Battles skipped with the debug Win button are marked `skipped`.
 - The scene stays nearly empty. `GameBootstrap` builds the run at runtime, and placeholder art is generated in code (`PlaceholderArt`).
 

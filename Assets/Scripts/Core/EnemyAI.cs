@@ -11,6 +11,12 @@ namespace ArmyRoguelike.Core
         Throw,
         Raise,
         Bomb,
+
+        /// <summary>A cutpurse running off with stolen gold.</summary>
+        Flee,
+
+        /// <summary>The Giant shoving everyone near it.</summary>
+        Slam,
     }
 
     /// <summary>What an enemy plans to do next, for the hover display.</summary>
@@ -75,6 +81,12 @@ namespace ArmyRoguelike.Core
         /// <summary>What this enemy would do first if its turn started now. Used to show intent on hover.</summary>
         public static Intent PredictIntent(Battle battle, Unit enemy)
         {
+            if (enemy.CarryingLoot > 0)
+                return new Intent(IntentKind.Flee, enemy);
+
+            if (enemy.Stats.Slams && battle.Living(Team.Player).Count(u => Battle.Distance(enemy, u) <= 2) >= 2)
+                return new Intent(IntentKind.Slam, enemy);
+
             if (enemy.Stats.CanRaise)
             {
                 // Intent is shown during the player's turn, so assume a full enemy AP pool.
@@ -115,6 +127,8 @@ namespace ArmyRoguelike.Core
         {
             if (enemy.Stats.CanRaise)
                 NecromancerTurn(battle, enemy, events);
+            else if (enemy.Stats.StealsGold > 0)
+                CutpurseTurn(battle, enemy, events);
             else if (enemy.Stats.CanBomb)
                 BomberTurn(battle, enemy, events);
             else if (enemy.Stats.AreaMelee)
@@ -145,10 +159,62 @@ namespace ArmyRoguelike.Core
             }
         }
 
-        /// <summary>Smash anyone adjacent, throw one boulder per turn from range, otherwise walk closer.</summary>
+        /// <summary>
+        /// Without loot: walk up and stab like any melee unit. With loot: run for the far edge (the
+        /// enemies' back row) and escape once it gets there.
+        /// </summary>
+        private static void CutpurseTurn(Battle battle, Unit thief, List<BattleEvent> events)
+        {
+            var backRow = battle.Board.Height - 1;
+            while (!battle.IsOver && thief.IsAlive && !thief.Escaped)
+            {
+                if (thief.CarryingLoot > 0)
+                {
+                    if (thief.Pos.Y == backRow)
+                    {
+                        battle.Escape(thief, events);
+                        return;
+                    }
+
+                    // Furthest row reachable, cheapest first; give up if it can't get any further this turn.
+                    var best = battle.GetReachable(thief)
+                        .OrderByDescending(kv => kv.Key.Y)
+                        .ThenBy(kv => kv.Value)
+                        .FirstOrDefault();
+                    if (best.Key.Y <= thief.Pos.Y)
+                        return;
+                    var move = battle.DoMove(thief, best.Key);
+                    if (move == null)
+                        return;
+                    events.AddRange(move);
+                    continue;
+                }
+
+                var target = ChooseTarget(battle, thief);
+                if (target == null)
+                    return;
+                if (battle.CanAttack(thief, target))
+                {
+                    events.AddRange(battle.DoAttack(thief, target));
+                    continue;
+                }
+
+                if (!Approach(battle, thief, target, Battle.AttackCost, events))
+                    return;
+            }
+        }
+
+        /// <summary>
+        /// Slam first if two or more of the player's units are within 2 tiles, then smash anyone adjacent,
+        /// throw one boulder per turn from range, otherwise walk closer.
+        /// </summary>
         private static void OgreTurn(Battle battle, Unit ogre, List<BattleEvent> events)
         {
             var thrown = false;
+            if (ogre.Stats.Slams && ogre.Ap >= Battle.AttackCost &&
+                battle.Living(Team.Player).Count(u => Battle.Distance(ogre, u) <= 2) >= 2)
+                events.AddRange(battle.DoSlam(ogre));
+
             while (!battle.IsOver && ogre.IsAlive)
             {
                 if (battle.AdjacentFoes(ogre).Count > 0)

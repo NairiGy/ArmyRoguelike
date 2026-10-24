@@ -52,7 +52,8 @@ namespace ArmyRoguelike.Tests
             var players = b.Units.Where(u => u.Team == Team.Player).ToList();
             for (var i = survivors; i < players.Count; i++)
                 players[i].Hp = 0;
-            foreach (var e in b.Units.Where(u => u.Team == Team.Enemy).ToList())
+            // Elementals split when they die, so keep going until nothing is left standing.
+            for (var e = b.Living(Team.Enemy).FirstOrDefault(); e != null && !b.IsOver; e = b.Living(Team.Enemy).FirstOrDefault())
             {
                 e.Hp = 1;
                 var killer = players[0];
@@ -150,7 +151,7 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Map_NineSteps_TwoChoicesEach_TrainersOffered_OgreLast()
+        public void Map_Act1_EachFactionOnce_BossLast()
         {
             for (var seed = 0; seed < 50; seed++)
             {
@@ -170,8 +171,81 @@ namespace ArmyRoguelike.Tests
 
                 var last = run.Map[Run.Steps - 1].Single();
                 Assert.AreEqual(NodeKind.Boss, last.Kind);
-                Assert.AreEqual(Encounter.Ogre, last.Encounter);
+                Assert.IsTrue(Encounter.Bosses.Contains(last.Encounter));
+
+                var battles = run.Map.Take(Run.Steps - 1).SelectMany(s => s).Where(n => n.Kind == NodeKind.Battle).Select(n => n.Encounter).ToList();
+                CollectionAssert.AreEquivalent(Encounter.Regular, battles, "every faction exactly once on the map");
             }
+        }
+
+        [Test]
+        public void Map_BothBossesComeUp()
+        {
+            var bosses = Enumerable.Range(0, 40).Select(s => NewRun(s).Map[Run.Steps - 1][0].Encounter).Distinct().Count();
+            Assert.AreEqual(2, bosses);
+        }
+
+        [Test]
+        public void Trainer_FirstEvolutionFree_ThenPaid()
+        {
+            for (var seed = 0; seed < 300; seed++)
+            {
+                var run = NewRun(seed);
+                while (run.State == RunState.Map && run.StepIndex < Run.TrainerSteps[0])
+                {
+                    run.ChooseNode(0);
+                    PlayThroughNode(run);
+                }
+
+                if (run.State != RunState.Map || run.Gold < Run.SecondEvolutionPrice)
+                    continue;
+                run.ChooseNode(run.CurrentChoices.ToList().FindIndex(n => n.Kind == NodeKind.Trainer));
+                var gold = run.Gold;
+                Assert.AreEqual(0, run.NextEvolutionPrice);
+                Assert.IsTrue(run.Evolve(run.Army[0], run.Army[0].Stats.Evolutions[0]));
+                Assert.AreEqual(gold, run.Gold, "first is free");
+                Assert.AreEqual(Run.SecondEvolutionPrice, run.NextEvolutionPrice);
+                Assert.IsTrue(run.Evolve(run.Army[1], run.Army[1].Stats.Evolutions[0]));
+                Assert.AreEqual(gold - Run.SecondEvolutionPrice, run.Gold);
+                Assert.AreEqual(Run.LaterEvolutionPrice, run.NextEvolutionPrice);
+                return;
+            }
+
+            Assert.Fail("never reached a trainer with enough gold");
+        }
+
+        [Test]
+        public void Necromancer_RaisesTheFactionsYouBeat()
+        {
+            var fought = new[] { Encounter.Wolves, Encounter.Goblins };
+            var b = Encounter.Necromancer.CreateBattle(ArmyMember.StartingArmy(), new System.Random(3), fought);
+            var minions = b.Units.Where(u => u.Team == Team.Enemy && !u.Stats.CanRaise).ToList();
+            Assert.AreEqual(2, minions.Count(u => u.Stats == UnitStats.Raised(UnitStats.Wolf)));
+            Assert.AreEqual(2, minions.Count(u => u.Stats == UnitStats.Raised(UnitStats.GoblinBomber)));
+            Assert.IsTrue(minions.All(u => u.Stats.LeavesRemains), "they can all be raised again");
+
+            var none = Encounter.Necromancer.CreateBattle(ArmyMember.StartingArmy(), new System.Random(3));
+            Assert.AreEqual(4, none.Units.Count(u => u.Stats == UnitStats.Skeleton), "skeletons when nothing was beaten");
+        }
+
+        [Test]
+        public void Layouts_FollowTheirRules()
+        {
+            foreach (var enc in Encounter.Regular.Concat(Encounter.Bosses))
+            {
+                for (var seed = 0; seed < 30; seed++)
+                {
+                    var b = enc.CreateBattle(ArmyMember.StartingArmy(), new System.Random(seed), Encounter.Regular);
+                    for (var x = 0; x < 8; x++)
+                    for (var y = 0; y < Battle.PlayerZoneRows; y++)
+                        Assert.IsFalse(b.Board.IsObstacle(new GridPos(x, y)), $"{enc.Name}: player rows clear");
+                    Assert.IsTrue(b.Units.Any(u => u.Team == Team.Enemy), enc.Name);
+                }
+            }
+
+            // The ridge always has exactly three gaps.
+            var ridge = Encounter.Goblins.CreateBattle(ArmyMember.StartingArmy(), new System.Random(5));
+            Assert.AreEqual(5, Enumerable.Range(0, 8).Count(x => ridge.Board.IsObstacle(new GridPos(x, 4))));
         }
 
         [Test]
@@ -406,12 +480,15 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Event_Ambush_IsAWolfFightThatPaysExtra()
+        public void Event_Ambush_IsAFreshFactionThatPaysExtra()
         {
             var run = RunAtEvent(EventKind.Ambush);
+            var ahead = run.Map.Skip(run.StepIndex + 1).SelectMany(s => s).Select(n => n.Encounter).ToList();
             run.StartAmbush();
             Assert.AreEqual(RunState.Battle, run.State);
-            Assert.AreEqual(Encounter.Wolves, run.CurrentEncounter);
+            Assert.IsTrue(Encounter.Regular.Contains(run.CurrentEncounter));
+            Assert.IsFalse(run.Fought.Contains(run.CurrentEncounter), "not one you've fought");
+            Assert.IsFalse(ahead.Contains(run.CurrentEncounter), "not one still waiting on the map");
             var before = run.Gold;
             WinCurrentBattle(run, 3);
             run.FinishBattle();
@@ -429,7 +506,8 @@ namespace ArmyRoguelike.Tests
                 b.Place(u, new GridPos(x++, 0));
             b.StartBattle();
             var rogue = b.Units.Single(u => u.Stats == UnitStats.Rogue);
-            foreach (var e in b.Units.Where(u => u.Team == Team.Enemy).ToList())
+            // Elementals split when they die, so keep going until nothing is left standing.
+            for (var e = b.Living(Team.Enemy).FirstOrDefault(); e != null && !b.IsOver; e = b.Living(Team.Enemy).FirstOrDefault())
             {
                 e.Hp = 1;
                 rogue.Ap = 99;
@@ -545,6 +623,7 @@ namespace ArmyRoguelike.Tests
                 new[] { (UnitStats.Necromancer, new GridPos(4, 2)), (UnitStats.Skeleton, new GridPos(0, 7)) });
             var rogue = Player(b);
             Enemy(b, 1).Hp = 0;
+            Enemy(b, 0).Hp = 6;
             b.PlayerAttack(rogue, Enemy(b, 0));
             b.PlayerAttack(rogue, Enemy(b, 0));
             Assert.AreEqual(Phase.Victory, b.Phase);
@@ -612,10 +691,28 @@ namespace ArmyRoguelike.Tests
             var archer = Player(b, 1);
             warrior.Pos = new GridPos(3, 4);
             archer.Pos = new GridPos(5, 6);
-            var events = b.EndPlayerTurn();
-            var smash = events.OfType<SmashEvent>().First();
+            // Called directly: on its own turn the Giant would slam them away first.
+            var ogre = Enemy(b);
+            ogre.Ap = ogre.MaxAp;
+            var smash = b.DoSmash(ogre).OfType<SmashEvent>().Single();
             Assert.AreEqual(2, smash.Hits.Count);
             Assert.AreEqual(UnitStats.Ogre.Damage, smash.Hits[0].Damage);
+        }
+
+        [Test]
+        public void Giant_SlamsWhenCrowded()
+        {
+            var b = Started(Army(UnitStats.Warrior, UnitStats.Archer), new[] { new GridPos(0, 0), new GridPos(1, 0) },
+                new[] { (UnitStats.Ogre, new GridPos(3, 5)) });
+            var warrior = Player(b, 0);
+            var archer = Player(b, 1);
+            warrior.Pos = new GridPos(3, 4);
+            archer.Pos = new GridPos(5, 6);
+            Assert.AreEqual(IntentKind.Slam, EnemyAI.PredictIntent(b, Enemy(b)).Kind);
+            var events = b.EndPlayerTurn();
+            Assert.IsTrue(events.OfType<AreaAttackEvent>().Any(a => a.Kind == "slam"));
+            var pushes = events.OfType<PushEvent>().Where(p => p.Pusher == Enemy(b)).ToList();
+            Assert.IsTrue(pushes.Any(p => p.Unit == warrior) && pushes.Any(p => p.Unit == archer));
         }
 
         [Test]
@@ -651,7 +748,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void MiniRun_EveryBattleTerminates()
         {
-            foreach (var encounter in Encounter.Regular.Append(Encounter.Ogre))
+            foreach (var encounter in Encounter.Regular.Concat(Encounter.Bosses))
             {
                 var b = encounter.CreateBattle(ArmyMember.StartingArmy());
                 var x = 2;

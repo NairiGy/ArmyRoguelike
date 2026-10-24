@@ -1241,6 +1241,16 @@ namespace ArmyRoguelike.Core
                 }
             }
 
+            if (!target.IsAlive && target.Stats.SplitsInto != null)
+                Split(target, after);
+
+            // A cutpurse grabs gold with its first landed hit, then runs for it.
+            if (hostile && kind == DamageKind.Attack && amount > 0 && source.IsAlive && source.Stats.StealsGold > 0 && source.CarryingLoot == 0)
+            {
+                source.CarryingLoot = source.Stats.StealsGold;
+                after.Add(new EffectEvent(EffectKind.Steal, source, source.CarryingLoot, source.Hp, source));
+            }
+
             if (target.IsAlive && hostile && kind == DamageKind.Attack)
             {
                 if (source.Has(Ability.Poison))
@@ -1257,6 +1267,62 @@ namespace ArmyRoguelike.Core
             }
 
             return new Hit(target, amount, target.Hp);
+        }
+
+        /// <summary>
+        /// A dying Elemental becomes two Shards: one on its own tile, one on a free neighbour (if any).
+        /// They wait until the next enemy turn to act.
+        /// </summary>
+        private void Split(Unit parent, List<BattleEvent> after)
+        {
+            var tiles = new List<GridPos> { parent.Pos };
+            tiles.AddRange(parent.Pos.Neighbours().Where(IsFree).OrderBy(p => p.Y).ThenBy(p => p.X));
+            var children = new List<Unit>();
+            foreach (var tile in tiles.Where(t => IsFree(t)).Take(2))
+            {
+                var child = new Unit(_nextId++, parent.Team, parent.Stats.SplitsInto) { Pos = tile, IsPlaced = true, IsDone = true };
+                _units.Add(child);
+                children.Add(child);
+            }
+
+            if (children.Count > 0)
+                after.Add(new SplitEvent(parent, children));
+        }
+
+        /// <summary>Gold carried off the board by escaped cutpurses this battle.</summary>
+        public int StolenGold { get; private set; }
+
+        /// <summary>A unit leaves the board with whatever loot it carries.</summary>
+        internal void Escape(Unit unit, List<BattleEvent> events)
+        {
+            unit.Escaped = true;
+            unit.IsPlaced = false;
+            StolenGold += unit.CarryingLoot;
+            events.Add(new EscapeEvent(unit, unit.CarryingLoot));
+            CheckEnd();
+        }
+
+        /// <summary>Slam: every other unit within 2 tiles of the slammer is shoved 1 tile away from it.</summary>
+        internal List<BattleEvent> DoSlam(Unit slammer)
+        {
+            slammer.Ap -= AttackCost;
+            var events = new List<BattleEvent>();
+            var area = Board.AllTiles().Where(p => Distance(p, 1, slammer) <= 2 && !Cells(slammer).Contains(p)).ToList();
+            events.Add(new AreaAttackEvent(slammer, "slam", slammer.Pos, area, new List<Hit>()));
+            var cx = slammer.Pos.X + (slammer.Size - 1) * 0.5;
+            var cy = slammer.Pos.Y + (slammer.Size - 1) * 0.5;
+            var shoved = _units.Where(u => u != slammer && u.IsPlaced && u.IsAlive && u.Size == 1 && Distance(slammer, u) <= 2)
+                .OrderByDescending(u => Distance(slammer, u)).ToList();
+            foreach (var u in shoved)
+            {
+                var dx = u.Pos.X - cx;
+                var dy = u.Pos.Y - cy;
+                var dir = Math.Abs(dx) >= Math.Abs(dy) ? new GridPos(Math.Sign(dx), 0) : new GridPos(0, Math.Sign(dy));
+                Push(u, dir, slammer, events);
+            }
+
+            CheckEnd();
+            return events;
         }
 
         /// <summary>Thorned Mail: a melee attacker takes damage back from the unit it hit.</summary>

@@ -18,8 +18,11 @@ namespace ArmyRoguelike.View
         public readonly int RunSeed;
         public readonly bool Ambush;
         public readonly bool Boss;
+        public readonly string Layout;
+        public readonly string LayoutRule;
 
-        public BattleContext(int step, int steps, string encounter, int gold, int runSeed, bool ambush, bool boss)
+        public BattleContext(int step, int steps, string encounter, int gold, int runSeed, bool ambush, bool boss,
+            string layout = "", string layoutRule = "")
         {
             Step = step;
             Steps = steps;
@@ -28,6 +31,8 @@ namespace ArmyRoguelike.View
             RunSeed = runSeed;
             Ambush = ambush;
             Boss = boss;
+            Layout = layout;
+            LayoutRule = layoutRule;
         }
 
         public int GoldIfWon(int survivors) => Run.GoldFor(survivors) + (Ambush ? Run.AmbushBonusGold : 0);
@@ -586,6 +591,16 @@ namespace ArmyRoguelike.View
                     _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
                     _intent.Show(from, to);
                     break;
+                case IntentKind.Flee:
+                    // Show where it's running: the far edge it escapes from.
+                    for (var x = 0; x < Battle.Board.Width; x++)
+                        _board.SetHighlight(new GridPos(x, Battle.Board.Height - 1), RaiseColor);
+                    break;
+                case IntentKind.Slam:
+                    foreach (var p in Battle.Board.AllTiles())
+                        if (Battle.Distance(p, 1, enemy) <= 2 && !Battle.Cells(enemy).Contains(p))
+                            _board.SetHighlight(p, SmashZoneColor);
+                    break;
                 default:
                     _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
                     _intent.Show(from, to);
@@ -725,7 +740,9 @@ namespace ArmyRoguelike.View
                     }
                     else
                     {
-                        if (area.Kind == "volley" || area.Kind == "pierce")
+                        if (area.Kind == "slam")
+                            StartCoroutine(Shake(0.08f, BlastTime));
+                        if (area.Kind == "volley" || area.Kind == "pierce" || area.Kind == "slam")
                             StartCoroutine(_board.Flash(area.Area, BlastTime * 0.6f));
                         yield return attacker.Lunge(aim, () =>
                         {
@@ -816,6 +833,25 @@ namespace ArmyRoguelike.View
                     _board.SyncTiles();
                     break;
                 }
+                case EscapeEvent escape:
+                {
+                    var view = _board.ViewOf(escape.Unit);
+                    DamagePopup.Spawn(view.TopWorld + Vector3.up * 0.25f,
+                        escape.Gold > 0 ? $"Escaped with {escape.Gold} gold" : "Escaped", DamagePopup.DamageColor, 44);
+                    yield return view.Slide(escape.Unit.Pos, new GridPos(escape.Unit.Pos.X, escape.Unit.Pos.Y + 1), null);
+                    view.gameObject.SetActive(false);
+                    break;
+                }
+                case SplitEvent split:
+                {
+                    // Only add the new views: a full sync would jump units still waiting to be animated.
+                    foreach (var child in split.Children)
+                        StartCoroutine(_board.AddView(child).Raise());
+                    var at = IsoMath.GridToWorld(split.Parent.Pos) + Vector3.up * 0.6f;
+                    DamagePopup.Spawn(at, "Split!", DamagePopup.AbilityColor, 48);
+                    yield return new WaitForSeconds(0.5f);
+                    break;
+                }
                 case SummonEvent summon:
                 {
                     var builder = _board.ViewOf(summon.Summoner);
@@ -863,6 +899,10 @@ namespace ArmyRoguelike.View
                     break;
                 case EffectKind.Guard:
                     DamagePopup.Spawn(at, "Guard!", DamagePopup.AbilityColor, 48);
+                    break;
+                case EffectKind.Steal:
+                    DamagePopup.Spawn(at, $"Stole {effect.Amount} gold!", DamagePopup.DamageColor, 44);
+                    view.RefreshStatus();
                     break;
             }
 
@@ -1036,15 +1076,16 @@ namespace ArmyRoguelike.View
         }
 
         private string Header =>
-            $"Step {_context.Step}/{_context.Steps}: {(_context.Boss ? "Boss " : "")}{(_context.Ambush ? "Ambush! " : "")}{_context.Encounter}    Gold {_context.Gold}";
+            $"Step {_context.Step}/{_context.Steps}: {(_context.Boss ? "Boss " : "")}{(_context.Ambush ? "Ambush! " : "")}{_context.Encounter} ({_context.Layout})    Gold {_context.Gold}";
 
         private void DrawPlacementHud()
         {
             var army = Battle.Units.Where(u => u.Team == Team.Player).ToList();
-            var h = 70 + army.Count * (ButtonHeight + 2) + 10;
+            var h = 110 + army.Count * (ButtonHeight + 2) + 10;
             GUILayout.BeginArea(Panel(Margin, Margin, PanelWidth, h), GUI.skin.box);
             GUILayout.Label(Header);
             GUILayout.Label("Place your army in the blue tiles. Click a placed statue to move it.", TextStyle);
+            GUILayout.Label(_context.LayoutRule, TextStyle);
             foreach (var u in army)
             {
                 var item = u.Equipment != null ? $" [{u.Equipment.Name}]" : "";
@@ -1169,7 +1210,7 @@ namespace ArmyRoguelike.View
 
         private void DrawEndHud()
         {
-            const float w = 260, h = 120;
+            const float w = 280, h = 140;
             GUILayout.BeginArea(Panel((GuiWidth - w) * 0.5f, 120, w, h), GUI.skin.box);
             var style = new GUIStyle(GUI.skin.label) { fontSize = 22, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
             var centred = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter };
@@ -1178,6 +1219,8 @@ namespace ArmyRoguelike.View
                 var survivors = Battle.LivingArmy.Count();
                 GUILayout.Label("Victory!", style);
                 GUILayout.Label($"{survivors} survived: +{_context.GoldIfWon(survivors)} gold", centred);
+                if (Battle.StolenGold > 0)
+                    GUILayout.Label($"Cutpurses got away with {Battle.StolenGold} gold.", centred);
             }
             else
             {
@@ -1257,6 +1300,10 @@ namespace ArmyRoguelike.View
                     return $"Wants to: throw a boulder at the {name} (rock lands on the dark tile)";
                 case IntentKind.Bomb:
                     return $"Wants to: bomb the {name}'s tile (goes off next enemy turn)";
+                case IntentKind.Flee:
+                    return $"Wants to: run off the far edge with {intent.Target.CarryingLoot} of your gold. Kill it first!";
+                case IntentKind.Slam:
+                    return "Wants to: slam, shoving everyone within 2 tiles (red area) 1 tile away";
                 default:
                     return $"Wants to attack: {name}";
             }

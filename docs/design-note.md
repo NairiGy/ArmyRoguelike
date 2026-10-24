@@ -1,7 +1,7 @@
 # Grid Tactics Roguelike — Design Note
 
 Working title: "Army Roguelike" (placeholder; a better name will come later). Separate project from Nardatro. Unity project: `Desktop/Unity projects/ArmyRoguelike`. This file (`docs/design-note.md`) is the canonical copy.
-Status: Prototype 4 built, not yet playtested: draft 3 of 5 base units, 9-step map with free Trainers at steps 4 and 7 (every unit +1 tier per visit), 5 evolution trees (38 unit types, 3 tiers), only rule-bending items. Full unit/ability/item reference: `docs/gamepedia.html` (generated from game data; re-export via Tools → Export Gamepedia). Earlier, Prototype 3: branching 6-step map (battles, shops, ? events, ogre boss), built-in unit abilities, ability items, the sapper recruit with mines, and a goblin bomber battle. Prototype 2 (fixed mini-run) was playtested once: won, about 5.5 minutes. Fixes from it: walk-up attacks, End turn confirmation, necromancer no longer idle. Prototype 1 (one battle): no bugs, felt OK, won 2/2, "not super easy". Numbers marked *(placeholder)* are only examples.
+Status: Prototype 5 (Act 1) built, not yet playtested: 7-step Act 1 where each of four factions (wolves, goblins, bandits, elementals) appears at most once, rule-based layouts, a rotating boss (Necromancer raising your beaten factions, or the Giant), one evolution per unit per Trainer visit with paid extras, zone of control. Prototype 4: draft 3 of 5 base units, 9-step map with free Trainers at steps 4 and 7 (every unit +1 tier per visit), 5 evolution trees (38 unit types, 3 tiers), only rule-bending items. Full unit/ability/item reference: `docs/gamepedia.html` (generated from game data; re-export via Tools → Export Gamepedia). Earlier, Prototype 3: branching 6-step map (battles, shops, ? events, ogre boss), built-in unit abilities, ability items, the sapper recruit with mines, and a goblin bomber battle. Prototype 2 (fixed mini-run) was playtested once: won, about 5.5 minutes. Fixes from it: walk-up attacks, End turn confirmation, necromancer no longer idle. Prototype 1 (one battle): no bugs, felt OK, won 2/2, "not super easy". Numbers marked *(placeholder)* are only examples.
 
 ## Pitch
 
@@ -177,11 +177,61 @@ Goal: find out whether building up the army across fights feels good.
 - **Ambush:** a wolf pack fight that pays +5 gold.
 - **Shrine:** one unit gets +2 max HP for the run.
 
+## Prototype 5: Act 1
+
+Goal: battles that don't repeat and a boss that checks the build. The run is a single Act 1 for now; later acts come after this one feels good.
+
+**Map (7 steps)** — the four factions are shuffled onto four battle nodes, so no faction appears twice in a run:
+
+| Step | Choice |
+|---|---|
+| 1 | Battle (faction A) or Battle (faction B) |
+| 2 | Shop or ? |
+| 3 | Battle (faction C) or ? |
+| 4 | Trainer or Shop |
+| 5 | Battle (faction D) or ? |
+| 6 | Trainer or ? |
+| 7 | Boss: Necromancer or Giant (one per run) |
+
+- An Ambush event fights a faction you haven't met that isn't waiting later on the map; if none is left, the ambushers flee and drop 10 gold.
+
+**Layouts** — every encounter has a template with fixed rules; rock positions and start tiles vary within them. The player's back two rows are always clear and every enemy is reachable on foot.
+
+| Encounter | Layout | Rule |
+|---|---|---|
+| Wolf Pack | Open Field | 1–2 mirrored pairs of rocks; wolves start within 2 tiles of the leader |
+| Goblin Bombers | Ridge | A rock ridge across row 5 with 3 gaps; bombers on the back row |
+| Bandit Camp | Camp | 3 cover rocks in the middle; crossbowmen behind them, cutpurses on the flanks, brute in the centre |
+| Elementals | Crystal Cave | 2 mirrored pairs of crystals; 3 elementals spread out |
+| Necromancer (boss) | Graveyard | 4–6 tombstones in the middle |
+| Giant (boss) | Quarry | 1 mirrored pair of boulders |
+
+**New factions** *(placeholder numbers)*
+
+| Unit | HP | Dmg | Rng | AP | Rule |
+|---|---|---|---|---|---|
+| Cutpurse (x2) | 5 | 2 | 1 | 5 | On a landed hit it steals 5 gold and runs for the far edge; if it reaches it, it escapes and the gold is lost. Kill it first and nothing is lost. |
+| Crossbowman (x2) | 6 | 3 | 4 | 3 | Ranged, needs line of sight. |
+| Bandit Brute | 12 | 3 | 1 | 3 | Tough (takes 1 less damage). |
+| Elemental (x3) | 10 | 3 | 1 | 3 | When it dies it splits into 2 Shards (its tile + a free neighbour). |
+| Shard | 5 | 2 | 1 | 3 | — |
+
+**Bosses** *(placeholder numbers)*
+
+- **Necromancer** (14 HP, 3 dmg bolt, range 3): his army is raised from the factions beaten this act — 2 of each faction's representative (Bone Wolf, Bone Goblin Bomber, Bone Crossbowman, Bone Shard), topped up with Skeletons to at least 4. All of them leave bone piles and can be raised again (within 5 tiles, 3 AP).
+- **Giant** (the ogre, 36 HP): Slam (2 AP) shoves everyone within 2 tiles 1 tile away when 2+ of your units are that close; plus the club smash and boulders that stay as rocks.
+
+**Trainer economy** — one evolution per unit per visit. The first evolution of a visit is free, the second costs 20 gold, each after that 35. A won fight pays 15–25, so a typical act (2–3 fights) buys about one recruit (15), one item (7–10) and one paid evolution.
+
+**Zone of control** — each step out of a tile next to an enemy costs +2 AP, both sides.
+
 ## Later / maybe
 
 - Drawn spell cards during battle.
 - Other win conditions.
 - Difficulty modifiers (for example, HP carrying over between fights).
+- **Banners:** an army-wide rule layer (like Balatro jokers, but every banner bends a rule and has a cost, e.g. Lone Wolf: army limit 1 but big upside). Parked: "hard topic".
+- **More acts** after Act 1; terrain features (river, bushes, crumbling floor) for layouts; post-battle reward choices; elite nodes.
 
 ## Open questions
 

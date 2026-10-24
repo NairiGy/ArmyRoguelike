@@ -122,14 +122,24 @@ public static class GamepediaWriter
     private static void Encounters(StringBuilder html)
     {
         html.Append("<section id=\"encounters\"><h2>Encounters</h2><p>Battles are on an 8x8 board; you place your army in the back two rows. ");
-        html.Append("Kill every enemy to win. The ogre is always the final boss.</p><div class=\"grid\">");
-        foreach (var enc in Encounter.Regular.Append(Encounter.Ogre))
-        {
-            var counts = enc.Enemies.GroupBy(e => e.stats.Name).Select(g => g.Count() > 1 ? $"{g.Key} x{g.Count()}" : g.Key);
-            html.Append($"<div class=\"card\"><div class=\"body\"><h4>{Esc(enc.Name)}</h4><p>{Esc(string.Join(", ", counts))}</p></div></div>");
-        }
-
+        html.Append("Kill every enemy to win. Each faction appears at most once per run; Act 1 ends with one of the bosses. ");
+        html.Append("Every encounter has a layout template: fixed rules, with the exact rocks and start tiles varied each time.</p>");
+        html.Append("<h3>Factions</h3><div class=\"grid\">");
+        foreach (var enc in Encounter.Regular)
+            EncounterCard(html, enc, enc.EnemySummary());
+        html.Append("</div><h3>Bosses</h3><div class=\"grid\">");
+        EncounterCard(html, Encounter.Necromancer, new[] { "Necromancer", "2 raised units from each faction you beat this act (Skeletons fill up to 4)" });
+        EncounterCard(html, Encounter.Giant, Encounter.Giant.EnemySummary());
         html.Append("</div></section>");
+    }
+
+    private static void EncounterCard(StringBuilder html, Encounter enc, System.Collections.Generic.IEnumerable<string> enemies)
+    {
+        html.Append($"<div class=\"card\"><div class=\"body\"><h4>{Esc(enc.Name)} <span class=\"badge\">{Esc(enc.Layout)}</span></h4>");
+        html.Append($"<p class=\"role\">{Esc(enc.LayoutRule)}</p><p>{Esc(string.Join(", ", enemies))}</p>");
+        if (enc.RaisedRepresentative != null)
+            html.Append($"<p class=\"stats\">Necromancer raises: {Esc(UnitStats.Raised(enc.RaisedRepresentative).Name)}</p>");
+        html.Append("</div></div>");
     }
 
     private static void Items(StringBuilder html)
@@ -176,18 +186,18 @@ public static class GamepediaWriter
     {
         html.Append("<section id=\"run\"><h2>Run &amp; map</h2><ul>");
         html.Append($"<li>Draft {Run.DraftSize} different base units. Army size up to {Run.MaxArmySize}.</li>");
-        html.Append($"<li>The road has {Run.Steps} steps; each step offers 2 nodes. Step 1 is two battles; the last step is the ogre. ");
-        html.Append($"Steps {string.Join(" and ", Run.TrainerSteps.Select(s => s + 1))} always offer a Trainer.</li>");
-        html.Append("<li>Other steps: battle (50%), shop (25%) or ? event (25%).</li>");
-        html.Append($"<li>Won battle: {Run.BaseGold} gold + {Run.GoldPerSurvivor} per surviving unit (+{Run.AmbushBonusGold} for an ambush).</li>");
-        html.Append($"<li><b>Trainer</b>: free; every unit can evolve one tier per visit.</li>");
+        html.Append($"<li>Act 1 has {Run.Steps} steps; each step offers 2 nodes. The four factions are shuffled onto four battle nodes (two at step 1, one at steps 3 and 5), so none repeats. ");
+        html.Append($"Steps {string.Join(" and ", Run.TrainerSteps.Select(s => s + 1))} offer a Trainer; the last step is a boss (Necromancer or Giant).</li>");
+        html.Append("<li>The other choices are shops and ? events.</li>");
+        html.Append($"<li>Won battle: {Run.BaseGold} gold + {Run.GoldPerSurvivor} per surviving unit (+{Run.AmbushBonusGold} for an ambush). Gold carried off by escaped cutpurses is lost.</li>");
+        html.Append($"<li><b>Trainer</b>: each unit can evolve one tier per visit. The first evolution of a visit is free, the second costs {Run.SecondEvolutionPrice} gold, each after that {Run.LaterEvolutionPrice}.</li>");
         html.Append($"<li><b>Shop</b>: {Run.ShopSize} items and a random base-unit recruit for {Run.RecruitPrice} gold (if the army has room).</li>");
         html.Append("<li>Every battle starts at full HP and dead units come back. Evolutions, items, Bloodthirst damage and shrine HP last the whole run.</li>");
         html.Append("</ul><h3>? events</h3><table><tr><th>Event</th><th>What happens</th></tr>");
         html.Append($"<tr><td>Wandering Recruit</td><td>A random base unit joins for free ({Run.FullArmyGold} gold instead if the army is full).</td></tr>");
         html.Append("<tr><td>Abandoned Cart</td><td>A random item for any unit, or leave it.</td></tr>");
         html.Append($"<tr><td>Gambler</td><td>Pay {Run.GambleCost} gold for a 50% chance at {Run.GambleWin}.</td></tr>");
-        html.Append($"<tr><td>Ambush</td><td>A wolf pack fight that pays +{Run.AmbushBonusGold} gold.</td></tr>");
+        html.Append($"<tr><td>Ambush</td><td>A fight against a faction you haven't met (and won't meet later on the map) that pays +{Run.AmbushBonusGold} gold. If none is left, they flee and drop gold.</td></tr>");
         html.Append($"<tr><td>Shrine</td><td>One unit gets +{Run.ShrineHp} max HP for the run.</td></tr>");
         html.Append("</table></section>");
     }

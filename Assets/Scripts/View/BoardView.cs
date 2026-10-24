@@ -211,6 +211,15 @@ namespace ArmyRoguelike.View
 
         public UnitView ViewOf(Unit unit) => _units.TryGetValue(unit, out var v) ? v : null;
 
+        /// <summary>Creates the view for a unit that appeared mid-battle (a shard), without touching the others.</summary>
+        public UnitView AddView(Unit unit)
+        {
+            if (!_units.TryGetValue(unit, out var view))
+                _units[unit] = view = UnitView.Create(unit, transform);
+            view.SetGridPosition(unit.Pos);
+            return view;
+        }
+
         public void SetHighlight(GridPos p, Color color)
         {
             if (!_highlights.TryGetValue(p, out var h))

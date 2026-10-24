@@ -226,6 +226,52 @@ namespace ArmyRoguelike.Tests
             Assert.GreaterOrEqual(Battle.Distance(Enemy(b), Player(b)), 2);
         }
 
+        // ---------- Bandits and elementals ----------
+
+        [Test]
+        public void Cutpurse_StealsOnHit_ThenRunsAndEscapes()
+        {
+            var b = Started(new[] { M(UnitStats.Warrior) }, new[] { P(3, 1) }, new[] { (UnitStats.Cutpurse, P(3, 2)) });
+            var thief = Enemy(b);
+            var events = b.EndPlayerTurn();
+            Assert.IsTrue(events.OfType<EffectEvent>().Any(e => e.Kind == EffectKind.Steal));
+            Assert.AreEqual(UnitStats.Cutpurse.StealsGold, thief.CarryingLoot);
+            Assert.AreEqual(Intent(b, thief), IntentKind.Flee);
+            for (var i = 0; i < 4 && !b.IsOver; i++)
+                b.EndPlayerTurn();
+            Assert.IsTrue(thief.Escaped);
+            Assert.AreEqual(UnitStats.Cutpurse.StealsGold, b.StolenGold);
+            Assert.AreEqual(Phase.Victory, b.Phase, "the last enemy left the board");
+        }
+
+        [Test]
+        public void Cutpurse_KilledWithLoot_StealsNothing()
+        {
+            var b = Started(new[] { M(UnitStats.Rogue) }, new[] { P(3, 1) }, new[] { (UnitStats.Cutpurse, P(3, 2)), (UnitStats.Wolf, P(7, 7)) });
+            var thief = Enemy(b);
+            thief.CarryingLoot = 5;
+            thief.Hp = 1;
+            b.PlayerAttack(Player(b), thief);
+            Assert.IsFalse(thief.IsAlive);
+            Assert.AreEqual(0, b.StolenGold);
+        }
+
+        [Test]
+        public void Elemental_SplitsIntoTwoShards()
+        {
+            var b = Started(new[] { M(UnitStats.Rogue) }, new[] { P(3, 1) }, new[] { (UnitStats.Elemental, P(3, 2)) });
+            var elemental = Enemy(b);
+            elemental.Hp = 1;
+            var events = b.PlayerAttack(Player(b), elemental);
+            var split = events.OfType<SplitEvent>().Single();
+            Assert.AreEqual(2, split.Children.Count);
+            Assert.IsTrue(split.Children.All(c => c.Stats == UnitStats.Shard && c.IsAlive));
+            Assert.AreEqual(Phase.PlayerTurn, b.Phase, "not won yet: the shards are still standing");
+            Assert.AreEqual(P(3, 2), split.Children[0].Pos, "one shard where the elemental stood");
+        }
+
+        private static IntentKind Intent(Battle b, Unit u) => EnemyAI.PredictIntent(b, u).Kind;
+
         // ---------- Zone of control ----------
 
         [Test]
