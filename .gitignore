@@ -45,3 +45,6 @@ Desktop.ini
 
 # --- Playtest logs (written by PlaytestLogger)
 /[Pp]laytests/
+
+# --- tools/dev.sh build output
+/tools/out/
