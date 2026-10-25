@@ -22,11 +22,12 @@ A single-player roguelike army-builder. You lead a small squad of living statues
   - `EnemyAI.cs`: enemy behaviour and the intent shown on hover. `Run.cs`: draft, map, shop, trainer and events. `Encounter.cs`: factions, bosses and their layout templates.
   - `AssemblyInfo.cs` lets the tests set internal state directly.
 - `Assets/Scripts/View`: Unity side (`ArmyRoguelike.View` assembly). It shows the battle and handles input, and only reads state and calls into Core. Screens are IMGUI; buttons that change the screen run deferred via `GameBootstrap.Do` to avoid IMGUI layout errors.
-- `Assets/Editor`: `PreviewCapture` (renders a battle to PNG headlessly), `GamepediaExporter` + `GamepediaWriter` (the gamepedia; the writer is plain C#).
+- `Assets/Editor`: `PreviewCapture` (renders a battle to PNG headlessly), `GamepediaExporter` + `GamepediaWriter` (the gamepedia; the writer is plain C#), `ArtExperiment` (Tools → Art → Import Statues, plus the art-experiment renders).
+- `Assets/Art`: painted art (see "Visual direction" in the design note). `Experiment/Source/<unit>_iso.png` are the AI-generated source images; Import Statues cuts them out into `Units/Resources/Statues/<UnitKind>.png`. `Environment/Resources` holds the greyscale backdrop and the palette-ramp shader used by `View/BattleScenery.cs`. Raw AI art also lives outside the repo in `Desktop/ai art/<unit>/`.
 - `Assets/Tests/EditMode`: NUnit tests for Core.
 - `tools/dev.sh compile|test|wiki`: compile, run the tests and write a text-only gamepedia with Unity's bundled compiler, with the Editor open or closed. See `tools/README.md`. The Pipeline package (`com.unity.pipeline`) lets `unity status` / `unity command` drive an open Editor.
 - `Playtests/` (git-ignored): a JSON log per battle (`PlaytestLogger`) and per run (`RunLogger`). F9 in game saves a marker with a board snapshot. Read these to summarize playtests instead of asking the user for numbers. Battles skipped with the debug Win button are marked `skipped`.
-- The scene stays nearly empty. `GameBootstrap` builds the run at runtime, and placeholder art is generated in code (`PlaceholderArt`).
+- The scene stays nearly empty. `GameBootstrap` builds the run at runtime, and placeholder art is generated in code (`PlaceholderArt`). Unit types with a painted statue sprite use it instead.
 
 ## Version control
 

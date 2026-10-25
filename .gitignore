@@ -48,3 +48,6 @@ Desktop.ini
 
 # --- tools/dev.sh build output
 /tools/out/
+
+# Raw AI art drops before import (art experiment)
+/ArtInbox/

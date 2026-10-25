@@ -8,6 +8,7 @@ namespace ArmyRoguelike.View
     public sealed class BoardView : MonoBehaviour
     {
         private static readonly Color TileColor = new Color(0.56f, 0.52f, 0.44f);
+        private Color _rockTint = Color.white;
 
         private readonly Dictionary<GridPos, SpriteRenderer> _tiles = new Dictionary<GridPos, SpriteRenderer>();
         private readonly Dictionary<GridPos, SpriteRenderer> _highlights = new Dictionary<GridPos, SpriteRenderer>();
@@ -139,6 +140,7 @@ namespace ArmyRoguelike.View
             rock.transform.SetParent(transform, false);
             rock.transform.position = IsoMath.GridToWorld(p);
             rock.sprite = PlaceholderArt.Rock;
+            rock.color = _rockTint;
             rock.sortingOrder = IsoMath.SortingOrder(p) + 5;
             _rocks[p] = rock;
         }
@@ -154,7 +156,7 @@ namespace ArmyRoguelike.View
                 if (Battle.Board.IsObstacle(p))
                 {
                     AddRock(p);
-                    _rocks[p].color = Battle.Ice.ContainsKey(p) ? IceTint : Battle.IsBarricade(p) ? BarricadeTint : Color.white;
+                    _rocks[p].color = Battle.Ice.ContainsKey(p) ? IceTint : Battle.IsBarricade(p) ? BarricadeTint : _rockTint;
                 }
                 else if (_rocks.TryGetValue(p, out var rock))
                 {
@@ -218,6 +220,20 @@ namespace ArmyRoguelike.View
                 _units[unit] = view = UnitView.Create(unit, transform);
             view.SetGridPosition(unit.Pos);
             return view;
+        }
+
+        /// <summary>Recolours the ground to suit the battle's scenery palette.</summary>
+        public void SetGroundTint(Color color)
+        {
+            foreach (var tile in _tiles.Values)
+                tile.color = color;
+        }
+
+        /// <summary>Recolours plain rocks (not ice or barricades) to suit the scenery palette.</summary>
+        public void SetRockTint(Color color)
+        {
+            _rockTint = color;
+            SyncTiles();
         }
 
         public void SetHighlight(GridPos p, Color color)

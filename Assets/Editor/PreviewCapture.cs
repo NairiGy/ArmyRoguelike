@@ -21,6 +21,7 @@ public static class PreviewCapture
         var output = "battle-preview.png";
         var placeArmy = false;
         var encounter = 0;
+        var palette = 0;
         for (var i = 0; i < args.Length; i++)
         {
             if (args[i] == "-previewOut" && i + 1 < args.Length)
@@ -29,14 +30,16 @@ public static class PreviewCapture
                 placeArmy = true;
             if (args[i] == "-previewEncounter" && i + 1 < args.Length)
                 int.TryParse(args[i + 1], out encounter);
+            if (args[i] == "-previewPalette" && i + 1 < args.Length)
+                int.TryParse(args[i + 1], out palette);
         }
 
         EditorSceneManager.OpenScene("Assets/Scenes/SampleScene.unity");
-        Capture(output, placeArmy, encounter);
+        Capture(output, placeArmy, encounter, palette, args.Contains("-previewPixelate"));
         EditorApplication.Exit(0);
     }
 
-    private static void Capture(string output, bool placeArmy, int encounter = 0)
+    internal static void Capture(string output, bool placeArmy, int encounter = 0, int palette = 0, bool pixelate = false)
     {
         // -previewEncounter: 0 wolves, 1 goblins, 2 bandits, 3 elementals, 4 necromancer, 5 giant.
         var encounters = Encounter.Regular.Concat(Encounter.Bosses).ToArray();
@@ -86,6 +89,9 @@ public static class PreviewCapture
                 board.SetHighlight(p, new Color(1f, 0.45f, 0.1f, 0.4f));
             var cam = Camera.main;
             GameBootstrap.FrameCamera(cam, board);
+            // The capture is 16:9; frame the scenery for that, whatever the batch-mode camera thinks.
+            cam.aspect = 16f / 9f;
+            BattleScenery.Apply(cam, board, palette, pixelate);
             var rt = new RenderTexture(1280, 720, 24);
             cam.targetTexture = rt;
             // The first render after creating sprites can miss their textures; the second is reliable.
@@ -97,6 +103,7 @@ public static class PreviewCapture
             tex.Apply();
             File.WriteAllBytes(output, tex.EncodeToPNG());
             cam.targetTexture = null;
+            cam.ResetAspect();
             RenderTexture.active = null;
             Debug.Log($"Battle preview written to {Path.GetFullPath(output)}");
         }

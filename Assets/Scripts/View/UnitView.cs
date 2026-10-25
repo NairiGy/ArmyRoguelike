@@ -53,6 +53,12 @@ namespace ArmyRoguelike.View
             _body.sprite = PlaceholderArt.Statue(unit.Stats.Kind);
             // Raised (undead) enemies are pale bone instead of grey granite.
             _baseColor = unit.Team == Team.Player ? TierStone(unit.Stats.Tier) : unit.Stats.IsUndead ? new Color(0.78f, 0.76f, 0.66f) : PlaceholderArt.EnemyStone;
+            if (PlaceholderArt.IsPainted(unit.Stats.Kind))
+            {
+                _baseColor = Color.white;
+                // The art faces down-left; enemies turn round to face the player's side.
+                _body.flipX = unit.Team == Team.Enemy;
+            }
             _body.color = _baseColor;
             if (unit.IsPackLeader)
                 _body.transform.localScale = Vector3.one * 1.25f;

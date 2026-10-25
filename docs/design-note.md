@@ -19,6 +19,15 @@ A roguelike army-builder: lead a small squad across a Slay the Spire–style map
 - The board should **not** look like a chessboard.
 - Engine: Unity 6.
 
+## Visual direction
+
+- **Look:** chunky, stylized, hand-painted statues on square pedestals, seen in 3/4 isometric view on the 2:1 board.
+- **Teams read by stone:** player statues are pale sandstone, enemies dark basalt. Rune glow is an optional extra, not required.
+- **Art source:** AI-generated 2D images (ChatGPT). Every new unit uses the same prompt template, on a plain light grey background, with an existing unit image attached as a style reference. Tested with warrior, archer and wolf: they match as one set.
+- **Pipeline:** an editor tool cuts out the background, finds the pedestal and scales every statue to the same pedestal width (0.6 tile). Left and right facing come from flipping the sprite.
+- **3D route** (image → Tripo/Meshy model → baked from the board's camera): tested. Consistent and controllable, but it looked flatter and slimmer than the 2D images. Parked as a fallback, for example if units ever need more than two facings.
+- **Still open:** board and tile look, terrain, effects, UI/HUD, how evolution tiers look, and the unit labels that currently sit over the statues.
+
 ## Design goals
 
 - Fun from the very first turn, with real choices.

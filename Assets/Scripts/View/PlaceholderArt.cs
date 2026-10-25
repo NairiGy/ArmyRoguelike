@@ -39,8 +39,31 @@ namespace ArmyRoguelike.View
             }
         }
 
+        /// <summary>Art experiment: finished sprites that replace a statue's placeholder. Shown untinted.</summary>
+        public static readonly Dictionary<UnitKind, Sprite> StatueOverrides = new Dictionary<UnitKind, Sprite>();
+
+        private static readonly Dictionary<UnitKind, Sprite> Painted = new Dictionary<UnitKind, Sprite>();
+
+        /// <summary>
+        /// The painted statue for a unit type, from Resources/Statues (made by Tools/Art/Import Statues),
+        /// or null if it has none yet. Painted statues carry their own colours and are shown untinted.
+        /// </summary>
+        public static Sprite PaintedStatue(UnitKind kind)
+        {
+            if (StatueOverrides.TryGetValue(kind, out var custom))
+                return custom;
+            if (!Painted.TryGetValue(kind, out var sprite))
+                Painted[kind] = sprite = Resources.Load<Sprite>("Statues/" + (kind == UnitKind.PackLeader ? UnitKind.Wolf : kind));
+            return sprite;
+        }
+
+        public static bool IsPainted(UnitKind kind) => PaintedStatue(kind) != null;
+
         public static Sprite Statue(UnitKind kind)
         {
+            var painted = PaintedStatue(kind);
+            if (painted != null)
+                return painted;
             if (Statues.TryGetValue(kind, out var sprite))
                 return sprite;
             switch (kind)

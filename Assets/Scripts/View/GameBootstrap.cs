@@ -128,6 +128,7 @@ namespace ArmyRoguelike.View
             _battleRoot.transform.SetParent(transform, false);
             var board = BoardView.Create(battle, _battleRoot.transform);
             FrameCamera(Camera.main, board);
+            BattleScenery.Apply(Camera.main, board, _run.StepIndex);
             var context = new BattleContext(_run.StepIndex + 1, Run.Steps, _run.CurrentEncounter.Name, _run.Gold, _run.Seed,
                 _run.IsAmbush, _run.CurrentEncounter.IsBoss, _run.CurrentEncounter.Layout, _run.CurrentEncounter.LayoutRule);
             _controller = _battleRoot.AddComponent<BattleController>();
