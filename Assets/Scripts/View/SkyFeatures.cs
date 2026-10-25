@@ -15,11 +15,14 @@ namespace ArmyRoguelike.View
             public bool ClearSky, Moon, Stars, ShootingStars, Lanterns, Birds, Aurora;
         }
 
-        public static Mix Default;
+        // Clear sky, stars, shooting stars and lanterns: the mix that worked in playtesting.
+        public static Mix Default = new Mix { ClearSky = true, Stars = true, ShootingStars = true, Lanterns = true };
 
         [Tooltip("Open night sky with the cloud sea only low down (otherwise the cloudy panorama).")]
         public bool clearSky;
         public bool moon;
+        [Tooltip("The stylised crescent instead of the painted full moon.")]
+        public bool crescentMoon = true;
         [Tooltip("Where the moon sits on screen, 0..1 from the bottom left.")]
         public Vector2 moonPosition = new Vector2(0.17f, 0.8f);
         public float moonSize = 1.2f;
@@ -47,6 +50,8 @@ namespace ArmyRoguelike.View
         private GameObject _moonRoot;
         private SpriteRenderer _moon;
         private SpriteRenderer _moonHalo;
+        private Sprite _fullMoon;
+        private Sprite _crescent;
         private GameObject _starRoot;
         private SpriteRenderer[] _stars;
         private float[] _starPhase;
@@ -122,7 +127,8 @@ namespace ArmyRoguelike.View
             _moonHalo.color = new Color(pale.r, pale.g, pale.b, 0.16f);
             _moon = new GameObject("Disc").AddComponent<SpriteRenderer>();
             _moon.transform.SetParent(moonRoot, false);
-            _moon.sprite = Resources.Load<Sprite>("Backdrops/moon");
+            _fullMoon = Resources.Load<Sprite>("Backdrops/moon");
+            _crescent = Resources.Load<Sprite>("Backdrops/moon_crescent");
             _moon.sharedMaterial = scenerySprites;
             _moon.color = new Color(1f, 0.55f, 1f, 1f);
             _moon.sortingOrder = -31700;
@@ -175,10 +181,11 @@ namespace ArmyRoguelike.View
                 _birds[i] = new GameObject("Bird").AddComponent<SpriteRenderer>();
                 _birds[i].transform.SetParent(flockRoot, false);
                 _birds[i].sprite = BirdSprite;
-                _birds[i].color = new Color(dark.r, dark.g, dark.b, 0.85f);
+                // Pale and moonlit: dark birds disappear against the night sky.
+                _birds[i].color = new Color(pale.r, pale.g, pale.b, 0.8f);
                 _birds[i].sortingOrder = -31600;
                 // A loose V: the leader in front, the rest trailing behind and to either side.
-                _birdOffset[i] = new Vector3(-0.22f * ((i + 1) / 2), (i % 2 == 0 ? 1 : -1) * 0.1f * ((i + 1) / 2), 0f) +
+                _birdOffset[i] = new Vector3(-0.35f * ((i + 1) / 2), (i % 2 == 0 ? 1 : -1) * 0.16f * ((i + 1) / 2), 0f) +
                                  new Vector3((float)rng.NextDouble() * 0.06f, (float)rng.NextDouble() * 0.05f, 0f);
             }
 
@@ -218,6 +225,7 @@ namespace ArmyRoguelike.View
             if (_skyMaterial != null)
                 _skyMaterial.mainTexture = clearSky && _clearSky != null ? _clearSky : _cloudySky;
 
+            _moon.sprite = crescentMoon && _crescent != null ? _crescent : _fullMoon;
             _moonRoot.SetActive(moon && _moon.sprite != null);
             if (_moonRoot.activeSelf)
             {
@@ -319,7 +327,7 @@ namespace ArmyRoguelike.View
             {
                 _birds[i].transform.position = lead + _birdOffset[i];
                 var flap = Mathf.Sin(t * 9f + i * 1.3f);
-                _birds[i].transform.localScale = new Vector3(0.16f, 0.16f * (0.35f + 0.65f * Mathf.Abs(flap)), 1f);
+                _birds[i].transform.localScale = new Vector3(0.3f, 0.3f * (0.35f + 0.65f * Mathf.Abs(flap)), 1f);
             }
         }
 

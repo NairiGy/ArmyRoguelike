@@ -160,9 +160,10 @@ public static class ArtExperiment
         if (args.Contains("-artSky"))
         {
             // Night-sky mixes, as a 3x2 sheet in this order.
+            var main = SkyFeatures.Default;
             var mixes = new (string name, SkyFeatures.Mix mix)[]
             {
-                ("now", new SkyFeatures.Mix()),
+                ("main", main),
                 ("moon_stars", new SkyFeatures.Mix { ClearSky = true, Moon = true, Stars = true }),
                 ("moon_stars_shooting_lanterns", new SkyFeatures.Mix { ClearSky = true, Moon = true, Stars = true, ShootingStars = true, Lanterns = true }),
                 ("stars_aurora_birds", new SkyFeatures.Mix { ClearSky = true, Stars = true, Aurora = true, Birds = true }),
@@ -180,7 +181,7 @@ public static class ArtExperiment
                 shots.Add(Downscale(shot.GetPixels(), shot.width, shot.height, 360));
             }
 
-            SkyFeatures.Default = new SkyFeatures.Mix();
+            SkyFeatures.Default = main;
             var w = shots[0].width;
             var h = shots[0].height;
             var sheet = new Texture2D(w * 3, h * 2, TextureFormat.RGB24, false);
@@ -406,10 +407,12 @@ public static class ArtExperiment
             if (File.Exists(Source + sky + ".png"))
                 SaveTexture(backdrops + sky + ".png", SeamlessStrip(LoadSource(sky + ".png")), true);
 
-        // The moon: keyed out, centred, one world unit across at scale 1.
-        if (File.Exists(Source + "sky_moon.png"))
-            foreach (var (tex, _, _) in KeyOutGreen(LoadSource("sky_moon.png")))
-                SaveSprite(backdrops + "moon.png", tex, new Vector2(0.5f, 0.5f), tex.width);
+        // The moons (painted full moon and stylised crescent): keyed out, centred, about one world unit
+        // across at scale 1.
+        foreach (var (file, sprite) in new[] { ("sky_moon.png", "moon.png"), ("sky_crescent.png", "moon_crescent.png") })
+            if (File.Exists(Source + file))
+                foreach (var (tex, _, _) in KeyOutGreen(LoadSource(file)))
+                    SaveSprite(backdrops + sprite, tex, new Vector2(0.5f, 0.5f), Mathf.Max(tex.width, tex.height));
 
         foreach (var band in new[] { "puffy", "wispy" })
             if (File.Exists(Source + $"clouds_band_{band}.png"))
