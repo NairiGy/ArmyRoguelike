@@ -6,7 +6,7 @@ Shader "ArmyRoguelike/PaletteRamp"
 {
     Properties
     {
-        _MainTex ("Greyscale", 2D) = "white" {}
+        [PerRendererData] _MainTex ("Greyscale", 2D) = "white" {}
         _Ramp ("Palette ramp", 2D) = "white" {}
         _PixelSize ("Pixelate (texels per block, 0 = off)", Float) = 0
         _Scroll ("Drift (UV per second)", Float) = 0

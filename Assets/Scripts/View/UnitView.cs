@@ -317,9 +317,9 @@ namespace ArmyRoguelike.View
         {
             if (material == null || !PlaceholderArt.IsPainted(Unit.Stats.Kind))
                 return;
-            _body.sharedMaterial = material;
+            _body.sharedMaterial = BattleScenery.PerTexture(material, _body.sprite.texture);
             if (_base != null)
-                _base.sharedMaterial = material;
+                _base.sharedMaterial = BattleScenery.PerTexture(material, _base.sprite.texture);
         }
 
         private void ApplyColor()

@@ -5,7 +5,7 @@ Shader "ArmyRoguelike/Glow"
 {
     Properties
     {
-        _MainTex ("Sprite", 2D) = "white" {}
+        [PerRendererData] _MainTex ("Sprite", 2D) = "white" {}
         _Intensity ("Intensity", Float) = 1
     }
     SubShader

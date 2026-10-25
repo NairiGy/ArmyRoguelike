@@ -6,7 +6,7 @@ Shader "ArmyRoguelike/StatueRamp"
 {
     Properties
     {
-        _MainTex ("Sprite", 2D) = "white" {}
+        [PerRendererData] _MainTex ("Sprite", 2D) = "white" {}
         _Ramp ("Team ramp", 2D) = "white" {}
         _LumMin ("Darkest brightness in the art", Float) = 0
         _LumMax ("Brightest brightness in the art", Float) = 1

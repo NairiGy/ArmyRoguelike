@@ -125,6 +125,21 @@ namespace ArmyRoguelike.View
 
         public static int PaletteCount => Palettes.Length;
 
+        private static readonly Dictionary<(Material, Texture), Material> PerTextureMaterials = new Dictionary<(Material, Texture), Material>();
+
+        /// <summary>
+        /// A copy of a sprite material for one texture. Sprites with different textures must not share a
+        /// custom material: Unity batched them and drew some sprites with another sprite's texture.
+        /// </summary>
+        public static Material PerTexture(Material material, Texture texture)
+        {
+            if (material == null || texture == null)
+                return material;
+            if (!PerTextureMaterials.TryGetValue((material, texture), out var copy) || copy == null)
+                PerTextureMaterials[(material, texture)] = copy = new Material(material) { mainTexture = texture };
+            return copy;
+        }
+
         /// <summary>Builds the scenery for a framed board. Call after the camera has been framed.</summary>
         public static void Apply(Camera cam, BoardView board, int palette, bool pixelateBackdrop = false, Setting setting = Setting.TowerSky)
         {
@@ -349,7 +364,7 @@ namespace ArmyRoguelike.View
                 sr.transform.SetParent(root, false);
                 sr.transform.position = s;
                 sr.sprite = sprite;
-                sr.sharedMaterial = material;
+                sr.sharedMaterial = PerTexture(material, sprite.texture);
                 sr.color = Value(1f);
                 sr.sortingOrder = IsoMath.SortingOrder(sr.transform.position) + 5;
             }
@@ -368,7 +383,7 @@ namespace ArmyRoguelike.View
                 sr.transform.SetParent(root, false);
                 sr.transform.position = pos;
                 sr.sprite = sprite;
-                sr.sharedMaterial = material;
+                sr.sharedMaterial = PerTexture(material, sprite.texture);
                 sr.color = new Color(1f, 0.6f, 1f, 1f);
                 sr.sortingOrder = IsoMath.SortingOrder(sr.transform.position) + 5;
                 // The bowl's rim is about two thirds of the way up the sprite.

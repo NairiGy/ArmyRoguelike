@@ -176,7 +176,7 @@ namespace ArmyRoguelike.View
             if (painted)
             {
                 rock.sprite = _rockArt[Variant(p, _rockArt.Length)];
-                rock.sharedMaterial = _rockArtMaterial;
+                rock.sharedMaterial = BattleScenery.PerTexture(_rockArtMaterial, rock.sprite.texture);
                 rock.color = _rockArtColor;
                 return;
             }
@@ -299,7 +299,7 @@ namespace ArmyRoguelike.View
             {
                 kv.Value.sprite = slabs[Variant(kv.Key, slabs.Length)];
                 kv.Value.flipX = Variant(new GridPos(kv.Key.Y, kv.Key.X), 2) == 1;
-                kv.Value.sharedMaterial = material;
+                kv.Value.sharedMaterial = BattleScenery.PerTexture(material, kv.Value.sprite.texture);
                 kv.Value.color = color;
             }
         }
