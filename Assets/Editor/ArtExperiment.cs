@@ -13,7 +13,7 @@ using Object = UnityEngine.Object;
 /// <summary>
 /// Art experiment (branch experiment/art-style): turns the AI-generated warrior into sprites (a cut-out
 /// 2D image, and 3D models baked from the board's isometric angle) and renders the same battle with each.
-/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artPalette] [-artUnits] [-artPlayerColour] [-artSky] [-artNoPedestal] [-artGlow] [-artBraziers] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
+/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artPalette] [-artHighlights] [-artUnits] [-artPlayerColour] [-artSky] [-artNoPedestal] [-artGlow] [-artBraziers] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
 /// </summary>
 public static class ArtExperiment
 {
@@ -153,6 +153,30 @@ public static class ArtExperiment
                 sheet.SetPixels(i % 2 * w, (1 - i / 2) * h, w, h, shots[i].GetPixels());
             sheet.Apply();
             Save(sheet, Path.Combine(outDir, "player_colours.png"));
+            EditorApplication.Exit(0);
+            return;
+        }
+
+        if (args.Contains("-artHighlights"))
+        {
+            // The battle with highlights as if the warrior were selected: its tile, where it can move,
+            // a wolf it could attack and a hovered tile (colours as in BattleController).
+            PreviewCapture.Capture(Path.Combine(outDir, "highlights.png"), true, decorate: board =>
+            {
+                var battle = board.Battle;
+                var warrior = battle.Units.First(u => u.Team == Team.Player);
+                board.SetHighlight(warrior.Pos, new Color(1f, 0.9f, 0.4f, 0.5f));
+                foreach (var p in battle.Board.AllTiles())
+                {
+                    var dist = Mathf.Abs(p.X - warrior.Pos.X) + Mathf.Abs(p.Y - warrior.Pos.Y);
+                    if (dist > 0 && dist <= 3 && !battle.Board.IsObstacle(p) && battle.Units.All(u => !u.IsPlaced || u.Pos != p))
+                        board.SetHighlight(p, new Color(0.45f, 0.75f, 1f, 0.4f));
+                }
+
+                var wolf = battle.Units.First(u => u.Team == Team.Enemy);
+                board.SetHighlight(wolf.Pos, new Color(1f, 0.3f, 0.25f, 0.55f));
+                board.SetHighlight(new GridPos(warrior.Pos.X + 1, warrior.Pos.Y + 2), new Color(1f, 1f, 1f, 0.55f));
+            });
             EditorApplication.Exit(0);
             return;
         }

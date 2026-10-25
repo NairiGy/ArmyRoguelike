@@ -25,6 +25,33 @@ namespace ArmyRoguelike.View
 
         public static Sprite Rock => _rock != null ? _rock : _rock = MakeRock();
 
+        private static Sprite _glowTile;
+
+        /// <summary>
+        /// A smooth white tile for highlights: a soft glowing edge, a faint fill and feathered corners.
+        /// High resolution and filtered, so it never looks pixelated.
+        /// </summary>
+        public static Sprite GlowTile => _glowTile != null ? _glowTile : _glowTile = MakeGlowTile();
+
+        private static Sprite MakeGlowTile()
+        {
+            const int w = 256, h = 128;
+            var tex = NewTexture(w, h);
+            tex.filterMode = FilterMode.Bilinear;
+            for (var y = 0; y < h; y++)
+            for (var x = 0; x < w; x++)
+            {
+                // 0 at the centre, 1 on the edge of the diamond.
+                var d = Mathf.Abs(x + 0.5f - w * 0.5f) / (w * 0.5f) + Mathf.Abs(y + 0.5f - h * 0.5f) / (h * 0.5f);
+                var rim = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.55f, 0.92f, d));
+                var a = (0.14f + 0.6f * rim) * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.93f, 1f, d)));
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+            }
+
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), w);
+        }
+
         private static Sprite _statueBase;
 
         /// <summary>How tall the code-drawn statue base is, in world units; the figure stands this high.</summary>

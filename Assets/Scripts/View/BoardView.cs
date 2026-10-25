@@ -46,9 +46,11 @@ namespace ArmyRoguelike.View
                 var highlight = new GameObject($"Highlight {p}").AddComponent<SpriteRenderer>();
                 highlight.transform.SetParent(transform, false);
                 highlight.transform.position = IsoMath.GridToWorld(p);
-                highlight.transform.localScale = Vector3.one * 0.9f;
-                highlight.sprite = PlaceholderArt.Tile;
+                highlight.transform.localScale = Vector3.one * 0.96f;
+                highlight.sprite = PlaceholderArt.GlowTile;
                 highlight.sortingOrder = tile.sortingOrder + 1;
+                if (_spriteMaterial == null)
+                    _spriteMaterial = highlight.sharedMaterial;
                 highlight.enabled = false;
                 _highlights[p] = highlight;
 
@@ -233,6 +235,12 @@ namespace ArmyRoguelike.View
             var a = 0.35f + 0.15f * Mathf.Sin(Time.time * 9f);
             foreach (var burn in _burns.Values)
                 burn.color = new Color(BurnTint.r, BurnTint.g, BurnTint.b, a);
+
+            // Highlights breathe gently, so they read as magic light rather than paint.
+            var pulse = 0.8f + 0.2f * Mathf.Sin(Time.time * 3f);
+            foreach (var kv in _highlights)
+                if (kv.Value.enabled && _highlightColors.TryGetValue(kv.Key, out var c))
+                    kv.Value.color = new Color(c.r, c.g, c.b, c.a * pulse);
         }
 
         /// <summary>Creates views for newly placed units and moves every view to its unit's tile.</summary>
@@ -335,10 +343,21 @@ namespace ArmyRoguelike.View
             SyncTiles();
         }
 
+        private readonly Dictionary<GridPos, Color> _highlightColors = new Dictionary<GridPos, Color>();
+        private static Material _glowMaterial;
+
+        /// <summary>
+        /// Lights a tile in a colour: a soft glowing edge and faint fill, added as light so it glows on the
+        /// dark floor. Dark colours (like where a boulder will land) are painted on normally instead.
+        /// </summary>
         public void SetHighlight(GridPos p, Color color)
         {
             if (!_highlights.TryGetValue(p, out var h))
                 return;
+            if (_glowMaterial == null)
+                _glowMaterial = new Material(Resources.Load<Shader>("Shaders/Glow"));
+            h.sharedMaterial = Mathf.Max(color.r, color.g, color.b) < 0.35f ? _spriteMaterial : _glowMaterial;
+            _highlightColors[p] = color;
             h.color = color;
             h.enabled = true;
         }

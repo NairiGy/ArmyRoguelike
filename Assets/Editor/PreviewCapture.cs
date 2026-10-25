@@ -44,7 +44,7 @@ public static class PreviewCapture
     }
 
     internal static void Capture(string output, bool placeArmy, int encounter = 0, int palette = BattleScenery.MainPalette, bool pixelate = false,
-        BattleScenery.Setting setting = BattleScenery.MainSetting)
+        BattleScenery.Setting setting = BattleScenery.MainSetting, System.Action<BoardView> decorate = null)
     {
         // -previewEncounter: 0 wolves, 1 goblins, 2 bandits, 3 elementals, 4 necromancer, 5 giant.
         var encounters = Encounter.Regular.Concat(Encounter.Bosses).ToArray();
@@ -97,6 +97,8 @@ public static class PreviewCapture
             // The capture is 16:9; frame the scenery for that, whatever the batch-mode camera thinks.
             cam.aspect = 16f / 9f;
             BattleScenery.Apply(cam, board, palette, pixelate, setting);
+            // Optional extras for experiment renders, e.g. highlights as if a unit were selected.
+            decorate?.Invoke(board);
             var rt = new RenderTexture(1280, 720, 24);
             cam.targetTexture = rt;
             // The first render after creating sprites can miss their textures; the second is reliable.
