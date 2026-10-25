@@ -13,7 +13,7 @@ using Object = UnityEngine.Object;
 /// <summary>
 /// Art experiment (branch experiment/art-style): turns the AI-generated warrior into sprites (a cut-out
 /// 2D image, and 3D models baked from the board's isometric angle) and renders the same battle with each.
-/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artPalette] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
+/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artPalette] [-artBraziers] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
 /// </summary>
 public static class ArtExperiment
 {
@@ -130,6 +130,26 @@ public static class ArtExperiment
             return;
         }
 
+        if (args.Contains("-artBraziers"))
+        {
+            // The main battlefield without and with the lit braziers, side by side.
+            var shots = new List<Texture2D>();
+            foreach (var on in new[] { false, true })
+            {
+                BattleScenery.Braziers = on;
+                var path = Path.Combine(outDir, on ? "braziers_on.png" : "braziers_off.png");
+                PreviewCapture.Capture(path, true);
+                var shot = new Texture2D(2, 2);
+                shot.LoadImage(File.ReadAllBytes(path));
+                shots.Add(Downscale(shot.GetPixels(), shot.width, shot.height, 540));
+            }
+
+            BattleScenery.Braziers = true;
+            Save(SideBySide(shots), Path.Combine(outDir, "braziers_comparison.png"));
+            EditorApplication.Exit(0);
+            return;
+        }
+
         if (args.Contains("-artGrid"))
         {
             // The main battlefield with no grid, a very soft one and the current one, side by side.
@@ -240,6 +260,7 @@ public static class ArtExperiment
     private const string TowerFolder = "Assets/Art/Environment/Resources/Tower/";
     // Rocks are scaled so their width is this much of a tile.
     private const float RockWidth = 0.9f;
+    private const float BrazierWidth = 0.6f;
 
     /// <summary>
     /// The tower roof's painted pieces: the three obstacles on green (Source/tower_rocks_sheet.png) become
@@ -253,6 +274,10 @@ public static class ArtExperiment
         var i = 0;
         foreach (var (tex, pivot, widthPx) in KeyOutGreen(sheet))
             SaveSprite(TowerFolder + $"rock_{i++}.png", tex, pivot, widthPx / RockWidth);
+
+        if (File.Exists(Source + "tower_brazier.png"))
+            foreach (var (tex, pivot, widthPx) in KeyOutGreen(LoadSource("tower_brazier.png")))
+                SaveSprite(TowerFolder + "brazier.png", tex, pivot, widthPx / BrazierWidth);
 
         var slabs = LoadSource("tower_floor_slabs.png");
         for (var q = 0; q < 4; q++)

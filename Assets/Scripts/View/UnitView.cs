@@ -26,7 +26,10 @@ namespace ArmyRoguelike.View
         private float _bobTime;
         private Vector3 _bodyRest;
 
+        private static readonly Color ShadowColor = new Color(0f, 0f, 0f, 0.5f);
+
         private SpriteRenderer _body;
+        private SpriteRenderer _shadow;
         private TextMesh _label;
         private MeshRenderer _labelRenderer;
         private SpriteRenderer _labelPlate;
@@ -69,6 +72,13 @@ namespace ArmyRoguelike.View
                 // Evolved statues stand a little taller.
                 _body.transform.localScale = Vector3.one * (1f + 0.06f * (unit.Stats.Tier - 1));
             _bodyRest = _body.transform.localPosition;
+
+            // A soft shadow on the floor grounds the statue; it stays put while the body bobs and lunges.
+            _shadow = new GameObject("Shadow").AddComponent<SpriteRenderer>();
+            _shadow.transform.SetParent(transform, false);
+            _shadow.transform.localScale = Vector3.one * (0.75f * Unit.Size);
+            _shadow.sprite = PlaceholderArt.SoftShadow;
+            _shadow.color = ShadowColor;
 
             var top = _body.sprite.bounds.max.y * _body.transform.localScale.y;
 
@@ -127,6 +137,7 @@ namespace ArmyRoguelike.View
         {
             transform.position = world;
             var order = IsoMath.SortingOrder(world) + 5;
+            _shadow.sortingOrder = order - 5;
             // Bones lie flat on the tile, under anything standing there.
             _body.sortingOrder = _showingBones ? order - 4 : order;
             if (_labelPlate != null)
@@ -395,12 +406,16 @@ namespace ArmyRoguelike.View
             SetSelected(false);
             SetBarsVisible(false);
             var start = _body.color;
+            var shadowStart = _shadow.color;
             for (var t = 0f; t < 1f; t += Time.deltaTime / 0.45f)
             {
                 _body.transform.localPosition = _bodyRest + Vector3.down * (t * 0.15f);
                 _body.color = new Color(start.r, start.g, start.b, 1f - t);
+                _shadow.color = new Color(0f, 0f, 0f, shadowStart.a * (1f - t));
                 yield return null;
             }
+
+            _shadow.enabled = false;
 
             if (!Unit.Stats.LeavesRemains)
             {
@@ -420,6 +435,8 @@ namespace ArmyRoguelike.View
         {
             _body.sprite = PlaceholderArt.Statue(Unit.Stats.Kind);
             _showingBones = false;
+            _shadow.color = ShadowColor;
+            _shadow.enabled = true;
             SetGridPosition(Unit.Pos);
             _body.color = new Color(0.75f, 0.55f, 1f);
             for (var t = 0f; t < 1f; t += Time.deltaTime / 0.5f)

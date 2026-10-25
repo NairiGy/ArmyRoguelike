@@ -60,6 +60,9 @@ namespace ArmyRoguelike.View
             return colours.ToArray();
         }
 
+        /// <summary>Lit braziers on the board's side corners, where the setting has brazier art.</summary>
+        public static bool Braziers = true;
+
         /// <summary>Opacity of the tile outlines on painted floors; 0 draws none.</summary>
         public static float GridAlpha = 0f;
 
@@ -108,6 +111,8 @@ namespace ArmyRoguelike.View
             if (shader == null)
                 return;
             var ramp = MakeRamp(stops);
+            // Cloud shadows are on only for settings with clouds (set below).
+            Shader.SetGlobalFloat("_CloudShadow", 0f);
 
             var statueShader = Resources.Load<Shader>("Shaders/StatueRamp");
             if (StatueRamps && statueShader != null)
@@ -119,6 +124,11 @@ namespace ArmyRoguelike.View
                 var enemy = NewMaterial(statueShader, Texture2D.whiteTexture, MakeRamp(ParseStops(EnemyRamps[p])));
                 enemy.SetFloat("_LumMin", 0.1f);
                 enemy.SetFloat("_LumMax", 0.5f);
+                // A thin rim in the palette's brightest colour picks the statues out of the dark floor.
+                var rim = Sample(stops, 1f);
+                rim.a = 0.6f;
+                player.SetColor("_RimColor", rim);
+                enemy.SetColor("_RimColor", rim);
                 board.SetStatueMaterials(player, enemy);
             }
             var root = new GameObject("Scenery").transform;
@@ -128,14 +138,18 @@ namespace ArmyRoguelike.View
             var viewH = cam.orthographicSize * 2f;
             var viewW = viewH * Mathf.Max(cam.aspect, 16f / 9f);
             var centre = (Vector2)cam.transform.position;
+            BuildVignette(root, centre, viewW, viewH, stops[0]);
 
             if (IsoScenes.TryGetValue(setting, out var scene))
             {
                 var sceneMaterial = NewMaterial(shader, Resources.Load<Texture2D>(scene.Texture), ramp);
+                sceneMaterial.SetFloat("_Shadowed", 1f);
                 BuildIsoScene(root, board, scene, sceneMaterial);
+                Shader.SetGlobalFloat("_CloudShadow", scene.Clouds ? 0.45f : 0f);
                 if (scene.Clouds)
                 {
-                    sceneMaterial.SetFloat("_Flow", 0.012f);
+                    sceneMaterial.SetFloat("_Flow", 0.03f);
+                    SceneryMotes.Create(root, centre, viewW, viewH, Sample(stops, 0.95f));
                     var wisps = CloudTexture();
                     var screenBottom = centre.y - viewH * 0.5f;
                     // Two bands at different heights and speeds, low across the tower's walls.
@@ -151,6 +165,7 @@ namespace ArmyRoguelike.View
                     // Lifted towards light (sprite colours clamp at 1, so through the haze channel) so the slab
                     // joints read as the grid; rocks lifted more so they stand out from the floor.
                     var spriteMaterial = NewMaterial(shader, Texture2D.whiteTexture, ramp);
+                    spriteMaterial.SetFloat("_Shadowed", 1f);
                     board.SetTileArt(slabs, spriteMaterial, new Color(1f, 0.25f, 0.9f, 1f));
                     var line = Sample(stops, 0.85f);
                     line.a = GridAlpha;
@@ -158,6 +173,9 @@ namespace ArmyRoguelike.View
                         board.SetGridLines(line);
                     if (rocks.Length > 0)
                         board.SetRockArt(rocks, spriteMaterial, new Color(1f, 0.55f, 1f, 1f));
+                    var brazier = System.Array.Find(art, s => s.name == "brazier");
+                    if (Braziers && brazier != null)
+                        BuildBraziers(root, board, brazier, spriteMaterial);
                     return;
                 }
 
@@ -299,6 +317,50 @@ namespace ArmyRoguelike.View
                 sr.color = Value(1f);
                 sr.sortingOrder = IsoMath.SortingOrder(sr.transform.position) + 5;
             }
+        }
+
+        /// <summary>A lit brazier just outside each of the board's side corners.</summary>
+        private static void BuildBraziers(Transform root, BoardView board, Sprite sprite, Material material)
+        {
+            var (_, left, _, right) = BoardCorners(board);
+            var centre = (left + right) * 0.5f;
+            var glow = new Material(Resources.Load<Shader>("Shaders/Glow"));
+            foreach (var corner in new[] { left, right })
+            {
+                var pos = corner + (corner - centre).normalized * 0.3f;
+                var sr = new GameObject("Brazier").AddComponent<SpriteRenderer>();
+                sr.transform.SetParent(root, false);
+                sr.transform.position = pos;
+                sr.sprite = sprite;
+                sr.sharedMaterial = material;
+                sr.color = new Color(1f, 0.6f, 1f, 1f);
+                sr.sortingOrder = IsoMath.SortingOrder(sr.transform.position) + 5;
+                // The bowl's rim is about two thirds of the way up the sprite; the light falls mostly onto the board.
+                SceneryFire.Create(root, pos, sprite.bounds.max.y * 0.72f, (Vector3)(centre - pos).normalized * 0.7f, sr.sortingOrder, glow);
+            }
+        }
+
+        /// <summary>Darkens the screen's edges and corners towards the palette's darkest colour.</summary>
+        private static void BuildVignette(Transform root, Vector2 centre, float viewW, float viewH, Color dark)
+        {
+            const int w = 128, h = 72;
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            for (var y = 0; y < h; y++)
+            for (var x = 0; x < w; x++)
+            {
+                var dx = (x + 0.5f) / w * 2f - 1f;
+                var dy = (y + 0.5f) / h * 2f - 1f;
+                var d = Mathf.Sqrt(dx * dx * 0.8f + dy * dy);
+                tex.SetPixel(x, y, new Color(dark.r, dark.g, dark.b, Mathf.SmoothStep(0f, 0.6f, Mathf.InverseLerp(0.75f, 1.35f, d))));
+            }
+
+            tex.Apply();
+            var sr = new GameObject("Vignette").AddComponent<SpriteRenderer>();
+            sr.transform.SetParent(root, false);
+            sr.transform.position = centre;
+            sr.sprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), w / viewW);
+            sr.transform.localScale = new Vector3(1f, viewH / (h * viewW / w), 1f);
+            sr.sortingOrder = 30000;
         }
 
         /// <summary>A band of drifting cloud across the screen, soft along its top edge.</summary>

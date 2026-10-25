@@ -12,6 +12,7 @@ Shader "ArmyRoguelike/PaletteRamp"
         _PixelSize ("Pixelate (texels per block, 0 = off)", Float) = 0
         _Scroll ("Drift (UV per second)", Float) = 0
         _Flow ("Cloud swirl (UV amplitude, 0 = off)", Float) = 0
+        _Shadowed ("Takes drifting cloud shadows (0..1)", Float) = 0
     }
     SubShader
     {
@@ -26,6 +27,7 @@ Shader "ArmyRoguelike/PaletteRamp"
             #pragma vertex vert
             #pragma fragment frag
             #include "UnityCG.cginc"
+            #include "ArtShared.cginc"
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
@@ -34,22 +36,10 @@ Shader "ArmyRoguelike/PaletteRamp"
             float _PixelSize;
             float _Scroll;
             float _Flow;
-
-            float hash(float3 p) { return frac(sin(dot(p, float3(12.9898, 78.233, 37.719))) * 43758.5453); }
-
-            float noise(float3 p)
-            {
-                float3 i = floor(p);
-                float3 f = frac(p);
-                f = f * f * (3 - 2 * f);
-                return lerp(lerp(lerp(hash(i), hash(i + float3(1, 0, 0)), f.x), lerp(hash(i + float3(0, 1, 0)), hash(i + float3(1, 1, 0)), f.x), f.y),
-                            lerp(lerp(hash(i + float3(0, 0, 1)), hash(i + float3(1, 0, 1)), f.x), lerp(hash(i + float3(0, 1, 1)), hash(i + float3(1, 1, 1)), f.x), f.y), f.z);
-            }
-
-            float luma(float3 c) { return dot(c, float3(0.299, 0.587, 0.114)); }
+            float _Shadowed;
 
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; };
-            struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; };
+            struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; float2 wpos : TEXCOORD1; };
 
             v2f vert(appdata v)
             {
@@ -57,6 +47,7 @@ Shader "ArmyRoguelike/PaletteRamp"
                 o.pos = UnityObjectToClipPos(v.vertex);
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex) + float2(_Time.y * _Scroll, 0);
                 o.color = v.color;
+                o.wpos = mul(unity_ObjectToWorld, v.vertex).xy;
                 return o;
             }
 
@@ -71,7 +62,7 @@ Shader "ArmyRoguelike/PaletteRamp"
                 if (_Flow > 0)
                 {
                     // Two slow noise fields push the lookup around, but only where the painting is light.
-                    float t = _Time.y * 0.12;
+                    float t = _Time.y * 0.22;
                     float2 push = float2(noise(float3(uv * 5, t)), noise(float3(uv * 5 + 17.3, t))) - 0.5;
                     push += (float2(noise(float3(uv * 13, t * 1.7)), noise(float3(uv * 13 + 5.1, t * 1.7))) - 0.5) * 0.5;
                     float mask = smoothstep(0.5, 0.72, luma(tex2D(_MainTex, uv).rgb));
@@ -81,6 +72,12 @@ Shader "ArmyRoguelike/PaletteRamp"
                 }
                 float4 c = tex2D(_MainTex, uv);
                 float value = saturate(lerp(luma(c.rgb) * i.color.r, i.color.b, i.color.g));
+                if (_Shadowed > 0)
+                {
+                    // Drifting cloud shadows darken solid things (stone), never the light clouds themselves.
+                    float solid = 1 - smoothstep(0.5, 0.72, luma(c.rgb));
+                    value *= 1 - cloudShadow(i.wpos) * solid * _Shadowed;
+                }
                 float3 col = tex2D(_Ramp, float2(value, 0.5)).rgb;
                 return float4(col, c.a * i.color.a);
             }
