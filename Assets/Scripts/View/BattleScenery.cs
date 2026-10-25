@@ -33,11 +33,13 @@ namespace ArmyRoguelike.View
             public Vector2 Top, Left, Bottom, Right;
             // Resources folder with this setting's painted floor slabs (slab_*) and rocks (rock_*), if any.
             public string ArtFolder;
+            // The painting's light parts are clouds: let them swirl, and drift more cloud past in front.
+            public bool Clouds;
         }
 
         private static readonly Dictionary<Setting, IsoScene> IsoScenes = new Dictionary<Setting, IsoScene>
         {
-            [Setting.IsoTower] = new IsoScene { Texture = "Backdrops/iso_tower", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower" },
+            [Setting.IsoTower] = new IsoScene { Texture = "Backdrops/iso_tower", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", Clouds = true },
             [Setting.IsoTemple] = new IsoScene { Texture = "Backdrops/iso_temple", Top = new Vector2(745, 220), Left = new Vector2(355, 430), Bottom = new Vector2(880, 735), Right = new Vector2(1265, 470) },
             [Setting.IsoGraveyard] = new IsoScene { Texture = "Backdrops/iso_graveyard", Top = new Vector2(840, 210), Left = new Vector2(325, 470), Bottom = new Vector2(905, 765), Right = new Vector2(1330, 490) },
         };
@@ -78,7 +80,18 @@ namespace ArmyRoguelike.View
 
             if (IsoScenes.TryGetValue(setting, out var scene))
             {
-                BuildIsoScene(root, board, scene, NewMaterial(shader, Resources.Load<Texture2D>(scene.Texture), ramp));
+                var sceneMaterial = NewMaterial(shader, Resources.Load<Texture2D>(scene.Texture), ramp);
+                BuildIsoScene(root, board, scene, sceneMaterial);
+                if (scene.Clouds)
+                {
+                    sceneMaterial.SetFloat("_Flow", 0.012f);
+                    var wisps = CloudTexture();
+                    var screenBottom = centre.y - viewH * 0.5f;
+                    // Two bands at different heights and speeds, low across the tower's walls.
+                    CloudBand(root, NewMaterial(shader, wisps, ramp), FrontCloudOrder, centre.x, viewW, screenBottom - 0.3f, 1.3f, 0.9f, 0.006f);
+                    CloudBand(root, NewMaterial(shader, wisps, ramp), FrontCloudOrder + 1, centre.x, viewW, screenBottom - 0.2f, 0.8f, 1f, -0.011f);
+                }
+
                 var art = scene.ArtFolder != null ? Resources.LoadAll<Sprite>(scene.ArtFolder) : new Sprite[0];
                 var slabs = System.Array.FindAll(art, s => s.name.StartsWith("slab_"));
                 var rocks = System.Array.FindAll(art, s => s.name.StartsWith("rock_"));
@@ -142,14 +155,9 @@ namespace ArmyRoguelike.View
             var tex = (Texture2D)material.mainTexture;
             if (tex == null)
                 return;
-            var w = board.Battle.Board.Width;
-            var h = board.Battle.Board.Height;
+            var c = BoardCorners(board);
             var image = new[] { scene.Top, scene.Left, scene.Bottom, scene.Right };
-            var world = new[]
-            {
-                (Vector2)IsoMath.GridToWorld(w - 0.5f, h - 0.5f), (Vector2)IsoMath.GridToWorld(-0.5f, h - 0.5f),
-                (Vector2)IsoMath.GridToWorld(-0.5f, -0.5f), (Vector2)IsoMath.GridToWorld(w - 0.5f, -0.5f),
-            };
+            var world = new[] { c.top, c.left, c.bottom, c.right };
             var fx = FitAffine(image, world, p => p.x);
             var fy = FitAffine(image, world, p => p.y);
             Vector2 Map(float px, float py) => new Vector2(fx.x * px + fx.y * py + fx.z, fy.x * px + fy.y * py + fy.z);
@@ -181,35 +189,60 @@ namespace ArmyRoguelike.View
         /// <summary>The tower's two front walls, hanging below the board's front edges and fading into haze.</summary>
         private static void BuildWalls(Transform root, BoardView board, Material material)
         {
-            var w = board.Battle.Board.Width;
-            var h = board.Battle.Board.Height;
-            var left = (Vector2)IsoMath.GridToWorld(-0.5f, h - 0.5f);
-            var bottom = (Vector2)IsoMath.GridToWorld(-0.5f, -0.5f);
-            var right = (Vector2)IsoMath.GridToWorld(w - 0.5f, -0.5f);
+            var (_, left, bottom, right) = BoardCorners(board);
             var down = Vector2.down * WallDepth;
             var courses = WallDepth / 0.65f;
             // Light comes from the top left, as on the statues: the left wall is the lit one.
-            Quad(root, "Wall left", material, WallOrder, left + down, bottom + down, bottom, left, Value(0.5f), h * 0.5f, courses, Haze(0.5f));
-            Quad(root, "Wall right", material, WallOrder, bottom + down, right + down, right, bottom, Value(0.33f), w * 0.5f, courses, Haze(0.33f));
+            Quad(root, "Wall left", material, WallOrder, left + down, bottom + down, bottom, left, Value(0.5f), Tiles(left, bottom) * 0.5f, courses, Haze(0.5f));
+            Quad(root, "Wall right", material, WallOrder, bottom + down, right + down, right, bottom, Value(0.33f), Tiles(bottom, right) * 0.5f, courses, Haze(0.33f));
         }
+
+        /// <summary>The board's outer corners as they appear on screen, whichever way the grid runs.</summary>
+        private static (Vector2 top, Vector2 left, Vector2 bottom, Vector2 right) BoardCorners(BoardView board)
+        {
+            var w = board.Battle.Board.Width;
+            var h = board.Battle.Board.Height;
+            var corners = new[]
+            {
+                (Vector2)IsoMath.GridToWorld(-0.5f, -0.5f), (Vector2)IsoMath.GridToWorld(w - 0.5f, -0.5f),
+                (Vector2)IsoMath.GridToWorld(-0.5f, h - 0.5f), (Vector2)IsoMath.GridToWorld(w - 0.5f, h - 0.5f),
+            };
+            Vector2 Most(System.Func<Vector2, float> key)
+            {
+                var best = corners[0];
+                foreach (var p in corners)
+                    if (key(p) > key(best))
+                        best = p;
+                return best;
+            }
+
+            return (Most(p => p.y), Most(p => -p.x), Most(p => -p.y), Most(p => p.x));
+        }
+
+        /// <summary>How many tiles long a board edge between two corners is.</summary>
+        private static int Tiles(Vector2 a, Vector2 b) =>
+            Mathf.RoundToInt(Vector2.Distance(a, b) / ((Vector2)IsoMath.GridToWorld(1f, 0f) - (Vector2)IsoMath.GridToWorld(0f, 0f)).magnitude);
 
         /// <summary>Merlons along the two back edges, every other tile, straddling the edge.</summary>
         private static void BuildBattlements(Transform root, BoardView board, Material material)
         {
-            var w = board.Battle.Board.Width;
-            var h = board.Battle.Board.Height;
+            var (top, left, _, right) = BoardCorners(board);
+            var centre = (left + right) * 0.5f;
             var sprite = MerlonTexture();
-            var spots = new List<Vector2>();
-            for (var i = 0; i < w; i += 2)
-                spots.Add(new Vector2(i, h - 0.5f + 0.15f));
-            for (var j = 0; j < h; j += 2)
-                spots.Add(new Vector2(w - 0.5f + 0.15f, j));
-            spots.Add(new Vector2(w - 0.5f + 0.15f, h - 0.5f + 0.15f));
+            var spots = new List<Vector2> { top + (top - centre).normalized * 0.08f };
+            foreach (var end in new[] { left, right })
+            {
+                var n = Tiles(top, end);
+                var outward = ((top + end) * 0.5f - centre).normalized * 0.08f;
+                for (var i = 0; i < n; i += 2)
+                    spots.Add(Vector2.Lerp(top, end, (i + 0.5f) / n) + outward);
+            }
+
             foreach (var s in spots)
             {
                 var sr = new GameObject("Merlon").AddComponent<SpriteRenderer>();
                 sr.transform.SetParent(root, false);
-                sr.transform.position = IsoMath.GridToWorld(s.x, s.y);
+                sr.transform.position = s;
                 sr.sprite = sprite;
                 sr.sharedMaterial = material;
                 sr.color = Value(1f);

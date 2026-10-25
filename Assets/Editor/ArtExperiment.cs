@@ -13,7 +13,7 @@ using Object = UnityEngine.Object;
 /// <summary>
 /// Art experiment (branch experiment/art-style): turns the AI-generated warrior into sprites (a cut-out
 /// 2D image, and 3D models baked from the board's isometric angle) and renders the same battle with each.
-/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artScenery] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
+/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
 /// </summary>
 public static class ArtExperiment
 {
@@ -72,6 +72,14 @@ public static class ArtExperiment
 
             sheet.Apply();
             Save(sheet, Path.Combine(outDir, "scenery_overview.png"));
+            EditorApplication.Exit(0);
+            return;
+        }
+
+        if (args.Contains("-artImport"))
+        {
+            ImportStatues();
+            ImportTowerArt();
             EditorApplication.Exit(0);
             return;
         }
