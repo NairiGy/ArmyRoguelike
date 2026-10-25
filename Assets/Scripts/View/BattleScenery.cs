@@ -23,6 +23,9 @@ namespace ArmyRoguelike.View
         public const Setting MainSetting = Setting.IsoTower;
         public const int MainPalette = 2;
 
+        /// <summary>Opacity of the tile outlines on painted floors; 0 draws none.</summary>
+        public static float GridAlpha = 0f;
+
         /// <summary>An isometric painting and where its empty platform's corners are, in image pixels from the top left.</summary>
         private struct IsoScene
         {
@@ -86,8 +89,9 @@ namespace ArmyRoguelike.View
                     var spriteMaterial = NewMaterial(shader, Texture2D.whiteTexture, ramp);
                     board.SetTileArt(slabs, spriteMaterial, new Color(1f, 0.25f, 0.9f, 1f));
                     var line = Sample(stops, 0.85f);
-                    line.a = 0.35f;
-                    board.SetGridLines(line);
+                    line.a = GridAlpha;
+                    if (GridAlpha > 0f)
+                        board.SetGridLines(line);
                     if (rocks.Length > 0)
                         board.SetRockArt(rocks, spriteMaterial, new Color(1f, 0.55f, 1f, 1f));
                     return;

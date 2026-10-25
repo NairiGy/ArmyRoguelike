@@ -13,7 +13,7 @@ using Object = UnityEngine.Object;
 /// <summary>
 /// Art experiment (branch experiment/art-style): turns the AI-generated warrior into sprites (a cut-out
 /// 2D image, and 3D models baked from the board's isometric angle) and renders the same battle with each.
-/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artScenery] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
+/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artScenery] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
 /// </summary>
 public static class ArtExperiment
 {
@@ -72,6 +72,25 @@ public static class ArtExperiment
 
             sheet.Apply();
             Save(sheet, Path.Combine(outDir, "scenery_overview.png"));
+            EditorApplication.Exit(0);
+            return;
+        }
+
+        if (args.Contains("-artGrid"))
+        {
+            // The main battlefield with no grid, a very soft one and the current one, side by side.
+            var shots = new List<Texture2D>();
+            foreach (var alpha in new[] { 0f, 0.12f, 0.35f })
+            {
+                BattleScenery.GridAlpha = alpha;
+                var path = Path.Combine(outDir, $"grid_{alpha:0.00}.png");
+                PreviewCapture.Capture(path, true);
+                var shot = new Texture2D(2, 2);
+                shot.LoadImage(File.ReadAllBytes(path));
+                shots.Add(Downscale(shot.GetPixels(), shot.width, shot.height, 480));
+            }
+
+            Save(SideBySide(shots), Path.Combine(outDir, "grid_comparison.png"));
             EditorApplication.Exit(0);
             return;
         }
