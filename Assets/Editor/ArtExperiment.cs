@@ -13,7 +13,7 @@ using Object = UnityEngine.Object;
 /// <summary>
 /// Art experiment (branch experiment/art-style): turns the AI-generated warrior into sprites (a cut-out
 /// 2D image, and 3D models baked from the board's isometric angle) and renders the same battle with each.
-/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artPalette] [-artBraziers] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
+/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artPalette] [-artPlayerColour] [-artGlow] [-artBraziers] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
 /// </summary>
 public static class ArtExperiment
 {
@@ -126,6 +126,53 @@ public static class ArtExperiment
 
             sheet.Apply();
             Save(sheet, Path.Combine(outDir, "palette_comparison.png"));
+            EditorApplication.Exit(0);
+            return;
+        }
+
+        if (args.Contains("-artPlayerColour"))
+        {
+            // The player's statues in the current ramp and each candidate, as a 2x2 sheet.
+            var shots = new List<Texture2D>();
+            for (var option = -1; option < BattleScenery.PlayerRampOptions.Length; option++)
+            {
+                BattleScenery.PlayerRampOption = option;
+                var name = option < 0 ? "current" : BattleScenery.PlayerRampOptions[option].name.Replace(' ', '_');
+                var path = Path.Combine(outDir, $"player_{option + 1}_{name}.png");
+                PreviewCapture.Capture(path, true);
+                var shot = new Texture2D(2, 2);
+                shot.LoadImage(File.ReadAllBytes(path));
+                shots.Add(Downscale(shot.GetPixels(), shot.width, shot.height, 540));
+            }
+
+            BattleScenery.PlayerRampOption = -1;
+            var w = shots[0].width;
+            var h = shots[0].height;
+            var sheet = new Texture2D(w * 2, h * 2, TextureFormat.RGB24, false);
+            for (var i = 0; i < shots.Count; i++)
+                sheet.SetPixels(i % 2 * w, (1 - i / 2) * h, w, h, shots[i].GetPixels());
+            sheet.Apply();
+            Save(sheet, Path.Combine(outDir, "player_colours.png"));
+            EditorApplication.Exit(0);
+            return;
+        }
+
+        if (args.Contains("-artGlow"))
+        {
+            // The statues with a plain moonlight rim and with team-coloured glow, side by side.
+            var shots = new List<Texture2D>();
+            foreach (var on in new[] { false, true })
+            {
+                BattleScenery.TeamGlow = on;
+                var path = Path.Combine(outDir, on ? "glow_on.png" : "glow_off.png");
+                PreviewCapture.Capture(path, true);
+                var shot = new Texture2D(2, 2);
+                shot.LoadImage(File.ReadAllBytes(path));
+                shots.Add(Downscale(shot.GetPixels(), shot.width, shot.height, 540));
+            }
+
+            BattleScenery.TeamGlow = true;
+            Save(SideBySide(shots), Path.Combine(outDir, "glow_comparison.png"));
             EditorApplication.Exit(0);
             return;
         }

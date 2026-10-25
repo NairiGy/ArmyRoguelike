@@ -62,6 +62,8 @@ Shader "ArmyRoguelike/StatueRamp"
                 // An edge lit by the moon: this pixel is solid but the one a few texels up-left is empty.
                 float2 towardLight = float2(-1, 1) * _MainTex_TexelSize.xy * 3;
                 float rim = c.a * (1 - tex2D(_MainTex, i.uv + towardLight).a);
+                // A slow pulse, out of step from statue to statue (by position).
+                rim *= 0.7 + 0.3 * sin(_Time.y * 2.2 + (i.wpos.x + i.wpos.y) * 2);
                 col = lerp(col, _RimColor.rgb, rim * _RimColor.a * (1 - cloudShadow(i.wpos)));
                 return float4(col, c.a) * i.color;
             }

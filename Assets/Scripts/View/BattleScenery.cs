@@ -35,6 +35,16 @@ namespace ArmyRoguelike.View
             new[] { "#2a2030", "#6a5060", "#b08a80", "#e6c0a0", "#fff0d8" },
         };
 
+        /// <summary>Colour test: player ramp candidates for the night palette, and which one to use (-1 = the palette's own).</summary>
+        public static readonly (string name, string[] ramp)[] PlayerRampOptions =
+        {
+            ("Moon marble", new[] { "#1e2433", "#4a5670", "#8a9ab4", "#c8d4e6", "#f4f8ff" }),
+            ("Torch gold", new[] { "#2a1c14", "#6a4a2c", "#b8844a", "#e8bc78", "#fff0c0" }),
+            ("Pale bone", new[] { "#26241e", "#5e5a4c", "#a09a84", "#d8d2bc", "#f8f4e6" }),
+        };
+
+        public static int PlayerRampOption = -1;
+
         private static readonly string[][] EnemyRamps =
         {
             new[] { "#1a1212", "#3a2a28", "#5c4a44", "#8a7468", "#b8a490" },
@@ -59,6 +69,9 @@ namespace ArmyRoguelike.View
             colours.Add(new Color(0.97f, 0.95f, 0.9f));
             return colours.ToArray();
         }
+
+        /// <summary>Statue rims glow in team colours (pale blue for the player, ember red for enemies).</summary>
+        public static bool TeamGlow = true;
 
         /// <summary>Lit braziers on the board's side corners, where the setting has brazier art.</summary>
         public static bool Braziers = true;
@@ -118,17 +131,18 @@ namespace ArmyRoguelike.View
             if (StatueRamps && statueShader != null)
             {
                 // The art's own brightness range: sandstone is light, basalt dark; each fills its whole ramp.
-                var player = NewMaterial(statueShader, Texture2D.whiteTexture, MakeRamp(ParseStops(PlayerRamps[p])));
+                var playerRamp = PlayerRampOption >= 0 ? PlayerRampOptions[PlayerRampOption].ramp : PlayerRamps[p];
+                var player = NewMaterial(statueShader, Texture2D.whiteTexture, MakeRamp(ParseStops(playerRamp)));
                 player.SetFloat("_LumMin", 0.3f);
                 player.SetFloat("_LumMax", 0.95f);
                 var enemy = NewMaterial(statueShader, Texture2D.whiteTexture, MakeRamp(ParseStops(EnemyRamps[p])));
                 enemy.SetFloat("_LumMin", 0.1f);
                 enemy.SetFloat("_LumMax", 0.5f);
-                // A thin rim in the palette's brightest colour picks the statues out of the dark floor.
-                var rim = Sample(stops, 1f);
-                rim.a = 0.6f;
-                player.SetColor("_RimColor", rim);
-                enemy.SetColor("_RimColor", rim);
+                // A thin pulsing rim picks the statues out of the dark floor: with team glow it is the team's
+                // magic colour, otherwise the palette's brightest colour.
+                var moon = Sample(stops, 1f);
+                player.SetColor("_RimColor", TeamGlow ? new Color(0.6f, 0.85f, 1f, 0.85f) : new Color(moon.r, moon.g, moon.b, 0.6f));
+                enemy.SetColor("_RimColor", TeamGlow ? new Color(1f, 0.4f, 0.2f, 0.85f) : new Color(moon.r, moon.g, moon.b, 0.6f));
                 board.SetStatueMaterials(player, enemy);
             }
             var root = new GameObject("Scenery").transform;

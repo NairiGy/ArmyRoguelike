@@ -315,10 +315,71 @@ namespace ArmyRoguelike.View
 
         private void Update()
         {
+            Breathe();
             if (!_selected)
                 return;
             _bobTime += Time.deltaTime;
             _body.transform.localPosition = _bodyRest + Vector3.up * (Mathf.Abs(Mathf.Sin(_bobTime * 5f)) * 0.06f);
+        }
+
+        // ---------- Idle life ----------
+
+        private Vector3 _bodyScale;
+        private float _breathPhase = -1f;
+        private float _nextDust;
+
+        /// <summary>
+        /// Living statues are never quite still: a slow, tiny rise and fall (out of step between units),
+        /// and now and then a few specks of stone dust crumble off.
+        /// </summary>
+        private void Breathe()
+        {
+            if (!PlaceholderArt.IsPainted(Unit.Stats.Kind) || _showingBones || !Unit.IsAlive)
+                return;
+            if (_breathPhase < 0f)
+            {
+                _breathPhase = Random.value * 10f;
+                _bodyScale = _body.transform.localScale;
+                _nextDust = Time.time + Random.Range(2f, 8f);
+            }
+
+            var breath = Mathf.Sin(Time.time * 1.3f + _breathPhase);
+            _body.transform.localScale = new Vector3(_bodyScale.x * (1f - 0.006f * breath), _bodyScale.y * (1f + 0.014f * breath), _bodyScale.z);
+
+            if (Time.time < _nextDust)
+                return;
+            _nextDust = Time.time + Random.Range(5f, 12f);
+            StartCoroutine(Crumble());
+        }
+
+        private IEnumerator Crumble()
+        {
+            var height = _body.sprite.bounds.max.y * _bodyScale.y;
+            var specks = new SpriteRenderer[Random.Range(2, 5)];
+            var starts = new Vector3[specks.Length];
+            for (var i = 0; i < specks.Length; i++)
+            {
+                specks[i] = new GameObject("Dust").AddComponent<SpriteRenderer>();
+                specks[i].transform.SetParent(transform, false);
+                specks[i].sprite = PlaceholderArt.Pixel;
+                specks[i].sortingOrder = _body.sortingOrder + 1;
+                starts[i] = new Vector3(Random.Range(-0.15f, 0.15f), height * Random.Range(0.35f, 0.85f), 0f);
+                specks[i].transform.localScale = Vector3.one * Random.Range(0.012f, 0.022f);
+            }
+
+            for (var t = 0f; t < 1f; t += Time.deltaTime / 0.9f)
+            {
+                for (var i = 0; i < specks.Length; i++)
+                {
+                    specks[i].transform.localPosition = starts[i] + new Vector3(i % 2 == 0 ? 0.03f * t : -0.03f * t, -0.3f * t * t, 0f);
+                    specks[i].color = new Color(0.62f, 0.6f, 0.58f, 0.8f * (1f - t));
+                }
+
+                yield return null;
+            }
+
+            foreach (var s in specks)
+                Destroy(s.gameObject);
         }
 
         // ---------- Animations ----------
