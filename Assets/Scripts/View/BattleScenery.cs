@@ -23,8 +23,8 @@ namespace ArmyRoguelike.View
         public const Setting MainSetting = Setting.IsoTower;
         public const int MainPalette = 2;
 
-        /// <summary>Palette test: colour painted statues through their team's ramp of the current palette.</summary>
-        public static bool StatueRamps;
+        /// <summary>Colour painted statues through their team's ramp of the current palette, so units match the scene.</summary>
+        public static bool StatueRamps = true;
 
         // Per palette, the ramps statues are drawn with: the player's warm, light stone and the enemy's
         // dark, cool stone, so the teams stay apart in every palette.

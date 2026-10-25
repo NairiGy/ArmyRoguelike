@@ -112,7 +112,7 @@ public static class ArtExperiment
                 rows.Add(new List<Texture2D> { row[0], row[2], row[1] });
             }
 
-            BattleScenery.StatueRamps = false;
+            BattleScenery.StatueRamps = true;
             var sheet = new Texture2D(rows[0].Sum(t => t.width), rows.Count * rows[0][0].height, TextureFormat.RGB24, false);
             for (var r = 0; r < rows.Count; r++)
             {

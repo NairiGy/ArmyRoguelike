@@ -27,7 +27,9 @@ A roguelike army-builder: lead a small squad across a Slay the Spire–style map
 - **Pipeline:** an editor tool cuts out the background, finds the pedestal and scales every statue to the same pedestal width (0.6 tile). Left and right facing come from flipping the sprite.
 - **3D route** (image → Tripo/Meshy model → baked from the board's camera): tested. Consistent and controllable, but it looked flatter and slimmer than the 2D images. Parked as a fallback, for example if units ever need more than two facings.
 - **Battlefield:** the board is the roof of a tall tower above the clouds, at night. The scene is one greyscale isometric painting (ChatGPT) whose empty roof is fitted under the board, coloured through a palette ramp: the same painting can take any palette, so moods are cheap. Kept for later as alternatives: a temple courtyard and a graveyard (same technique), a tower built from pieces in front of a flat sky, and the amber-dusk and toxic-green palettes.
-- **Still open:** rocks and tile look, terrain, effects, UI/HUD, how evolution tiers look, and the unit labels that currently sit over the statues.
+- **One palette for everything:** each palette also has a ramp per team; painted statues are drawn by brightness through their team's ramp (player warm and light, enemy cool and dark), so switching palette recolours units and scene together without new art. A whole-screen snap to ~20 colours was tested and kept as an idea.
+- **Board and facing:** the player deploys at the top of the screen, facing down-right towards the enemy; enemies face down-left, towards the camera, so their faces show. The tower roof has painted slabs and rocks and no grid; the clouds drift and swirl.
+- **Still open:** placeholder statues for the other factions, terrain, effects, UI/HUD, how evolution tiers look, and the unit labels that currently sit over the statues.
 
 ## Design goals
 
