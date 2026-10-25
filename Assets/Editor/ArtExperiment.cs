@@ -145,7 +145,7 @@ public static class ArtExperiment
                 shots.Add(Downscale(shot.GetPixels(), shot.width, shot.height, 540));
             }
 
-            BattleScenery.PlayerRampOption = -1;
+            BattleScenery.PlayerRampOption = 0;
             var w = shots[0].width;
             var h = shots[0].height;
             var sheet = new Texture2D(w * 2, h * 2, TextureFormat.RGB24, false);

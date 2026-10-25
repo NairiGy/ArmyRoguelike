@@ -35,7 +35,7 @@ namespace ArmyRoguelike.View
             new[] { "#2a2030", "#6a5060", "#b08a80", "#e6c0a0", "#fff0d8" },
         };
 
-        /// <summary>Colour test: player ramp candidates for the night palette, and which one to use (-1 = the palette's own).</summary>
+        /// <summary>Player ramp choices for the night palette, and which one to use (-1 = the palette's own).</summary>
         public static readonly (string name, string[] ramp)[] PlayerRampOptions =
         {
             ("Moon marble", new[] { "#1e2433", "#4a5670", "#8a9ab4", "#c8d4e6", "#f4f8ff" }),
@@ -43,7 +43,8 @@ namespace ArmyRoguelike.View
             ("Pale bone", new[] { "#26241e", "#5e5a4c", "#a09a84", "#d8d2bc", "#f8f4e6" }),
         };
 
-        public static int PlayerRampOption = -1;
+        // Moon marble is the main look; torch gold and pale bone stay as alternatives.
+        public static int PlayerRampOption = 0;
 
         private static readonly string[][] EnemyRamps =
         {
