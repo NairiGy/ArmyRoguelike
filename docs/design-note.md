@@ -26,7 +26,8 @@ A roguelike army-builder: lead a small squad across a Slay the Spire–style map
 - **Art source:** AI-generated 2D images (ChatGPT). Every new unit uses the same prompt template, on a plain light grey background, with an existing unit image attached as a style reference. Tested with warrior, archer and wolf: they match as one set.
 - **Pipeline:** an editor tool cuts out the background, finds the pedestal and scales every statue to the same pedestal width (0.6 tile). Left and right facing come from flipping the sprite.
 - **3D route** (image → Tripo/Meshy model → baked from the board's camera): tested. Consistent and controllable, but it looked flatter and slimmer than the 2D images. Parked as a fallback, for example if units ever need more than two facings.
-- **Still open:** board and tile look, terrain, effects, UI/HUD, how evolution tiers look, and the unit labels that currently sit over the statues.
+- **Battlefield:** the board is the roof of a tall tower above the clouds, at night. The scene is one greyscale isometric painting (ChatGPT) whose empty roof is fitted under the board, coloured through a palette ramp: the same painting can take any palette, so moods are cheap. Kept for later as alternatives: a temple courtyard and a graveyard (same technique), a tower built from pieces in front of a flat sky, and the amber-dusk and toxic-green palettes.
+- **Still open:** rocks and tile look, terrain, effects, UI/HUD, how evolution tiers look, and the unit labels that currently sit over the statues.
 
 ## Design goals
 

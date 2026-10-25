@@ -19,6 +19,10 @@ namespace ArmyRoguelike.View
 
         public static readonly string[] PaletteNames = { "Amber dusk", "Toxic green", "Cold night" };
 
+        /// <summary>What battles use: the isometric tower at night. The other settings and palettes are kept for later.</summary>
+        public const Setting MainSetting = Setting.IsoTower;
+        public const int MainPalette = 2;
+
         /// <summary>An isometric painting and where its empty platform's corners are, in image pixels from the top left.</summary>
         private struct IsoScene
         {

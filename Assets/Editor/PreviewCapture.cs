@@ -21,8 +21,8 @@ public static class PreviewCapture
         var output = "battle-preview.png";
         var placeArmy = false;
         var encounter = 0;
-        var palette = 0;
-        var setting = BattleScenery.Setting.TowerSky;
+        var palette = BattleScenery.MainPalette;
+        var setting = BattleScenery.MainSetting;
         for (var i = 0; i < args.Length; i++)
         {
             if (args[i] == "-previewOut" && i + 1 < args.Length)
@@ -43,8 +43,8 @@ public static class PreviewCapture
         EditorApplication.Exit(0);
     }
 
-    internal static void Capture(string output, bool placeArmy, int encounter = 0, int palette = 0, bool pixelate = false,
-        BattleScenery.Setting setting = BattleScenery.Setting.TowerSky)
+    internal static void Capture(string output, bool placeArmy, int encounter = 0, int palette = BattleScenery.MainPalette, bool pixelate = false,
+        BattleScenery.Setting setting = BattleScenery.MainSetting)
     {
         // -previewEncounter: 0 wolves, 1 goblins, 2 bandits, 3 elementals, 4 necromancer, 5 giant.
         var encounters = Encounter.Regular.Concat(Encounter.Bosses).ToArray();
