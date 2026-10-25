@@ -72,10 +72,10 @@ namespace ArmyRoguelike.View
         }
 
         /// <summary>Size of every unit (statue, base, shadow, bars) relative to the art's own size. Live via ArtTuning.</summary>
-        public static float UnitScale = 1f;
+        public static float UnitScale = 0.7f;
 
-        /// <summary>Painted statues stand on a stone base drawn in code, square to the tile.</summary>
-        public static bool DrawnBases;
+        /// <summary>Figure-only statue art (no painted pedestal) stands on a stone base drawn in code, square to the tile.</summary>
+        public static bool DrawnBases = true;
 
         /// <summary>Statue rims glow in team colours (pale blue for the player, ember red for enemies).</summary>
         public static bool TeamGlow = true;

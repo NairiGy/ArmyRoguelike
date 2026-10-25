@@ -74,7 +74,7 @@ namespace ArmyRoguelike.View
                 _body.transform.localScale = Vector3.one * (1f + 0.06f * (unit.Stats.Tier - 1));
 
             // Optionally a stone base drawn in code, always square to the tile, with the figure standing on it.
-            if (BattleScenery.DrawnBases && PlaceholderArt.IsPainted(unit.Stats.Kind))
+            if (BattleScenery.DrawnBases && PlaceholderArt.IsFigureOnly(unit.Stats.Kind))
             {
                 _base = new GameObject("Base").AddComponent<SpriteRenderer>();
                 _base.transform.SetParent(transform, false);

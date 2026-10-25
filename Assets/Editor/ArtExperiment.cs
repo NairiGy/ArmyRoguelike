@@ -416,6 +416,18 @@ public static class ArtExperiment
             SaveSprite(StatueFolder + kind + ".png", tex, pivot, ppu);
             Debug.Log($"Imported statue {kind} from {file}");
         }
+
+        // Figure-only versions (Source/<unit>_nopedestal.png): the game prefers these and stands them on
+        // the code-drawn base.
+        foreach (var file in Directory.GetFiles(Source, "*_nopedestal.png"))
+        {
+            var unit = Path.GetFileName(file).Replace("_nopedestal.png", "");
+            if (!Enum.TryParse<UnitKind>(unit, true, out var kind))
+                continue;
+            var (_, tex, pivot, ppu) = CutOut2D(Path.GetFileName(file), unit + "_figure");
+            SaveSprite(StatueFolder + kind + "_figure.png", tex, pivot, ppu);
+            Debug.Log($"Imported figure-only statue {kind} from {file}");
+        }
     }
 
     private const string TowerFolder = "Assets/Art/Environment/Resources/Tower/";

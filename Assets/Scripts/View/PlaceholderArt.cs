@@ -64,20 +64,36 @@ namespace ArmyRoguelike.View
 
         private static readonly Dictionary<UnitKind, Sprite> Painted = new Dictionary<UnitKind, Sprite>();
 
+        private static readonly HashSet<UnitKind> FigureOnly = new HashSet<UnitKind>();
+
         /// <summary>
         /// The painted statue for a unit type, from Resources/Statues (made by Tools/Art/Import Statues),
-        /// or null if it has none yet. Painted statues carry their own colours and are shown untinted.
+        /// or null if it has none yet. "Kind_figure" (a figure without a painted pedestal, which stands on a
+        /// base drawn in code) is preferred over "Kind" (a figure on its own painted pedestal).
         /// </summary>
         public static Sprite PaintedStatue(UnitKind kind)
         {
             if (StatueOverrides.TryGetValue(kind, out var custom))
                 return custom;
             if (!Painted.TryGetValue(kind, out var sprite))
-                Painted[kind] = sprite = Resources.Load<Sprite>("Statues/" + (kind == UnitKind.PackLeader ? UnitKind.Wolf : kind));
+            {
+                var name = "Statues/" + (kind == UnitKind.PackLeader ? UnitKind.Wolf : kind);
+                sprite = Resources.Load<Sprite>(name + "_figure");
+                if (sprite != null)
+                    FigureOnly.Add(kind);
+                else
+                    sprite = Resources.Load<Sprite>(name);
+                Painted[kind] = sprite;
+            }
+
             return sprite;
         }
 
         public static bool IsPainted(UnitKind kind) => PaintedStatue(kind) != null;
+
+        /// <summary>Whether the unit's painted art has no pedestal of its own and needs the code-drawn base.</summary>
+        public static bool IsFigureOnly(UnitKind kind) =>
+            PaintedStatue(kind) != null && (FigureOnly.Contains(kind) || StatueOverrides.ContainsKey(kind));
 
         public static Sprite Statue(UnitKind kind)
         {

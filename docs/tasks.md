@@ -10,7 +10,7 @@ and move done items to the "Done" section at the bottom now and then.
 ## Visuals (art chat, branch `experiment/art-style`)
 
 - [ ] Painted aurora: ChatGPT's free image limit was hit on 2026-10-25; retry the prompt saved in the ChatGPT chat "Generate Crescent Moon Image". Then replace the code aurora with it (maybe for another setting).
-- [ ] Decide on pedestals: keep, or redraw every statue on a thin slab (warrior and wolf versions exist in `Assets/Art/Experiment/Source/*_nopedestal.png`).
+- [ ] Redraw the archer, rogue and sapper as figure-only art (no pedestal, thin slab, same prompt style as `warrior_nopedestal.png`), save as `Assets/Art/Experiment/Source/<unit>_nopedestal.png` and run Tools → Art → Import Statues. Needs ChatGPT (free image limit). Every future unit is drawn this way.
 - [ ] Improve the player statues' colour (moon marble is better than before, not final).
 - [ ] Painted statues for the other factions (goblins, bandits, elementals, bosses) and for evolved units; they are still grey placeholders.
 - [ ] Labels and health bars over the statues: restyle (part of the UI pass).
