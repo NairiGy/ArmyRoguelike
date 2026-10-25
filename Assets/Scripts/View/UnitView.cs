@@ -56,9 +56,9 @@ namespace ArmyRoguelike.View
             if (PlaceholderArt.IsPainted(unit.Stats.Kind))
             {
                 _baseColor = Color.white;
-                // Player art faces down-left and is mirrored to face down-right, towards the enemy rows; enemy
-                // art is drawn from behind, facing up-left towards the player.
-                _body.flipX = unit.Team == Team.Player;
+                // Shown as drawn: the player's statues face down-right, towards the enemy rows, and enemy
+                // statues face down-left, towards the camera, so their faces show.
+                _body.flipX = false;
             }
             _body.color = _baseColor;
             if (unit.IsPackLeader)
