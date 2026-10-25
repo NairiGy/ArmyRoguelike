@@ -25,6 +25,17 @@ namespace ArmyRoguelike.View
 
         public static Sprite Rock => _rock != null ? _rock : _rock = MakeRock();
 
+        private static Sprite _statueBase;
+
+        /// <summary>How tall the code-drawn statue base is, in world units; the figure stands this high.</summary>
+        public const float StatueBaseHeight = 0.13f;
+
+        /// <summary>
+        /// A low square stone plinth, exactly on the 2:1 tile grid, in greyscale so a palette material can
+        /// colour it: lit top with a bevelled rim, lit left side, shaded right side.
+        /// </summary>
+        public static Sprite StatueBase => _statueBase != null ? _statueBase : _statueBase = MakeStatueBase();
+
         private static Sprite _gridLine;
         private static Sprite _softShadow;
 
@@ -174,6 +185,40 @@ namespace ArmyRoguelike.View
 
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), PixelsPerUnit);
+        }
+
+        private static Sprite MakeStatueBase()
+        {
+            // 0.62 of a tile wide at 128 pixels per unit.
+            const float ppu = 128f;
+            const float halfW = 40f, halfH = 20f;
+            var raise = Mathf.RoundToInt(StatueBaseHeight * ppu);
+            const int w = 82;
+            var h = Mathf.CeilToInt(halfH * 2f + raise + 2f);
+            var tex = NewTexture(w, h);
+            tex.filterMode = FilterMode.Bilinear;
+            var cx = w * 0.5f;
+            for (var lift = 0; lift <= raise; lift++)
+            {
+                var cy = halfH + 1f + lift;
+                var isTop = lift == raise;
+                for (var y = 0; y < h; y++)
+                for (var x = 0; x < w; x++)
+                {
+                    var d = Mathf.Abs(x + 0.5f - cx) / halfW + Mathf.Abs(y + 0.5f - cy) / halfH;
+                    if (d > 1f)
+                        continue;
+                    float v;
+                    if (isTop)
+                        v = d > 0.86f ? 0.98f : 0.86f; // a bright bevel round the top
+                    else
+                        v = (x < cx ? 0.68f : 0.5f) - (lift < 3 ? 0.06f : 0f); // a darker foot line
+                    tex.SetPixel(x, y, new Color(v, v, v, 1f));
+                }
+            }
+
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, (halfH + 1f) / h), ppu);
         }
 
         private static Sprite MakeGridLine()

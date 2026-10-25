@@ -13,7 +13,7 @@ using Object = UnityEngine.Object;
 /// <summary>
 /// Art experiment (branch experiment/art-style): turns the AI-generated warrior into sprites (a cut-out
 /// 2D image, and 3D models baked from the board's isometric angle) and renders the same battle with each.
-/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artPalette] [-artPlayerColour] [-artSky] [-artNoPedestal] [-artGlow] [-artBraziers] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
+/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artPalette] [-artUnits] [-artPlayerColour] [-artSky] [-artNoPedestal] [-artGlow] [-artBraziers] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
 /// </summary>
 public static class ArtExperiment
 {
@@ -153,6 +153,55 @@ public static class ArtExperiment
                 sheet.SetPixels(i % 2 * w, (1 - i / 2) * h, w, h, shots[i].GetPixels());
             sheet.Apply();
             Save(sheet, Path.Combine(outDir, "player_colours.png"));
+            EditorApplication.Exit(0);
+            return;
+        }
+
+        if (args.Contains("-artUnits"))
+        {
+            // Unit sizes (columns) with the painted pedestals and with code-drawn bases under the warrior and
+            // wolves redrawn without pedestals (rows), cropped to the middle of the board.
+            var scales = new[] { 1f, 0.8f, 0.65f };
+            var rows = new List<List<Texture2D>>();
+            foreach (var drawn in new[] { false, true })
+            {
+                PlaceholderArt.StatueOverrides.Clear();
+                BattleScenery.DrawnBases = drawn;
+                if (drawn)
+                {
+                    Override(UnitKind.Warrior, CutOut2D("warrior_nopedestal.png", "warrior_nopedestal"), outDir);
+                    var wolf = CutOut2D("wolf_nopedestal.png", "wolf_nopedestal");
+                    Override(UnitKind.Wolf, wolf, outDir);
+                    Override(UnitKind.PackLeader, wolf, outDir);
+                }
+
+                var row = new List<Texture2D>();
+                foreach (var scale in scales)
+                {
+                    BattleScenery.UnitScale = scale;
+                    var path = Path.Combine(outDir, $"units_{(drawn ? "base" : "pedestal")}_{scale:0.00}.png");
+                    PreviewCapture.Capture(path, true);
+                    var shot = new Texture2D(2, 2);
+                    shot.LoadImage(File.ReadAllBytes(path));
+                    // The middle of the frame, where the units stand.
+                    var crop = shot.GetPixels(250, 120, 900, 500);
+                    row.Add(Downscale(crop, 900, 500, 333));
+                }
+
+                rows.Add(row);
+            }
+
+            PlaceholderArt.StatueOverrides.Clear();
+            BattleScenery.DrawnBases = false;
+            BattleScenery.UnitScale = 1f;
+            var w = rows[0][0].width;
+            var h = rows[0][0].height;
+            var sheet = new Texture2D(w * 3, h * 2, TextureFormat.RGB24, false);
+            for (var r = 0; r < 2; r++)
+            for (var c = 0; c < 3; c++)
+                sheet.SetPixels(c * w, (1 - r) * h, w, h, rows[r][c].GetPixels());
+            sheet.Apply();
+            Save(sheet, Path.Combine(outDir, "units_comparison.png"));
             EditorApplication.Exit(0);
             return;
         }

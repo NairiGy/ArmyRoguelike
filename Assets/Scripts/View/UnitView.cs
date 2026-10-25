@@ -30,6 +30,7 @@ namespace ArmyRoguelike.View
 
         private SpriteRenderer _body;
         private SpriteRenderer _shadow;
+        private SpriteRenderer _base;
         private TextMesh _label;
         private MeshRenderer _labelRenderer;
         private SpriteRenderer _labelPlate;
@@ -71,6 +72,17 @@ namespace ArmyRoguelike.View
             else if (unit.Stats.Tier > 1)
                 // Evolved statues stand a little taller.
                 _body.transform.localScale = Vector3.one * (1f + 0.06f * (unit.Stats.Tier - 1));
+
+            // Optionally a stone base drawn in code, always square to the tile, with the figure standing on it.
+            if (BattleScenery.DrawnBases && PlaceholderArt.IsPainted(unit.Stats.Kind))
+            {
+                _base = new GameObject("Base").AddComponent<SpriteRenderer>();
+                _base.transform.SetParent(transform, false);
+                _base.transform.localScale = Vector3.one * Unit.Size;
+                _base.sprite = PlaceholderArt.StatueBase;
+                _body.transform.localPosition = Vector3.up * (PlaceholderArt.StatueBaseHeight * Unit.Size);
+            }
+
             _bodyRest = _body.transform.localPosition;
 
             // A soft shadow on the floor grounds the statue; it stays put while the body bobs and lunges.
@@ -80,7 +92,7 @@ namespace ArmyRoguelike.View
             _shadow.sprite = PlaceholderArt.SoftShadow;
             _shadow.color = ShadowColor;
 
-            var top = _body.sprite.bounds.max.y * _body.transform.localScale.y;
+            var top = _body.transform.localPosition.y + _body.sprite.bounds.max.y * _body.transform.localScale.y;
 
             if (unit.Team == Team.Player)
             {
@@ -109,6 +121,7 @@ namespace ArmyRoguelike.View
             _barBack = MakeBar("HpBack", new Color(0.1f, 0.1f, 0.1f, 0.85f), top + 0.08f);
             _barFill = MakeBar("HpFill", unit.Team == Team.Player ? new Color(0.35f, 0.8f, 0.4f) : new Color(0.85f, 0.3f, 0.25f), top + 0.08f);
 
+            transform.localScale = Vector3.one * BattleScenery.UnitScale;
             SetGridPosition(unit.Pos);
             RefreshHp(unit.Hp);
         }
@@ -138,6 +151,8 @@ namespace ArmyRoguelike.View
             transform.position = world;
             var order = IsoMath.SortingOrder(world) + 5;
             _shadow.sortingOrder = order - 5;
+            if (_base != null)
+                _base.sortingOrder = order - 1;
             // Bones lie flat on the tile, under anything standing there.
             _body.sortingOrder = _showingBones ? order - 4 : order;
             if (_labelPlate != null)
@@ -300,8 +315,11 @@ namespace ArmyRoguelike.View
         /// <summary>Draws a painted statue with a scenery material (e.g. its team's palette ramp). Placeholders are left alone.</summary>
         public void SetStatueMaterial(Material material)
         {
-            if (material != null && PlaceholderArt.IsPainted(Unit.Stats.Kind))
-                _body.sharedMaterial = material;
+            if (material == null || !PlaceholderArt.IsPainted(Unit.Stats.Kind))
+                return;
+            _body.sharedMaterial = material;
+            if (_base != null)
+                _base.sharedMaterial = material;
         }
 
         private void ApplyColor()
@@ -315,6 +333,8 @@ namespace ArmyRoguelike.View
 
         private void Update()
         {
+            // The whole unit (statue, base, shadow, bars) scales around its tile; tunable live via ArtTuning.
+            transform.localScale = Vector3.one * BattleScenery.UnitScale;
             ShedDust();
             if (!_selected)
                 return;
@@ -463,10 +483,14 @@ namespace ArmyRoguelike.View
                 _body.transform.localPosition = _bodyRest + Vector3.down * (t * 0.15f);
                 _body.color = new Color(start.r, start.g, start.b, 1f - t);
                 _shadow.color = new Color(0f, 0f, 0f, shadowStart.a * (1f - t));
+                if (_base != null)
+                    _base.color = new Color(1f, 1f, 1f, 1f - t);
                 yield return null;
             }
 
             _shadow.enabled = false;
+            if (_base != null)
+                _base.enabled = false;
 
             if (!Unit.Stats.LeavesRemains)
             {
@@ -488,6 +512,11 @@ namespace ArmyRoguelike.View
             _showingBones = false;
             _shadow.color = ShadowColor;
             _shadow.enabled = true;
+            if (_base != null)
+            {
+                _base.color = Color.white;
+                _base.enabled = true;
+            }
             SetGridPosition(Unit.Pos);
             _body.color = new Color(0.75f, 0.55f, 1f);
             for (var t = 0f; t < 1f; t += Time.deltaTime / 0.5f)

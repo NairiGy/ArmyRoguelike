@@ -16,6 +16,9 @@ and move done items to the "Done" section at the bottom now and then.
 - [ ] Labels and health bars over the statues: restyle (part of the UI pass).
 - [ ] UI/HUD pass (IMGUI panels are still placeholders).
 - [ ] Lightning at night (planned, later).
+- [ ] Platform built from pieces (painted slabs per tile plus edge and wall pieces along the outline) instead of one painting, so boards can be any size or shape (16x16 already works by zooming out; odd shapes need this). Later, when non-rectangular boards are planned.
+- [ ] Highlights that fit the theme: soft glowing tiles instead of flat, pixelated diamonds (move = pale magic blue, attack = ember red, hover outline, path markers).
+- [ ] Feel pass: attack wind-up, hit-stop and recoil, heavy steps with dust, projectiles; damage chips, cracks, crumbling deaths, better damage numbers, explosions.
 - [ ] Tune the cloud layers' values once settled (live in the Inspector: Scenery → Scenery Clouds) and make them the defaults.
 - [ ] Merge `experiment/art-style` into `main` when the battle's look is settled.
 

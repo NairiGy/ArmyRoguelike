@@ -71,6 +71,12 @@ namespace ArmyRoguelike.View
             return colours.ToArray();
         }
 
+        /// <summary>Size of every unit (statue, base, shadow, bars) relative to the art's own size. Live via ArtTuning.</summary>
+        public static float UnitScale = 1f;
+
+        /// <summary>Painted statues stand on a stone base drawn in code, square to the tile.</summary>
+        public static bool DrawnBases;
+
         /// <summary>Statue rims glow in team colours (pale blue for the player, ember red for enemies).</summary>
         public static bool TeamGlow = true;
 
@@ -148,6 +154,7 @@ namespace ArmyRoguelike.View
                 board.SetStatueMaterials(player, enemy);
             }
             var root = new GameObject("Scenery").transform;
+            root.gameObject.AddComponent<ArtTuning>();
             root.SetParent(board.transform, false);
             cam.backgroundColor = stops[0];
 
