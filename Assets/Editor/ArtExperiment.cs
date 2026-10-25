@@ -355,6 +355,22 @@ public static class ArtExperiment
             foreach (var (tex, pivot, widthPx) in KeyOutGreen(LoadSource("tower_brazier.png")))
                 SaveSprite(TowerFolder + "brazier.png", tex, pivot, widthPx / BrazierWidth);
 
+        // The tower on its own (same framing as the painting), so clouds can pass behind it, and the
+        // cloud strips that do.
+        const string backdrops = "Assets/Art/Environment/Resources/Backdrops/";
+        if (File.Exists(Source + "iso_tower_only.png"))
+        {
+            var only = LoadSource("iso_tower_only.png");
+            var layer = new Texture2D(only.width, only.height, TextureFormat.RGBA32, true);
+            layer.SetPixels(KeyGreen(only));
+            layer.Apply(true);
+            SaveTexture(backdrops + "iso_tower_layer.png", layer, false);
+        }
+
+        foreach (var band in new[] { "puffy", "wispy" })
+            if (File.Exists(Source + $"clouds_band_{band}.png"))
+                SaveTexture(backdrops + $"cloud_{band}.png", SeamlessStrip(LoadSource($"clouds_band_{band}.png")), true);
+
         var slabs = LoadSource("tower_floor_slabs.png");
         for (var q = 0; q < 4; q++)
         {
@@ -376,28 +392,87 @@ public static class ArtExperiment
     /// Removes a pure green background and returns each object (they stand in one row with gaps), with
     /// its pivot at the centre of its footprint and its width in pixels.
     /// </summary>
-    private static List<(Texture2D tex, Vector2 pivot, float widthPx)> KeyOutGreen(Texture2D sheet)
+    /// <summary>The image's pixels with its pure green background made transparent.</summary>
+    private static Color[] KeyGreen(Texture2D image)
     {
-        var w = sheet.width;
-        var h = sheet.height;
-        var px = sheet.GetPixels();
-        var column = new bool[w];
+        var px = image.GetPixels();
         for (var j = 0; j < px.Length; j++)
         {
             var c = px[j];
             var greenness = c.g - Mathf.Max(c.r, c.b);
             if (greenness > 0.25f)
-                px[j] = Color.clear;
-            else
             {
-                // Edge pixels pick up green from the background: soften and de-tint them.
-                if (greenness > 0.08f)
-                    px[j].a = 1f - (greenness - 0.08f) / 0.17f;
-                px[j].g = Mathf.Min(c.g, Mathf.Max(c.r, c.b));
-                if (px[j].a > 0.5f)
-                    column[j % w] = true;
+                px[j] = Color.clear;
+                continue;
             }
+
+            // Edge pixels pick up green from the background: soften and de-tint them.
+            if (greenness > 0.08f)
+                px[j].a = 1f - (greenness - 0.08f) / 0.17f;
+            px[j].g = Mathf.Min(c.g, Mathf.Max(c.r, c.b));
         }
+
+        return px;
+    }
+
+    /// <summary>
+    /// A cloud strip from a green-screen image: keyed, cropped to the band's rows, and made to repeat
+    /// seamlessly by cross-fading its last columns into its first.
+    /// </summary>
+    private static Texture2D SeamlessStrip(Texture2D image)
+    {
+        var w = image.width;
+        var h = image.height;
+        var px = KeyGreen(image);
+        int minY = h, maxY = 0;
+        for (var j = 0; j < px.Length; j++)
+            if (px[j].a > 0.05f)
+            {
+                minY = Mathf.Min(minY, j / w);
+                maxY = Mathf.Max(maxY, j / w);
+            }
+
+        var fade = w / 8;
+        var outW = w - fade;
+        var outH = maxY - minY + 1;
+        var strip = new Texture2D(outW, outH, TextureFormat.RGBA32, true);
+        for (var y = 0; y < outH; y++)
+        for (var x = 0; x < outW; x++)
+        {
+            var c = px[(y + minY) * w + x];
+            if (x < fade)
+                c = Color.Lerp(px[(y + minY) * w + outW + x], c, (float)x / fade);
+            strip.SetPixel(x, y, c);
+        }
+
+        strip.Apply(true);
+        return strip;
+    }
+
+    /// <summary>Saves a plain texture (not a sprite) that repeats sideways, e.g. a cloud strip or a scene layer.</summary>
+    private static void SaveTexture(string path, Texture2D tex, bool repeatSideways)
+    {
+        File.WriteAllBytes(path, tex.EncodeToPNG());
+        AssetDatabase.ImportAsset(path);
+        var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+        importer.textureType = TextureImporterType.Default;
+        importer.alphaIsTransparency = true;
+        importer.mipmapEnabled = true;
+        importer.wrapModeU = repeatSideways ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
+        importer.wrapModeV = TextureWrapMode.Clamp;
+        importer.textureCompression = TextureImporterCompression.Uncompressed;
+        importer.SaveAndReimport();
+    }
+
+    private static List<(Texture2D tex, Vector2 pivot, float widthPx)> KeyOutGreen(Texture2D sheet)
+    {
+        var w = sheet.width;
+        var h = sheet.height;
+        var px = KeyGreen(sheet);
+        var column = new bool[w];
+        for (var j = 0; j < px.Length; j++)
+            if (px[j].a > 0.5f)
+                column[j % w] = true;
 
         var result = new List<(Texture2D, Vector2, float)>();
         for (var x0 = 0; x0 < w; x0++)

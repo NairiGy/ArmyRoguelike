@@ -87,13 +87,15 @@ namespace ArmyRoguelike.View
             public Vector2 Top, Left, Bottom, Right;
             // Resources folder with this setting's painted floor slabs (slab_*) and rocks (rock_*), if any.
             public string ArtFolder;
-            // The painting's light parts are clouds: let them swirl, and drift more cloud past in front.
+            // A sky with clouds: parallax cloud layers drift past (needs TowerLayer), and dust motes.
             public bool Clouds;
+            // The painting's tower alone (same framing), drawn over the clouds that pass behind it.
+            public string TowerLayer;
         }
 
         private static readonly Dictionary<Setting, IsoScene> IsoScenes = new Dictionary<Setting, IsoScene>
         {
-            [Setting.IsoTower] = new IsoScene { Texture = "Backdrops/iso_tower", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", Clouds = true },
+            [Setting.IsoTower] = new IsoScene { Texture = "Backdrops/iso_tower", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", Clouds = true, TowerLayer = "Backdrops/iso_tower_layer" },
             [Setting.IsoTemple] = new IsoScene { Texture = "Backdrops/iso_temple", Top = new Vector2(745, 220), Left = new Vector2(355, 430), Bottom = new Vector2(880, 735), Right = new Vector2(1265, 470) },
             [Setting.IsoGraveyard] = new IsoScene { Texture = "Backdrops/iso_graveyard", Top = new Vector2(840, 210), Left = new Vector2(325, 470), Bottom = new Vector2(905, 765), Right = new Vector2(1330, 490) },
         };
@@ -110,6 +112,7 @@ namespace ArmyRoguelike.View
         private const float HazeValue = 0.8f;
         private const int BackdropOrder = -32000;
         private const int BackCloudOrder = -31000;
+        private const int TowerLayerOrder = -30000;
         private const int WallOrder = -1500;
         private const int FrontCloudOrder = 31000;
         private static readonly Color NeutralGround = new Color(0.5f, 0.48f, 0.44f);
@@ -160,12 +163,22 @@ namespace ArmyRoguelike.View
                 if (scene.Clouds)
                 {
                     SceneryMotes.Create(root, centre, viewW, viewH, Sample(stops, 0.95f));
-                    var wisps = CloudTexture();
-                    var screenBottom = centre.y - viewH * 0.5f;
-                    // Two bands at different heights and speeds, low across the tower's walls, both drifting
-                    // right with the wind (a negative scroll moves the texture to the right).
-                    CloudBand(root, NewMaterial(shader, wisps, ramp), FrontCloudOrder, centre.x, viewW, screenBottom - 0.3f, 1.3f, 0.9f, -0.006f);
-                    CloudBand(root, NewMaterial(shader, wisps, ramp), FrontCloudOrder + 1, centre.x, viewW, screenBottom - 0.2f, 0.8f, 1f, -0.011f);
+                    var tower = Resources.Load<Texture2D>(scene.TowerLayer);
+                    var puffy = Resources.Load<Texture2D>("Backdrops/cloud_puffy");
+                    var wispy = Resources.Load<Texture2D>("Backdrops/cloud_wispy");
+                    if (tower != null && puffy != null && wispy != null)
+                    {
+                        // Parallax: cloud layers slide right with one wind, the farther (higher, fainter,
+                        // smaller) the slower. Three pass behind the tower, which sits on its own layer over
+                        // the painting, and one low band passes in front of its walls.
+                        var screenTop = centre.y + viewH * 0.5f;
+                        var screenBottom = centre.y - viewH * 0.5f;
+                        CloudBand(root, NewMaterial(shader, wispy, ramp), BackCloudOrder, centre.x, viewW, screenTop - 1.9f, 0.7f, 0.8f, 0.004f, 0.75f);
+                        CloudBand(root, NewMaterial(shader, puffy, ramp), BackCloudOrder + 1, centre.x, viewW, screenTop - 3.4f, 1.1f, 0.88f, 0.009f, 0.85f);
+                        CloudBand(root, NewMaterial(shader, puffy, ramp), BackCloudOrder + 2, centre.x, viewW, screenBottom + 0.4f, 1.6f, 0.95f, 0.016f, 0.95f);
+                        BuildIsoScene(root, board, scene, NewMaterial(shader, tower, ramp), TowerLayerOrder);
+                        CloudBand(root, NewMaterial(shader, puffy, ramp), FrontCloudOrder, centre.x, viewW, screenBottom - 0.7f, 1.4f, 1f, 0.03f, 1f);
+                    }
                 }
 
                 var art = scene.ArtFolder != null ? Resources.LoadAll<Sprite>(scene.ArtFolder) : new Sprite[0];
@@ -212,8 +225,8 @@ namespace ArmyRoguelike.View
             var clouds = CloudTexture();
             var bottom = centre.y - viewH * 0.5f;
             // Behind the tower the cloud sea rises around its walls; in front a lower band drifts the other way.
-            CloudBand(root, NewMaterial(shader, clouds, ramp), BackCloudOrder, centre.x, viewW, bottom, 2.2f, 0.85f, 0.006f);
-            CloudBand(root, NewMaterial(shader, clouds, ramp), FrontCloudOrder, centre.x, viewW, bottom - 0.1f, 1.1f, 1f, -0.01f);
+            CloudBand(root, NewMaterial(shader, clouds, ramp), BackCloudOrder, centre.x, viewW, bottom, 2.2f, 0.85f, 0.006f, 1f);
+            CloudBand(root, NewMaterial(shader, clouds, ramp), FrontCloudOrder, centre.x, viewW, bottom - 0.1f, 1.1f, 1f, 0.01f, 1f);
 
             BuildWalls(root, board, NewMaterial(shader, StoneBlocks(), ramp));
             BuildBattlements(root, board, NewMaterial(shader, MerlonTexture().texture, ramp));
@@ -229,7 +242,7 @@ namespace ArmyRoguelike.View
         /// Places an isometric painting so its platform lies under the board: the best affine fit of the
         /// platform's four corners onto the board's four corners (the painting's angle is never exactly 2:1).
         /// </summary>
-        private static void BuildIsoScene(Transform root, BoardView board, IsoScene scene, Material material)
+        private static void BuildIsoScene(Transform root, BoardView board, IsoScene scene, Material material, int order = BackdropOrder)
         {
             var tex = (Texture2D)material.mainTexture;
             if (tex == null)
@@ -241,7 +254,7 @@ namespace ArmyRoguelike.View
             var fy = FitAffine(image, world, p => p.y);
             Vector2 Map(float px, float py) => new Vector2(fx.x * px + fx.y * py + fx.z, fy.x * px + fy.y * py + fy.z);
             // Image rows run downwards; the quad goes counter-clockwise from the image's bottom left.
-            Quad(root, "Scene", material, BackdropOrder, Map(0, tex.height), Map(tex.width, tex.height), Map(tex.width, 0), Map(0, 0), Value(1f));
+            Quad(root, "Scene", material, order, Map(0, tex.height), Map(tex.width, tex.height), Map(tex.width, 0), Map(0, 0), Value(1f));
         }
 
         /// <summary>Least-squares (a, b, c) with a*px + b*py + c ≈ target(world) over the point pairs.</summary>
@@ -374,12 +387,19 @@ namespace ArmyRoguelike.View
         }
 
         /// <summary>A band of drifting cloud across the screen, soft along its top edge.</summary>
-        private static void CloudBand(Transform root, Material material, int order, float centreX, float viewW, float bottomY, float height, float value, float drift)
+        /// <param name="speed">How fast it drifts right, in screen widths per second (roughly).</param>
+        /// <param name="alpha">Opacity: far layers are fainter, as if seen through haze.</param>
+        private static void CloudBand(Transform root, Material material, int order, float centreX, float viewW, float bottomY, float height, float value, float speed, float alpha)
         {
-            material.SetFloat("_Scroll", drift);
+            var tex = material.mainTexture;
             var w = viewW * 1.1f;
+            // Keep the strip's own proportions as it repeats along the band.
+            var repeats = w / (height * tex.width / tex.height);
+            // A negative scroll moves the texture to the right, with the wind.
+            material.SetFloat("_Scroll", -speed * repeats);
             var bl = new Vector2(centreX - w * 0.5f, bottomY);
-            Quad(root, "Clouds", material, order, bl, bl + new Vector2(w, 0f), bl + new Vector2(w, height), bl + new Vector2(0f, height), Value(value), w / (height * 2f));
+            var col = new Color(value, 0f, 0f, alpha);
+            Quad(root, "Clouds", material, order, bl, bl + new Vector2(w, 0f), bl + new Vector2(w, height), bl + new Vector2(0f, height), col, repeats);
         }
 
         // ---------- Helpers ----------
