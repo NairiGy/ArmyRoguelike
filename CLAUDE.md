@@ -6,6 +6,7 @@ A single-player roguelike army-builder. You lead a small squad of living statues
 
 - **Prototype 5 (Act 1):** draft 3 of 5 base units, then a 7-step Act 1: each of four factions (wolves, goblins, bandits, elementals) appears at most once, each encounter uses a rule-based layout (`Core/Encounter.cs`), and the act ends with a rotating boss (Necromancer raising the factions you beat, or the Giant). Trainers allow one evolution per unit per visit (first free, then paid). 38 player unit types in 5 evolution trees; items only grant abilities. Not playtested yet.
 - Design and placeholder numbers: [docs/design-note.md](docs/design-note.md). Keep it updated when design decisions change.
+- Open tasks across all topics (visuals, gameplay, sound, marketing): [docs/tasks.md](docs/tasks.md). Read it at the start of a session and update it when you finish or find work.
 - Reference of every unit, ability, item, enemy and rule: [docs/gamepedia.html](docs/gamepedia.html), generated from the game data.
 
 ## Tech

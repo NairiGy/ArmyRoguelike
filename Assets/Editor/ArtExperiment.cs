@@ -166,9 +166,9 @@ public static class ArtExperiment
                 ("main", main),
                 ("moon_stars", new SkyFeatures.Mix { ClearSky = true, Moon = true, Stars = true }),
                 ("moon_stars_shooting_lanterns", new SkyFeatures.Mix { ClearSky = true, Moon = true, Stars = true, ShootingStars = true, Lanterns = true }),
-                ("stars_aurora_birds", new SkyFeatures.Mix { ClearSky = true, Stars = true, Aurora = true, Birds = true }),
-                ("cloudy_moon_birds", new SkyFeatures.Mix { Moon = true, Birds = true }),
-                ("everything", new SkyFeatures.Mix { ClearSky = true, Moon = true, Stars = true, ShootingStars = true, Lanterns = true, Birds = true, Aurora = true }),
+                ("stars_aurora", new SkyFeatures.Mix { ClearSky = true, Stars = true, Aurora = true }),
+                ("cloudy_moon", new SkyFeatures.Mix { Moon = true }),
+                ("everything", new SkyFeatures.Mix { ClearSky = true, Moon = true, Stars = true, ShootingStars = true, Lanterns = true, Aurora = true }),
             };
             var shots = new List<Texture2D>();
             for (var i = 0; i < mixes.Length; i++)

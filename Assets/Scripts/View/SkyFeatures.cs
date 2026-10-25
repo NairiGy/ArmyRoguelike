@@ -4,7 +4,7 @@ namespace ArmyRoguelike.View
 {
     /// <summary>
     /// Optional night-sky elements behind the tower: a clear or cloudy sky panorama, the moon, stars,
-    /// shooting stars, sky lanterns, birds and an aurora. Each one is a live switch: select "Scenery" in
+    /// shooting stars, sky lanterns and an aurora. Each one is a live switch: select "Scenery" in
     /// the Hierarchy during Play and mix them in the Inspector. Defaults come from BattleScenery.
     /// </summary>
     public sealed class SkyFeatures : MonoBehaviour
@@ -12,7 +12,7 @@ namespace ArmyRoguelike.View
         /// <summary>Which elements a new battle starts with (the Inspector switches start from these).</summary>
         public struct Mix
         {
-            public bool ClearSky, Moon, Stars, ShootingStars, Lanterns, Birds, Aurora;
+            public bool ClearSky, Moon, Stars, ShootingStars, Lanterns, Aurora;
         }
 
         // Clear sky, stars, shooting stars and lanterns: the mix that worked in playtesting.
@@ -31,14 +31,10 @@ namespace ArmyRoguelike.View
         [Tooltip("Seconds between shooting stars (roughly).")]
         public float shootingStarEvery = 12f;
         public bool lanterns;
-        public bool birds;
-        [Tooltip("Seconds between flocks of birds (roughly).")]
-        public float birdsEvery = 18f;
         public bool aurora;
 
         private const int StarCount = 110;
         private const int LanternCount = 9;
-        private const int FlockSize = 6;
 
         private Material _skyMaterial;
         private Texture _cloudySky;
@@ -66,11 +62,6 @@ namespace ArmyRoguelike.View
         private float[] _lanternAge;
         private float[] _lanternLife;
         private float[] _lanternX;
-        private GameObject _flockRoot;
-        private SpriteRenderer[] _birds;
-        private Vector3[] _birdOffset;
-        private float _flockStart;
-        private float _flockY;
         private GameObject _auroraRoot;
 
         /// <param name="skyMaterial">The sky panorama's material, whose texture the clear-sky switch swaps.</param>
@@ -109,7 +100,6 @@ namespace ArmyRoguelike.View
             stars = Default.Stars;
             shootingStars = Default.ShootingStars;
             lanterns = Default.Lanterns;
-            birds = Default.Birds;
             aurora = Default.Aurora;
             _skyMaterial = skyMaterial;
             _cloudySky = cloudySky;
@@ -149,7 +139,7 @@ namespace ArmyRoguelike.View
                 _starPhase[i] = (float)rng.NextDouble() * 20f;
             }
 
-            // The first shooting star and flock are already on their way, so a new battle opens with them.
+            // The first shooting star is already on its way, so a new battle opens with it.
             _shootingStar = Dot(transform, "Shooting star", glow, -31850);
             NewShootingStar();
             _shootingStart = -0.4f;
@@ -170,27 +160,6 @@ namespace ArmyRoguelike.View
                 _lanternAge[i] = (float)rng.NextDouble() * _lanternLife[i];
                 _lanternX[i] = Mathf.Lerp(_min.x, _max.x, (i + (float)rng.NextDouble()) / LanternCount);
             }
-
-            // A small flock of birds, dark silhouettes flapping across with the wind.
-            var flockRoot = Group("Birds");
-            _flockRoot = flockRoot.gameObject;
-            _birds = new SpriteRenderer[FlockSize];
-            _birdOffset = new Vector3[FlockSize];
-            for (var i = 0; i < FlockSize; i++)
-            {
-                _birds[i] = new GameObject("Bird").AddComponent<SpriteRenderer>();
-                _birds[i].transform.SetParent(flockRoot, false);
-                _birds[i].sprite = BirdSprite;
-                // Pale and moonlit: dark birds disappear against the night sky.
-                _birds[i].color = new Color(pale.r, pale.g, pale.b, 0.8f);
-                _birds[i].sortingOrder = -31600;
-                // A loose V: the leader in front, the rest trailing behind and to either side.
-                _birdOffset[i] = new Vector3(-0.35f * ((i + 1) / 2), (i % 2 == 0 ? 1 : -1) * 0.16f * ((i + 1) / 2), 0f) +
-                                 new Vector3((float)rng.NextDouble() * 0.06f, (float)rng.NextDouble() * 0.05f, 0f);
-            }
-
-            _flockStart = -6f;
-            _flockY = Mathf.Lerp(_horizon + 1f, _max.y - 0.6f, 0.5f);
 
             // Aurora: a wide band of curtains high in the sky.
             var auroraShader = Resources.Load<Shader>("Shaders/Aurora");
@@ -249,7 +218,6 @@ namespace ArmyRoguelike.View
             _lanternRoot.SetActive(lanterns);
             if (lanterns)
                 AnimateLanterns(t, dt);
-            AnimateBirds(t);
             _auroraRoot.SetActive(aurora);
         }
 
@@ -303,61 +271,6 @@ namespace ArmyRoguelike.View
                 _lanternHalos[i].transform.position = pos;
                 _lanternHalos[i].transform.localScale = Vector3.one * size * 4f;
                 _lanternHalos[i].color = new Color(1f, 0.5f, 0.15f, 0.25f * fade * flicker);
-            }
-        }
-
-        private void AnimateBirds(float t)
-        {
-            const float crossing = 14f;
-            var age = t - _flockStart;
-            if (age > Mathf.Max(crossing, birdsEvery))
-            {
-                _flockStart = t;
-                _flockY = Random.Range(_horizon + 0.8f, _max.y - 0.5f);
-                age = 0f;
-            }
-
-            var flying = birds && age < crossing;
-            _flockRoot.SetActive(flying);
-            if (!flying)
-                return;
-            var p = age / crossing;
-            var lead = new Vector3(Mathf.Lerp(_min.x - 1f, _max.x + 1.5f, p), _flockY + Mathf.Sin(t * 0.5f) * 0.1f, 0f);
-            for (var i = 0; i < _birds.Length; i++)
-            {
-                _birds[i].transform.position = lead + _birdOffset[i];
-                var flap = Mathf.Sin(t * 9f + i * 1.3f);
-                _birds[i].transform.localScale = new Vector3(0.3f, 0.3f * (0.35f + 0.65f * Mathf.Abs(flap)), 1f);
-            }
-        }
-
-        private static Sprite _bird;
-
-        /// <summary>A tiny bird silhouette: two wings in a shallow V.</summary>
-        private static Sprite BirdSprite
-        {
-            get
-            {
-                if (_bird != null)
-                    return _bird;
-                const int w = 32, h = 16;
-                var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
-                tex.SetPixels32(new Color32[w * h]);
-                for (var x = 0; x < w; x++)
-                {
-                    // Each wing curves up from the body in the middle.
-                    var d = Mathf.Abs(x - w * 0.5f) / (w * 0.5f);
-                    var y = 3f + 9f * Mathf.Sqrt(d);
-                    for (var dy = -1; dy <= 1; dy++)
-                    {
-                        var py = Mathf.RoundToInt(y) + dy;
-                        if (py >= 0 && py < h)
-                            tex.SetPixel(x, py, new Color(1f, 1f, 1f, dy == 0 ? 1f : 0.5f));
-                    }
-                }
-
-                tex.Apply();
-                return _bird = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.3f), w);
             }
         }
     }
