@@ -4,9 +4,10 @@ using UnityEngine;
 namespace ArmyRoguelike.View
 {
     /// <summary>
-    /// Everything around the board: a greyscale backdrop coloured by a palette, the board's stone sides
-    /// (so it reads as a plateau) and a dark strip of rocks along the bottom of the screen. All of it
-    /// goes through one palette ramp, so a new palette changes the whole mood.
+    /// Everything around the board, which is the roof of a tall tower above the clouds: a greyscale sky
+    /// and cloud sea behind, the tower's walls dropping into haze, battlements on the back edges and a
+    /// drifting band of cloud in front. All of it goes through one palette ramp, so a new palette changes
+    /// the whole mood.
     /// </summary>
     public static class BattleScenery
     {
@@ -20,10 +21,12 @@ namespace ArmyRoguelike.View
             new[] { "#0b0f18", "#16223a", "#25384f", "#3a5268", "#5c7486", "#c48d8c" },
         };
 
-        private const float SlabDepth = 0.65f;
+        private const float WallDepth = 2f;
+        private const float HazeValue = 0.8f;
         private const int BackdropOrder = -32000;
-        private const int SlabOrder = -1500;
-        private const int ForegroundOrder = 31000;
+        private const int BackCloudOrder = -31000;
+        private const int WallOrder = -1500;
+        private const int FrontCloudOrder = 31000;
         private static readonly Color NeutralGround = new Color(0.5f, 0.48f, 0.44f);
 
         public static int PaletteCount => Palettes.Length;
@@ -44,7 +47,7 @@ namespace ArmyRoguelike.View
             var viewW = viewH * Mathf.Max(cam.aspect, 16f / 9f);
             var centre = (Vector2)cam.transform.position;
 
-            var backdrop = Resources.Load<Texture2D>("Backdrops/ruins");
+            var backdrop = Resources.Load<Texture2D>("Backdrops/clouds");
             if (backdrop != null)
             {
                 var aspect = (float)backdrop.width / backdrop.height;
@@ -53,11 +56,17 @@ namespace ArmyRoguelike.View
                 var material = NewMaterial(shader, backdrop, ramp);
                 material.SetFloat("_PixelSize", pixelateBackdrop ? 6f : 0f);
                 var bl = centre - new Vector2(w, h) * 0.5f;
-                Quad(root, "Backdrop", material, BackdropOrder, bl, bl + new Vector2(w, 0f), bl + new Vector2(w, h), bl + new Vector2(0f, h), 1f);
+                Quad(root, "Backdrop", material, BackdropOrder, bl, bl + new Vector2(w, 0f), bl + new Vector2(w, h), bl + new Vector2(0f, h), Value(1f));
             }
 
-            BuildSlab(root, board, NewMaterial(shader, StoneBlocks(), ramp));
-            BuildForeground(root, NewMaterial(shader, Texture2D.whiteTexture, ramp), centre, viewW, viewH);
+            var clouds = CloudTexture();
+            var bottom = centre.y - viewH * 0.5f;
+            // Behind the tower the cloud sea rises around its walls; in front a lower band drifts the other way.
+            CloudBand(root, NewMaterial(shader, clouds, ramp), BackCloudOrder, centre.x, viewW, bottom, 2.2f, 0.85f, 0.006f);
+            CloudBand(root, NewMaterial(shader, clouds, ramp), FrontCloudOrder, centre.x, viewW, bottom - 0.1f, 1.1f, 1f, -0.01f);
+
+            BuildWalls(root, board, NewMaterial(shader, StoneBlocks(), ramp));
+            BuildBattlements(root, board, NewMaterial(shader, MerlonTexture().texture, ramp));
 
             // Darker than the sandstone statues, so they stand out on it.
             board.SetGroundTint(Color.Lerp(Sample(stops, 0.5f), NeutralGround, 0.45f));
@@ -66,72 +75,74 @@ namespace ArmyRoguelike.View
 
         // ---------- Pieces ----------
 
-        /// <summary>The two front sides of the board, hanging below its front edges.</summary>
-        private static void BuildSlab(Transform root, BoardView board, Material material)
+        /// <summary>The tower's two front walls, hanging below the board's front edges and fading into haze.</summary>
+        private static void BuildWalls(Transform root, BoardView board, Material material)
         {
             var w = board.Battle.Board.Width;
             var h = board.Battle.Board.Height;
             var left = (Vector2)IsoMath.GridToWorld(-0.5f, h - 0.5f);
             var bottom = (Vector2)IsoMath.GridToWorld(-0.5f, -0.5f);
             var right = (Vector2)IsoMath.GridToWorld(w - 0.5f, -0.5f);
-            var down = Vector2.down * SlabDepth;
-            // Light comes from the top left, as on the statues: the left side is the lit one.
-            Quad(root, "Slab left", material, SlabOrder, left + down, bottom + down, bottom, left, 0.5f, h * 0.5f);
-            Quad(root, "Slab right", material, SlabOrder, bottom + down, right + down, right, bottom, 0.33f, w * 0.5f);
+            var down = Vector2.down * WallDepth;
+            var courses = WallDepth / 0.65f;
+            // Light comes from the top left, as on the statues: the left wall is the lit one.
+            Quad(root, "Wall left", material, WallOrder, left + down, bottom + down, bottom, left, Value(0.5f), h * 0.5f, courses, Haze(0.5f));
+            Quad(root, "Wall right", material, WallOrder, bottom + down, right + down, right, bottom, Value(0.33f), w * 0.5f, courses, Haze(0.33f));
         }
 
-        /// <summary>Two layers of dark jagged rock along the bottom edge, higher towards the corners.</summary>
-        private static void BuildForeground(Transform root, Material material, Vector2 centre, float viewW, float viewH)
+        /// <summary>Merlons along the two back edges, every other tile, straddling the edge.</summary>
+        private static void BuildBattlements(Transform root, BoardView board, Material material)
         {
-            var rng = new System.Random(7);
-            var bottomY = centre.y - viewH * 0.5f - 0.05f;
-            for (var layer = 0; layer < 2; layer++)
+            var w = board.Battle.Board.Width;
+            var h = board.Battle.Board.Height;
+            var sprite = MerlonTexture();
+            var spots = new List<Vector2>();
+            for (var i = 0; i < w; i += 2)
+                spots.Add(new Vector2(i, h - 0.5f + 0.15f));
+            for (var j = 0; j < h; j += 2)
+                spots.Add(new Vector2(w - 0.5f + 0.15f, j));
+            spots.Add(new Vector2(w - 0.5f + 0.15f, h - 0.5f + 0.15f));
+            foreach (var s in spots)
             {
-                var verts = new List<Vector3>();
-                var tris = new List<int>();
-                var lift = layer == 0 ? 1.35f : 1f;
-                for (var x = -viewW * 0.55f; x <= viewW * 0.55f + 0.01f; x += 0.22f)
-                {
-                    var edge = Mathf.Abs(x) / (viewW * 0.5f);
-                    var height = (0.08f + 0.75f * edge * edge * edge + (float)rng.NextDouble() * 0.12f) * lift;
-                    verts.Add(new Vector3(centre.x + x, bottomY));
-                    verts.Add(new Vector3(centre.x + x, bottomY + height));
-                    if (verts.Count >= 4)
-                    {
-                        var i = verts.Count - 4;
-                        tris.AddRange(new[] { i, i + 1, i + 3, i, i + 3, i + 2 });
-                    }
-                }
-
-                var value = layer == 0 ? 0.14f : 0.02f;
-                var colors = new Color[verts.Count];
-                for (var i = 0; i < colors.Length; i++)
-                    colors[i] = new Color(value, 0f, 0f, 1f);
-                var mesh = new Mesh { name = "Foreground" };
-                mesh.SetVertices(verts);
-                mesh.SetTriangles(tris, 0);
-                mesh.colors = colors;
-                mesh.uv = new Vector2[verts.Count];
-                AddRenderer(root, $"Foreground {layer}", mesh, material, ForegroundOrder + layer);
+                var sr = new GameObject("Merlon").AddComponent<SpriteRenderer>();
+                sr.transform.SetParent(root, false);
+                sr.transform.position = IsoMath.GridToWorld(s.x, s.y);
+                sr.sprite = sprite;
+                sr.sharedMaterial = material;
+                sr.color = Value(1f);
+                sr.sortingOrder = IsoMath.SortingOrder(sr.transform.position) + 5;
             }
+        }
+
+        /// <summary>A band of drifting cloud across the screen, soft along its top edge.</summary>
+        private static void CloudBand(Transform root, Material material, int order, float centreX, float viewW, float bottomY, float height, float value, float drift)
+        {
+            material.SetFloat("_Scroll", drift);
+            var w = viewW * 1.1f;
+            var bl = new Vector2(centreX - w * 0.5f, bottomY);
+            Quad(root, "Clouds", material, order, bl, bl + new Vector2(w, 0f), bl + new Vector2(w, height), bl + new Vector2(0f, height), Value(value), w / (height * 2f));
         }
 
         // ---------- Helpers ----------
 
-        /// <summary>A quad from four corners (counter-clockwise from bottom left), its brightness scaled by value.</summary>
-        private static void Quad(Transform root, string name, Material material, int order, Vector2 a, Vector2 b, Vector2 c, Vector2 d, float value, float uRepeat = 1f)
+        private static Color Value(float v) => new Color(v, 0f, 0f, 1f);
+
+        /// <summary>Vertex colour for the bottom of a wall: fully faded into the haze.</summary>
+        private static Color Haze(float v) => new Color(v, 1f, HazeValue, 1f);
+
+        /// <summary>
+        /// A quad from four corners (counter-clockwise from bottom left). Its vertex colour sets brightness
+        /// (and haze, see the shader); the bottom two corners can take a different colour.
+        /// </summary>
+        private static void Quad(Transform root, string name, Material material, int order, Vector2 a, Vector2 b, Vector2 c, Vector2 d,
+            Color col, float uRepeat = 1f, float vRepeat = 1f, Color? bottomCol = null)
         {
             var mesh = new Mesh { name = name };
             mesh.vertices = new Vector3[] { a, b, c, d };
-            mesh.uv = new[] { new Vector2(0f, 0f), new Vector2(uRepeat, 0f), new Vector2(uRepeat, 1f), new Vector2(0f, 1f) };
-            var col = new Color(value, 0f, 0f, 1f);
-            mesh.colors = new[] { col, col, col, col };
+            mesh.uv = new[] { new Vector2(0f, 0f), new Vector2(uRepeat, 0f), new Vector2(uRepeat, vRepeat), new Vector2(0f, vRepeat) };
+            var low = bottomCol ?? col;
+            mesh.colors = new[] { low, low, col, col };
             mesh.triangles = new[] { 0, 1, 2, 0, 2, 3 };
-            AddRenderer(root, name, mesh, material, order);
-        }
-
-        private static void AddRenderer(Transform root, string name, Mesh mesh, Material material, int order)
-        {
             var go = new GameObject(name);
             go.transform.SetParent(root, false);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
@@ -171,7 +182,7 @@ namespace ArmyRoguelike.View
             return tex;
         }
 
-        /// <summary>Greyscale stone blocks in two staggered courses, tiling sideways.</summary>
+        /// <summary>Greyscale stone blocks in two staggered courses, tiling both ways.</summary>
         private static Texture2D StoneBlocks()
         {
             const int w = 64, h = 32;
@@ -188,6 +199,78 @@ namespace ArmyRoguelike.View
                 var mortar = y % (h / 2) == 0 || bx % 32 == 0;
                 var v = mortar ? 0.45f : shade[course * 2 + bx / 32] - (y % (h / 2)) * 0.006f;
                 tex.SetPixel(x, y, new Color(v, v, v, 1f));
+            }
+
+            tex.Apply();
+            return tex;
+        }
+
+        private static Sprite _merlon;
+
+        /// <summary>A small stone block, drawn in greyscale for the palette: lit top, lit left, shaded right.</summary>
+        private static Sprite MerlonTexture()
+        {
+            if (_merlon != null)
+                return _merlon;
+            const int w = 26, h = 34, raise = 20;
+            const float halfW = 12f, halfH = 6f;
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            tex.SetPixels32(new Color32[w * h]);
+            for (var lift = 0; lift <= raise; lift++)
+            {
+                var cy = halfH + 1f + lift;
+                for (var y = 0; y < h; y++)
+                for (var x = 0; x < w; x++)
+                {
+                    if (Mathf.Abs(x + 0.5f - w * 0.5f) / halfW + Mathf.Abs(y + 0.5f - cy) / halfH > 1f)
+                        continue;
+                    var v = lift == raise ? 0.9f : x < w / 2 ? 0.7f : 0.48f;
+                    tex.SetPixel(x, y, new Color(v, v, v, 1f));
+                }
+            }
+
+            tex.Apply();
+            return _merlon = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, (halfH + 1f) / h), PlaceholderArt.PixelsPerUnit);
+        }
+
+        /// <summary>Soft cloud puffs that tile sideways and thin out towards the top.</summary>
+        private static Texture2D CloudTexture()
+        {
+            const int w = 256, h = 128;
+            // Repeats sideways only: wrapping vertically would bleed the dense bottom into the faded top.
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false)
+                { wrapModeU = TextureWrapMode.Repeat, wrapModeV = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            var rng = new System.Random(11);
+            var lattice = new float[64, 64];
+            for (var i = 0; i < 64; i++)
+            for (var j = 0; j < 64; j++)
+                lattice[i, j] = (float)rng.NextDouble();
+
+            // Value noise that wraps horizontally after `cells` lattice cells.
+            float Noise(float x, float y, int cells)
+            {
+                var x0 = Mathf.FloorToInt(x);
+                var y0 = Mathf.FloorToInt(y);
+                var fx = x - x0;
+                var fy = y - y0;
+                fx = fx * fx * (3f - 2f * fx);
+                fy = fy * fy * (3f - 2f * fy);
+                float L(int i, int j) => lattice[((i % cells) + cells) % cells, ((j % 64) + 64) % 64];
+                return Mathf.Lerp(Mathf.Lerp(L(x0, y0), L(x0 + 1, y0), fx), Mathf.Lerp(L(x0, y0 + 1), L(x0 + 1, y0 + 1), fx), fy);
+            }
+
+            for (var y = 0; y < h; y++)
+            for (var x = 0; x < w; x++)
+            {
+                var u = (float)x / w;
+                var v = (float)y / h;
+                var n = Noise(u * 6f, v * 3f, 6) * 0.55f + Noise(u * 12f, v * 6f, 12) * 0.3f + Noise(u * 24f, v * 12f, 24) * 0.15f;
+                var density = n * 0.9f + (1f - v) * 0.85f - 0.75f;
+                // The top rows always fade out, so the band never ends in a hard line.
+                var alpha = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.2f, density)) * Mathf.SmoothStep(1f, 0f, Mathf.InverseLerp(0.6f, 0.95f, v));
+                // Puff tops catch the light; their insides are a little greyer.
+                var lum = Mathf.Lerp(1f, 0.72f, Mathf.Clamp01(density * 1.6f)) * (0.9f + 0.1f * n);
+                tex.SetPixel(x, y, new Color(lum, lum, lum, alpha));
             }
 
             tex.Apply();
