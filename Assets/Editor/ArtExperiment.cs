@@ -13,7 +13,7 @@ using Object = UnityEngine.Object;
 /// <summary>
 /// Art experiment (branch experiment/art-style): turns the AI-generated warrior into sprites (a cut-out
 /// 2D image, and 3D models baked from the board's isometric angle) and renders the same battle with each.
-/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artPalette] [-artPlayerColour] [-artGlow] [-artBraziers] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
+/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artPalette] [-artPlayerColour] [-artNoPedestal] [-artGlow] [-artBraziers] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
 /// </summary>
 public static class ArtExperiment
 {
@@ -153,6 +153,35 @@ public static class ArtExperiment
                 sheet.SetPixels(i % 2 * w, (1 - i / 2) * h, w, h, shots[i].GetPixels());
             sheet.Apply();
             Save(sheet, Path.Combine(outDir, "player_colours.png"));
+            EditorApplication.Exit(0);
+            return;
+        }
+
+        if (args.Contains("-artNoPedestal"))
+        {
+            // The warrior and wolves as now, and redrawn standing on a thin slab instead of a pedestal.
+            var shots = new List<Texture2D>();
+            foreach (var bare in new[] { false, true })
+            {
+                PlaceholderArt.StatueOverrides.Clear();
+                if (bare)
+                {
+                    var warrior = CutOut2D("warrior_nopedestal.png", "warrior_nopedestal");
+                    var wolf = CutOut2D("wolf_nopedestal.png", "wolf_nopedestal");
+                    Override(UnitKind.Warrior, warrior, outDir);
+                    Override(UnitKind.Wolf, wolf, outDir);
+                    Override(UnitKind.PackLeader, wolf, outDir);
+                }
+
+                var path = Path.Combine(outDir, bare ? "pedestal_off.png" : "pedestal_on.png");
+                PreviewCapture.Capture(path, true);
+                var shot = new Texture2D(2, 2);
+                shot.LoadImage(File.ReadAllBytes(path));
+                shots.Add(Downscale(shot.GetPixels(), shot.width, shot.height, 540));
+            }
+
+            PlaceholderArt.StatueOverrides.Clear();
+            Save(SideBySide(shots), Path.Combine(outDir, "pedestal_comparison.png"));
             EditorApplication.Exit(0);
             return;
         }
