@@ -173,11 +173,11 @@ namespace ArmyRoguelike.View
                         // the painting, and one low band passes in front of its walls.
                         var screenTop = centre.y + viewH * 0.5f;
                         var screenBottom = centre.y - viewH * 0.5f;
-                        CloudBand(root, NewMaterial(shader, wispy, ramp), BackCloudOrder, centre.x, viewW, screenTop - 1.9f, 0.7f, 0.8f, 0.0013f, 0.75f);
-                        CloudBand(root, NewMaterial(shader, puffy, ramp), BackCloudOrder + 1, centre.x, viewW, screenTop - 3.4f, 1.1f, 0.88f, 0.003f, 0.85f);
-                        CloudBand(root, NewMaterial(shader, puffy, ramp), BackCloudOrder + 2, centre.x, viewW, screenBottom + 0.4f, 1.6f, 0.95f, 0.0055f, 0.95f);
+                        CloudBand(root, "Far wisps", NewMaterial(shader, wispy, ramp), BackCloudOrder, centre.x, viewW, screenTop - 1.9f, 0.7f, 0.8f, 0.0013f, 0.75f);
+                        CloudBand(root, "Middle (behind tower)", NewMaterial(shader, puffy, ramp), BackCloudOrder + 1, centre.x, viewW, screenTop - 3.4f, 1.1f, 0.88f, 0.003f, 0.85f);
+                        CloudBand(root, "Near (behind tower)", NewMaterial(shader, puffy, ramp), BackCloudOrder + 2, centre.x, viewW, screenBottom + 0.4f, 1.6f, 0.95f, 0.0055f, 0.95f);
                         BuildIsoScene(root, board, scene, NewMaterial(shader, tower, ramp), TowerLayerOrder);
-                        CloudBand(root, NewMaterial(shader, puffy, ramp), FrontCloudOrder, centre.x, viewW, screenBottom - 0.7f, 1.4f, 1f, 0.01f, 1f);
+                        CloudBand(root, "Front band", NewMaterial(shader, puffy, ramp), FrontCloudOrder, centre.x, viewW, screenBottom - 0.7f, 1.4f, 1f, 0.01f, 1f);
                     }
                 }
 
@@ -225,8 +225,8 @@ namespace ArmyRoguelike.View
             var clouds = CloudTexture();
             var bottom = centre.y - viewH * 0.5f;
             // Behind the tower the cloud sea rises around its walls; in front a lower band drifts the other way.
-            CloudBand(root, NewMaterial(shader, clouds, ramp), BackCloudOrder, centre.x, viewW, bottom, 2.2f, 0.85f, 0.006f, 1f);
-            CloudBand(root, NewMaterial(shader, clouds, ramp), FrontCloudOrder, centre.x, viewW, bottom - 0.1f, 1.1f, 1f, 0.01f, 1f);
+            CloudBand(root, "Back clouds", NewMaterial(shader, clouds, ramp), BackCloudOrder, centre.x, viewW, bottom, 2.2f, 0.85f, 0.006f, 1f);
+            CloudBand(root, "Front clouds", NewMaterial(shader, clouds, ramp), FrontCloudOrder, centre.x, viewW, bottom - 0.1f, 1.1f, 1f, 0.01f, 1f);
 
             BuildWalls(root, board, NewMaterial(shader, StoneBlocks(), ramp));
             BuildBattlements(root, board, NewMaterial(shader, MerlonTexture().texture, ramp));
@@ -389,17 +389,13 @@ namespace ArmyRoguelike.View
         /// <summary>A band of drifting cloud across the screen, soft along its top edge.</summary>
         /// <param name="speed">How fast it drifts right, in screen widths per second (roughly).</param>
         /// <param name="alpha">Opacity: far layers are fainter, as if seen through haze.</param>
-        private static void CloudBand(Transform root, Material material, int order, float centreX, float viewW, float bottomY, float height, float value, float speed, float alpha)
+        private static void CloudBand(Transform root, string name, Material material, int order, float centreX, float viewW, float bottomY, float height, float value, float speed, float alpha)
         {
-            var tex = material.mainTexture;
-            var w = viewW * 1.1f;
-            // Keep the strip's own proportions as it repeats along the band.
-            var repeats = w / (height * tex.width / tex.height);
-            // A negative scroll moves the texture to the right, with the wind.
-            material.SetFloat("_Scroll", -speed * repeats);
-            var bl = new Vector2(centreX - w * 0.5f, bottomY);
-            var col = new Color(value, 0f, 0f, alpha);
-            Quad(root, "Clouds", material, order, bl, bl + new Vector2(w, 0f), bl + new Vector2(w, height), bl + new Vector2(0f, height), col, repeats);
+            // All bands live on one component, so they can be tuned in the Inspector while the game runs.
+            var clouds = root.GetComponent<SceneryClouds>();
+            if (clouds == null)
+                clouds = root.gameObject.AddComponent<SceneryClouds>();
+            clouds.Add(name, material, order, centreX, viewW * 1.1f, bottomY, height, value, speed, alpha);
         }
 
         // ---------- Helpers ----------
