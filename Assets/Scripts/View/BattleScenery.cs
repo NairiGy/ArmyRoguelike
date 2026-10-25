@@ -28,11 +28,13 @@ namespace ArmyRoguelike.View
         {
             public string Texture;
             public Vector2 Top, Left, Bottom, Right;
+            // Resources folder with this setting's painted floor slabs (slab_*) and rocks (rock_*), if any.
+            public string ArtFolder;
         }
 
         private static readonly Dictionary<Setting, IsoScene> IsoScenes = new Dictionary<Setting, IsoScene>
         {
-            [Setting.IsoTower] = new IsoScene { Texture = "Backdrops/iso_tower", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380) },
+            [Setting.IsoTower] = new IsoScene { Texture = "Backdrops/iso_tower", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower" },
             [Setting.IsoTemple] = new IsoScene { Texture = "Backdrops/iso_temple", Top = new Vector2(745, 220), Left = new Vector2(355, 430), Bottom = new Vector2(880, 735), Right = new Vector2(1265, 470) },
             [Setting.IsoGraveyard] = new IsoScene { Texture = "Backdrops/iso_graveyard", Top = new Vector2(840, 210), Left = new Vector2(325, 470), Bottom = new Vector2(905, 765), Right = new Vector2(1330, 490) },
         };
@@ -74,6 +76,20 @@ namespace ArmyRoguelike.View
             if (IsoScenes.TryGetValue(setting, out var scene))
             {
                 BuildIsoScene(root, board, scene, NewMaterial(shader, Resources.Load<Texture2D>(scene.Texture), ramp));
+                var art = scene.ArtFolder != null ? Resources.LoadAll<Sprite>(scene.ArtFolder) : new Sprite[0];
+                var slabs = System.Array.FindAll(art, s => s.name.StartsWith("slab_"));
+                var rocks = System.Array.FindAll(art, s => s.name.StartsWith("rock_"));
+                if (slabs.Length > 0)
+                {
+                    // Lifted towards light (sprite colours clamp at 1, so through the haze channel) so the slab
+                    // joints read as the grid; rocks lifted more so they stand out from the floor.
+                    var spriteMaterial = NewMaterial(shader, Texture2D.whiteTexture, ramp);
+                    board.SetTileArt(slabs, spriteMaterial, new Color(1f, 0.25f, 0.9f, 1f));
+                    if (rocks.Length > 0)
+                        board.SetRockArt(rocks, spriteMaterial, new Color(1f, 0.4f, 1f, 1f));
+                    return;
+                }
+
                 // The painting has its own floor: tiles only tint it lightly, so their edges read as a grid.
                 var tint = Color.Lerp(Sample(stops, 0.5f), NeutralGround, 0.45f);
                 tint.a = 0.3f;

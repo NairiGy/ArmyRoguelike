@@ -9,6 +9,10 @@ namespace ArmyRoguelike.View
     {
         private static readonly Color TileColor = new Color(0.56f, 0.52f, 0.44f);
         private Color _rockTint = Color.white;
+        private Sprite[] _rockArt;
+        private Material _rockArtMaterial;
+        private Color _rockArtColor;
+        private Material _spriteMaterial;
 
         private readonly Dictionary<GridPos, SpriteRenderer> _tiles = new Dictionary<GridPos, SpriteRenderer>();
         private readonly Dictionary<GridPos, SpriteRenderer> _highlights = new Dictionary<GridPos, SpriteRenderer>();
@@ -139,11 +143,36 @@ namespace ArmyRoguelike.View
             var rock = new GameObject($"Rock {p}").AddComponent<SpriteRenderer>();
             rock.transform.SetParent(transform, false);
             rock.transform.position = IsoMath.GridToWorld(p);
-            rock.sprite = PlaceholderArt.Rock;
-            rock.color = _rockTint;
+            if (_spriteMaterial == null)
+                _spriteMaterial = rock.sharedMaterial;
             rock.sortingOrder = IsoMath.SortingOrder(p) + 5;
             _rocks[p] = rock;
+            StyleRock(p, rock);
         }
+
+        /// <summary>
+        /// Plain rocks use the scenery's painted rocks when it has them; ice walls and barricades keep the
+        /// tinted block so they stay recognisable.
+        /// </summary>
+        private void StyleRock(GridPos p, SpriteRenderer rock)
+        {
+            var ice = Battle.Ice.ContainsKey(p);
+            var barricade = Battle.IsBarricade(p);
+            if (!ice && !barricade && _rockArt != null && _rockArt.Length > 0)
+            {
+                rock.sprite = _rockArt[Variant(p, _rockArt.Length)];
+                rock.sharedMaterial = _rockArtMaterial;
+                rock.color = _rockArtColor;
+                return;
+            }
+
+            rock.sprite = PlaceholderArt.Rock;
+            rock.sharedMaterial = _spriteMaterial;
+            rock.color = ice ? IceTint : barricade ? BarricadeTint : _rockTint;
+        }
+
+        /// <summary>A stable pseudo-random pick per tile, so the board looks the same every frame.</summary>
+        private static int Variant(GridPos p, int count) => Mathf.Abs((p.X * 73856093) ^ (p.Y * 19349663)) % count;
 
         /// <summary>
         /// Makes rocks, ice walls, barricades and burning ground match the rules: ice is pale blue,
@@ -156,7 +185,7 @@ namespace ArmyRoguelike.View
                 if (Battle.Board.IsObstacle(p))
                 {
                     AddRock(p);
-                    _rocks[p].color = Battle.Ice.ContainsKey(p) ? IceTint : Battle.IsBarricade(p) ? BarricadeTint : _rockTint;
+                    StyleRock(p, _rocks[p]);
                 }
                 else if (_rocks.TryGetValue(p, out var rock))
                 {
@@ -227,6 +256,27 @@ namespace ArmyRoguelike.View
         {
             foreach (var tile in _tiles.Values)
                 tile.color = color;
+        }
+
+        /// <summary>Replaces the plain tiles with painted slabs (picked per tile) drawn with the scenery's material.</summary>
+        public void SetTileArt(Sprite[] slabs, Material material, Color color)
+        {
+            foreach (var kv in _tiles)
+            {
+                kv.Value.sprite = slabs[Variant(kv.Key, slabs.Length)];
+                kv.Value.flipX = Variant(new GridPos(kv.Key.Y, kv.Key.X), 2) == 1;
+                kv.Value.sharedMaterial = material;
+                kv.Value.color = color;
+            }
+        }
+
+        /// <summary>Plain rocks become the scenery's painted rocks (picked per tile), drawn with its material.</summary>
+        public void SetRockArt(Sprite[] rocks, Material material, Color color)
+        {
+            _rockArt = rocks;
+            _rockArtMaterial = material;
+            _rockArtColor = color;
+            SyncTiles();
         }
 
         /// <summary>Recolours plain rocks (not ice or barricades) to suit the scenery palette.</summary>

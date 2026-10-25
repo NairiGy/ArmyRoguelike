@@ -42,6 +42,7 @@ public static class ArtExperiment
             // The battle as it looks in the game, in every setting and palette, plus one overview sheet:
             // a row per setting, a column per palette.
             ImportStatues();
+            ImportTowerArt();
             var rows = new List<List<Texture2D>>();
             foreach (BattleScenery.Setting setting in Enum.GetValues(typeof(BattleScenery.Setting)))
             {
@@ -158,26 +159,170 @@ public static class ArtExperiment
             if (!Enum.TryParse<UnitKind>(unit, true, out var kind))
                 continue;
             var (_, tex, pivot, ppu) = CutOut2D(Path.GetFileName(file), unit);
-            var path = StatueFolder + kind + ".png";
-            File.WriteAllBytes(path, tex.EncodeToPNG());
-            AssetDatabase.ImportAsset(path);
-            var importer = (TextureImporter)AssetImporter.GetAtPath(path);
-            importer.textureType = TextureImporterType.Sprite;
-            importer.spriteImportMode = SpriteImportMode.Single;
-            importer.alphaIsTransparency = true;
-            importer.mipmapEnabled = true;
-            importer.filterMode = FilterMode.Trilinear;
-            importer.textureCompression = TextureImporterCompression.Uncompressed;
-            var settings = new TextureImporterSettings();
-            importer.ReadTextureSettings(settings);
-            settings.spriteAlignment = (int)SpriteAlignment.Custom;
-            settings.spritePivot = pivot;
-            settings.spritePixelsPerUnit = ppu;
-            settings.spriteMeshType = SpriteMeshType.FullRect;
-            importer.SetTextureSettings(settings);
-            importer.SaveAndReimport();
+            SaveSprite(StatueFolder + kind + ".png", tex, pivot, ppu);
             Debug.Log($"Imported statue {kind} from {file}");
         }
+    }
+
+    private const string TowerFolder = "Assets/Art/Environment/Resources/Tower/";
+    // Rocks are scaled so their width is this much of a tile.
+    private const float RockWidth = 0.9f;
+
+    /// <summary>
+    /// The tower roof's painted pieces: the three obstacles on green (Source/tower_rocks_sheet.png) become
+    /// rock_0..2, and the four top-down slabs (Source/tower_floor_slabs.png) become isometric tiles slab_0..3.
+    /// </summary>
+    [MenuItem("Tools/Art/Import Tower Art")]
+    public static void ImportTowerArt()
+    {
+        Directory.CreateDirectory(TowerFolder);
+        var sheet = LoadSource("tower_rocks_sheet.png");
+        var i = 0;
+        foreach (var (tex, pivot, widthPx) in KeyOutGreen(sheet))
+            SaveSprite(TowerFolder + $"rock_{i++}.png", tex, pivot, widthPx / RockWidth);
+
+        var slabs = LoadSource("tower_floor_slabs.png");
+        for (var q = 0; q < 4; q++)
+        {
+            // Quadrants in reading order; texture rows start at the bottom.
+            var half = slabs.width / 2;
+            var square = TrimDark(slabs.GetPixels(q % 2 * half, (1 - q / 2) * half, half, half), half);
+            SaveSprite(TowerFolder + $"slab_{q}.png", IsoTile(square), new Vector2(0.5f, 0.5f), IsoTileWidth);
+        }
+    }
+
+    private static Texture2D LoadSource(string file)
+    {
+        var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+        tex.LoadImage(File.ReadAllBytes(Source + file));
+        return tex;
+    }
+
+    /// <summary>
+    /// Removes a pure green background and returns each object (they stand in one row with gaps), with
+    /// its pivot at the centre of its footprint and its width in pixels.
+    /// </summary>
+    private static List<(Texture2D tex, Vector2 pivot, float widthPx)> KeyOutGreen(Texture2D sheet)
+    {
+        var w = sheet.width;
+        var h = sheet.height;
+        var px = sheet.GetPixels();
+        var column = new bool[w];
+        for (var j = 0; j < px.Length; j++)
+        {
+            var c = px[j];
+            var greenness = c.g - Mathf.Max(c.r, c.b);
+            if (greenness > 0.25f)
+                px[j] = Color.clear;
+            else
+            {
+                // Edge pixels pick up green from the background: soften and de-tint them.
+                if (greenness > 0.08f)
+                    px[j].a = 1f - (greenness - 0.08f) / 0.17f;
+                px[j].g = Mathf.Min(c.g, Mathf.Max(c.r, c.b));
+                if (px[j].a > 0.5f)
+                    column[j % w] = true;
+            }
+        }
+
+        var result = new List<(Texture2D, Vector2, float)>();
+        for (var x0 = 0; x0 < w; x0++)
+        {
+            if (!column[x0])
+                continue;
+            var x1 = x0;
+            while (x1 + 1 < w && column[x1 + 1])
+                x1++;
+            if (x1 - x0 > 40)
+            {
+                int minY = h, maxY = 0;
+                for (var y = 0; y < h; y++)
+                for (var x = x0; x <= x1; x++)
+                    if (px[y * w + x].a > 0.5f)
+                    {
+                        minY = Mathf.Min(minY, y);
+                        maxY = Mathf.Max(maxY, y);
+                    }
+
+                var cw = x1 - x0 + 1;
+                var ch = maxY - minY + 1;
+                var crop = new Color[cw * ch];
+                for (var y = 0; y < ch; y++)
+                    Array.Copy(px, (y + minY) * w + x0, crop, y * cw, cw);
+                var tex = Downscale(crop, cw, ch, Mathf.Min(ch, SpriteHeightPx));
+                // An isometric footprint is half as tall as it is wide; its centre is a quarter-width up.
+                var pivot = new Vector2(0.5f, Mathf.Min(0.45f, cw * 0.25f / ch));
+                result.Add((tex, pivot, cw * (float)tex.height / ch));
+            }
+
+            x0 = x1;
+        }
+
+        return result;
+    }
+
+    /// <summary>Crops away the dark gap lines around a slab cut from the 2x2 sheet.</summary>
+    private static Color[] TrimDark(Color[] square, int size)
+    {
+        bool Dark(int x, int y) => square[y * size + x].grayscale < 0.12f;
+        int lo = 0, hi = size - 1;
+        while (lo < size / 4 && (Dark(lo, size / 2) || Dark(size / 2, lo)))
+            lo++;
+        while (hi > size * 3 / 4 && (Dark(hi, size / 2) || Dark(size / 2, hi)))
+            hi--;
+        var n = hi - lo + 1;
+        var trimmed = new Color[n * n];
+        for (var y = 0; y < n; y++)
+            Array.Copy(square, (y + lo) * size + lo, trimmed, y * n, n);
+        return trimmed;
+    }
+
+    private const int IsoTileWidth = 256;
+
+    /// <summary>Lays a square, top-down texture onto a 2:1 isometric diamond the width of one tile.</summary>
+    private static Texture2D IsoTile(Color[] square)
+    {
+        var n = (int)Mathf.Sqrt(square.Length);
+        var src = new Texture2D(n, n, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+        src.SetPixels(square);
+        src.Apply();
+        const int w = IsoTileWidth, h = IsoTileWidth / 2;
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        for (var y = 0; y < h; y++)
+        for (var x = 0; x < w; x++)
+        {
+            // Screen offset from the centre, in half-tile units, back to the square's (u, v).
+            var a = (x + 0.5f - w * 0.5f) / (w * 0.5f);
+            var b = (y + 0.5f - h * 0.5f) / (h * 0.5f);
+            var u = (a + b + 1f) * 0.5f;
+            var v = (b - a + 1f) * 0.5f;
+            var inside = u >= 0f && u <= 1f && v >= 0f && v <= 1f;
+            tex.SetPixel(x, y, inside ? src.GetPixelBilinear(u, v) : Color.clear);
+        }
+
+        tex.Apply();
+        return tex;
+    }
+
+    private static void SaveSprite(string path, Texture2D tex, Vector2 pivot, float ppu)
+    {
+        File.WriteAllBytes(path, tex.EncodeToPNG());
+        AssetDatabase.ImportAsset(path);
+        var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+        importer.textureType = TextureImporterType.Sprite;
+        importer.spriteImportMode = SpriteImportMode.Single;
+        importer.alphaIsTransparency = true;
+        importer.mipmapEnabled = true;
+        importer.filterMode = FilterMode.Trilinear;
+        importer.textureCompression = TextureImporterCompression.Uncompressed;
+        var settings = new TextureImporterSettings();
+        importer.ReadTextureSettings(settings);
+        settings.spriteAlignment = (int)SpriteAlignment.Custom;
+        settings.spritePivot = pivot;
+        settings.spritePixelsPerUnit = ppu;
+        settings.spriteMeshType = SpriteMeshType.FullRect;
+        importer.SetTextureSettings(settings);
+        importer.SaveAndReimport();
     }
 
     private static void Override(UnitKind kind, (string name, Texture2D tex, Vector2 pivot, float ppu) art, string outDir)
