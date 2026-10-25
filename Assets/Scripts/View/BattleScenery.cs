@@ -85,8 +85,11 @@ namespace ArmyRoguelike.View
                     // joints read as the grid; rocks lifted more so they stand out from the floor.
                     var spriteMaterial = NewMaterial(shader, Texture2D.whiteTexture, ramp);
                     board.SetTileArt(slabs, spriteMaterial, new Color(1f, 0.25f, 0.9f, 1f));
+                    var line = Sample(stops, 0.85f);
+                    line.a = 0.35f;
+                    board.SetGridLines(line);
                     if (rocks.Length > 0)
-                        board.SetRockArt(rocks, spriteMaterial, new Color(1f, 0.4f, 1f, 1f));
+                        board.SetRockArt(rocks, spriteMaterial, new Color(1f, 0.55f, 1f, 1f));
                     return;
                 }
 

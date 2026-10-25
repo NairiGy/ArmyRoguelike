@@ -158,7 +158,22 @@ namespace ArmyRoguelike.View
         {
             var ice = Battle.Ice.ContainsKey(p);
             var barricade = Battle.IsBarricade(p);
-            if (!ice && !barricade && _rockArt != null && _rockArt.Length > 0)
+            var painted = !ice && !barricade && _rockArt != null && _rockArt.Length > 0;
+            // Painted rocks get a soft shadow so they sit on the floor instead of blending into it.
+            var shadow = rock.transform.Find("Shadow")?.GetComponent<SpriteRenderer>();
+            if (painted && shadow == null)
+            {
+                shadow = new GameObject("Shadow").AddComponent<SpriteRenderer>();
+                shadow.transform.SetParent(rock.transform, false);
+                shadow.transform.localScale = Vector3.one * 0.95f;
+                shadow.sprite = PlaceholderArt.SoftShadow;
+                shadow.color = new Color(0f, 0f, 0f, 0.55f);
+                shadow.sortingOrder = rock.sortingOrder - 1;
+            }
+
+            if (shadow != null)
+                shadow.enabled = painted;
+            if (painted)
             {
                 rock.sprite = _rockArt[Variant(p, _rockArt.Length)];
                 rock.sharedMaterial = _rockArtMaterial;
@@ -267,6 +282,21 @@ namespace ArmyRoguelike.View
                 kv.Value.flipX = Variant(new GridPos(kv.Key.Y, kv.Key.X), 2) == 1;
                 kv.Value.sharedMaterial = material;
                 kv.Value.color = color;
+            }
+        }
+
+        /// <summary>Draws a thin outline round every tile, so the grid reads on a painted floor.</summary>
+        public void SetGridLines(Color color)
+        {
+            foreach (var kv in _tiles)
+            {
+                var line = new GameObject($"Grid {kv.Key}").AddComponent<SpriteRenderer>();
+                line.transform.SetParent(transform, false);
+                line.transform.position = kv.Value.transform.position;
+                line.sprite = PlaceholderArt.GridLine;
+                line.color = color;
+                // Over the tile, burning ground and highlights' edges, under everything standing on the board.
+                line.sortingOrder = kv.Value.sortingOrder + 3;
             }
         }
 

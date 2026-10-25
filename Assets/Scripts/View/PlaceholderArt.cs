@@ -25,6 +25,15 @@ namespace ArmyRoguelike.View
 
         public static Sprite Rock => _rock != null ? _rock : _rock = MakeRock();
 
+        private static Sprite _gridLine;
+        private static Sprite _softShadow;
+
+        /// <summary>A thin white outline of one tile, for drawing the grid over painted floors.</summary>
+        public static Sprite GridLine => _gridLine != null ? _gridLine : _gridLine = MakeGridLine();
+
+        /// <summary>A soft dark oval the width of a tile, for grounding things that stand on the board.</summary>
+        public static Sprite SoftShadow => _softShadow != null ? _softShadow : _softShadow = MakeSoftShadow();
+
         /// <summary>A single white pixel, for bars and lines.</summary>
         public static Sprite Pixel
         {
@@ -165,6 +174,42 @@ namespace ArmyRoguelike.View
 
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), PixelsPerUnit);
+        }
+
+        private static Sprite MakeGridLine()
+        {
+            const int w = 128, h = 64;
+            var tex = NewTexture(w, h);
+            tex.filterMode = FilterMode.Bilinear;
+            for (var y = 0; y < h; y++)
+            for (var x = 0; x < w; x++)
+            {
+                // Distance to the diamond's edge in pixels (measured vertically), faded over about 1.5 px.
+                var d = (1f - (Mathf.Abs(x + 0.5f - w * 0.5f) / (w * 0.5f) + Mathf.Abs(y + 0.5f - h * 0.5f) / (h * 0.5f))) * h * 0.5f;
+                var a = d < 0f ? 0f : 1f - Mathf.Clamp01((d - 0.5f) / 1.5f);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+            }
+
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), w);
+        }
+
+        private static Sprite MakeSoftShadow()
+        {
+            const int w = 64, h = 32;
+            var tex = NewTexture(w, h);
+            tex.filterMode = FilterMode.Bilinear;
+            for (var y = 0; y < h; y++)
+            for (var x = 0; x < w; x++)
+            {
+                var dx = (x + 0.5f - w * 0.5f) / (w * 0.5f);
+                var dy = (y + 0.5f - h * 0.5f) / (h * 0.5f);
+                var r = Mathf.Sqrt(dx * dx + dy * dy);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, Mathf.Clamp01(1f - r) * Mathf.Clamp01(1f - r) * 1.6f));
+            }
+
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), w);
         }
 
         private static Sprite MakeRock()
