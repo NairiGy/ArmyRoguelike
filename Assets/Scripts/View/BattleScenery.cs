@@ -23,6 +23,43 @@ namespace ArmyRoguelike.View
         public const Setting MainSetting = Setting.IsoTower;
         public const int MainPalette = 2;
 
+        /// <summary>Palette test: colour painted statues through their team's ramp of the current palette.</summary>
+        public static bool StatueRamps;
+
+        // Per palette, the ramps statues are drawn with: the player's warm, light stone and the enemy's
+        // dark, cool stone, so the teams stay apart in every palette.
+        private static readonly string[][] PlayerRamps =
+        {
+            new[] { "#2a1a12", "#6b4a2e", "#b08850", "#e8c88a", "#fff0c8" },
+            new[] { "#2a2620", "#6a6048", "#b0a478", "#e2d8b0", "#fbf6e0" },
+            new[] { "#2a2030", "#6a5060", "#b08a80", "#e6c0a0", "#fff0d8" },
+        };
+
+        private static readonly string[][] EnemyRamps =
+        {
+            new[] { "#1a1212", "#3a2a28", "#5c4a44", "#8a7468", "#b8a490" },
+            new[] { "#14181c", "#2a3434", "#465652", "#6a8278", "#98b0a0" },
+            new[] { "#10141e", "#222e40", "#3a4a60", "#5e7290", "#90a4c0" },
+        };
+
+        /// <summary>
+        /// Palette test: every colour of a palette (scenery, both teams' stone, and the health-bar colours),
+        /// for snapping the whole screen to it.
+        /// </summary>
+        public static Color[] ScreenPalette(int palette)
+        {
+            var p = ((palette % Palettes.Length) + Palettes.Length) % Palettes.Length;
+            var colours = new List<Color>();
+            colours.AddRange(ParseStops(Palettes[p]));
+            colours.AddRange(ParseStops(PlayerRamps[p]));
+            colours.AddRange(ParseStops(EnemyRamps[p]));
+            colours.Add(new Color(0.35f, 0.8f, 0.4f));
+            colours.Add(new Color(0.85f, 0.3f, 0.25f));
+            colours.Add(new Color(0.1f, 0.1f, 0.12f));
+            colours.Add(new Color(0.97f, 0.95f, 0.9f));
+            return colours.ToArray();
+        }
+
         /// <summary>Opacity of the tile outlines on painted floors; 0 draws none.</summary>
         public static float GridAlpha = 0f;
 
@@ -65,11 +102,25 @@ namespace ArmyRoguelike.View
         /// <summary>Builds the scenery for a framed board. Call after the camera has been framed.</summary>
         public static void Apply(Camera cam, BoardView board, int palette, bool pixelateBackdrop = false, Setting setting = Setting.TowerSky)
         {
-            var stops = ParseStops(Palettes[((palette % Palettes.Length) + Palettes.Length) % Palettes.Length]);
+            var p = ((palette % Palettes.Length) + Palettes.Length) % Palettes.Length;
+            var stops = ParseStops(Palettes[p]);
             var shader = Resources.Load<Shader>("Shaders/PaletteRamp");
             if (shader == null)
                 return;
             var ramp = MakeRamp(stops);
+
+            var statueShader = Resources.Load<Shader>("Shaders/StatueRamp");
+            if (StatueRamps && statueShader != null)
+            {
+                // The art's own brightness range: sandstone is light, basalt dark; each fills its whole ramp.
+                var player = NewMaterial(statueShader, Texture2D.whiteTexture, MakeRamp(ParseStops(PlayerRamps[p])));
+                player.SetFloat("_LumMin", 0.3f);
+                player.SetFloat("_LumMax", 0.95f);
+                var enemy = NewMaterial(statueShader, Texture2D.whiteTexture, MakeRamp(ParseStops(EnemyRamps[p])));
+                enemy.SetFloat("_LumMin", 0.1f);
+                enemy.SetFloat("_LumMax", 0.5f);
+                board.SetStatueMaterials(player, enemy);
+            }
             var root = new GameObject("Scenery").transform;
             root.SetParent(board.transform, false);
             cam.backgroundColor = stops[0];

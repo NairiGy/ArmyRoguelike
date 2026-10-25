@@ -286,6 +286,13 @@ namespace ArmyRoguelike.View
             ApplyColor();
         }
 
+        /// <summary>Draws a painted statue with a scenery material (e.g. its team's palette ramp). Placeholders are left alone.</summary>
+        public void SetStatueMaterial(Material material)
+        {
+            if (material != null && PlaceholderArt.IsPainted(Unit.Stats.Kind))
+                _body.sharedMaterial = material;
+        }
+
         private void ApplyColor()
         {
             var c = _baseColor * _tint;

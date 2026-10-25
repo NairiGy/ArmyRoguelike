@@ -243,7 +243,7 @@ namespace ArmyRoguelike.View
                 if (!unit.IsPlaced)
                     continue;
                 if (!_units.TryGetValue(unit, out var view))
-                    _units[unit] = view = UnitView.Create(unit, transform);
+                    _units[unit] = view = NewView(unit);
                 if (!unit.IsAlive && !unit.IsRemains)
                     continue;
                 view.SetGridPosition(unit.Pos);
@@ -261,9 +261,28 @@ namespace ArmyRoguelike.View
         public UnitView AddView(Unit unit)
         {
             if (!_units.TryGetValue(unit, out var view))
-                _units[unit] = view = UnitView.Create(unit, transform);
+                _units[unit] = view = NewView(unit);
             view.SetGridPosition(unit.Pos);
             return view;
+        }
+
+        private Material _playerStatueMaterial;
+        private Material _enemyStatueMaterial;
+
+        private UnitView NewView(Unit unit)
+        {
+            var view = UnitView.Create(unit, transform);
+            view.SetStatueMaterial(unit.Team == Team.Player ? _playerStatueMaterial : _enemyStatueMaterial);
+            return view;
+        }
+
+        /// <summary>Draws painted statues with these materials (per team), now and for units that appear later.</summary>
+        public void SetStatueMaterials(Material player, Material enemy)
+        {
+            _playerStatueMaterial = player;
+            _enemyStatueMaterial = enemy;
+            foreach (var kv in _units)
+                kv.Value.SetStatueMaterial(kv.Key.Team == Team.Player ? player : enemy);
         }
 
         /// <summary>Recolours the ground to suit the battle's scenery palette.</summary>

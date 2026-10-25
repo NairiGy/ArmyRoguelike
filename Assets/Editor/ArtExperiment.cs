@@ -13,7 +13,7 @@ using Object = UnityEngine.Object;
 /// <summary>
 /// Art experiment (branch experiment/art-style): turns the AI-generated warrior into sprites (a cut-out
 /// 2D image, and 3D models baked from the board's isometric angle) and renders the same battle with each.
-/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
+/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artPalette] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
 /// </summary>
 public static class ArtExperiment
 {
@@ -80,6 +80,52 @@ public static class ArtExperiment
         {
             ImportStatues();
             ImportTowerArt();
+            EditorApplication.Exit(0);
+            return;
+        }
+
+        if (args.Contains("-artPalette"))
+        {
+            // Rows: night, then amber dusk. Columns: as now, statues through team ramps (a), and the whole
+            // screen snapped to one small palette (b).
+            var rows = new List<List<Texture2D>>();
+            foreach (var palette in new[] { 2, 0 })
+            {
+                var row = new List<Texture2D>();
+                foreach (var ramps in new[] { false, true })
+                {
+                    BattleScenery.StatueRamps = ramps;
+                    var path = Path.Combine(outDir, $"palette_{palette}_{(ramps ? "a_ramps" : "now")}.png");
+                    PreviewCapture.Capture(path, true, 0, palette);
+                    var shot = new Texture2D(2, 2);
+                    shot.LoadImage(File.ReadAllBytes(path));
+                    row.Add(Downscale(shot.GetPixels(), shot.width, shot.height, 360));
+                    if (ramps)
+                        continue;
+                    var snapped = SnapToPalette(shot, BattleScenery.ScreenPalette(palette));
+                    Save(snapped, Path.Combine(outDir, $"palette_{palette}_b_snapped.png"));
+                    row.Add(null);
+                    row[row.Count - 1] = Downscale(snapped.GetPixels(), snapped.width, snapped.height, 360);
+                }
+
+                // Order the columns: now, (a), (b).
+                rows.Add(new List<Texture2D> { row[0], row[2], row[1] });
+            }
+
+            BattleScenery.StatueRamps = false;
+            var sheet = new Texture2D(rows[0].Sum(t => t.width), rows.Count * rows[0][0].height, TextureFormat.RGB24, false);
+            for (var r = 0; r < rows.Count; r++)
+            {
+                var x = 0;
+                foreach (var t in rows[r])
+                {
+                    sheet.SetPixels(x, sheet.height - (r + 1) * t.height, t.width, t.height, t.GetPixels());
+                    x += t.width;
+                }
+            }
+
+            sheet.Apply();
+            Save(sheet, Path.Combine(outDir, "palette_comparison.png"));
             EditorApplication.Exit(0);
             return;
         }
@@ -624,4 +670,33 @@ public static class ArtExperiment
     }
 
     private static void Save(Texture2D tex, string path) => File.WriteAllBytes(path, tex.EncodeToPNG());
+
+    /// <summary>Replaces every pixel with the nearest palette colour (weighted RGB distance), no dithering.</summary>
+    private static Texture2D SnapToPalette(Texture2D src, Color[] palette)
+    {
+        var px = src.GetPixels();
+        for (var i = 0; i < px.Length; i++)
+        {
+            var c = px[i];
+            var best = palette[0];
+            var bestD = float.MaxValue;
+            foreach (var p in palette)
+            {
+                float dr = c.r - p.r, dg = c.g - p.g, db = c.b - p.b;
+                var d = 0.3f * dr * dr + 0.59f * dg * dg + 0.11f * db * db;
+                if (d < bestD)
+                {
+                    bestD = d;
+                    best = p;
+                }
+            }
+
+            px[i] = best;
+        }
+
+        var tex = new Texture2D(src.width, src.height, TextureFormat.RGB24, false);
+        tex.SetPixels(px);
+        tex.Apply();
+        return tex;
+    }
 }
