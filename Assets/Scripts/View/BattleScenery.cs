@@ -158,28 +158,28 @@ namespace ArmyRoguelike.View
 
             if (IsoScenes.TryGetValue(setting, out var scene))
             {
-                var sceneMaterial = NewMaterial(shader, Resources.Load<Texture2D>(scene.Texture), ramp);
-                BuildIsoScene(root, board, scene, sceneMaterial);
-                if (scene.Clouds)
+                var tower = scene.TowerLayer != null ? Resources.Load<Texture2D>(scene.TowerLayer) : null;
+                var sky = Resources.Load<Texture2D>("Backdrops/sky_panorama");
+                var puffy = Resources.Load<Texture2D>("Backdrops/cloud_puffy");
+                var wispy = Resources.Load<Texture2D>("Backdrops/cloud_wispy");
+                if (scene.Clouds && tower != null && sky != null && puffy != null && wispy != null)
                 {
-                    SceneryMotes.Create(root, centre, viewW, viewH, Sample(stops, 0.95f));
-                    var tower = Resources.Load<Texture2D>(scene.TowerLayer);
-                    var puffy = Resources.Load<Texture2D>("Backdrops/cloud_puffy");
-                    var wispy = Resources.Load<Texture2D>("Backdrops/cloud_wispy");
-                    if (tower != null && puffy != null && wispy != null)
-                    {
-                        // Parallax: cloud layers slide right with one wind, the farther (higher, fainter,
-                        // smaller) the slower. Three pass behind the tower, which sits on its own layer over
-                        // the painting, and one low band passes in front of its walls.
-                        var screenTop = centre.y + viewH * 0.5f;
-                        var screenBottom = centre.y - viewH * 0.5f;
-                        CloudBand(root, "Far wisps", NewMaterial(shader, wispy, ramp), BackCloudOrder, centre.x, viewW, screenTop - 1.9f, 0.7f, 0.8f, 0.0013f, 0.75f);
-                        CloudBand(root, "Middle (behind tower)", NewMaterial(shader, puffy, ramp), BackCloudOrder + 1, centre.x, viewW, screenTop - 3.4f, 1.1f, 0.88f, 0.003f, 0.85f);
-                        CloudBand(root, "Near (behind tower)", NewMaterial(shader, puffy, ramp), BackCloudOrder + 2, centre.x, viewW, screenBottom + 0.4f, 1.6f, 0.95f, 0.0055f, 0.95f);
-                        BuildIsoScene(root, board, scene, NewMaterial(shader, tower, ramp), TowerLayerOrder);
-                        CloudBand(root, "Front band", NewMaterial(shader, puffy, ramp), FrontCloudOrder, centre.x, viewW, screenBottom - 0.7f, 1.4f, 1f, 0.01f, 1f);
-                    }
+                    // Everything in the sky moves. Parallax: a seamless sky panorama and cloud layers slide right
+                    // with one wind, the farther (higher, fainter, smaller) the slower; all of them pass behind
+                    // the tower, which is on its own layer.
+                    var screenTop = centre.y + viewH * 0.5f;
+                    var screenBottom = centre.y - viewH * 0.5f;
+                    CloudBand(root, "Sky panorama", NewMaterial(shader, sky, ramp), BackdropOrder, centre.x, viewW, screenBottom - 0.3f, viewH + 0.6f, 1f, 0.0004f, 1f);
+                    CloudBand(root, "Far wisps", NewMaterial(shader, wispy, ramp), BackCloudOrder, centre.x, viewW, screenTop - 1.9f, 0.7f, 0.8f, 0.0013f, 0.75f);
+                    CloudBand(root, "Middle (behind tower)", NewMaterial(shader, puffy, ramp), BackCloudOrder + 1, centre.x, viewW, screenTop - 3.4f, 1.1f, 0.88f, 0.003f, 0.85f);
+                    CloudBand(root, "Near (behind tower)", NewMaterial(shader, puffy, ramp), BackCloudOrder + 2, centre.x, viewW, screenBottom + 0.4f, 1.6f, 0.95f, 0.0055f, 0.95f);
+                    BuildIsoScene(root, board, scene, NewMaterial(shader, tower, ramp), TowerLayerOrder);
                 }
+                else
+                    BuildIsoScene(root, board, scene, NewMaterial(shader, Resources.Load<Texture2D>(scene.Texture), ramp));
+
+                if (scene.Clouds)
+                    SceneryMotes.Create(root, centre, viewW, viewH, Sample(stops, 0.95f));
 
                 var art = scene.ArtFolder != null ? Resources.LoadAll<Sprite>(scene.ArtFolder) : new Sprite[0];
                 var slabs = System.Array.FindAll(art, s => s.name.StartsWith("slab_"));

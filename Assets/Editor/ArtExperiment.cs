@@ -367,6 +367,9 @@ public static class ArtExperiment
             SaveTexture(backdrops + "iso_tower_layer.png", layer, false);
         }
 
+        if (File.Exists(Source + "sky_panorama.png"))
+            SaveTexture(backdrops + "sky_panorama.png", SeamlessStrip(LoadSource("sky_panorama.png")), true);
+
         foreach (var band in new[] { "puffy", "wispy" })
             if (File.Exists(Source + $"clouds_band_{band}.png"))
                 SaveTexture(backdrops + $"cloud_{band}.png", SeamlessStrip(LoadSource($"clouds_band_{band}.png")), true);
