@@ -125,8 +125,6 @@ namespace ArmyRoguelike.View
             if (shader == null)
                 return;
             var ramp = MakeRamp(stops);
-            // Cloud shadows are on only for settings with clouds (set below).
-            Shader.SetGlobalFloat("_CloudShadow", 0f);
 
             var statueShader = Resources.Load<Shader>("Shaders/StatueRamp");
             if (StatueRamps && statueShader != null)
@@ -158,12 +156,9 @@ namespace ArmyRoguelike.View
             if (IsoScenes.TryGetValue(setting, out var scene))
             {
                 var sceneMaterial = NewMaterial(shader, Resources.Load<Texture2D>(scene.Texture), ramp);
-                sceneMaterial.SetFloat("_Shadowed", 1f);
                 BuildIsoScene(root, board, scene, sceneMaterial);
-                Shader.SetGlobalFloat("_CloudShadow", scene.Clouds ? 0.55f : 0f);
                 if (scene.Clouds)
                 {
-                    sceneMaterial.SetFloat("_Flow", 0.03f);
                     SceneryMotes.Create(root, centre, viewW, viewH, Sample(stops, 0.95f));
                     var wisps = CloudTexture();
                     var screenBottom = centre.y - viewH * 0.5f;
@@ -181,7 +176,6 @@ namespace ArmyRoguelike.View
                     // Lifted towards light (sprite colours clamp at 1, so through the haze channel) so the slab
                     // joints read as the grid; rocks lifted more so they stand out from the floor.
                     var spriteMaterial = NewMaterial(shader, Texture2D.whiteTexture, ramp);
-                    spriteMaterial.SetFloat("_Shadowed", 1f);
                     board.SetTileArt(slabs, spriteMaterial, new Color(1f, 0.25f, 0.9f, 1f));
                     var line = Sample(stops, 0.85f);
                     line.a = GridAlpha;

@@ -1,6 +1,6 @@
 // Painted statues coloured by the scenery palette: the sprite's brightness, stretched from
-// _LumMin.._LumMax to 0..1, picks a colour from the team's ramp. Drifting cloud shadows darken it,
-// and a thin rim of moonlight catches the edges that face the light (up-left). The sprite colour
+// _LumMin.._LumMax to 0..1, picks a colour from the team's ramp. A thin pulsing rim (team glow or
+// moonlight) catches the edges that face the light (up-left). The sprite colour
 // still multiplies the result, so hit flashes, dimming and other tints keep working.
 Shader "ArmyRoguelike/StatueRamp"
 {
@@ -56,7 +56,6 @@ Shader "ArmyRoguelike/StatueRamp"
                 rgb = LinearToGammaSpace(rgb);
                 #endif
                 float value = saturate((luma(rgb) - _LumMin) / max(_LumMax - _LumMin, 0.01));
-                value *= 1 - cloudShadow(i.wpos);
                 float3 col = tex2D(_Ramp, float2(value, 0.5)).rgb;
 
                 // An edge lit by the moon: this pixel is solid but the one a few texels up-left is empty.
@@ -64,7 +63,7 @@ Shader "ArmyRoguelike/StatueRamp"
                 float rim = c.a * (1 - tex2D(_MainTex, i.uv + towardLight).a);
                 // A slow pulse, out of step from statue to statue (by position).
                 rim *= 0.7 + 0.3 * sin(_Time.y * 2.2 + (i.wpos.x + i.wpos.y) * 2);
-                col = lerp(col, _RimColor.rgb, rim * _RimColor.a * (1 - cloudShadow(i.wpos)));
+                col = lerp(col, _RimColor.rgb, rim * _RimColor.a);
                 return float4(col, c.a) * i.color;
             }
             ENDCG
