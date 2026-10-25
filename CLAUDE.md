@@ -48,25 +48,13 @@ A single-player roguelike army-builder. You lead a small squad of living statues
 
 ## Working across chats
 
-The game is worked on in several chats, one per big topic, so no chat gets overloaded:
+The game is worked on in several chats, one per big topic (visuals and art, gameplay and mechanics, and later sound, marketing and others), so no chat gets overloaded. The user starts each chat and coordinates them; there is no master chat.
 
-- **Master chat:** plans and organises. It starts topic chats, reads `docs/tasks.md` and the design note when planning, and decides when branches get merged. It doesn't do the topic work itself.
-- **Topic chats:** visuals and art, gameplay and mechanics, and later sound, marketing and others. Each builds its own topic and keeps its part of `docs/tasks.md` and the design note current itself.
-
-A topic chat messages the master only when:
-
-- it needs something outside its topic: a merge, its turn with Unity, a change to another chat's files, or a decision that affects another topic;
-- it's blocked on something only the master or the user can resolve;
-- it finds work for another topic;
-- its branch reaches a state worth merging or playtesting.
-
-Everything else (tweaks, work in progress, finished tasks, the user's choices within its topic) stays in its own chat and in the files. Keep messages to a few lines.
-
-Chats can't read each other's conversations; these files are what connects them:
-
-- `CLAUDE.md` (this file): how we work. `docs/design-note.md`: what has been decided. `docs/tasks.md`: what is left to do.
+- Chats don't message each other. They can't read each other's conversations either; these files are what connects them:
+  - `CLAUDE.md` (this file): how we work. `docs/design-note.md`: what has been decided. `docs/tasks.md`: what is left to do.
 - At the start of a session, read all three. At the end of a piece of work, update `docs/tasks.md` (tick done items, add new ones) and record any decision in the design note, so the other chats know.
-- Hand-over notes or large findings for another chat go in the shared notes folder named in the chat's first message, not into the repo.
+- Work found for another topic goes into that topic's section of `docs/tasks.md`.
+- Merges and decisions that affect more than one topic are the user's call. When asked for a status or a plan, answer from the three files.
 
 The chats share one project folder, so:
 
