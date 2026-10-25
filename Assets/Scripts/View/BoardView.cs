@@ -104,15 +104,24 @@ namespace ArmyRoguelike.View
         public System.Collections.IEnumerator Flash(IEnumerable<GridPos> area, float duration)
         {
             var flashes = new List<SpriteRenderer>();
+            if (_glowMaterial == null)
+                _glowMaterial = new Material(Resources.Load<Shader>("Shaders/Glow"));
+            var centre = Vector3.zero;
             foreach (var p in area)
             {
                 var sr = new GameObject("Blast").AddComponent<SpriteRenderer>();
                 sr.transform.SetParent(transform, false);
                 sr.transform.position = IsoMath.GridToWorld(p);
-                sr.sprite = PlaceholderArt.Tile;
+                sr.sprite = PlaceholderArt.GlowTile;
+                sr.sharedMaterial = _glowMaterial;
                 sr.sortingOrder = 14000;
                 flashes.Add(sr);
+                centre += sr.transform.position;
             }
+
+            // The blast itself: flash, shockwave, debris and a shake at the middle of the area.
+            if (flashes.Count > 0)
+                Fx.Explosion(centre / flashes.Count);
 
             for (var t = 0f; t < 1f; t += Time.deltaTime / duration)
             {

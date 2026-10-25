@@ -11,6 +11,8 @@ Shader "ArmyRoguelike/StatueRamp"
         _LumMin ("Darkest brightness in the art", Float) = 0
         _LumMax ("Brightest brightness in the art", Float) = 1
         _RimColor ("Moonlight rim colour", Color) = (0, 0, 0, 0)
+        [PerRendererData] _Crack ("Cracks (damage 0..1)", Float) = 0
+        [PerRendererData] _Flash ("Hit flash (0..1)", Float) = 0
     }
     SubShader
     {
@@ -33,6 +35,8 @@ Shader "ArmyRoguelike/StatueRamp"
             float _LumMin;
             float _LumMax;
             float4 _RimColor;
+            float _Crack;
+            float _Flash;
 
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; };
             struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; float2 wpos : TEXCOORD1; };
@@ -64,6 +68,9 @@ Shader "ArmyRoguelike/StatueRamp"
                 // A slow pulse, out of step from statue to statue (by position).
                 rim *= 0.7 + 0.3 * sin(_Time.y * 2.2 + (i.wpos.x + i.wpos.y) * 2);
                 col = lerp(col, _RimColor.rgb, rim * _RimColor.a);
+                // Damage cracks the stone; a hit flashes it white for a moment.
+                col *= 1 - 0.8 * cracks(i.uv * float2(6, 8), _Crack);
+                col = lerp(col, 1, _Flash);
                 return float4(col, c.a) * i.color;
             }
             ENDCG

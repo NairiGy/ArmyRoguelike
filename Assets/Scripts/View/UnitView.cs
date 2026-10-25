@@ -170,7 +170,31 @@ namespace ArmyRoguelike.View
             var t = _barFill.transform;
             t.localScale = new Vector3(BarWidth * frac * BarScale, BarHeight, 1f);
             t.localPosition = new Vector3(-BarWidth * BarScale * (1f - frac) * 0.5f, _barBack.transform.localPosition.y, 0f);
+            ShowCracks(1f - frac);
         }
+
+        private MaterialPropertyBlock _crackBlock;
+
+        /// <summary>Painted statues crack as they lose HP (0 = whole, 1 = about to break).</summary>
+        private void ShowCracks(float damage) => SetStatueFloat("_Crack", Mathf.Clamp01(damage));
+
+        /// <summary>Sets a per-statue value of the statue shader (cracks, hit flash) on painted statues.</summary>
+        private void SetStatueFloat(string property, float value)
+        {
+            if (!PlaceholderArt.IsPainted(Unit.Stats.Kind))
+                return;
+            if (_crackBlock == null)
+                _crackBlock = new MaterialPropertyBlock();
+            _body.GetPropertyBlock(_crackBlock);
+            _crackBlock.SetFloat(property, value);
+            _body.SetPropertyBlock(_crackBlock);
+        }
+
+        /// <summary>The colour of chips and rubble knocked off this statue.</summary>
+        private Color StoneColor => Unit.Team == Team.Player ? new Color(0.85f, 0.88f, 0.95f) : new Color(0.42f, 0.44f, 0.52f);
+
+        /// <summary>The middle of the statue's body, where blows land.</summary>
+        private Vector3 BodyCentre => transform.position + Vector3.up * (_bodyRest.y + _body.sprite.bounds.max.y * _body.transform.lossyScale.y * 0.45f);
 
         /// <summary>Big units get a wider HP bar.</summary>
         private float BarScale => Unit.Size;
@@ -400,15 +424,24 @@ namespace ArmyRoguelike.View
             foreach (var tile in path)
             {
                 var to = WorldOf(tile);
+                // A heavy stone step: eased across, lifted in the middle, then it lands with a little settle
+                // and a puff of dust.
                 for (var t = 0f; t < 1f; t += Time.deltaTime / StepTime)
                 {
-                    var p = Vector3.Lerp(from, to, t);
-                    SetWorldPosition(p);
+                    var e = t * t * (3f - 2f * t);
+                    SetWorldPosition(Vector3.Lerp(from, to, e));
                     _body.transform.localPosition = _bodyRest + Vector3.up * (Mathf.Sin(t * Mathf.PI) * HopHeight);
                     yield return null;
                 }
 
                 SetWorldPosition(to);
+                Fx.Dust(to, 3, 0.18f);
+                for (var t = 0f; t < 1f; t += Time.deltaTime / 0.06f)
+                {
+                    _body.transform.localPosition = _bodyRest + Vector3.down * (Mathf.Sin(t * Mathf.PI) * 0.02f);
+                    yield return null;
+                }
+
                 from = to;
             }
 
@@ -436,46 +469,83 @@ namespace ArmyRoguelike.View
             SetWorldPosition(b);
         }
 
-        /// <summary>Quick lunge towards the target and back. <paramref name="onImpact"/> runs at the furthest point.</summary>
+        /// <summary>
+        /// An attack towards the target: a wind-up (leaning back), a fast strike, a brief freeze on impact
+        /// (hit-stop) and the way back. A ranged attacker only recoils and fires a projectile instead.
+        /// <paramref name="onImpact"/> runs when the blow or the projectile lands; without it, this is just
+        /// a gesture (placing a mine, raising the dead...), so nothing flies and nothing freezes.
+        /// </summary>
         public IEnumerator Lunge(Vector3 target, System.Action onImpact)
         {
             var home = transform.position;
-            var reach = Vector3.Lerp(home, target, Unit.Stats.IsRanged ? 0.15f : 0.4f);
-            for (var t = 0f; t < 1f; t += Time.deltaTime / 0.08f)
+            var toward = (target - home).normalized;
+            var ranged = Unit.Stats.IsRanged;
+
+            for (var t = 0f; t < 1f; t += Time.deltaTime / 0.09f)
             {
-                transform.position = Vector3.Lerp(home, reach, t);
+                transform.position = home - toward * (0.06f * Mathf.Sin(t * Mathf.PI * 0.5f));
                 yield return null;
             }
 
-            onImpact?.Invoke();
-            for (var t = 0f; t < 1f; t += Time.deltaTime / 0.14f)
+            var windUp = transform.position;
+            var reach = Vector3.Lerp(home, target, ranged ? 0.1f : 0.42f);
+            for (var t = 0f; t < 1f; t += Time.deltaTime / 0.06f)
             {
-                transform.position = Vector3.Lerp(reach, home, t);
+                transform.position = Vector3.Lerp(windUp, reach, 1f - (1f - t) * (1f - t));
+                yield return null;
+            }
+
+            transform.position = reach;
+            if (onImpact != null)
+            {
+                if (ranged)
+                    yield return Fx.Projectile(BodyCentre, target + Vector3.up * 0.25f, new Color(1f, 0.95f, 0.8f), onImpact);
+                else
+                {
+                    Fx.Impact(Vector3.Lerp(home, target, 0.75f) + Vector3.up * 0.25f, new Color(1f, 0.9f, 0.7f));
+                    onImpact();
+                    yield return new WaitForSeconds(0.06f);
+                }
+            }
+
+            for (var t = 0f; t < 1f; t += Time.deltaTime / 0.16f)
+            {
+                transform.position = Vector3.Lerp(reach, home, t * t * (3f - 2f * t));
                 yield return null;
             }
 
             transform.position = home;
         }
 
+        /// <summary>Struck: a white flash fading to red, stone chips flying off and a hard shake.</summary>
         public IEnumerator Hit()
         {
             var home = transform.position;
-            _body.color = new Color(1f, 0.45f, 0.4f);
-            for (var t = 0f; t < 1f; t += Time.deltaTime / 0.18f)
+            Fx.Chips(BodyCentre, StoneColor);
+            for (var t = 0f; t < 1f; t += Time.deltaTime / 0.24f)
             {
-                transform.position = home + Vector3.right * (Mathf.Sin(t * Mathf.PI * 6f) * 0.04f * (1f - t));
+                // White for the first instant, then a red tint that fades back.
+                SetStatueFloat("_Flash", Mathf.Clamp01(1f - t * 4f));
+                _body.color = Color.Lerp(Color.white, new Color(1f, 0.45f, 0.4f), Mathf.Clamp01(t * 3f) * (1f - t));
+                transform.position = home + Vector3.right * (Mathf.Sin(t * Mathf.PI * 7f) * 0.05f * (1f - t));
                 yield return null;
             }
 
+            SetStatueFloat("_Flash", 0f);
             transform.position = home;
             ApplyColor();
         }
 
-        /// <summary>Sinks and fades out. Units that leave remains turn into a bone pile instead of vanishing.</summary>
+        /// <summary>
+        /// Crumbles: chunks of stone break off and fall around it in a cloud of dust while the statue sinks
+        /// and fades. Units that leave remains turn into a bone pile instead of vanishing.
+        /// </summary>
         public IEnumerator Die()
         {
             SetSelected(false);
             SetBarsVisible(false);
+            Fx.Rubble(transform.position, StoneColor, (BodyCentre - transform.position).y * 2f);
+            Fx.Shake(0.04f, 0.18f);
             var start = _body.color;
             var shadowStart = _shadow.color;
             for (var t = 0f; t < 1f; t += Time.deltaTime / 0.45f)

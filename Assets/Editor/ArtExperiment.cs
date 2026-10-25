@@ -175,6 +175,9 @@ public static class ArtExperiment
 
                 var wolf = battle.Units.First(u => u.Team == Team.Enemy);
                 board.SetHighlight(wolf.Pos, new Color(1f, 0.3f, 0.25f, 0.55f));
+                // Damaged statues, to see the cracks: the warrior at half HP, the first wolf nearly broken.
+                board.ViewOf(warrior).RefreshHp(warrior.MaxHp / 2);
+                board.ViewOf(wolf).RefreshHp(1);
                 board.SetHighlight(new GridPos(warrior.Pos.X + 1, warrior.Pos.Y + 2), new Color(1f, 1f, 1f, 0.55f));
             });
             EditorApplication.Exit(0);
