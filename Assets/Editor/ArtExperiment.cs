@@ -13,7 +13,7 @@ using Object = UnityEngine.Object;
 /// <summary>
 /// Art experiment (branch experiment/art-style): turns the AI-generated warrior into sprites (a cut-out
 /// 2D image, and 3D models baked from the board's isometric angle) and renders the same battle with each.
-/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artPalette] [-artPlayerColour] [-artNoPedestal] [-artGlow] [-artBraziers] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
+/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artPalette] [-artPlayerColour] [-artSky] [-artNoPedestal] [-artGlow] [-artBraziers] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
 /// </summary>
 public static class ArtExperiment
 {
@@ -153,6 +153,41 @@ public static class ArtExperiment
                 sheet.SetPixels(i % 2 * w, (1 - i / 2) * h, w, h, shots[i].GetPixels());
             sheet.Apply();
             Save(sheet, Path.Combine(outDir, "player_colours.png"));
+            EditorApplication.Exit(0);
+            return;
+        }
+
+        if (args.Contains("-artSky"))
+        {
+            // Night-sky mixes, as a 3x2 sheet in this order.
+            var mixes = new (string name, SkyFeatures.Mix mix)[]
+            {
+                ("now", new SkyFeatures.Mix()),
+                ("moon_stars", new SkyFeatures.Mix { ClearSky = true, Moon = true, Stars = true }),
+                ("moon_stars_shooting_lanterns", new SkyFeatures.Mix { ClearSky = true, Moon = true, Stars = true, ShootingStars = true, Lanterns = true }),
+                ("stars_aurora_birds", new SkyFeatures.Mix { ClearSky = true, Stars = true, Aurora = true, Birds = true }),
+                ("cloudy_moon_birds", new SkyFeatures.Mix { Moon = true, Birds = true }),
+                ("everything", new SkyFeatures.Mix { ClearSky = true, Moon = true, Stars = true, ShootingStars = true, Lanterns = true, Birds = true, Aurora = true }),
+            };
+            var shots = new List<Texture2D>();
+            for (var i = 0; i < mixes.Length; i++)
+            {
+                SkyFeatures.Default = mixes[i].mix;
+                var path = Path.Combine(outDir, $"sky_{i + 1}_{mixes[i].name}.png");
+                PreviewCapture.Capture(path, true);
+                var shot = new Texture2D(2, 2);
+                shot.LoadImage(File.ReadAllBytes(path));
+                shots.Add(Downscale(shot.GetPixels(), shot.width, shot.height, 360));
+            }
+
+            SkyFeatures.Default = new SkyFeatures.Mix();
+            var w = shots[0].width;
+            var h = shots[0].height;
+            var sheet = new Texture2D(w * 3, h * 2, TextureFormat.RGB24, false);
+            for (var i = 0; i < shots.Count; i++)
+                sheet.SetPixels(i % 3 * w, (1 - i / 3) * h, w, h, shots[i].GetPixels());
+            sheet.Apply();
+            Save(sheet, Path.Combine(outDir, "sky_mixes.png"));
             EditorApplication.Exit(0);
             return;
         }
@@ -367,8 +402,14 @@ public static class ArtExperiment
             SaveTexture(backdrops + "iso_tower_layer.png", layer, false);
         }
 
-        if (File.Exists(Source + "sky_panorama.png"))
-            SaveTexture(backdrops + "sky_panorama.png", SeamlessStrip(LoadSource("sky_panorama.png")), true);
+        foreach (var sky in new[] { "sky_panorama", "sky_clear_panorama" })
+            if (File.Exists(Source + sky + ".png"))
+                SaveTexture(backdrops + sky + ".png", SeamlessStrip(LoadSource(sky + ".png")), true);
+
+        // The moon: keyed out, centred, one world unit across at scale 1.
+        if (File.Exists(Source + "sky_moon.png"))
+            foreach (var (tex, _, _) in KeyOutGreen(LoadSource("sky_moon.png")))
+                SaveSprite(backdrops + "moon.png", tex, new Vector2(0.5f, 0.5f), tex.width);
 
         foreach (var band in new[] { "puffy", "wispy" })
             if (File.Exists(Source + $"clouds_band_{band}.png"))

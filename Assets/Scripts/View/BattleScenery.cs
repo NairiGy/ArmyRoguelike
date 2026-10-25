@@ -169,7 +169,13 @@ namespace ArmyRoguelike.View
                     // the tower, which is on its own layer.
                     var screenTop = centre.y + viewH * 0.5f;
                     var screenBottom = centre.y - viewH * 0.5f;
-                    CloudBand(root, "Sky panorama", NewMaterial(shader, sky, ramp), BackdropOrder, centre.x, viewW, screenBottom - 0.3f, viewH + 0.6f, 1f, 0.0004f, 1f);
+                    var skyMaterial = NewMaterial(shader, sky, ramp);
+                    CloudBand(root, "Sky panorama", skyMaterial, BackdropOrder, centre.x, viewW, screenBottom - 0.3f, viewH + 0.6f, 1f, 0.0004f, 1f);
+                    // The clear panorama's horizon is about 64% of the way down the image.
+                    var horizon = screenBottom - 0.3f + (viewH + 0.6f) * 0.36f;
+                    SkyFeatures.Create(root.gameObject, skyMaterial, sky, Resources.Load<Texture2D>("Backdrops/sky_clear_panorama"),
+                        centre, viewW, viewH, horizon, Sample(stops, 1f), stops[0], NewMaterial(shader, Texture2D.whiteTexture, ramp),
+                        new Material(Resources.Load<Shader>("Shaders/Glow")));
                     CloudBand(root, "Far wisps", NewMaterial(shader, wispy, ramp), BackCloudOrder, centre.x, viewW, screenTop - 1.9f, 0.7f, 0.8f, 0.0013f, 0.75f);
                     CloudBand(root, "Middle (behind tower)", NewMaterial(shader, puffy, ramp), BackCloudOrder + 1, centre.x, viewW, screenTop - 3.4f, 1.1f, 0.88f, 0.003f, 0.85f);
                     CloudBand(root, "Near (behind tower)", NewMaterial(shader, puffy, ramp), BackCloudOrder + 2, centre.x, viewW, screenBottom + 0.4f, 1.6f, 0.95f, 0.0055f, 0.95f);
