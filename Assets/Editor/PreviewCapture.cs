@@ -22,6 +22,7 @@ public static class PreviewCapture
         var placeArmy = false;
         var encounter = 0;
         var palette = 0;
+        var setting = BattleScenery.Setting.TowerSky;
         for (var i = 0; i < args.Length; i++)
         {
             if (args[i] == "-previewOut" && i + 1 < args.Length)
@@ -32,14 +33,18 @@ public static class PreviewCapture
                 int.TryParse(args[i + 1], out encounter);
             if (args[i] == "-previewPalette" && i + 1 < args.Length)
                 int.TryParse(args[i + 1], out palette);
+            // -previewSetting TowerSky|IsoTower|IsoTemple|IsoGraveyard
+            if (args[i] == "-previewSetting" && i + 1 < args.Length)
+                System.Enum.TryParse(args[i + 1], out setting);
         }
 
         EditorSceneManager.OpenScene("Assets/Scenes/SampleScene.unity");
-        Capture(output, placeArmy, encounter, palette, args.Contains("-previewPixelate"));
+        Capture(output, placeArmy, encounter, palette, args.Contains("-previewPixelate"), setting);
         EditorApplication.Exit(0);
     }
 
-    internal static void Capture(string output, bool placeArmy, int encounter = 0, int palette = 0, bool pixelate = false)
+    internal static void Capture(string output, bool placeArmy, int encounter = 0, int palette = 0, bool pixelate = false,
+        BattleScenery.Setting setting = BattleScenery.Setting.TowerSky)
     {
         // -previewEncounter: 0 wolves, 1 goblins, 2 bandits, 3 elementals, 4 necromancer, 5 giant.
         var encounters = Encounter.Regular.Concat(Encounter.Bosses).ToArray();
@@ -91,7 +96,7 @@ public static class PreviewCapture
             GameBootstrap.FrameCamera(cam, board);
             // The capture is 16:9; frame the scenery for that, whatever the batch-mode camera thinks.
             cam.aspect = 16f / 9f;
-            BattleScenery.Apply(cam, board, palette, pixelate);
+            BattleScenery.Apply(cam, board, palette, pixelate, setting);
             var rt = new RenderTexture(1280, 720, 24);
             cam.targetTexture = rt;
             // The first render after creating sprites can miss their textures; the second is reliable.

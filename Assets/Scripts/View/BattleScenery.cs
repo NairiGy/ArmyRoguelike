@@ -11,7 +11,27 @@ namespace ArmyRoguelike.View
     /// </summary>
     public static class BattleScenery
     {
+        /// <summary>
+        /// Where the battle takes place. TowerSky builds a tower from pieces in front of a flat sky picture;
+        /// the others are single isometric paintings whose empty central platform the board is fitted onto.
+        /// </summary>
+        public enum Setting { TowerSky, IsoTower, IsoTemple, IsoGraveyard }
+
         public static readonly string[] PaletteNames = { "Amber dusk", "Toxic green", "Cold night" };
+
+        /// <summary>An isometric painting and where its empty platform's corners are, in image pixels from the top left.</summary>
+        private struct IsoScene
+        {
+            public string Texture;
+            public Vector2 Top, Left, Bottom, Right;
+        }
+
+        private static readonly Dictionary<Setting, IsoScene> IsoScenes = new Dictionary<Setting, IsoScene>
+        {
+            [Setting.IsoTower] = new IsoScene { Texture = "Backdrops/iso_tower", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380) },
+            [Setting.IsoTemple] = new IsoScene { Texture = "Backdrops/iso_temple", Top = new Vector2(745, 220), Left = new Vector2(355, 430), Bottom = new Vector2(880, 735), Right = new Vector2(1265, 470) },
+            [Setting.IsoGraveyard] = new IsoScene { Texture = "Backdrops/iso_graveyard", Top = new Vector2(840, 210), Left = new Vector2(325, 470), Bottom = new Vector2(905, 765), Right = new Vector2(1330, 490) },
+        };
 
         // Each palette runs from its darkest to its brightest colour.
         private static readonly string[][] Palettes =
@@ -32,7 +52,7 @@ namespace ArmyRoguelike.View
         public static int PaletteCount => Palettes.Length;
 
         /// <summary>Builds the scenery for a framed board. Call after the camera has been framed.</summary>
-        public static void Apply(Camera cam, BoardView board, int palette, bool pixelateBackdrop = false)
+        public static void Apply(Camera cam, BoardView board, int palette, bool pixelateBackdrop = false, Setting setting = Setting.TowerSky)
         {
             var stops = ParseStops(Palettes[((palette % Palettes.Length) + Palettes.Length) % Palettes.Length]);
             var shader = Resources.Load<Shader>("Shaders/PaletteRamp");
@@ -46,6 +66,17 @@ namespace ArmyRoguelike.View
             var viewH = cam.orthographicSize * 2f;
             var viewW = viewH * Mathf.Max(cam.aspect, 16f / 9f);
             var centre = (Vector2)cam.transform.position;
+
+            if (IsoScenes.TryGetValue(setting, out var scene))
+            {
+                BuildIsoScene(root, board, scene, NewMaterial(shader, Resources.Load<Texture2D>(scene.Texture), ramp));
+                // The painting has its own floor: tiles only tint it lightly, so their edges read as a grid.
+                var tint = Color.Lerp(Sample(stops, 0.5f), NeutralGround, 0.45f);
+                tint.a = 0.3f;
+                board.SetGroundTint(tint);
+                board.SetRockTint(Color.Lerp(Color.white, Sample(stops, 0.7f), 0.55f));
+                return;
+            }
 
             var backdrop = Resources.Load<Texture2D>("Backdrops/clouds");
             if (backdrop != null)
@@ -74,6 +105,51 @@ namespace ArmyRoguelike.View
         }
 
         // ---------- Pieces ----------
+
+        /// <summary>
+        /// Places an isometric painting so its platform lies under the board: the best affine fit of the
+        /// platform's four corners onto the board's four corners (the painting's angle is never exactly 2:1).
+        /// </summary>
+        private static void BuildIsoScene(Transform root, BoardView board, IsoScene scene, Material material)
+        {
+            var tex = (Texture2D)material.mainTexture;
+            if (tex == null)
+                return;
+            var w = board.Battle.Board.Width;
+            var h = board.Battle.Board.Height;
+            var image = new[] { scene.Top, scene.Left, scene.Bottom, scene.Right };
+            var world = new[]
+            {
+                (Vector2)IsoMath.GridToWorld(w - 0.5f, h - 0.5f), (Vector2)IsoMath.GridToWorld(-0.5f, h - 0.5f),
+                (Vector2)IsoMath.GridToWorld(-0.5f, -0.5f), (Vector2)IsoMath.GridToWorld(w - 0.5f, -0.5f),
+            };
+            var fx = FitAffine(image, world, p => p.x);
+            var fy = FitAffine(image, world, p => p.y);
+            Vector2 Map(float px, float py) => new Vector2(fx.x * px + fx.y * py + fx.z, fy.x * px + fy.y * py + fy.z);
+            // Image rows run downwards; the quad goes counter-clockwise from the image's bottom left.
+            Quad(root, "Scene", material, BackdropOrder, Map(0, tex.height), Map(tex.width, tex.height), Map(tex.width, 0), Map(0, 0), Value(1f));
+        }
+
+        /// <summary>Least-squares (a, b, c) with a*px + b*py + c ≈ target(world) over the point pairs.</summary>
+        private static Vector3 FitAffine(Vector2[] image, Vector2[] world, System.Func<Vector2, float> target)
+        {
+            // Normal equations of the 3-parameter linear fit, solved by Cramer's rule.
+            double sxx = 0, sxy = 0, sx = 0, syy = 0, sy = 0, n = image.Length, tx = 0, ty = 0, t = 0;
+            for (var i = 0; i < image.Length; i++)
+            {
+                double x = image[i].x, y = image[i].y, v = target(world[i]);
+                sxx += x * x; sxy += x * y; sx += x; syy += y * y; sy += y;
+                tx += x * v; ty += y * v; t += v;
+            }
+
+            double Det(double a, double b, double c, double d, double e, double f, double g, double hh, double k) =>
+                a * (e * k - f * hh) - b * (d * k - f * g) + c * (d * hh - e * g);
+            var det = Det(sxx, sxy, sx, sxy, syy, sy, sx, sy, n);
+            return new Vector3(
+                (float)(Det(tx, sxy, sx, ty, syy, sy, t, sy, n) / det),
+                (float)(Det(sxx, tx, sx, sxy, ty, sy, sx, t, n) / det),
+                (float)(Det(sxx, sxy, tx, sxy, syy, ty, sx, sy, t) / det));
+        }
 
         /// <summary>The tower's two front walls, hanging below the board's front edges and fading into haze.</summary>
         private static void BuildWalls(Transform root, BoardView board, Material material)

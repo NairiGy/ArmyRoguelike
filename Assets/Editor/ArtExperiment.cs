@@ -39,11 +39,38 @@ public static class ArtExperiment
 
         if (args.Contains("-artScenery"))
         {
-            // The battle as it looks in the game, once per scenery palette, plus a pixelated backdrop.
+            // The battle as it looks in the game, in every setting and palette, plus one overview sheet:
+            // a row per setting, a column per palette.
             ImportStatues();
-            for (var p = 0; p < BattleScenery.PaletteCount; p++)
-                PreviewCapture.Capture(Path.Combine(outDir, $"scenery_{p}.png"), true, 0, p);
-            PreviewCapture.Capture(Path.Combine(outDir, "scenery_0_pixelated.png"), true, 0, 0, true);
+            var rows = new List<List<Texture2D>>();
+            foreach (BattleScenery.Setting setting in Enum.GetValues(typeof(BattleScenery.Setting)))
+            {
+                var row = new List<Texture2D>();
+                for (var p = 0; p < BattleScenery.PaletteCount; p++)
+                {
+                    var path = Path.Combine(outDir, $"scenery_{setting}_{p}.png");
+                    PreviewCapture.Capture(path, true, 0, p, false, setting);
+                    var shot = new Texture2D(2, 2);
+                    shot.LoadImage(File.ReadAllBytes(path));
+                    row.Add(Downscale(shot.GetPixels(), shot.width, shot.height, 360));
+                }
+
+                rows.Add(row);
+            }
+
+            var sheet = new Texture2D(rows[0].Sum(t => t.width), rows.Count * rows[0][0].height, TextureFormat.RGB24, false);
+            for (var r = 0; r < rows.Count; r++)
+            {
+                var x = 0;
+                foreach (var t in rows[r])
+                {
+                    sheet.SetPixels(x, sheet.height - (r + 1) * t.height, t.width, t.height, t.GetPixels());
+                    x += t.width;
+                }
+            }
+
+            sheet.Apply();
+            Save(sheet, Path.Combine(outDir, "scenery_overview.png"));
             EditorApplication.Exit(0);
             return;
         }
