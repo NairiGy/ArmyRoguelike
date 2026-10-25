@@ -173,11 +173,11 @@ namespace ArmyRoguelike.View
                         // the painting, and one low band passes in front of its walls.
                         var screenTop = centre.y + viewH * 0.5f;
                         var screenBottom = centre.y - viewH * 0.5f;
-                        CloudBand(root, NewMaterial(shader, wispy, ramp), BackCloudOrder, centre.x, viewW, screenTop - 1.9f, 0.7f, 0.8f, 0.004f, 0.75f);
-                        CloudBand(root, NewMaterial(shader, puffy, ramp), BackCloudOrder + 1, centre.x, viewW, screenTop - 3.4f, 1.1f, 0.88f, 0.009f, 0.85f);
-                        CloudBand(root, NewMaterial(shader, puffy, ramp), BackCloudOrder + 2, centre.x, viewW, screenBottom + 0.4f, 1.6f, 0.95f, 0.016f, 0.95f);
+                        CloudBand(root, NewMaterial(shader, wispy, ramp), BackCloudOrder, centre.x, viewW, screenTop - 1.9f, 0.7f, 0.8f, 0.0013f, 0.75f);
+                        CloudBand(root, NewMaterial(shader, puffy, ramp), BackCloudOrder + 1, centre.x, viewW, screenTop - 3.4f, 1.1f, 0.88f, 0.003f, 0.85f);
+                        CloudBand(root, NewMaterial(shader, puffy, ramp), BackCloudOrder + 2, centre.x, viewW, screenBottom + 0.4f, 1.6f, 0.95f, 0.0055f, 0.95f);
                         BuildIsoScene(root, board, scene, NewMaterial(shader, tower, ramp), TowerLayerOrder);
-                        CloudBand(root, NewMaterial(shader, puffy, ramp), FrontCloudOrder, centre.x, viewW, screenBottom - 0.7f, 1.4f, 1f, 0.03f, 1f);
+                        CloudBand(root, NewMaterial(shader, puffy, ramp), FrontCloudOrder, centre.x, viewW, screenBottom - 0.7f, 1.4f, 1f, 0.01f, 1f);
                     }
                 }
 
