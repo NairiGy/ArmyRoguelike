@@ -50,8 +50,17 @@ A single-player roguelike army-builder. You lead a small squad of living statues
 
 The game is worked on in several chats, one per big topic, so no chat gets overloaded:
 
-- **Master chat:** plans and organises. It starts topic chats, gets their reports, keeps `docs/tasks.md` current, and decides when branches get merged. It doesn't do the topic work itself.
-- **Topic chats:** visuals and art, gameplay and mechanics, and later sound, marketing and others. Each builds its own topic and reports back to the master.
+- **Master chat:** plans and organises. It starts topic chats, reads `docs/tasks.md` and the design note when planning, and decides when branches get merged. It doesn't do the topic work itself.
+- **Topic chats:** visuals and art, gameplay and mechanics, and later sound, marketing and others. Each builds its own topic and keeps its part of `docs/tasks.md` and the design note current itself.
+
+A topic chat messages the master only when:
+
+- it needs something outside its topic: a merge, its turn with Unity, a change to another chat's files, or a decision that affects another topic;
+- it's blocked on something only the master or the user can resolve;
+- it finds work for another topic;
+- its branch reaches a state worth merging or playtesting.
+
+Everything else (tweaks, work in progress, finished tasks, the user's choices within its topic) stays in its own chat and in the files. Keep messages to a few lines.
 
 Chats can't read each other's conversations; these files are what connects them:
 
