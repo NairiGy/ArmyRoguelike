@@ -160,15 +160,16 @@ namespace ArmyRoguelike.View
                 var sceneMaterial = NewMaterial(shader, Resources.Load<Texture2D>(scene.Texture), ramp);
                 sceneMaterial.SetFloat("_Shadowed", 1f);
                 BuildIsoScene(root, board, scene, sceneMaterial);
-                Shader.SetGlobalFloat("_CloudShadow", scene.Clouds ? 0.45f : 0f);
+                Shader.SetGlobalFloat("_CloudShadow", scene.Clouds ? 0.55f : 0f);
                 if (scene.Clouds)
                 {
                     sceneMaterial.SetFloat("_Flow", 0.03f);
                     SceneryMotes.Create(root, centre, viewW, viewH, Sample(stops, 0.95f));
                     var wisps = CloudTexture();
                     var screenBottom = centre.y - viewH * 0.5f;
-                    // Two bands at different heights and speeds, low across the tower's walls.
-                    CloudBand(root, NewMaterial(shader, wisps, ramp), FrontCloudOrder, centre.x, viewW, screenBottom - 0.3f, 1.3f, 0.9f, 0.006f);
+                    // Two bands at different heights and speeds, low across the tower's walls, both drifting
+                    // right with the wind (a negative scroll moves the texture to the right).
+                    CloudBand(root, NewMaterial(shader, wisps, ramp), FrontCloudOrder, centre.x, viewW, screenBottom - 0.3f, 1.3f, 0.9f, -0.006f);
                     CloudBand(root, NewMaterial(shader, wisps, ramp), FrontCloudOrder + 1, centre.x, viewW, screenBottom - 0.2f, 0.8f, 1f, -0.011f);
                 }
 
@@ -350,8 +351,8 @@ namespace ArmyRoguelike.View
                 sr.sharedMaterial = material;
                 sr.color = new Color(1f, 0.6f, 1f, 1f);
                 sr.sortingOrder = IsoMath.SortingOrder(sr.transform.position) + 5;
-                // The bowl's rim is about two thirds of the way up the sprite; the light falls mostly onto the board.
-                SceneryFire.Create(root, pos, sprite.bounds.max.y * 0.72f, (Vector3)(centre - pos).normalized * 0.7f, sr.sortingOrder, glow);
+                // The bowl's rim is about two thirds of the way up the sprite.
+                SceneryFire.Create(root, pos, sprite.bounds.max.y * 0.72f, sr.sortingOrder, glow);
             }
         }
 

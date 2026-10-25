@@ -3,21 +3,19 @@ using UnityEngine;
 namespace ArmyRoguelike.View
 {
     /// <summary>
-    /// Fire in a brazier: a flickering warm pool of light on the floor, a glow over the bowl, flame tongues
-    /// that rise and fade, and the odd spark. All additive, so it lights whatever is underneath.
+    /// Fire in a brazier: a glow over the bowl, flame tongues that rise and fade, and the odd spark. All
+    /// additive. (A warm pool of light on the floor was tried and looked out of place.)
     /// </summary>
     public sealed class SceneryFire : MonoBehaviour
     {
         private const int Tongues = 6;
         private const int Sparks = 4;
 
-        private static readonly Color PoolColor = new Color(1f, 0.5f, 0.15f, 0.22f);
         private static readonly Color HaloColor = new Color(1f, 0.45f, 0.1f, 0.35f);
         // Saturated: the tongues overlap and add up, and paler colours burn out to white.
         private static readonly Color FlameBase = new Color(1f, 0.55f, 0.12f, 0.7f);
         private static readonly Color FlameTip = new Color(0.9f, 0.18f, 0.04f, 0f);
 
-        private SpriteRenderer _pool;
         private SpriteRenderer _halo;
         private SpriteRenderer[] _tongues;
         private SpriteRenderer[] _sparks;
@@ -29,15 +27,13 @@ namespace ArmyRoguelike.View
         private float _seed;
 
         /// <summary>Lights a fire in a brazier standing at floorPos, its bowl bowlHeight above the floor.</summary>
-        /// <param name="poolOffset">Where the light pool's centre sits relative to the brazier (towards the board).</param>
-        public static SceneryFire Create(Transform parent, Vector3 floorPos, float bowlHeight, Vector3 poolOffset, int order, Material glow)
+        public static SceneryFire Create(Transform parent, Vector3 floorPos, float bowlHeight, int order, Material glow)
         {
             var go = new GameObject("Fire");
             go.transform.SetParent(parent, false);
             go.transform.position = floorPos;
             var fire = go.AddComponent<SceneryFire>();
             fire.Build(bowlHeight, order, glow);
-            fire._pool.transform.localPosition = poolOffset;
             return fire;
         }
 
@@ -46,9 +42,7 @@ namespace ArmyRoguelike.View
             var sr = new GameObject(name).AddComponent<SpriteRenderer>();
             sr.transform.SetParent(transform, false);
             sr.sprite = SceneryMotes.Dot;
-            // Null keeps the ordinary sprite material (normal blending).
-            if (glow != null)
-                sr.sharedMaterial = glow;
+            sr.sharedMaterial = glow;
             sr.sortingOrder = order;
             return sr;
         }
@@ -57,9 +51,6 @@ namespace ArmyRoguelike.View
         {
             _seed = Random.value * 100f;
             _bowl = Vector3.up * bowlHeight;
-            // The pool lies on the floor, over the tiles but under anything standing on them. It is a normal
-            // (not additive) tint: added orange on a blue night floor would come out grey-white, not warm.
-            _pool = Glow("Light pool", null, -850);
             _halo = Glow("Halo", glow, order + 1);
             _halo.transform.localPosition = _bowl;
             _tongues = new SpriteRenderer[Tongues];
@@ -92,8 +83,6 @@ namespace ArmyRoguelike.View
             var t = Time.time + _seed;
             // Two out-of-step waves make the flicker irregular.
             var flicker = 0.85f + 0.1f * Mathf.Sin(t * 9.1f) + 0.05f * Mathf.Sin(t * 23.7f);
-            _pool.transform.localScale = new Vector3(2.2f, 1.1f, 1f) * (0.97f + 0.03f * flicker);
-            _pool.color = new Color(PoolColor.r, PoolColor.g, PoolColor.b, PoolColor.a * flicker);
             _halo.transform.localScale = Vector3.one * (0.7f + 0.06f * flicker);
             _halo.color = new Color(HaloColor.r, HaloColor.g, HaloColor.b, HaloColor.a * flicker);
 

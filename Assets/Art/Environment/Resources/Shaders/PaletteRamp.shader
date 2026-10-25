@@ -1,8 +1,8 @@
 // Scenery colouring: the texture's brightness (times the vertex colour's red channel) picks a colour
 // from a palette ramp, dark to light. One greyscale backdrop gives a different mood per palette.
 // Vertex green fades the result towards the brightness in vertex blue (haze), and _Scroll drifts
-// the texture sideways (clouds). _Flow makes only the light parts of a painting (its clouds) swirl
-// slowly, leaving darker shapes like a tower still.
+// the texture sideways (clouds). _Flow makes only the light parts of a painting (its clouds) drift
+// with the wind, leaving darker shapes like a tower still.
 Shader "ArmyRoguelike/PaletteRamp"
 {
     Properties
@@ -11,7 +11,7 @@ Shader "ArmyRoguelike/PaletteRamp"
         _Ramp ("Palette ramp", 2D) = "white" {}
         _PixelSize ("Pixelate (texels per block, 0 = off)", Float) = 0
         _Scroll ("Drift (UV per second)", Float) = 0
-        _Flow ("Cloud swirl (UV amplitude, 0 = off)", Float) = 0
+        _Flow ("Cloud drift (UV per 7 s cycle, 0 = off)", Float) = 0
         _Shadowed ("Takes drifting cloud shadows (0..1)", Float) = 0
     }
     SubShader
@@ -59,18 +59,23 @@ Shader "ArmyRoguelike/PaletteRamp"
                     float2 block = _MainTex_TexelSize.xy * _PixelSize;
                     uv = (floor(uv / block) + 0.5) * block;
                 }
+                float4 c = tex2D(_MainTex, uv);
                 if (_Flow > 0)
                 {
-                    // Two slow noise fields push the lookup around, but only where the painting is light.
-                    float t = _Time.y * 0.22;
-                    float2 push = float2(noise(float3(uv * 5, t)), noise(float3(uv * 5 + 17.3, t))) - 0.5;
-                    push += (float2(noise(float3(uv * 13, t * 1.7)), noise(float3(uv * 13 + 5.1, t * 1.7))) - 0.5) * 0.5;
-                    float mask = smoothstep(0.5, 0.72, luma(tex2D(_MainTex, uv).rgb));
-                    float2 moved = uv + push * _Flow * mask;
-                    // Never pull dark pixels (the tower's edge) into the clouds.
-                    uv = lerp(uv, moved, smoothstep(0.45, 0.65, luma(tex2D(_MainTex, moved).rgb)));
+                    // The painting's clouds drift steadily with the wind: two copies slide along it half a
+                    // cycle apart and cross-fade, so the drift never visibly resets. Only light areas move;
+                    // a copy that would pull dark pixels (the tower's edge) into the clouds is not used there.
+                    float cycle = _Time.y / 7;
+                    float2 wind = normalize(CloudWind) * _Flow;
+                    float mask = smoothstep(0.5, 0.72, luma(c.rgb));
+                    float p0 = frac(cycle);
+                    float p1 = frac(cycle + 0.5);
+                    float4 s0 = tex2D(_MainTex, uv - wind * p0 * mask);
+                    float4 s1 = tex2D(_MainTex, uv - wind * p1 * mask);
+                    s0 = lerp(c, s0, smoothstep(0.45, 0.65, luma(s0.rgb)));
+                    s1 = lerp(c, s1, smoothstep(0.45, 0.65, luma(s1.rgb)));
+                    c = lerp(s1, s0, 1 - abs(2 * p0 - 1));
                 }
-                float4 c = tex2D(_MainTex, uv);
                 float value = saturate(lerp(luma(c.rgb) * i.color.r, i.color.b, i.color.g));
                 if (_Shadowed > 0)
                 {

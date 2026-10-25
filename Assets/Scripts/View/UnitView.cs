@@ -315,7 +315,7 @@ namespace ArmyRoguelike.View
 
         private void Update()
         {
-            Breathe();
+            ShedDust();
             if (!_selected)
                 return;
             _bobTime += Time.deltaTime;
@@ -324,28 +324,18 @@ namespace ArmyRoguelike.View
 
         // ---------- Idle life ----------
 
-        private Vector3 _bodyScale;
-        private float _breathPhase = -1f;
-        private float _nextDust;
+        private float _nextDust = -1f;
 
         /// <summary>
-        /// Living statues are never quite still: a slow, tiny rise and fall (out of step between units),
-        /// and now and then a few specks of stone dust crumble off.
+        /// Living statues are never quite still: now and then a few specks of stone dust crumble off.
+        /// (A slow breathing rise and fall was tried; squashing stone looked rubbery.)
         /// </summary>
-        private void Breathe()
+        private void ShedDust()
         {
             if (!PlaceholderArt.IsPainted(Unit.Stats.Kind) || _showingBones || !Unit.IsAlive)
                 return;
-            if (_breathPhase < 0f)
-            {
-                _breathPhase = Random.value * 10f;
-                _bodyScale = _body.transform.localScale;
+            if (_nextDust < 0f)
                 _nextDust = Time.time + Random.Range(2f, 8f);
-            }
-
-            var breath = Mathf.Sin(Time.time * 1.3f + _breathPhase);
-            _body.transform.localScale = new Vector3(_bodyScale.x * (1f - 0.006f * breath), _bodyScale.y * (1f + 0.014f * breath), _bodyScale.z);
-
             if (Time.time < _nextDust)
                 return;
             _nextDust = Time.time + Random.Range(5f, 12f);
@@ -354,7 +344,7 @@ namespace ArmyRoguelike.View
 
         private IEnumerator Crumble()
         {
-            var height = _body.sprite.bounds.max.y * _bodyScale.y;
+            var height = _body.sprite.bounds.max.y * _body.transform.localScale.y;
             var specks = new SpriteRenderer[Random.Range(2, 5)];
             var starts = new Vector3[specks.Length];
             for (var i = 0; i < specks.Length; i++)

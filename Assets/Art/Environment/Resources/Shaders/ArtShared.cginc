@@ -18,12 +18,16 @@ float noise(float3 p)
 
 float luma(float3 c) { return dot(c, float3(0.299, 0.587, 0.114)); }
 
-// How much a world position is in cloud shadow right now, 0..1: big soft blobs drifting slowly.
+// The direction everything cloudy drifts in (world units per second for the shadows).
+static const float2 CloudWind = float2(0.12, 0.04);
+
+// How much a world position is in cloud shadow right now, 0..1: big blobs with fairly crisp edges,
+// drifting with the wind.
 float cloudShadow(float2 wpos)
 {
-    float2 p = wpos * 0.28 + _Time.y * float2(0.05, 0.018);
-    float n = noise(float3(p, 0)) * 0.65 + noise(float3(p * 2.3 + 7.1, 0)) * 0.35;
-    return smoothstep(0.48, 0.68, n) * _CloudShadow;
+    float2 p = (wpos - _Time.y * CloudWind) * 0.28;
+    float n = noise(float3(p, 0)) * 0.7 + noise(float3(p * 2.3 + 7.1, 0)) * 0.3;
+    return smoothstep(0.54, 0.6, n) * _CloudShadow;
 }
 
 #endif
