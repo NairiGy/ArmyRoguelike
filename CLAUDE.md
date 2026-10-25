@@ -45,3 +45,22 @@ A single-player roguelike army-builder. You lead a small squad of living statues
 - Keep `PlaytestLogger` and `RunLogger` up to date whenever gameplay changes: log whatever new data is needed to judge it. The user reports how it feels; the logs cover the numbers.
 - Keep the gamepedia current: after changing units, abilities, items, enemies or rules, re-export it (Tools → Export Gamepedia, or the batch method when the editor is closed) and commit `docs/gamepedia.html`.
 - Update this file when the project's structure or status changes.
+
+## Working across chats
+
+The game is worked on in several chats, one per big topic, so no chat gets overloaded:
+
+- **Master chat:** plans and organises. It starts topic chats, gets their reports, keeps `docs/tasks.md` current, and decides when branches get merged. It doesn't do the topic work itself.
+- **Topic chats:** visuals and art, gameplay and mechanics, and later sound, marketing and others. Each builds its own topic and reports back to the master.
+
+Chats can't read each other's conversations; these files are what connects them:
+
+- `CLAUDE.md` (this file): how we work. `docs/design-note.md`: what has been decided. `docs/tasks.md`: what is left to do.
+- At the start of a session, read all three. At the end of a piece of work, update `docs/tasks.md` (tick done items, add new ones) and record any decision in the design note, so the other chats know.
+- Hand-over notes or large findings for another chat go in the shared notes folder named in the chat's first message, not into the repo.
+
+The chats share one project folder, so:
+
+- Only one chat uses Unity at a time (batch renders and imports fail while the editor is open).
+- Don't edit the same files as another chat at the same time; commit only your own files, and never switch branches, stash or reset. For bigger parallel work, a chat can get its own worktree on its own branch.
+- Visual work currently lives on the branch `experiment/art-style`; it is merged into `main` when the battle's look is settled.
