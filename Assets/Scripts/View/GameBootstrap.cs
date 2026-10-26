@@ -141,10 +141,13 @@ namespace ArmyRoguelike.View
             var ambush = _run.IsAmbush;
             var earned = _run.FinishBattle();
             _runLog.RecordBattle(battle, earned, _controller.LogFile, ambush);
+            if (battle.ObjectiveLost)
+                _runLog.RecordOmen(_run.Curse.Value, false);
             Destroy(_battleRoot);
             _battleRoot = null;
             _controller = null;
-            _lastNote = battle.Phase != Phase.Victory ? null
+            _lastNote = battle.ObjectiveLost ? $"The shrine broke. {Omens.Name(_run.Curse.Value, false)}: {Omens.Describe(_run.Curse.Value, false)}"
+                : battle.Phase != Phase.Victory ? null
                 : _run.LastStolen > 0 ? $"Battle won: +{earned} gold, but cutpurses got away with {_run.LastStolen}."
                 : $"Battle won: +{earned} gold.";
             if (_run.State == RunState.Won || _run.State == RunState.Lost)
@@ -158,6 +161,146 @@ namespace ArmyRoguelike.View
             _lastNote = _run.EventOutcome;
             if (_run.State == RunState.Battle)
                 StartBattle();
+        }
+
+        // ---------- Test mode ----------
+        //
+        // Editor and dev builds only: any army, any encounter and any blessing or curse, straight into
+        // the battle with no run around it. Afterwards it comes back to the setup screen.
+
+        private static bool TestModeAvailable => Application.isEditor || Debug.isDebugBuild;
+
+        private bool _testMode;
+        private readonly System.Collections.Generic.List<UnitStats> _testArmy = new System.Collections.Generic.List<UnitStats>();
+        private Encounter _testEncounter = Encounter.MoonShrine;
+        private readonly System.Collections.Generic.List<Encounter> _testFought = new System.Collections.Generic.List<Encounter>();
+
+        // Null for no omen; otherwise the omen and whether it's a blessing (true) or a curse.
+        private (Omen omen, bool blessing)? _testOmen;
+
+        private void EnterTestMode()
+        {
+            _testMode = true;
+            // Test battles aren't part of a run, so no run log is written for this one.
+            _runLog = null;
+            if (_testArmy.Count == 0)
+                _testArmy.AddRange(new[] { UnitStats.Warrior, UnitStats.Archer, UnitStats.Rogue });
+        }
+
+        private void StartTestBattle()
+        {
+            var seed = Environment.TickCount;
+            var army = _testArmy.Select(s => new ArmyMember(s)).ToList();
+            var battle = _testEncounter.CreateBattle(army, new System.Random(seed), _testFought.ToList());
+            if (_testOmen.HasValue)
+                battle.AddOmen(_testOmen.Value.omen, _testOmen.Value.blessing ? Team.Player : Team.Enemy);
+
+            _battleRoot = new GameObject("Test battle");
+            _battleRoot.transform.SetParent(transform, false);
+            var board = BoardView.Create(battle, _battleRoot.transform);
+            FrameCamera(Camera.main, board);
+            var context = new BattleContext(0, 0, _testEncounter.Name, 0, seed, false, _testEncounter.IsBoss,
+                _testEncounter.Layout, _testEncounter.LayoutRule, test: true);
+            _controller = _battleRoot.AddComponent<BattleController>();
+            _controller.Init(board, Camera.main, context, () => Do(FinishTestBattle));
+        }
+
+        private void FinishTestBattle()
+        {
+            Destroy(_battleRoot);
+            _battleRoot = null;
+            _controller = null;
+        }
+
+        private void DrawTestSetup(float screenWidth)
+        {
+            const float w = 860;
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 10, w, 700), GUI.skin.box);
+            GUILayout.Label("Test battle", Title);
+            GUILayout.Label("For testing only: any army, any encounter, any blessing or curse. Normal battle rules; no run, gold or map.");
+            GUILayout.BeginHorizontal();
+
+            // Left: every unit type, click to add (up to the army limit).
+            GUILayout.BeginVertical(GUILayout.Width(300));
+            GUILayout.Label($"Add a unit ({_testArmy.Count}/{Run.MaxArmySize}):");
+            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(560));
+            foreach (var type in UnitStats.AllPlayerTypes)
+            {
+                GUI.enabled = _testArmy.Count < Run.MaxArmySize;
+                var pick = type;
+                if (GUILayout.Button($"{type.Name} (tier {type.Tier}, {type.Root.Name} line)"))
+                    Do(() => _testArmy.Add(pick));
+                GUI.enabled = true;
+            }
+
+            GUILayout.EndScrollView();
+            GUILayout.EndVertical();
+
+            // Middle: the army and the encounter.
+            GUILayout.BeginVertical(GUILayout.Width(260));
+            GUILayout.Label("Army (click to remove):");
+            for (var i = 0; i < _testArmy.Count; i++)
+            {
+                var index = i;
+                if (GUILayout.Button($"x  {_testArmy[i].Name}"))
+                    Do(() => _testArmy.RemoveAt(index));
+            }
+
+            GUILayout.Space(10);
+            GUILayout.Label("Encounter:");
+            foreach (var enc in Encounter.Regular.Concat(Encounter.Bosses).Concat(new[] { Encounter.MoonShrine }))
+            {
+                var pick = enc;
+                if (GUILayout.Button((enc == _testEncounter ? "> " : "") + enc.Name + (enc.IsBoss ? " (boss)" : "")))
+                    Do(() => _testEncounter = pick);
+            }
+
+            if (_testEncounter == Encounter.Necromancer)
+            {
+                GUILayout.Label("Factions already beaten (he raises them):");
+                foreach (var enc in Encounter.Regular)
+                {
+                    var faction = enc;
+                    var beaten = _testFought.Contains(enc);
+                    if (GUILayout.Button((beaten ? "[X] " : "[  ] ") + enc.Name))
+                        Do(() =>
+                        {
+                            if (!_testFought.Remove(faction))
+                                _testFought.Add(faction);
+                        });
+                }
+            }
+
+            GUILayout.EndVertical();
+
+            // Right: blessing or curse.
+            GUILayout.BeginVertical();
+            GUILayout.Label("Blessing or curse:");
+            if (GUILayout.Button((_testOmen == null ? "> " : "") + "None"))
+                Do(() => _testOmen = null);
+            foreach (var blessing in new[] { true, false })
+            foreach (var omen in Omens.All)
+            {
+                var pick = (omen, blessing);
+                var chosen = _testOmen.HasValue && _testOmen.Value.omen == omen && _testOmen.Value.blessing == blessing;
+                if (GUILayout.Button(new GUIContent((chosen ? "> " : "") + Omens.Name(omen, blessing), Omens.Describe(omen, blessing))))
+                    Do(() => _testOmen = pick);
+            }
+
+            GUILayout.Label(GUI.tooltip, new GUIStyle(GUI.skin.label) { wordWrap = true });
+            GUILayout.EndVertical();
+            GUILayout.EndHorizontal();
+
+            GUILayout.FlexibleSpace();
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Back to the draft", GUILayout.Height(32), GUILayout.Width(200)))
+                Do(Restart);
+            GUI.enabled = _testArmy.Count > 0;
+            if (GUILayout.Button("Start test battle", GUILayout.Height(32)))
+                Do(StartTestBattle);
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
+            GUILayout.EndArea();
         }
 
         private void LeaveShop()
@@ -189,6 +332,12 @@ namespace ArmyRoguelike.View
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
             var width = Screen.width / scale;
 
+            if (_testMode)
+            {
+                DrawTestSetup(width);
+                return;
+            }
+
             switch (_run.State)
             {
                 case RunState.Draft:
@@ -205,6 +354,9 @@ namespace ArmyRoguelike.View
                     break;
                 case RunState.Event:
                     DrawEvent(width);
+                    break;
+                case RunState.Blessing:
+                    DrawBlessing(width);
                     break;
                 case RunState.Won:
                 case RunState.Lost:
@@ -263,6 +415,8 @@ namespace ArmyRoguelike.View
             if (GUILayout.Button($"Start the run ({_draftPicks.Count}/{Run.DraftSize})", GUILayout.Height(34)))
                 Do(ConfirmDraft);
             GUI.enabled = true;
+            if (TestModeAvailable && GUILayout.Button("Test battle (testing only: any army, encounter and omen)"))
+                Do(EnterTestMode);
             GUILayout.EndArea();
         }
 
@@ -318,6 +472,10 @@ namespace ArmyRoguelike.View
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 20, w, 680), GUI.skin.box);
             GUILayout.Label("Act 1", Title);
             GUILayout.Label($"Gold: {_run.Gold}    Beaten: {(_run.Fought.Count > 0 ? string.Join(", ", _run.Fought.Select(f => f.Name)) : "nobody yet")}");
+            if (_run.Blessing.HasValue)
+                GUILayout.Label(Omens.Name(_run.Blessing.Value, true));
+            if (_run.Curse.HasValue)
+                GUILayout.Label(Omens.Name(_run.Curse.Value, false));
             if (!string.IsNullOrEmpty(_lastNote))
                 GUILayout.Label(_lastNote);
             GUILayout.Space(6);
@@ -351,6 +509,7 @@ namespace ArmyRoguelike.View
 
             GUILayout.Space(8);
             GUILayout.Label("? = something unexpected. Shops sell items and a recruit. Trainers evolve every unit one tier, for free.");
+            GUILayout.Label("Moon Shrine: defend it for 5 enemy turns to earn a blessing. If it breaks, you take a curse.");
             DrawArmy();
             GUILayout.EndArea();
         }
@@ -540,6 +699,33 @@ namespace ArmyRoguelike.View
                     }
 
                     break;
+            }
+
+            GUILayout.FlexibleSpace();
+            DrawArmy();
+            GUILayout.EndArea();
+        }
+
+        private void DrawBlessing(float screenWidth)
+        {
+            const float w = 520;
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 60, w, 560), GUI.skin.box);
+            GUILayout.Label("The Moon Shrine held", Title);
+            if (!string.IsNullOrEmpty(_lastNote))
+                GUILayout.Label(_lastNote);
+            GUILayout.Label("Choose a blessing. It stays with your army for the rest of the run.");
+            var style = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.UpperLeft, wordWrap = true };
+            foreach (var omen in _run.BlessingChoices)
+            {
+                var pick = omen;
+                if (GUILayout.Button($"{Omens.Name(omen, true)}\n{Omens.Describe(omen, true)}", style, GUILayout.Height(70)))
+                    Do(() =>
+                    {
+                        if (!_run.ChooseBlessing(pick))
+                            return;
+                        _runLog.RecordOmen(pick, true);
+                        _lastNote = $"{Omens.Name(pick, true)}: {Omens.Describe(pick, true)}";
+                    });
             }
 
             GUILayout.FlexibleSpace();

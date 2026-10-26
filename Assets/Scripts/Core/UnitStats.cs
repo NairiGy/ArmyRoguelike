@@ -30,6 +30,7 @@ namespace ArmyRoguelike.Core
         Brute,
         Elemental,
         Shard,
+        Shrine,
     }
 
     /// <summary>A passive rule a unit has, from its type or from an item.</summary>
@@ -213,6 +214,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>A battle-only unit (turret): doesn't count for survival or defeat.</summary>
         public bool IsSummon { get; private set; }
+
+        /// <summary>An objective the player defends (the Moon Shrine): can't act, and the fight is lost if it breaks.</summary>
+        public bool IsObjective { get; private set; }
 
         /// <summary>When it dies it splits into two of these. Null = no split.</summary>
         public UnitStats SplitsInto { get; private set; }
@@ -433,6 +437,13 @@ namespace ArmyRoguelike.Core
         public static readonly UnitStats Turret = new UnitStats(UnitKind.Turret, "Turret", 4, 2, 3, 2)
         {
             Label = "T", Role = "Stationary shooter.", Abilities = A(Ability.Immobile), IsSummon = true,
+        };
+
+        /// <summary>The Moon Shrine the player defends in a ritual fight. Sides with the player but never acts.</summary>
+        public static readonly UnitStats MoonShrine = new UnitStats(UnitKind.Shrine, "Moon Shrine", 15, 0, 1, 0)
+        {
+            Label = "S", Role = "Hold it until the ritual completes. If it breaks, the fight is lost.",
+            Abilities = A(Ability.Immobile), IsSummon = true, IsObjective = true,
         };
 
         /// <summary>The five tree roots the player drafts their starting army from.</summary>

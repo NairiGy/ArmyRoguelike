@@ -63,6 +63,9 @@ namespace ArmyRoguelike.Core
         /// <summary>Ward shield: absorbs this much damage before HP.</summary>
         public int Shield { get; internal set; }
 
+        /// <summary>Moon omen shield: absorbs damage before HP, gone at the start of the next player turn.</summary>
+        public int MoonShield { get; internal set; }
+
         /// <summary>The Lucky Charm has already saved this unit in this battle.</summary>
         public bool LastStandUsed { get; internal set; }
 
@@ -101,6 +104,8 @@ namespace ArmyRoguelike.Core
         public bool IsAlive => Hp > 0;
 
         public bool IsSummon => Stats.IsSummon;
+
+        public bool IsObjective => Stats.IsObjective;
 
         public bool IsWolf => Stats.Kind == UnitKind.Wolf;
 

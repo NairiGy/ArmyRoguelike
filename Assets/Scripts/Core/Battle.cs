@@ -117,6 +117,10 @@ namespace ArmyRoguelike.Core
         public const int BarricadeBlastDamage = 3;
         public const int ChargeRange = 4;
 
+        // Omens (placeholders).
+        public const int SunDamage = 3;
+        public const int MoonShield = 4;
+
         public static int ActionCost(ActionKind action)
         {
             switch (action)
@@ -140,6 +144,18 @@ namespace ArmyRoguelike.Core
         private readonly Dictionary<GridPos, int> _burning = new Dictionary<GridPos, int>();
         private int _nextId;
 
+        // Ritual fights: where the player deploys (null = the back rows) and enemies still to arrive.
+        private HashSet<GridPos> _deployZone;
+        private readonly List<(int afterEnemyTurn, UnitStats stats)> _waves = new List<(int, UnitStats)>();
+
+        // Omens: which side each one helps, the tiles a sun beam will strike, and shrouded tiles with the side they protect.
+        private readonly List<(Omen omen, Team side)> _omens = new List<(Omen, Team)>();
+        private readonly List<GridPos> _sunMarks = new List<GridPos>();
+        private readonly Dictionary<GridPos, Team> _shroud = new Dictionary<GridPos, Team>();
+
+        /// <summary>Random picks during the battle (omen targets, where reinforcements arrive).</summary>
+        internal Random Rng { get; set; } = new Random(0);
+
         public IReadOnlyList<Unit> Units => _units;
         public IReadOnlyList<Mine> Mines => _mines;
         public IReadOnlyList<Bomb> Bombs => _bombs;
@@ -158,6 +174,63 @@ namespace ArmyRoguelike.Core
 
         /// <summary>True if the battle was ended with <see cref="DebugWin"/> instead of being played.</summary>
         public bool WasSkipped { get; private set; }
+
+        // ---------- Ritual (defend the objective) ----------
+
+        /// <summary>The unit the player defends (the Moon Shrine), or null in a normal fight.</summary>
+        public Unit Objective { get; private set; }
+
+        /// <summary>Enemy turns to survive for the ritual to complete. 0 in a normal fight.</summary>
+        public int RitualTurns { get; private set; }
+
+        /// <summary>The fight was won by surviving until the ritual completed.</summary>
+        public bool RitualComplete { get; private set; }
+
+        /// <summary>The fight was lost because the objective broke.</summary>
+        public bool ObjectiveLost => Phase == Phase.Defeat && Objective != null && !Objective.IsAlive && LivingArmy.Any();
+
+        /// <summary>Enemy reinforcements still to come: after which enemy turn, and what.</summary>
+        public IReadOnlyList<(int afterEnemyTurn, UnitStats stats)> PendingWaves => _waves;
+
+        /// <summary>Events from the first player turn's start (omens), which happen inside <see cref="StartBattle"/>.</summary>
+        public List<BattleEvent> OpeningEvents { get; } = new List<BattleEvent>();
+
+        /// <summary>
+        /// Turns this into a ritual fight: the objective stands on its tile, the player deploys inside the zone,
+        /// the fight is won after surviving <paramref name="turns"/> enemy turns, and waves of enemies walk in from
+        /// the edges at the end of the given enemy turns.
+        /// </summary>
+        internal void SetupRitual(UnitStats objective, GridPos tile, IEnumerable<GridPos> deployZone, int turns,
+            IEnumerable<(int afterEnemyTurn, UnitStats stats)> waves)
+        {
+            Objective = new Unit(_nextId++, Team.Player, objective) { Pos = tile, IsPlaced = true, IsDone = true };
+            _units.Add(Objective);
+            _deployZone = new HashSet<GridPos>(deployZone);
+            RitualTurns = turns;
+            _waves.AddRange(waves);
+        }
+
+        /// <summary>Ritual turns left to survive, counting the coming enemy turn. 0 in a normal fight.</summary>
+        public int RitualTurnsLeft => RitualTurns == 0 ? 0 : Math.Max(0, RitualTurns - Math.Max(0, TurnNumber - 1));
+
+        // ---------- Omens ----------
+
+        /// <summary>Omens in play: each one and the side it helps (the player for a blessing, the enemy for a curse).</summary>
+        public IReadOnlyList<(Omen omen, Team side)> Omens => _omens;
+
+        /// <summary>Tiles a sun beam will strike at the start of the enemy turn.</summary>
+        public IReadOnlyList<GridPos> SunMarks => _sunMarks;
+
+        /// <summary>Shrouded tiles and the side each one protects from the other side's ranged attacks.</summary>
+        public IReadOnlyDictionary<GridPos, Team> Shroud => _shroud;
+
+        /// <summary>Puts an omen in play for this battle, helping <paramref name="side"/>. Call before the battle starts.</summary>
+        public void AddOmen(Omen omen, Team side) => _omens.Add((omen, side));
+
+        /// <summary>A unit on this tile can't be hit from range by the given team: it's shrouded against them.</summary>
+        public bool IsShroudedFrom(GridPos tile, Team attackerTeam) => _shroud.TryGetValue(tile, out var side) && side != attackerTeam;
+
+        private bool IsShroudedFrom(Unit target, Team attackerTeam) => Cells(target).Any(c => IsShroudedFrom(c, attackerTeam));
 
         public Battle(Board board, IEnumerable<ArmyMember> playerArmy, IEnumerable<(UnitStats stats, GridPos pos)> enemies)
         {
@@ -262,7 +335,8 @@ namespace ArmyRoguelike.Core
             return true;
         }
 
-        public bool IsPlayerZone(GridPos p) => Board.InBounds(p) && p.Y < PlayerZoneRows;
+        /// <summary>Where the player may deploy: the back two rows, or the ritual's zone around the objective.</summary>
+        public bool IsPlayerZone(GridPos p) => Board.InBounds(p) && (_deployZone != null ? _deployZone.Contains(p) : p.Y < PlayerZoneRows);
 
         public PackState GetPackState(Unit unit)
         {
@@ -461,6 +535,8 @@ namespace ArmyRoguelike.Core
                 return false;
             }
 
+            if (attacker.IsRanged && steps > 1 && IsShroudedFrom(target, attacker.Team))
+                return false;
             if (!attacker.IsRanged || attacker.Has(Ability.ArcaneBolt))
                 return true;
             foreach (var a in Footprint(from, attacker.Size))
@@ -499,7 +575,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Whether a player unit that hasn't finished could still move, attack or use an action this turn.</summary>
         public bool CanStillAct(Unit unit)
         {
-            if (!unit.IsAlive || unit.IsDone || unit.Team != Team.Player)
+            if (!unit.IsAlive || unit.IsDone || unit.Team != Team.Player || unit.IsObjective)
                 return false;
             if (unit.Ap >= AttackCost && Living(Team.Enemy).Any(e => CanAttack(unit, e)))
                 return true;
@@ -558,11 +634,12 @@ namespace ArmyRoguelike.Core
                 case ActionKind.PlaceMine:
                     return MinesOf(unit) < MaxMinesFor(unit) && steps == 1 && IsFree(tile) && !HasHazard(tile);
                 case ActionKind.ThrowBomb:
-                    return steps >= 2 && steps <= PlayerBombRange && !Board.IsObstacle(tile) && BombAt(tile) == null;
+                    return steps >= 2 && steps <= PlayerBombRange && !Board.IsObstacle(tile) && BombAt(tile) == null &&
+                           !IsShroudedFrom(tile, unit.Team);
                 case ActionKind.Snare:
                     return target != null && target.Team != unit.Team && steps <= ActionRange;
                 case ActionKind.Fireball:
-                    return steps >= 1 && steps <= FireballRange;
+                    return steps >= 1 && steps <= FireballRange && !IsShroudedFrom(tile, unit.Team);
                 case ActionKind.IceWall:
                     return steps >= 1 && steps <= ActionRange && IsFree(tile) && !HasHazard(tile) && RemainsAt(tile) == null;
                 case ActionKind.Ward:
@@ -749,7 +826,8 @@ namespace ArmyRoguelike.Core
         /// </summary>
         private void Push(Unit unit, GridPos dir, Unit pusher, List<BattleEvent> events)
         {
-            if (!unit.IsAlive)
+            // The shrine is rooted to its tile.
+            if (!unit.IsAlive || unit.IsObjective)
                 return;
             var from = unit.Pos;
             var to = from + dir;
@@ -790,7 +868,7 @@ namespace ArmyRoguelike.Core
             if (target == null || !target.IsAlive || target.Team == thrower.Team)
                 return false;
             var steps = Distance(thrower, target);
-            return steps >= 2 && steps <= thrower.Stats.ThrowRange;
+            return steps >= 2 && steps <= thrower.Stats.ThrowRange && !IsShroudedFrom(target, thrower.Team);
         }
 
         public bool CanBomb(Unit thrower, Unit target)
@@ -800,7 +878,7 @@ namespace ArmyRoguelike.Core
             if (target == null || !target.IsAlive || target.Team == thrower.Team)
                 return false;
             var steps = Distance(thrower, target);
-            return steps >= 2 && steps <= thrower.Stats.BombRange && BombAt(target.Pos) == null;
+            return steps >= 2 && steps <= thrower.Stats.BombRange && BombAt(target.Pos) == null && !IsShroudedFrom(target, thrower.Team);
         }
 
         /// <summary>
@@ -829,7 +907,7 @@ namespace ArmyRoguelike.Core
 
         public bool CanPlace(Unit unit, GridPos p)
         {
-            if (Phase != Phase.Placement || unit.Team != Team.Player || !IsPlayerZone(p) || Board.IsObstacle(p))
+            if (Phase != Phase.Placement || unit.Team != Team.Player || unit.IsObjective || !IsPlayerZone(p) || Board.IsObstacle(p))
                 return false;
             var occupant = UnitAt(p);
             return occupant == null || occupant == unit;
@@ -851,15 +929,15 @@ namespace ArmyRoguelike.Core
             if (Phase != Phase.Placement || !AllPlaced)
                 return false;
             TurnNumber = 1;
-            BeginTurn(Team.Player, new List<BattleEvent>());
             Phase = Phase.PlayerTurn;
+            BeginTurn(Team.Player, OpeningEvents);
             return true;
         }
 
         // ---------- Player turn ----------
 
         public bool CanAct(Unit unit) =>
-            Phase == Phase.PlayerTurn && unit.Team == Team.Player && unit.IsAlive && !unit.IsDone &&
+            Phase == Phase.PlayerTurn && unit.Team == Team.Player && unit.IsAlive && !unit.IsDone && !unit.IsObjective &&
             (ActiveUnit == null || ActiveUnit == unit);
 
         /// <summary>Moves a player unit. Returns the events, or null if the move isn't allowed.</summary>
@@ -929,6 +1007,16 @@ namespace ArmyRoguelike.Core
 
             if (IsOver)
                 return events;
+
+            // Ritual fights: surviving the last enemy turn completes the ritual; otherwise waves arrive.
+            if (RitualTurns > 0 && TurnNumber >= RitualTurns)
+            {
+                RitualComplete = true;
+                Phase = Phase.Victory;
+                return events;
+            }
+
+            SpawnWaves(events);
 
             TurnNumber++;
             BeginTurn(Team.Player, events);
@@ -1201,6 +1289,14 @@ namespace ArmyRoguelike.Core
                 amount = 0;
             }
 
+            if (target.MoonShield > 0 && amount > 0)
+            {
+                var absorbed = Math.Min(target.MoonShield, amount);
+                target.MoonShield -= absorbed;
+                amount -= absorbed;
+                after.Add(new EffectEvent(EffectKind.Absorb, target, absorbed, target.Hp, target));
+            }
+
             if (target.Shield > 0 && amount > 0)
             {
                 var absorbed = Math.Min(target.Shield, amount);
@@ -1358,6 +1454,9 @@ namespace ArmyRoguelike.Core
         /// </summary>
         private void BeginTurn(Team team, List<BattleEvent> events)
         {
+            if (team == Team.Enemy)
+                StrikeSunMarks(events);
+
             foreach (var u in Living(team).ToList())
             {
                 if (_burning.ContainsKey(u.Pos) || Cells(u).Any(_burning.ContainsKey))
@@ -1420,8 +1519,110 @@ namespace ArmyRoguelike.Core
                 }
             }
 
+            if (team == Team.Player)
+                ApplyOmens(events);
+
             CheckEnd();
         }
+
+        /// <summary>
+        /// Start of the player's turn: last round's shrouds and moon shields fade, then each omen picks a
+        /// random unit (never the objective): the Sun marks a tile under one of the other side's units, the
+        /// Night shrouds the 3x3 around one of its own side's units, the Moon shields one of its own side's units.
+        /// </summary>
+        private void ApplyOmens(List<BattleEvent> events)
+        {
+            if (IsOver || _omens.Count == 0)
+                return;
+            _shroud.Clear();
+            foreach (var u in _units)
+                u.MoonShield = 0;
+
+            foreach (var (omen, side) in _omens)
+            {
+                var other = side == Team.Player ? Team.Enemy : Team.Player;
+                var pool = Living(omen == Omen.Sun ? other : side).Where(u => !u.IsObjective).ToList();
+                if (pool.Count == 0)
+                    continue;
+                var unit = pool[Rng.Next(pool.Count)];
+                var blessing = side == Team.Player;
+                switch (omen)
+                {
+                    case Omen.Sun:
+                    {
+                        var cells = Cells(unit).ToList();
+                        var tile = cells[Rng.Next(cells.Count)];
+                        _sunMarks.Add(tile);
+                        events.Add(new OmenEvent(omen, blessing, unit, new[] { tile }));
+                        break;
+                    }
+                    case Omen.Night:
+                    {
+                        var area = BlastArea(unit.Pos);
+                        foreach (var p in area)
+                            _shroud[p] = side;
+                        events.Add(new OmenEvent(omen, blessing, unit, area));
+                        break;
+                    }
+                    case Omen.Moon:
+                        unit.MoonShield = MoonShield;
+                        events.Add(new OmenEvent(omen, blessing, unit, new GridPos[0]));
+                        break;
+                }
+            }
+        }
+
+        /// <summary>Start of the enemy turn: a sun beam strikes each marked tile, hurting whoever stands there now.</summary>
+        private void StrikeSunMarks(List<BattleEvent> events)
+        {
+            foreach (var tile in _sunMarks.ToList())
+            {
+                if (IsOver)
+                    break;
+                var hits = new List<Hit>();
+                var after = new List<BattleEvent>();
+                var victim = UnitAt(tile);
+                if (victim != null)
+                    hits.Add(Damage(victim, SunDamage, null, DamageKind.Blast, after));
+                events.Add(new ExplosionEvent("sun", null, tile, new[] { tile }, hits, 0));
+                events.AddRange(after);
+                CheckEnd();
+            }
+
+            _sunMarks.Clear();
+        }
+
+        /// <summary>
+        /// End of an enemy turn in a ritual fight: the waves due now walk in on random free edge tiles,
+        /// as far from the objective as possible. They act from the next enemy turn.
+        /// </summary>
+        private void SpawnWaves(List<BattleEvent> events)
+        {
+            var due = _waves.Where(w => w.afterEnemyTurn <= TurnNumber).ToList();
+            if (due.Count == 0)
+                return;
+            var arrived = new List<Unit>();
+            foreach (var wave in due)
+            {
+                _waves.Remove(wave);
+                var tiles = Board.AllTiles()
+                    .Where(p => (p.X == 0 || p.Y == 0 || p.X == Board.Width - 1 || p.Y == Board.Height - 1) && IsFree(p) && !HasHazard(p))
+                    .Where(p => Objective == null || p.StepsTo(Objective.Pos) >= RitualSpawnDistance)
+                    .ToList();
+                if (tiles.Count == 0)
+                    continue;
+                var tile = tiles[Rng.Next(tiles.Count)];
+                var unit = new Unit(_nextId++, Team.Enemy, wave.stats) { Pos = tile, IsPlaced = true, IsDone = true };
+                _units.Add(unit);
+                arrived.Add(unit);
+            }
+
+            if (arrived.Count > 0)
+                events.Add(new ReinforceEvent(arrived));
+        }
+
+        /// <summary>Enemies in a ritual fight start and arrive at least this many steps from the objective.</summary>
+        public const int RitualSpawnDistance = 4;
 
         /// <summary>
         /// Playtest shortcut: every enemy dies and the battle is won, with the whole army surviving.
@@ -1451,9 +1652,9 @@ namespace ArmyRoguelike.Core
         {
             if (IsOver || Phase == Phase.Placement)
                 return;
-            if (!Living(Team.Enemy).Any())
+            if (!Living(Team.Enemy).Any() && _waves.Count == 0)
                 Phase = Phase.Victory;
-            else if (!LivingArmy.Any())
+            else if (!LivingArmy.Any() || (Objective != null && !Objective.IsAlive))
                 Phase = Phase.Defeat;
         }
     }

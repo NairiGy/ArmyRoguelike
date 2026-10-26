@@ -21,9 +21,13 @@ namespace ArmyRoguelike.View
         public readonly string Layout;
         public readonly string LayoutRule;
 
+        /// <summary>A test battle from the test setup screen, outside any run.</summary>
+        public readonly bool Test;
+
         public BattleContext(int step, int steps, string encounter, int gold, int runSeed, bool ambush, bool boss,
-            string layout = "", string layoutRule = "")
+            string layout = "", string layoutRule = "", bool test = false)
         {
+            Test = test;
             Step = step;
             Steps = steps;
             Encounter = encounter;
@@ -56,6 +60,8 @@ namespace ArmyRoguelike.View
         private static readonly Color RaiseColor = new Color(0.7f, 0.4f, 1f, 0.6f);
         private static readonly Color BombZoneColor = new Color(1f, 0.45f, 0.1f, 0.4f);
         private static readonly Color MineSpotColor = new Color(1f, 0.9f, 0.3f, 0.5f);
+        private static readonly Color SunMarkColor = new Color(1f, 0.85f, 0.2f, 0.6f);
+        private static readonly Color ShroudColor = new Color(0.25f, 0.2f, 0.55f, 0.45f);
 
         // Wolf tints: warm while the leader's aura reaches them, pale and cold once the leader is dead.
         private static readonly Color NearLeaderTint = new Color(1.25f, 0.8f, 0.75f);
@@ -155,7 +161,7 @@ namespace ArmyRoguelike.View
         {
             var show = Battle.Phase == Phase.PlayerTurn && !_enemyTurnPlaying;
             var cost = show && !_busy ? PreviewCost() : 0;
-            foreach (var u in Battle.Units.Where(u => u.Team == Team.Player && u.IsPlaced && u.IsAlive))
+            foreach (var u in Battle.Units.Where(u => u.Team == Team.Player && u.IsPlaced && u.IsAlive && !u.IsObjective))
             {
                 var view = _board.ViewOf(u);
                 if (view == null)
@@ -193,7 +199,7 @@ namespace ArmyRoguelike.View
             if (clicked)
             {
                 var tile = _hovered.Value;
-                if (_hoveredUnit != null && _hoveredUnit.Team == Team.Player && _hoveredUnit != _toPlace)
+                if (_hoveredUnit != null && _hoveredUnit.Team == Team.Player && !_hoveredUnit.IsObjective && _hoveredUnit != _toPlace)
                 {
                     // Clicking a placed statue picks it up again.
                     _toPlace = _hoveredUnit;
@@ -224,6 +230,12 @@ namespace ArmyRoguelike.View
             _toPlace = null;
             _hint = "Click a statue to select it.";
             RefreshUnitStates();
+            // Omens take effect at the start of the first turn too.
+            if (Battle.OpeningEvents.Count > 0)
+            {
+                Record(Battle.OpeningEvents);
+                StartCoroutine(PlayPlayerAction(Battle.OpeningEvents));
+            }
         }
 
         // ---------- Player turn ----------
@@ -292,7 +304,9 @@ namespace ArmyRoguelike.View
 
             if (target != null && target.Team == Team.Player)
             {
-                if (Battle.CanAct(target))
+                if (target.IsObjective)
+                    _hint = $"The {target.Stats.Name} can't act. Keep it standing until the ritual completes.";
+                else if (Battle.CanAct(target))
                     Select(target);
                 else if (target.IsDone)
                     _hint = $"{target.Stats.Name} has finished its turn.";
@@ -489,6 +503,7 @@ namespace ArmyRoguelike.View
         private void DrawPlayerHighlights()
         {
             _board.ClearHighlights();
+            DrawOmenTiles();
             DrawBombZones();
             DrawEnemyHover();
             if (_selected == null)
@@ -537,6 +552,15 @@ namespace ArmyRoguelike.View
             if (_hoveredUnit != null && _hoveredUnit.Team == Team.Enemy && !Battle.CanAttack(_selected, _hoveredUnit) &&
                 Battle.FindAttackSpot(_selected, _hoveredUnit) is var spot && spot.HasValue)
                 _board.SetHighlight(spot.Value.tile, HoverColor);
+        }
+
+        /// <summary>Shrouded tiles, and the tiles a sun beam will strike at the start of the enemy turn.</summary>
+        private void DrawOmenTiles()
+        {
+            foreach (var p in Battle.Shroud.Keys)
+                _board.SetHighlight(p, ShroudColor);
+            foreach (var p in Battle.SunMarks)
+                _board.SetHighlight(p, SunMarkColor);
         }
 
         /// <summary>Every waiting bomb shows its blast area, so it can be dodged.</summary>
@@ -713,7 +737,11 @@ namespace ArmyRoguelike.View
                 }
                 case ExplosionEvent blast:
                 {
-                    _board.RemoveHazard(blast.Center);
+                    // A sun beam leaves any mine or bomb on its tile alone.
+                    if (blast.Cause == "sun")
+                        DamagePopup.Spawn(IsoMath.GridToWorld(blast.Center) + Vector3.up * 0.9f, "Sun beam!", DamagePopup.AbilityColor, 44);
+                    else
+                        _board.RemoveHazard(blast.Center);
                     StartCoroutine(_board.Flash(blast.Area, BlastTime));
                     StartCoroutine(Shake(0.06f + 0.02f * blast.ChainDepth, BlastTime));
                     foreach (var hit in blast.Hits)
@@ -850,6 +878,30 @@ namespace ArmyRoguelike.View
                     var at = IsoMath.GridToWorld(split.Parent.Pos) + Vector3.up * 0.6f;
                     DamagePopup.Spawn(at, "Split!", DamagePopup.AbilityColor, 48);
                     yield return new WaitForSeconds(0.5f);
+                    break;
+                }
+                case ReinforceEvent reinforce:
+                {
+                    foreach (var unit in reinforce.Units)
+                    {
+                        StartCoroutine(_board.AddView(unit).Raise());
+                        DamagePopup.Spawn(IsoMath.GridToWorld(unit.Pos) + Vector3.up * 0.6f, "Reinforcements!", DamagePopup.DamageColor, 40);
+                    }
+
+                    yield return new WaitForSeconds(0.6f);
+                    break;
+                }
+                case OmenEvent omen:
+                {
+                    var view = _board.ViewOf(omen.Unit);
+                    if (view == null)
+                        break;
+                    var text = omen.Omen == Omen.Sun ? "Sun mark" : omen.Omen == Omen.Night ? "Shrouded" : $"Moon shield {Battle.MoonShield}";
+                    DamagePopup.Spawn(view.TopWorld + Vector3.up * 0.25f, text, omen.Blessing ? DamagePopup.HealColor : DamagePopup.DamageColor, 40);
+                    view.RefreshStatus();
+                    foreach (var p in omen.Tiles)
+                        _board.SetHighlight(p, omen.Omen == Omen.Sun ? SunMarkColor : ShroudColor);
+                    yield return new WaitForSeconds(0.35f);
                     break;
                 }
                 case SummonEvent summon:
@@ -1075,17 +1127,41 @@ namespace ArmyRoguelike.View
                 GUI.Box(new Rect(Margin, ReferenceHeight - 80, 180, 30), _markerNote);
         }
 
-        private string Header =>
-            $"Step {_context.Step}/{_context.Steps}: {(_context.Boss ? "Boss " : "")}{(_context.Ambush ? "Ambush! " : "")}{_context.Encounter} ({_context.Layout})    Gold {_context.Gold}";
+        private string Header => _context.Test
+            ? $"TEST: {(_context.Boss ? "Boss " : "")}{_context.Encounter} ({_context.Layout})"
+            : $"Step {_context.Step}/{_context.Steps}:{(_context.Boss ? "Boss " : "")}{(_context.Ambush ? "Ambush! " : "")}{_context.Encounter} ({_context.Layout})    Gold {_context.Gold}";
+
+        /// <summary>For a ritual fight: how long the shrine must hold and when more enemies arrive.</summary>
+        private string RitualLine
+        {
+            get
+            {
+                if (Battle.Objective == null)
+                    return "";
+                var line = $"\nRitual: survive {Battle.RitualTurnsLeft} more enemy turn{(Battle.RitualTurnsLeft == 1 ? "" : "s")}. " +
+                           $"Shrine HP {Battle.Objective.Hp}/{Battle.Objective.MaxHp}";
+                var next = Battle.PendingWaves.Select(w => w.afterEnemyTurn).DefaultIfEmpty(0).Min();
+                if (next > 0)
+                    line += $"\nMore enemies arrive after enemy turn {next}";
+                return line;
+            }
+        }
+
+        /// <summary>The blessing or curse in play, if any.</summary>
+        private string OmenLine =>
+            string.Concat(Battle.Omens.Select(o => $"\n{Omens.Name(o.omen, o.side == Team.Player)}"));
 
         private void DrawPlacementHud()
         {
-            var army = Battle.Units.Where(u => u.Team == Team.Player).ToList();
-            var h = 110 + army.Count * (ButtonHeight + 2) + 10;
+            var army = Battle.Units.Where(u => u.Team == Team.Player && !u.IsObjective).ToList();
+            var omens = OmenLine.Trim();
+            var h = 110 + army.Count * (ButtonHeight + 2) + 10 + (omens.Length > 0 ? 20 * Battle.Omens.Count : 0);
             GUILayout.BeginArea(Panel(Margin, Margin, PanelWidth, h), GUI.skin.box);
             GUILayout.Label(Header);
             GUILayout.Label("Place your army in the blue tiles. Click a placed statue to move it.", TextStyle);
             GUILayout.Label(_context.LayoutRule, TextStyle);
+            if (omens.Length > 0)
+                GUILayout.Label(omens, TextStyle);
             foreach (var u in army)
             {
                 var item = u.Equipment != null ? $" [{u.Equipment.Name}]" : "";
@@ -1114,7 +1190,7 @@ namespace ArmyRoguelike.View
             var playerTurn = Battle.Phase == Phase.PlayerTurn && !_busy;
 
             // Top-left: turn and the selected unit.
-            var info = $"{Header}\nTurn {Battle.TurnNumber}: {(playerTurn ? "your turn" : "enemy turn")}";
+            var info = $"{Header}\nTurn {Battle.TurnNumber}: {(playerTurn ? "your turn" : "enemy turn")}{RitualLine}{OmenLine}";
             var apLine = "";
             if (_selected != null)
             {
@@ -1217,15 +1293,22 @@ namespace ArmyRoguelike.View
             if (Battle.Phase == Phase.Victory)
             {
                 var survivors = Battle.LivingArmy.Count();
-                GUILayout.Label("Victory!", style);
+                GUILayout.Label(Battle.RitualComplete ? "The ritual is complete!" : "Victory!", style);
                 GUILayout.Label($"{survivors} survived: +{_context.GoldIfWon(survivors)} gold", centred);
+                if (Battle.Objective != null)
+                    GUILayout.Label("The shrine held. Choose a blessing next.", centred);
                 if (Battle.StolenGold > 0)
                     GUILayout.Label($"Cutpurses got away with {Battle.StolenGold} gold.", centred);
+            }
+            else if (Battle.ObjectiveLost)
+            {
+                GUILayout.Label("The shrine broke", style);
+                GUILayout.Label(_context.Test ? "In a run: no gold and a random curse." : "No gold, and a curse follows you. The run goes on.", centred);
             }
             else
             {
                 GUILayout.Label("Defeat", style);
-                GUILayout.Label("The run is over.", centred);
+                GUILayout.Label(_context.Test ? "In a run, this would end it." : "The run is over.", centred);
             }
 
             if (GUILayout.Button("Continue"))
@@ -1235,6 +1318,10 @@ namespace ArmyRoguelike.View
 
         private string HoverText()
         {
+            if (_hoveredUnit != null && _hoveredUnit.IsObjective)
+                return $"{_hoveredUnit.Stats.Name}  HP {_hoveredUnit.Hp}/{_hoveredUnit.MaxHp}\n{_hoveredUnit.Stats.Role}\n" +
+                       "Enemies go for it unless one of your units is next to them.";
+
             if (_hoveredUnit != null && _hoveredUnit != _selected)
             {
                 var text = "Hover: " + UnitLine(_hoveredUnit);
@@ -1270,6 +1357,12 @@ namespace ArmyRoguelike.View
             if (_hovered.HasValue)
             {
                 var p = _hovered.Value;
+                if (Battle.SunMarks.Contains(p))
+                    return $"Sun mark: a sun beam strikes this tile at the start of the enemy turn for {Battle.SunDamage} damage to whoever stands here.";
+                if (Battle.Shroud.TryGetValue(p, out var side))
+                    return side == Team.Player
+                        ? "Shrouded: enemies can't hit units here from range."
+                        : "Shrouded: your units can't hit enemies here from range.";
                 if (Battle.BombAt(p) is Bomb bomb)
                     return $"Bomb: explodes at the start of the enemy turn for {bomb.Damage} damage to everyone in the orange 3x3.";
                 if (Battle.MineAt(p) != null)

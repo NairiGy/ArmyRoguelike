@@ -168,6 +168,9 @@ namespace ArmyRoguelike.View
                 case UnitKind.Turret:
                     sprite = MakeTurret();
                     break;
+                case UnitKind.Shrine:
+                    sprite = MakeShrine();
+                    break;
                 case UnitKind.Goblin:
                 case UnitKind.GoblinBomber:
                     sprite = MakeGoblin(kind == UnitKind.GoblinBomber);
@@ -621,6 +624,26 @@ namespace ArmyRoguelike.View
             // Crossbow arms and bolt.
             Fill(tex, 7, 27, 24, 28);
             Fill(tex, 15, 24, 16, 31);
+            Shade(tex, w, h);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);
+        }
+
+        /// <summary>The Moon Shrine: a stepped pillar with a crescent moon on top.</summary>
+        private static Sprite MakeShrine()
+        {
+            const int w = 36, h = 56;
+            var tex = NewTexture(w, h);
+            Plinth(tex, w, 13);
+            Fill(tex, 8, 4, 27, 7, 0.85f);
+            Fill(tex, 12, 8, 23, 33);
+            Fill(tex, 10, 34, 25, 36, 0.85f);
+            // Crescent: a disc with a smaller disc cut out of its upper right.
+            Disc(tex, 18, 45, 8);
+            for (var y = -6; y <= 6; y++)
+            for (var x = -6; x <= 6; x++)
+                if (x * x + y * y <= 36)
+                    tex.SetPixel(22 + x, 48 + y, Color.clear);
             Shade(tex, w, h);
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);

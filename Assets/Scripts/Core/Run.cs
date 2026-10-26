@@ -40,6 +40,9 @@ namespace ArmyRoguelike.Core
         Event,
         Trainer,
         Boss,
+
+        /// <summary>The Moon Shrine: defend it for a blessing; lose it and take a curse.</summary>
+        Ritual,
     }
 
     public enum EventKind
@@ -84,6 +87,7 @@ namespace ArmyRoguelike.Core
                     case NodeKind.Boss: return $"Boss: {Encounter.Name}";
                     case NodeKind.Shop: return "Shop";
                     case NodeKind.Trainer: return "Trainer";
+                    case NodeKind.Ritual: return Encounter.Name;
                     default: return "?";
                 }
             }
@@ -101,6 +105,9 @@ namespace ArmyRoguelike.Core
         Shop,
         Event,
         Trainer,
+
+        /// <summary>The Moon Shrine held: picking a blessing.</summary>
+        Blessing,
         Won,
         Lost,
     }
@@ -203,8 +210,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>
         /// Act 1, 7 steps. The four factions are shuffled and each appears on exactly one battle node, so
-        /// no faction can come up twice: step 1 offers two of them, steps 3 and 5 one each. Shops, ? events
-        /// and Trainers (steps 4 and 6) fill the rest, and step 7 is one of the two bosses.
+        /// no faction can come up twice: step 1 offers two of them, steps 3 and 5 one each. The Moon Shrine
+        /// is the other choice at step 3 or 5. Shops, ? events and Trainers (steps 4 and 6) fill the rest,
+        /// and step 7 is one of the two bosses.
         /// </summary>
         private void GenerateMap()
         {
@@ -213,12 +221,14 @@ namespace ArmyRoguelike.Core
             var shop = new MapNode(NodeKind.Shop);
             var unknown = new MapNode(NodeKind.Event);
             var trainer = new MapNode(NodeKind.Trainer);
+            var ritual = new MapNode(NodeKind.Ritual, Encounter.MoonShrine);
+            var ritualAtStep3 = _rng.Next(2) == 0;
 
             AddStep(Fight(0), Fight(1));
             AddStep(shop, unknown);
-            AddStep(Fight(2), unknown);
+            AddStep(Fight(2), ritualAtStep3 ? ritual : unknown);
             AddStep(trainer, shop);
-            AddStep(Fight(3), unknown);
+            AddStep(Fight(3), ritualAtStep3 ? unknown : ritual);
             AddStep(trainer, unknown);
             _map.Add(new[] { new MapNode(NodeKind.Boss, Encounter.Bosses[_rng.Next(Encounter.Bosses.Count)]) });
         }
@@ -247,6 +257,7 @@ namespace ArmyRoguelike.Core
             {
                 case NodeKind.Battle:
                 case NodeKind.Boss:
+                case NodeKind.Ritual:
                     CurrentEncounter = CurrentNode.Encounter;
                     State = RunState.Battle;
                     break;
@@ -281,7 +292,32 @@ namespace ArmyRoguelike.Core
             if (State != RunState.Battle)
                 throw new InvalidOperationException($"Can't start a battle while in {State}.");
             CurrentBattle = CurrentEncounter.CreateBattle(Army, _rng, Fought);
+            if (Blessing.HasValue)
+                CurrentBattle.AddOmen(Blessing.Value, Team.Player);
+            if (Curse.HasValue)
+                CurrentBattle.AddOmen(Curse.Value, Team.Enemy);
             return CurrentBattle;
+        }
+
+        // ---------- Moon Shrine ----------
+
+        /// <summary>The blessing chosen after holding the Moon Shrine, in play for every later battle.</summary>
+        public Omen? Blessing { get; private set; }
+
+        /// <summary>The curse taken after losing the Moon Shrine, in play for every later battle.</summary>
+        public Omen? Curse { get; private set; }
+
+        /// <summary>The blessings offered after holding the shrine (all of them, for now).</summary>
+        public IReadOnlyList<Omen> BlessingChoices => Omens.All;
+
+        /// <summary>Picks the blessing after holding the Moon Shrine and moves on.</summary>
+        public bool ChooseBlessing(Omen omen)
+        {
+            if (State != RunState.Blessing || !BlessingChoices.Contains(omen))
+                return false;
+            Blessing = omen;
+            NextStep();
+            return true;
         }
 
         public static int GoldFor(int survivors) => BaseGold + GoldPerSurvivor * survivors;
@@ -305,6 +341,14 @@ namespace ArmyRoguelike.Core
 
             if (battle.Phase == Phase.Defeat)
             {
+                // Losing the Moon Shrine with the army still standing isn't the end: it costs a random curse.
+                if (battle.ObjectiveLost)
+                {
+                    Curse = Omens.All[_rng.Next(Omens.All.Count)];
+                    NextStep();
+                    return 0;
+                }
+
                 State = RunState.Lost;
                 return 0;
             }
@@ -314,8 +358,13 @@ namespace ArmyRoguelike.Core
             Gold -= LastStolen;
             var earned = RewardFor(battle.LivingArmy.Count());
             Gold += earned;
-            if (!CurrentEncounter.IsBoss && !Fought.Contains(CurrentEncounter))
+            if (Encounter.Regular.Contains(CurrentEncounter) && !Fought.Contains(CurrentEncounter))
                 Fought.Add(CurrentEncounter);
+            if (CurrentEncounter.IsRitual)
+            {
+                State = RunState.Blessing;
+                return earned;
+            }
             if (IsFinalStep)
             {
                 State = RunState.Won;

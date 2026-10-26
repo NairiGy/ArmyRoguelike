@@ -45,16 +45,23 @@ namespace ArmyRoguelike.Tests
         private static void WinCurrentBattle(Run run, int survivors)
         {
             var b = run.StartBattle();
-            var x = 0;
-            foreach (var u in b.Units.Where(u => u.Team == Team.Player))
-                b.Place(u, new GridPos(x++, 0));
+            foreach (var u in b.Units.Where(u => u.Team == Team.Player && !u.IsObjective))
+                b.Place(u, b.Board.AllTiles().First(p => b.CanPlace(u, p) && b.UnitAt(p) == null));
             b.StartBattle();
-            var players = b.Units.Where(u => u.Team == Team.Player).ToList();
+            var players = b.Units.Where(u => u.Team == Team.Player && !u.IsObjective).ToList();
             for (var i = survivors; i < players.Count; i++)
                 players[i].Hp = 0;
-            // Elementals split when they die, so keep going until nothing is left standing.
-            for (var e = b.Living(Team.Enemy).FirstOrDefault(); e != null && !b.IsOver; e = b.Living(Team.Enemy).FirstOrDefault())
+            // Elementals split when they die, so keep going until nothing is left standing. In a ritual
+            // fight more arrive later, so end turns until the ritual completes.
+            for (var guard = 0; guard < 200 && !b.IsOver; guard++)
             {
+                var e = b.Living(Team.Enemy).FirstOrDefault();
+                if (e == null)
+                {
+                    b.EndPlayerTurn();
+                    continue;
+                }
+
                 e.Hp = 1;
                 var killer = players[0];
                 killer.Ap = 99;
@@ -115,6 +122,8 @@ namespace ArmyRoguelike.Tests
                 case RunState.Battle:
                     WinCurrentBattle(run, 3);
                     run.FinishBattle();
+                    if (run.State == RunState.Blessing)
+                        run.ChooseBlessing(run.BlessingChoices[0]);
                     break;
                 case RunState.Shop:
                     run.LeaveShop();
@@ -176,6 +185,91 @@ namespace ArmyRoguelike.Tests
                 var battles = run.Map.Take(Run.Steps - 1).SelectMany(s => s).Where(n => n.Kind == NodeKind.Battle).Select(n => n.Encounter).ToList();
                 CollectionAssert.AreEquivalent(Encounter.Regular, battles, "every faction exactly once on the map");
             }
+        }
+
+        [Test]
+        public void Map_MoonShrineOnce_AtStep3Or5_NextToABattle()
+        {
+            var steps = new System.Collections.Generic.HashSet<int>();
+            for (var seed = 0; seed < 50; seed++)
+            {
+                var run = NewRun(seed);
+                var where = Enumerable.Range(0, Run.Steps).Where(i => run.Map[i].Any(n => n.Kind == NodeKind.Ritual)).ToList();
+                Assert.AreEqual(1, where.Count, $"seed {seed}");
+                Assert.IsTrue(where[0] == 2 || where[0] == 4);
+                Assert.IsTrue(run.Map[where[0]].Any(n => n.Kind == NodeKind.Battle));
+                steps.Add(where[0]);
+            }
+
+            Assert.AreEqual(2, steps.Count, "both spots come up");
+        }
+
+        /// <summary>A run standing at the step that offers the Moon Shrine, having played through everything before it.</summary>
+        private static Run RunAtShrineStep(int seed)
+        {
+            var run = NewRun(seed);
+            while (!run.CurrentChoices.Any(n => n.Kind == NodeKind.Ritual))
+            {
+                run.ChooseNode(0);
+                PlayThroughNode(run);
+            }
+
+            return run;
+        }
+
+        private static int ShrineIndex(Run run) => run.CurrentChoices.ToList().FindIndex(n => n.Kind == NodeKind.Ritual);
+
+        [Test]
+        public void MoonShrine_Held_PickABlessing_InPlayInLaterBattles()
+        {
+            var run = RunAtShrineStep(3);
+            var step = run.StepIndex;
+            var gold = run.Gold;
+            run.ChooseNode(ShrineIndex(run));
+            Assert.AreEqual(RunState.Battle, run.State);
+            WinCurrentBattle(run, 3);
+            var earned = run.FinishBattle();
+            Assert.AreEqual(gold + earned, run.Gold);
+            Assert.AreEqual(RunState.Blessing, run.State);
+            Assert.IsFalse(run.Fought.Contains(Encounter.MoonShrine));
+
+            Assert.IsTrue(run.ChooseBlessing(Omen.Night));
+            Assert.AreEqual(Omen.Night, run.Blessing);
+            Assert.AreEqual(RunState.Map, run.State);
+            Assert.AreEqual(step + 1, run.StepIndex);
+
+            while (run.State == RunState.Map)
+            {
+                var fight = run.CurrentChoices.ToList().FindIndex(n => n.Kind == NodeKind.Battle || n.Kind == NodeKind.Boss);
+                run.ChooseNode(fight >= 0 ? fight : 0);
+                if (run.State != RunState.Battle)
+                    PlayThroughNode(run);
+            }
+
+            CollectionAssert.Contains(run.StartBattle().Omens, (Omen.Night, Team.Player));
+        }
+
+        [Test]
+        public void MoonShrine_Lost_RandomCurse_RunGoesOn()
+        {
+            var run = RunAtShrineStep(5);
+            var step = run.StepIndex;
+            var gold = run.Gold;
+            run.ChooseNode(ShrineIndex(run));
+            var b = run.StartBattle();
+            foreach (var u in b.Units.Where(u => u.Team == Team.Player && !u.IsObjective))
+                b.Place(u, b.Board.AllTiles().First(p => b.CanPlace(u, p) && b.UnitAt(p) == null));
+            b.StartBattle();
+            b.Objective.Hp = 0;
+            b.EndPlayerTurn();
+            Assert.IsTrue(b.ObjectiveLost);
+
+            Assert.AreEqual(0, run.FinishBattle());
+            Assert.AreEqual(gold, run.Gold);
+            Assert.IsTrue(run.Curse.HasValue);
+            Assert.IsNull(run.Blessing);
+            Assert.AreEqual(RunState.Map, run.State);
+            Assert.AreEqual(step + 1, run.StepIndex);
         }
 
         [Test]
