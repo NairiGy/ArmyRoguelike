@@ -31,6 +31,10 @@ and move done items to the "Done" section at the bottom now and then.
 - [ ] Playtest Prototype 5 (Act 1) and summarise from the logs.
 - [ ] Zone of control is hard to notice: the user only notices it when a unit can still get away. Consider showing enemies' reach (the tiles next to them) while a unit is selected. Ask before building.
 - [ ] Later (parked ideas, see "Later / maybe" in the design note): Banners, more acts, terrain features, post-battle reward choice, elite nodes, difficulty scaling.
+- [x] Gamepedia documents enemy AI: per-enemy actions and traits, shared AI rules, each behaviour's decision list, hover intent (2026-10-26, branch `docs/enemy-ai-wiki`, worktree `../ArmyRoguelike-enemy-ai-wiki`). Not merged yet; after merging, re-export with Tools → Export Gamepedia to get the statue images back (the committed page is text only).
+- [ ] When adding enemy AI (e.g. Moon Shrine elementals going for the shrine): add a value to `EnemyBehaviour` in `EnemyAI.cs` and its name and decision list in `GamepediaWriter.BehaviourSteps`; the export fails until the text exists.
+- [ ] Crossbowman's role text says "Hides behind cover", but its AI just walks to the cheapest tile with a shot (only the Camp layout starts it behind rocks). Fix the text or give it cover-seeking AI. Ask first.
+- [ ] Goblin Bomber hover intent only checks the nearest unit: it shows "attack" when it will bomb a farther unit, and ignores backing off. Decide whether the intent should match.
 
 ## Sound
 
