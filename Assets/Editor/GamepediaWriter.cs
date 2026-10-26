@@ -21,12 +21,13 @@ public static class GamepediaWriter
         html.Append("<header><h1>ArmyRoguelike Gamepedia</h1>");
         html.Append($"<p class=\"muted\">Generated from the game data on {DateTime.Now:yyyy-MM-dd HH:mm} ({generatedBy}). All numbers are placeholders. ");
         html.Append("Re-export with <b>Tools → Export Gamepedia</b>.</p>");
-        html.Append("<nav><a href=\"#trees\">Evolution trees</a><a href=\"#enemies\">Enemies</a><a href=\"#encounters\">Encounters</a>");
+        html.Append("<nav><a href=\"#trees\">Evolution trees</a><a href=\"#enemies\">Enemies</a><a href=\"#enemy-ai\">Enemy AI</a><a href=\"#encounters\">Encounters</a>");
         html.Append("<a href=\"#items\">Items</a><a href=\"#actions\">Actions</a><a href=\"#abilities\">Abilities</a>");
         html.Append("<a href=\"#run\">Run &amp; map</a><a href=\"#rules\">Battle rules</a></nav></header><main>");
 
         Trees(html);
         Enemies(html);
+        EnemyAISection(html);
         Encounters(html);
         Items(html);
         ActionsSection(html);
@@ -113,10 +114,216 @@ public static class GamepediaWriter
 
     private static void Enemies(StringBuilder html)
     {
-        html.Append("<section id=\"enemies\"><h2>Enemies</h2><div class=\"grid\">");
+        html.Append("<section id=\"enemies\"><h2>Enemies</h2>");
+        html.Append("<p>Each card lists what the enemy can do and which <a href=\"#enemy-ai\">AI behaviour</a> decides when it does it.</p><div class=\"grid\">");
         foreach (var e in UnitStats.Enemies)
-            UnitCard(html, e);
+            EnemyCard(html, e);
+        html.Append("</div><h3>The Necromancer's raised army</h3>");
+        html.Append("<p>Raised versions of each beaten faction's representative: same numbers, but each leaves a bone pile and can be raised again.</p><div class=\"grid\">");
+        foreach (var e in RaisedArmy())
+            EnemyCard(html, e);
         html.Append("</div></section>");
+    }
+
+    private static UnitStats[] RaisedArmy() =>
+        Encounter.Regular.Where(enc => enc.RaisedRepresentative != null).Select(enc => UnitStats.Raised(enc.RaisedRepresentative)).ToArray();
+
+    private static void EnemyCard(StringBuilder html, UnitStats unit)
+    {
+        html.Append($"<div class=\"card wide\" id=\"{Id(unit.Name)}\">");
+        var image = _image?.Invoke(unit);
+        html.Append(image != null
+            ? $"<img src=\"{image}\" alt=\"{Esc(unit.Name)}\">"
+            : $"<div class=\"noimg\">{Esc(unit.Label)}</div>");
+        html.Append($"<div class=\"body\"><h4>{Esc(unit.Name)}</h4>");
+        html.Append($"<p class=\"stats\">HP {unit.MaxHp} · DMG {unit.Damage} · RNG {unit.Range} · AP {unit.MaxAp}");
+        if (unit.Size > 1)
+            html.Append($" · {unit.Size}x{unit.Size}");
+        html.Append("</p>");
+        if (!string.IsNullOrEmpty(unit.Role))
+            html.Append($"<p class=\"role\">{Esc(unit.Role)}</p>");
+        html.Append("<ul>");
+        foreach (var line in EnemyActions(unit))
+            html.Append($"<li class=\"action\">{line}</li>");
+        foreach (var line in EnemyTraits(unit))
+            html.Append($"<li>{line}</li>");
+        html.Append("</ul>");
+        var behaviour = EnemyAI.BehaviourOf(unit);
+        html.Append($"<p class=\"ai\">AI: <a href=\"#{BehaviourId(behaviour)}\">{Esc(BehaviourName(behaviour))}</a></p>");
+        html.Append("</div></div>");
+    }
+
+    /// <summary>What the enemy can spend AP on, built from its stats.</summary>
+    private static string[] EnemyActions(UnitStats e)
+    {
+        var lines = new System.Collections.Generic.List<string>();
+        var cost = Battle.AttackCost;
+        if (e.AreaMelee)
+            lines.Add($"<b>Smash</b> ({cost} AP): {e.Damage} damage to every unit next to it.");
+        else if (e.IsRanged)
+            lines.Add($"<b>Ranged attack</b> ({cost} AP): {e.Damage} damage up to {e.Range} tiles away; needs line of sight.");
+        else
+            lines.Add($"<b>Attack</b> ({cost} AP): {e.Damage} damage to a unit next to it.");
+        if (e.Slams)
+            lines.Add($"<b>Slam</b> ({cost} AP): shoves every other 1x1 unit within 2 tiles (yours and its own) 1 tile away from it. " +
+                      $"A unit pushed into a rock, unit or the edge takes {Battle.CollisionDamage} damage.");
+        if (e.CanThrow)
+            lines.Add($"<b>Boulder</b> ({e.ThrowCost} AP, once a turn): {e.ThrowDamage} damage to a unit 2-{e.ThrowRange} tiles away, ignoring line of sight. " +
+                      "The boulder stays as a rock on the free tile next to the target that is closest to the thrower, burying any mine or bomb there.");
+        if (e.CanBomb)
+            lines.Add($"<b>Bomb</b> ({e.BombCost} AP, once a turn): lobbed onto the tile of a unit 2-{e.BombRange} tiles away that has no bomb on it yet, ignoring line of sight. " +
+                      $"It explodes at the start of the next enemy turn for {e.BombDamage} damage to everyone in the 3x3, its own side included, and sets off mines and bombs in the blast.");
+        if (e.CanRaise)
+            lines.Add($"<b>Raise</b> ({e.RaiseCost} AP): brings one of its side's bone piles within {e.RaiseRange} tiles back at full HP, if nobody stands on it. " +
+                      "The raised unit acts from the next enemy turn.");
+        return lines.ToArray();
+    }
+
+    /// <summary>Passive rules of an enemy type, built from its stats.</summary>
+    private static string[] EnemyTraits(UnitStats e)
+    {
+        var lines = new System.Collections.Generic.List<string>();
+        foreach (var a in e.Abilities)
+            lines.Add($"<b>{Esc(Abilities.Name(a))}</b>: {Esc(Abilities.Describe(a))}.");
+        if (e.Kind == UnitKind.PackLeader)
+            lines.Add($"<b>Pack aura</b>: wolves within {Battle.LeaderAuraRange} tiles deal +1 damage. When it dies, every wolf deals 1 less (minimum 1).");
+        else if (e.Kind == UnitKind.Wolf && !e.IsUndead)
+            lines.Add($"<b>Pack</b>: +1 damage within {Battle.LeaderAuraRange} tiles of a living Pack Leader, -1 once the leader is dead (minimum 1).");
+        if (e.StealsGold > 0)
+            lines.Add($"<b>Steal</b>: its first hit that does damage takes {e.StealsGold} of your gold. From then on it runs for the enemies' back row and escapes from there, and the gold is lost. Kill it first and you keep the gold.");
+        if (e.SplitsInto != null)
+            lines.Add($"<b>Split</b>: when it dies it becomes 2 {Link(e.SplitsInto.Name)}s, one on its tile and one on a free neighbour (fewer if there is no room). They act from the next enemy turn.");
+        if (e.LeavesRemains)
+            lines.Add("<b>Bone pile</b>: leaves one when killed, which a Necromancer can raise. A unit standing on the pile stops that.");
+        return lines.ToArray();
+    }
+
+    private static void EnemyAISection(StringBuilder html)
+    {
+        html.Append("<section id=\"enemy-ai\"><h2>Enemy AI</h2>");
+        html.Append("<p>How enemies decide what to do. The rules every enemy shares come first; each behaviour below only lists what it does differently.</p>");
+
+        html.Append("<h3 id=\"ai-turn\">The enemy turn</h3><ul>");
+        html.Append($"<li>At the start of the enemy phase, burning ground and poison tick, then every enemy gets its AP back: its full pool plus up to {Battle.MaxCarriedAp} unused AP from last turn (minus any slow).</li>");
+        html.Append("<li>Next, every bomb on the board explodes, one by one (a blast sets off other bombs and mines inside it).</li>");
+        html.Append("<li>Then the enemies act one at a time, in the order they entered the battle. Each finishes its whole turn before the next starts. Units raised or split off during this phase wait until the next enemy turn.</li>");
+        html.Append("<li>A turn is a loop: the enemy picks a target, does the first thing on its behaviour's list that it can, and starts over. It stops when it runs out of AP or nothing on the list helps. The target is picked again before every action, so after a kill it turns to the next one.</li>");
+        html.Append($"<li>Enemies move by your rules: {Battle.MoveCost} AP per tile, no diagonals, +{Battle.ZocCost} AP per step out of a tile next to one of your units (zone of control), and snared units can't move.</li>");
+        html.Append("<li>Enemies can't see mines. One that steps on a mine stops there and sets it off.</li></ul>");
+
+        html.Append("<h3 id=\"ai-target\">Targeting</h3><ol>");
+        html.Append($"<li>A unit with Taunt within {Battle.TauntRange} tiles: the nearest such unit.</li>");
+        html.Append("<li>Otherwise the nearest of your units, counted in steps and ignoring rocks. Ties go to the one with the lowest HP, then to the one listed first in your army.</li></ol>");
+        html.Append("<p>Every behaviour uses this target. Only the Bomber may bomb a different unit when its target can't be bombed, and the Necromancer raises bone piles before it looks for a target at all.</p>");
+
+        html.Append("<h3 id=\"ai-approach\">Walking up</h3><ol>");
+        html.Append($"<li>If it can reach a tile from which it can hit the target and still have {Battle.AttackCost} AP left for the attack, it walks to the cheapest such tile. Ranged units need range and line of sight from that tile.</li>");
+        html.Append("<li>Otherwise it walks as close to the target as it can: to the reachable tile with the shortest walk to any tile next to the target, the cheapest of those. That walk goes around rocks but through units, so an enemy stuck behind its friends still edges forward.</li>");
+        html.Append("<li>If no reachable tile is closer than where it stands, it stays put.</li></ol>");
+        html.Append("<p>Ranged enemies that walk up (the Crossbowman) walk to the cheapest tile with a shot. They don't look for cover; the Camp layout just starts them behind rocks.</p>");
+
+        html.Append("<h3 id=\"ai-retreat\">Backing off</h3>");
+        html.Append("<p>Used by enemies that want distance, once per turn, when their target is too close: it moves to the reachable tile furthest from the nearest of your units, the cheapest of those. If no tile is further away than where it stands, it stays.</p>");
+
+        html.Append("<h3 id=\"ai-range\">Getting into range from a distance</h3>");
+        html.Append("<p>Used by enemies that fight from afar, once per turn. They only consider tiles at least their comfort distance from every one of your units:</p><ol>");
+        html.Append("<li>The cheapest tile from which it can use its ranged action on the target, with enough AP left to do it.</li>");
+        html.Append("<li>If there is none, the tile closest to the target, if it is closer than where it stands.</li></ol>");
+
+        html.Append("<h3 id=\"ai-behaviours\">Behaviours</h3>");
+        html.Append("<table><tr><th>Behaviour</th><th>Each loop, the first that applies</th><th>Used by</th></tr>");
+        var everyone = UnitStats.Enemies.Concat(RaisedArmy()).ToArray();
+        foreach (EnemyBehaviour b in Enum.GetValues(typeof(EnemyBehaviour)))
+        {
+            var users = everyone.Where(u => EnemyAI.BehaviourOf(u) == b).Select(u => Link(u.Name));
+            html.Append($"<tr id=\"{BehaviourId(b)}\"><td><b>{Esc(BehaviourName(b))}</b></td><td><ol>");
+            foreach (var step in BehaviourSteps(b))
+                html.Append($"<li>{step}</li>");
+            html.Append($"</ol></td><td>{string.Join(", ", users)}</td></tr>");
+        }
+
+        html.Append("</table>");
+
+        html.Append("<h3 id=\"ai-intent\">Hover intent</h3>");
+        html.Append("<p>Hovering an enemy shows the first thing it would do if its turn started now. It is a forecast, not a promise: your moves change it, and it only shows the first action. ");
+        html.Append("Hovering a Pack Leader also lights up its aura.</p>");
+        html.Append("<table><tr><th>Shows</th><th>When (checked in this order)</th><th>On the board</th></tr>");
+        html.Append("<tr><td>Flee</td><td>It carries stolen gold.</td><td>The enemies' back row, where it will escape.</td></tr>");
+        html.Append("<tr><td>Slam</td><td>It can slam and 2 or more of your units are within 2 tiles.</td><td>The area within 2 tiles.</td></tr>");
+        html.Append("<tr><td>Raise</td><td>It can raise and one of its bone piles within raise range is free. AP isn't checked.</td><td>The bone pile.</td></tr>");
+        html.Append("<tr><td>Bomb</td><td>It bombs and its target is 2 to bomb-range tiles away with no bomb on its tile. Otherwise it shows Attack, though it may still bomb another unit or back off.</td><td>The target and the 3x3 blast.</td></tr>");
+        html.Append("<tr><td>Smash</td><td>It smashes and the target is next to it, or the target is out of boulder range.</td><td>The ring around it and the target.</td></tr>");
+        html.Append("<tr><td>Throw</td><td>It throws boulders and the target is 2 to throw-range tiles away.</td><td>The target and the tile where the rock will land.</td></tr>");
+        html.Append("<tr><td>Attack</td><td>Anything else, whether or not it can reach the target this turn.</td><td>The target, with an arrow.</td></tr>");
+        html.Append("</table></section>");
+    }
+
+    private static string BehaviourId(EnemyBehaviour b) => "ai-" + b.ToString().ToLowerInvariant();
+
+    private static string BehaviourName(EnemyBehaviour b)
+    {
+        switch (b)
+        {
+            case EnemyBehaviour.Advance: return "Walk up and hit";
+            case EnemyBehaviour.Thief: return "Thief";
+            case EnemyBehaviour.Bomber: return "Bomber";
+            case EnemyBehaviour.Giant: return "Giant";
+            case EnemyBehaviour.Necromancer: return "Necromancer";
+            default: throw new ArgumentOutOfRangeException(nameof(b), b, "Add a name and steps for this behaviour to the gamepedia.");
+        }
+    }
+
+    /// <summary>
+    /// The decision list of each behaviour, written to match <see cref="EnemyAI"/>'s turn routines.
+    /// Update it whenever a routine changes; a new behaviour without text stops the export.
+    /// </summary>
+    private static string[] BehaviourSteps(EnemyBehaviour b)
+    {
+        const string target = "<a href=\"#ai-target\">target</a>";
+        const string approach = "<a href=\"#ai-approach\">walk up</a>";
+        const string retreat = "<a href=\"#ai-retreat\">back off</a>";
+        const string range = "<a href=\"#ai-range\">get into range</a>";
+        switch (b)
+        {
+            case EnemyBehaviour.Advance:
+                return new[]
+                {
+                    $"If it can hit its {target} from where it stands: attack.",
+                    $"Otherwise {approach} to it.",
+                };
+            case EnemyBehaviour.Thief:
+                return new[]
+                {
+                    "Carrying stolen gold: if it is on the enemies' back row, escape with the gold. Otherwise move to the reachable tile furthest back (the cheapest of those). If it can't get any further back this turn, it stops.",
+                    $"Not carrying gold: attack its {target} if it can, otherwise {approach}, like Walk up and hit. Its first hit that does damage steals the gold, and it spends the rest of its AP running.",
+                };
+            case EnemyBehaviour.Bomber:
+                return new[]
+                {
+                    $"If its {target} is closer than {EnemyAI.BomberComfortDistance} tiles: {retreat} (once a turn).",
+                    "Bomb its target if it can; if not, the nearest of your units it can bomb (once a turn).",
+                    "If the target is next to it: stab.",
+                    $"If it hasn't bombed yet: {range} for a bomb (once a turn), with a comfort distance of {EnemyAI.BomberComfortDistance}.",
+                };
+            case EnemyBehaviour.Giant:
+                return new[]
+                {
+                    $"Once, at the very start of its turn: slam if 2 or more of your units are within 2 tiles and it has {Battle.AttackCost} AP.",
+                    $"If any of your units are next to it: smash (stops if it has less than {Battle.AttackCost} AP).",
+                    $"Throw a boulder at its {target} if it is 2 to throw-range tiles away (once a turn).",
+                    $"Otherwise {approach} to the target.",
+                };
+            case EnemyBehaviour.Necromancer:
+                return new[]
+                {
+                    "Raise the nearest bone pile it can, as long as its AP lasts.",
+                    $"If its {target} is closer than {EnemyAI.NecromancerComfortDistance} tiles: {retreat} (once a turn).",
+                    "If it can hit the target from where it stands: fire a bolt.",
+                    $"Otherwise {range} for a bolt (once a turn), with a comfort distance of {EnemyAI.NecromancerComfortDistance}. It never walks closer than that to shoot.",
+                };
+            default:
+                throw new ArgumentOutOfRangeException(nameof(b), b, "Add a name and steps for this behaviour to the gamepedia.");
+        }
     }
 
     private static void Encounters(StringBuilder html)
@@ -241,6 +448,7 @@ main { padding:0 32px 48px; } .muted { color:var(--muted); margin:0; }
 .node { display:flex; flex-direction:column; align-items:center; }
 .children { display:flex; gap:12px; margin-top:12px; padding-top:12px; border-top:2px solid var(--line); align-items:flex-start; }
 .card { display:flex; gap:10px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px; width:300px; }
+.card.wide { width:440px; } .ai { margin:6px 0 0; font-size:13px; }
 .card.tier2 { border-color:#7a6040; } .card.tier3 { border-color:#a08a30; }
 .card img { image-rendering:pixelated; width:72px; height:auto; align-self:flex-start; }
 .noimg { width:56px; height:56px; flex:none; border-radius:6px; background:var(--line); display:flex; align-items:center; justify-content:center; font-weight:bold; color:var(--accent); }

@@ -38,6 +38,25 @@ namespace ArmyRoguelike.Core
         }
     }
 
+    /// <summary>Which turn routine an enemy type runs. The gamepedia documents each one.</summary>
+    public enum EnemyBehaviour
+    {
+        /// <summary>Walk to the target and use the basic attack (melee or ranged).</summary>
+        Advance,
+
+        /// <summary>Like Advance until it lands a hit, then runs for the far edge with the gold.</summary>
+        Thief,
+
+        /// <summary>Keeps its distance and lobs delayed bombs.</summary>
+        Bomber,
+
+        /// <summary>Slam, area smash and boulder throws.</summary>
+        Giant,
+
+        /// <summary>Raises bone piles, keeps its distance and fires bolts.</summary>
+        Necromancer,
+    }
+
     /// <summary>
     /// Enemy behaviour. Wolves, skeletons and goblins walk to the nearest player unit and attack while
     /// AP lasts. The necromancer stays back, raises bone piles and fires bolts. The ogre throws boulders
@@ -46,8 +65,22 @@ namespace ArmyRoguelike.Core
     /// </summary>
     public static class EnemyAI
     {
-        private const int NecromancerComfortDistance = 3;
-        private const int BomberComfortDistance = 2;
+        public const int NecromancerComfortDistance = 3;
+        public const int BomberComfortDistance = 2;
+
+        /// <summary>The turn routine a type runs; <see cref="TakeTurn"/> dispatches on this.</summary>
+        public static EnemyBehaviour BehaviourOf(UnitStats stats)
+        {
+            if (stats.CanRaise)
+                return EnemyBehaviour.Necromancer;
+            if (stats.StealsGold > 0)
+                return EnemyBehaviour.Thief;
+            if (stats.CanBomb)
+                return EnemyBehaviour.Bomber;
+            if (stats.AreaMelee)
+                return EnemyBehaviour.Giant;
+            return EnemyBehaviour.Advance;
+        }
 
         /// <summary>
         /// The player unit this enemy wants to attack: nearest in steps, then lowest HP, then lowest id.
@@ -125,16 +158,24 @@ namespace ArmyRoguelike.Core
 
         public static void TakeTurn(Battle battle, Unit enemy, List<BattleEvent> events)
         {
-            if (enemy.Stats.CanRaise)
-                NecromancerTurn(battle, enemy, events);
-            else if (enemy.Stats.StealsGold > 0)
-                CutpurseTurn(battle, enemy, events);
-            else if (enemy.Stats.CanBomb)
-                BomberTurn(battle, enemy, events);
-            else if (enemy.Stats.AreaMelee)
-                OgreTurn(battle, enemy, events);
-            else
-                MeleeTurn(battle, enemy, events);
+            switch (BehaviourOf(enemy.Stats))
+            {
+                case EnemyBehaviour.Necromancer:
+                    NecromancerTurn(battle, enemy, events);
+                    break;
+                case EnemyBehaviour.Thief:
+                    CutpurseTurn(battle, enemy, events);
+                    break;
+                case EnemyBehaviour.Bomber:
+                    BomberTurn(battle, enemy, events);
+                    break;
+                case EnemyBehaviour.Giant:
+                    OgreTurn(battle, enemy, events);
+                    break;
+                default:
+                    MeleeTurn(battle, enemy, events);
+                    break;
+            }
         }
 
         // ---------- Behaviours ----------
