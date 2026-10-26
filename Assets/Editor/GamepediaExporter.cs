@@ -47,26 +47,65 @@ public static class GamepediaExporter
 
     private static readonly Dictionary<string, string> PngCache = new Dictionary<string, string>();
 
-    /// <summary>The sprite tinted like it is in the game, upscaled 3x without blurring, as a data URI.</summary>
+    /// <summary>Every card image is this tall, whatever the source size.</summary>
+    private const int CardHeight = 150;
+
+    /// <summary>
+    /// The sprite tinted like it is in the game, scaled to <see cref="CardHeight"/>, as a data URI. Pixel art
+    /// (point-filtered) stays crisp; painted statues are scaled smoothly.
+    /// </summary>
     private static string Png(Sprite sprite, Color tint)
     {
         var key = $"{sprite.GetInstanceID()}{tint}";
         if (PngCache.TryGetValue(key, out var cached))
             return cached;
-        var src = sprite.texture;
-        const int scale = 3;
-        var tex = new Texture2D(src.width * scale, src.height * scale, TextureFormat.RGBA32, false);
+        var src = ReadableCopy(sprite);
+        var scale = (float)CardHeight / src.height;
+        var tex = new Texture2D(Mathf.Max(1, Mathf.RoundToInt(src.width * scale)), CardHeight, TextureFormat.RGBA32, false);
+        var pixelArt = sprite.texture.filterMode == FilterMode.Point;
         for (var y = 0; y < tex.height; y++)
         for (var x = 0; x < tex.width; x++)
         {
-            var c = src.GetPixel(x / scale, y / scale);
+            var c = pixelArt
+                ? src.GetPixel(Mathf.Min(src.width - 1, (int)(x / scale)), Mathf.Min(src.height - 1, (int)(y / scale)))
+                : src.GetPixelBilinear((x + 0.5f) / tex.width, (y + 0.5f) / tex.height);
             tex.SetPixel(x, y, c.a > 0f ? new Color(c.r * tint.r, c.g * tint.g, c.b * tint.b, c.a) : c);
         }
 
         tex.Apply();
         var uri = "data:image/png;base64," + Convert.ToBase64String(tex.EncodeToPNG());
         UnityEngine.Object.DestroyImmediate(tex);
+        UnityEngine.Object.DestroyImmediate(src);
         PngCache[key] = uri;
         return uri;
+    }
+
+    /// <summary>
+    /// The sprite's own area as a new readable texture. Painted statues are imported without Read/Write
+    /// (keeping it off saves memory in the game), so those are copied through a render texture instead.
+    /// </summary>
+    private static Texture2D ReadableCopy(Sprite sprite)
+    {
+        var src = sprite.texture;
+        var r = sprite.rect;
+        int x = Mathf.RoundToInt(r.x), y = Mathf.RoundToInt(r.y), w = Mathf.RoundToInt(r.width), h = Mathf.RoundToInt(r.height);
+        var copy = new Texture2D(w, h, TextureFormat.RGBA32, false) { filterMode = src.filterMode };
+        if (src.isReadable)
+        {
+            copy.SetPixels(src.GetPixels(x, y, w, h));
+        }
+        else
+        {
+            var rt = RenderTexture.GetTemporary(src.width, src.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            Graphics.Blit(src, rt);
+            var previous = RenderTexture.active;
+            RenderTexture.active = rt;
+            copy.ReadPixels(new Rect(x, y, w, h), 0, 0);
+            RenderTexture.active = previous;
+            RenderTexture.ReleaseTemporary(rt);
+        }
+
+        copy.Apply();
+        return copy;
     }
 }
