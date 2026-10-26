@@ -172,7 +172,7 @@ namespace ArmyRoguelike.View
             var colors = new List<Color>();
             if (Unit.IsAlive)
             {
-                if (Unit.Shield > 0)
+                if (Unit.Shield > 0 || Unit.MoonShield > 0)
                     colors.Add(ShieldColor);
                 if (Unit.IsSnared)
                     colors.Add(SnareColor);

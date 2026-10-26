@@ -31,6 +31,8 @@ namespace ArmyRoguelike.View
             _log.layout = context.Layout;
             _log.goldAtStart = context.Gold;
             _goldIfWon = context.GoldIfWon;
+            _log.omens = battle.Omens.Select(o => Omens.Name(o.omen, o.side == Team.Player)).ToList();
+            _log.ritualTurns = battle.RitualTurns;
         }
 
         private readonly Func<int, int> _goldIfWon;
@@ -53,7 +55,7 @@ namespace ArmyRoguelike.View
         public void BattleStarted()
         {
             _battleStartTime = Time.realtimeSinceStartup;
-            foreach (var u in _battle.Units.Where(u => u.Team == Team.Player))
+            foreach (var u in _battle.Units.Where(u => u.Team == Team.Player && !u.IsObjective))
                 _log.placements.Add(new PlacementEntry
                 {
                     unit = Name(u), x = u.Pos.X, y = u.Pos.Y, equipment = u.Equipment?.Name ?? "", maxHp = u.MaxHp,
@@ -208,6 +210,22 @@ namespace ArmyRoguelike.View
                         target = string.Join(", ", split.Children.Select(Name)), amount = split.Children.Count,
                     });
                     break;
+                case ReinforceEvent reinforce:
+                    _log.wavesArrived += reinforce.Units.Count;
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = Team.Enemy.ToString(), unit = "", type = "reinforce",
+                        target = string.Join(", ", reinforce.Units.Select(Name)), amount = reinforce.Units.Count,
+                    });
+                    break;
+                case OmenEvent omen:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = "", unit = "", type = "omen",
+                        note = $"{omen.Omen.ToString().ToLowerInvariant()} {(omen.Blessing ? "blessing" : "curse")}",
+                        target = Name(omen.Unit), toX = omen.Unit.Pos.X, toY = omen.Unit.Pos.Y,
+                    });
+                    break;
                 case SummonEvent summon:
                     _log.actions.Add(new ActionEntry
                     {
@@ -273,6 +291,8 @@ namespace ArmyRoguelike.View
                 bonePiles = piles.Count,
                 bonePilesBlocked = piles.Count(p => _battle.UnitAt(p.Pos) is Unit u && u.Team == Team.Player),
             });
+            if (_battle.Objective != null)
+                _log.shrineHpAtEndTurn.Add(_battle.Objective.Hp);
         }
 
         /// <summary>
@@ -323,7 +343,10 @@ namespace ArmyRoguelike.View
             _log.turns = _battle.TurnNumber;
             _log.skipped = _battle.WasSkipped;
             _log.stolenGold = _battle.StolenGold;
-            _log.survivors = _battle.Living(Team.Player).Count();
+            _log.survivors = _battle.LivingArmy.Count();
+            _log.ritualComplete = _battle.RitualComplete;
+            _log.shrineLost = _battle.ObjectiveLost;
+            _log.shrineHpLeft = _battle.Objective?.Hp ?? 0;
             _log.goldEarned = _battle.Phase == Phase.Victory ? _goldIfWon(_log.survivors) : 0;
             _log.units = Summarise();
 
@@ -344,11 +367,14 @@ namespace ArmyRoguelike.View
             {
                 if (a.unit == null || !summaries.TryGetValue(a.unit, out var s))
                 {
-                    // No source (poison, burning ground): still count what the target took.
-                    if (a.type == "tick" && summaries.TryGetValue(a.target ?? "", out var ticked))
+                    // No source (poison, burning ground, sun beams): still count what the target took.
+                    if ((a.type == "tick" || a.type == "explosion") && summaries.TryGetValue(a.target ?? "", out var ticked))
                     {
                         ticked.damageTaken += a.damage;
-                        ticked.tickDamageTaken += a.damage;
+                        if (a.type == "tick")
+                            ticked.tickDamageTaken += a.damage;
+                        else
+                            ticked.sunDamageTaken += a.damage;
                         if (a.killed)
                             ticked.deaths++;
                     }
@@ -466,6 +492,20 @@ namespace ArmyRoguelike.View
             public int stolenGold;
             public int goldAtStart;
             public int goldEarned;
+
+            /// <summary>Blessings and curses in play this battle.</summary>
+            public List<string> omens = new List<string>();
+
+            /// <summary>
+            /// Moon Shrine fights: enemy turns to survive, whether the ritual completed or the shrine broke,
+            /// the shrine's HP when each player turn ended and at the end, and how many reinforcements arrived.
+            /// </summary>
+            public int ritualTurns;
+            public bool ritualComplete;
+            public bool shrineLost;
+            public int shrineHpLeft;
+            public List<int> shrineHpAtEndTurn = new List<int>();
+            public int wavesArrived;
             public List<PlacementEntry> placements = new List<PlacementEntry>();
             public List<UnitSummary> units = new List<UnitSummary>();
             public List<MarkerEntry> markers = new List<MarkerEntry>();
@@ -526,7 +566,7 @@ namespace ArmyRoguelike.View
 
             /// <summary>
             /// End turn prompt: "asked", "confirmed" or "cancelled" ("target" lists the units that could still act).
-            /// Explosion: "mine" or "bomb".
+            /// Explosion: "mine", "bomb", "barricade" or "sun". Omen: e.g. "sun blessing", "moon curse" ("target" is the unit picked).
             /// </summary>
             public string note;
 
@@ -613,6 +653,9 @@ namespace ArmyRoguelike.View
 
             /// <summary>Damage from poison and burning ground.</summary>
             public int tickDamageTaken;
+
+            /// <summary>Damage from sun beams (Sun blessing or curse).</summary>
+            public int sunDamageTaken;
 
             public int pushesDone;
             public int statusesApplied;

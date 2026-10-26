@@ -225,6 +225,24 @@ Goal: battles that don't repeat and a boss that checks the build. The run is a s
 
 **Zone of control** — each step out of a tile next to an enemy costs +2 AP, both sides.
 
+## Moon Shrine: the first non-"kill all" scenario
+
+Built 2026-10-26 on branch `feature/moon-shrine`, not yet playtested. Other scenario ideas, ranked, for later: break the ritual (destroy totems before turn N), survive waves, assassinate the leader, rescue a captive, hold the ground, break through, crumbling tower; puzzles last (fixed puzzles clash with a random army; maybe as a ? event with a fixed squad).
+
+- **Map:** a new node type (`NodeKind.Ritual`), once per run, as the other choice next to the battle at step 3 or step 5. May later merge into battle nodes as a variant.
+- **Board** *(placeholders)*: the shrine (15 HP, can't act or move) stands at (3,3). You deploy within 2 steps of it, not in the back rows. 3 Elementals start on edge tiles at least 4 steps away; 2 more walk in from the edges after enemy turns 1 and 3. One mirrored pair of crystals.
+- **Win:** survive 5 enemy turns; the ritual completes and the rest flee. Killing everyone wins early only once no reinforcements are left. Pays normal gold, then you pick a **blessing**.
+- **Loss:** the shrine breaks: no gold, a random **curse**, and the run goes on. Losing the whole army still ends the run.
+- **Enemy AI here:** go for the shrine unless one of your units is next to them (Taunt still wins). The shrine is your ally for Shield Wall and Guard; your own blasts and volleys hurt it.
+- **Factions:** elementals only for now (slow and tough; a split next to the shrine drops two shards on it). Goblin bombers don't fit (bombs on something that can't move). Other factions would need their own behaviour in this mode.
+- **Blessings and curses (omens):** one per run, lasting every battle after. A blessing helps you, the same omen as a curse helps the enemy. Omens never pick the shrine.
+
+| Omen | Blessing | Curse |
+|---|---|---|
+| Sun | Start of your turn: the tile under a random enemy is marked; at the start of the enemy turn a sun beam hits it for 3 (tile-based: pushing the enemy off makes it miss) | The mark goes under one of your units; step off before the enemy turn |
+| Night | Start of your turn: a random unit of yours and the 3x3 around it are shrouded until your next turn; enemies can't hit units there from range (point blank still works) | The shroud covers an enemy; your ranged attacks, fireballs and bombs can't reach it |
+| Moon | Start of your turn: a random unit of yours gets a 4-point shield until your next turn | The shield goes to an enemy |
+
 ## Later / maybe
 
 - Drawn spell cards during battle.

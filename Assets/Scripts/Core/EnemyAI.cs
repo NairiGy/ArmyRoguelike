@@ -50,7 +50,8 @@ namespace ArmyRoguelike.Core
         private const int BomberComfortDistance = 2;
 
         /// <summary>
-        /// The player unit this enemy wants to attack: nearest in steps, then lowest HP, then lowest id.
+        /// The player unit this enemy wants to attack: a taunter in range first; in a ritual fight a defender
+        /// next to it, else the objective; otherwise nearest in steps, then lowest HP, then lowest id.
         /// </summary>
         public static Unit ChooseTarget(Battle battle, Unit enemy)
         {
@@ -62,6 +63,18 @@ namespace ArmyRoguelike.Core
                 .FirstOrDefault();
             if (taunter != null)
                 return taunter;
+
+            // Ritual fights: go for the objective, unless a defender is already next to this enemy.
+            var objective = battle.Objective;
+            if (objective != null && objective.IsAlive)
+            {
+                var blocker = battle.Living(Team.Player)
+                    .Where(u => u != objective && Battle.Distance(enemy, u) == 1)
+                    .OrderBy(u => u.Hp)
+                    .ThenBy(u => u.Id)
+                    .FirstOrDefault();
+                return blocker ?? objective;
+            }
 
             return battle.Living(Team.Player)
                 .OrderBy(u => Battle.Distance(enemy, u))

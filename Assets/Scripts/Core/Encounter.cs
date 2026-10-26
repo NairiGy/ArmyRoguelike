@@ -34,7 +34,24 @@ namespace ArmyRoguelike.Core
         {
             public readonly List<GridPos> Rocks = new List<GridPos>();
             public readonly List<(UnitStats stats, GridPos pos)> Enemies = new List<(UnitStats, GridPos)>();
+
+            // Ritual fights only: the objective's tile, where the player deploys, turns to survive and later waves.
+            public GridPos? Objective;
+            public List<GridPos> DeployZone;
+            public int RitualTurns;
+            public readonly List<(int afterEnemyTurn, UnitStats stats)> Waves = new List<(int, UnitStats)>();
+
+            /// <summary>The tiles the player deploys on: the ritual zone, or the back two rows.</summary>
+            public IEnumerable<GridPos> PlayerTiles()
+            {
+                if (DeployZone != null)
+                    return DeployZone;
+                return Enumerable.Range(0, Battle.PlayerZoneRows).SelectMany(y => Enumerable.Range(0, Size).Select(x => P(x, y)));
+            }
         }
+
+        /// <summary>A ritual fight: defend an objective in the middle instead of killing everyone.</summary>
+        public bool IsRitual => this == MoonShrine;
 
         private Encounter(string name, string layout, string layoutRule, bool isBoss, UnitStats raised,
             Func<Random, IReadOnlyList<Encounter>, Plan> generate)
@@ -63,7 +80,10 @@ namespace ArmyRoguelike.Core
                     break;
             }
 
-            return new Battle(new Board(Size, Size, plan.Rocks), army, plan.Enemies);
+            var battle = new Battle(new Board(Size, Size, plan.Rocks), army, plan.Enemies) { Rng = new Random(rng.Next()) };
+            if (plan.Objective.HasValue)
+                battle.SetupRitual(UnitStats.MoonShrine, plan.Objective.Value, plan.DeployZone, plan.RitualTurns, plan.Waves);
+            return battle;
         }
 
         /// <summary>The enemy types this encounter can field (with nothing fought yet), for the gamepedia.</summary>
@@ -73,25 +93,31 @@ namespace ArmyRoguelike.Core
             return plan.Enemies.GroupBy(e => e.stats.Name).Select(g => g.Count() > 1 ? $"{g.Key} x{g.Count()}" : g.Key);
         }
 
-        /// <summary>Rocks off the player rows and enemy tiles, enemies on distinct tiles, and all reachable on foot.</summary>
+        /// <summary>
+        /// Rocks off the player's tiles, the objective and enemy tiles, enemies on distinct tiles, and all
+        /// reachable on foot from where the player deploys.
+        /// </summary>
         private static bool IsValid(Plan plan)
         {
             var rocks = new HashSet<GridPos>(plan.Rocks);
-            if (rocks.Any(r => r.Y < Battle.PlayerZoneRows || !In(r)))
+            var playerTiles = plan.PlayerTiles().ToList();
+            if (rocks.Any(r => playerTiles.Contains(r) || !In(r) || r == plan.Objective))
                 return false;
             var occupied = new HashSet<GridPos>();
+            if (plan.Objective.HasValue)
+                occupied.Add(plan.Objective.Value);
             foreach (var (stats, pos) in plan.Enemies)
             foreach (var c in Battle.Footprint(pos, stats.Size))
-                if (!In(c) || rocks.Contains(c) || !occupied.Add(c))
+                if (!In(c) || rocks.Contains(c) || playerTiles.Contains(c) || !occupied.Add(c))
                     return false;
 
-            // Flood fill from the player's rows through anything that isn't a rock.
+            // Flood fill from the player's tiles through anything that isn't a rock.
             var seen = new HashSet<GridPos>();
             var queue = new Queue<GridPos>();
-            for (var x = 0; x < Size; x++)
+            foreach (var p in playerTiles)
             {
-                seen.Add(new GridPos(x, 0));
-                queue.Enqueue(new GridPos(x, 0));
+                seen.Add(p);
+                queue.Enqueue(p);
             }
 
             while (queue.Count > 0)
@@ -209,6 +235,48 @@ namespace ArmyRoguelike.Core
 
                 foreach (var t in picked)
                     plan.Enemies.Add((UnitStats.Elemental, t));
+                return plan;
+            });
+
+        // ---------- Ritual ----------
+
+        /// <summary>Moon Shrine: enemy turns to survive, and when waves arrive (after these enemy turns, 2 each).</summary>
+        public const int RitualTurns = 5;
+
+        public static readonly IReadOnlyList<int> RitualWaveTurns = new[] { 1, 3 };
+        public const int RitualWaveSize = 2;
+        public const int RitualDeployRange = 2;
+
+        public static readonly GridPos ShrineTile = new GridPos(3, 3);
+
+        public static readonly Encounter MoonShrine = new Encounter("Moon Shrine", "Moon Shrine",
+            "Defend the shrine in the middle for 5 enemy turns. Elementals come from every edge, and more arrive on turns 2 and 4.",
+            false, null,
+            (rng, _) =>
+            {
+                var plan = new Plan
+                {
+                    Objective = ShrineTile,
+                    DeployZone = Enumerable.Range(0, Size * Size).Select(i => P(i % Size, i / Size))
+                        .Where(p => p != ShrineTile && p.StepsTo(ShrineTile) <= RitualDeployRange).ToList(),
+                    RitualTurns = RitualTurns,
+                };
+                MirroredPair(plan, rng.Next(0, 3), 5 + rng.Next(2));
+                bool Edge(GridPos p) => p.X == 0 || p.Y == 0 || p.X == Size - 1 || p.Y == Size - 1;
+                var picked = new List<GridPos>();
+                foreach (var t in FreeTiles(plan, rng, 0, Size - 1).Where(t => Edge(t) && t.StepsTo(ShrineTile) >= Battle.RitualSpawnDistance))
+                {
+                    if (picked.Count == 3)
+                        break;
+                    if (picked.All(p => p.StepsTo(t) >= 4))
+                        picked.Add(t);
+                }
+
+                foreach (var t in picked)
+                    plan.Enemies.Add((UnitStats.Elemental, t));
+                foreach (var turn in RitualWaveTurns)
+                    for (var i = 0; i < RitualWaveSize; i++)
+                        plan.Waves.Add((turn, UnitStats.Elemental));
                 return plan;
             });
 

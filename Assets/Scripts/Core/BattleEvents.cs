@@ -387,4 +387,45 @@ namespace ArmyRoguelike.Core
 
         public override Unit Actor => Raiser;
     }
+
+    /// <summary>Enemy reinforcements walked onto the board at the edge. They act from the next enemy turn.</summary>
+    public sealed class ReinforceEvent : BattleEvent
+    {
+        public readonly IReadOnlyList<Unit> Units;
+
+        public ReinforceEvent(IReadOnlyList<Unit> units)
+        {
+            Units = units;
+        }
+
+        public override Unit Actor => null;
+    }
+
+    /// <summary>
+    /// An omen took effect at the start of the player's turn: a sun mark on a tile, a shroud around a unit,
+    /// or a moon shield on a unit. The sun beam itself strikes later as an <see cref="ExplosionEvent"/> ("sun").
+    /// </summary>
+    public sealed class OmenEvent : BattleEvent
+    {
+        public readonly Omen Omen;
+
+        /// <summary>True for the player's blessing, false for a curse.</summary>
+        public readonly bool Blessing;
+
+        /// <summary>The unit marked, shrouded or shielded.</summary>
+        public readonly Unit Unit;
+
+        /// <summary>The marked or shrouded tiles (empty for a shield).</summary>
+        public readonly IReadOnlyList<GridPos> Tiles;
+
+        public OmenEvent(Omen omen, bool blessing, Unit unit, IReadOnlyList<GridPos> tiles)
+        {
+            Omen = omen;
+            Blessing = blessing;
+            Unit = unit;
+            Tiles = tiles;
+        }
+
+        public override Unit Actor => null;
+    }
 }

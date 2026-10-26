@@ -140,10 +140,13 @@ namespace ArmyRoguelike.View
             var ambush = _run.IsAmbush;
             var earned = _run.FinishBattle();
             _runLog.RecordBattle(battle, earned, _controller.LogFile, ambush);
+            if (battle.ObjectiveLost)
+                _runLog.RecordOmen(_run.Curse.Value, false);
             Destroy(_battleRoot);
             _battleRoot = null;
             _controller = null;
-            _lastNote = battle.Phase != Phase.Victory ? null
+            _lastNote = battle.ObjectiveLost ? $"The shrine broke. {Omens.Name(_run.Curse.Value, false)}: {Omens.Describe(_run.Curse.Value, false)}"
+                : battle.Phase != Phase.Victory ? null
                 : _run.LastStolen > 0 ? $"Battle won: +{earned} gold, but cutpurses got away with {_run.LastStolen}."
                 : $"Battle won: +{earned} gold.";
             if (_run.State == RunState.Won || _run.State == RunState.Lost)
@@ -204,6 +207,9 @@ namespace ArmyRoguelike.View
                     break;
                 case RunState.Event:
                     DrawEvent(width);
+                    break;
+                case RunState.Blessing:
+                    DrawBlessing(width);
                     break;
                 case RunState.Won:
                 case RunState.Lost:
@@ -317,6 +323,10 @@ namespace ArmyRoguelike.View
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 20, w, 680), GUI.skin.box);
             GUILayout.Label("Act 1", Title);
             GUILayout.Label($"Gold: {_run.Gold}    Beaten: {(_run.Fought.Count > 0 ? string.Join(", ", _run.Fought.Select(f => f.Name)) : "nobody yet")}");
+            if (_run.Blessing.HasValue)
+                GUILayout.Label(Omens.Name(_run.Blessing.Value, true));
+            if (_run.Curse.HasValue)
+                GUILayout.Label(Omens.Name(_run.Curse.Value, false));
             if (!string.IsNullOrEmpty(_lastNote))
                 GUILayout.Label(_lastNote);
             GUILayout.Space(6);
@@ -350,6 +360,7 @@ namespace ArmyRoguelike.View
 
             GUILayout.Space(8);
             GUILayout.Label("? = something unexpected. Shops sell items and a recruit. Trainers evolve every unit one tier, for free.");
+            GUILayout.Label("Moon Shrine: defend it for 5 enemy turns to earn a blessing. If it breaks, you take a curse.");
             DrawArmy();
             GUILayout.EndArea();
         }
@@ -539,6 +550,33 @@ namespace ArmyRoguelike.View
                     }
 
                     break;
+            }
+
+            GUILayout.FlexibleSpace();
+            DrawArmy();
+            GUILayout.EndArea();
+        }
+
+        private void DrawBlessing(float screenWidth)
+        {
+            const float w = 520;
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 60, w, 560), GUI.skin.box);
+            GUILayout.Label("The Moon Shrine held", Title);
+            if (!string.IsNullOrEmpty(_lastNote))
+                GUILayout.Label(_lastNote);
+            GUILayout.Label("Choose a blessing. It stays with your army for the rest of the run.");
+            var style = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.UpperLeft, wordWrap = true };
+            foreach (var omen in _run.BlessingChoices)
+            {
+                var pick = omen;
+                if (GUILayout.Button($"{Omens.Name(omen, true)}\n{Omens.Describe(omen, true)}", style, GUILayout.Height(70)))
+                    Do(() =>
+                    {
+                        if (!_run.ChooseBlessing(pick))
+                            return;
+                        _runLog.RecordOmen(pick, true);
+                        _lastNote = $"{Omens.Name(pick, true)}: {Omens.Describe(pick, true)}";
+                    });
             }
 
             GUILayout.FlexibleSpace();

@@ -47,13 +47,25 @@ namespace ArmyRoguelike.View
                 skipped = battle != null && battle.WasSkipped,
                 result = battle != null && battle.Phase == Phase.Victory ? "victory" : "defeat",
                 turns = battle?.TurnNumber ?? 0,
-                survivors = battle?.Living(Team.Player).Count() ?? 0,
+                survivors = battle?.LivingArmy.Count() ?? 0,
                 armySize = _run.Army.Count,
                 goldEarned = goldEarned,
                 goldAfter = _run.Gold,
                 logFile = logFile ?? "",
                 stolenGold = _run.LastStolen,
+                shrine = battle?.Objective == null ? "" : battle.Phase == Phase.Victory ? "held" : battle.ObjectiveLost ? "broken" : "army lost",
+                shrineHpLeft = battle?.Objective?.Hp ?? 0,
             });
+        }
+
+        /// <summary>The blessing picked after holding the Moon Shrine, or the curse taken after losing it.</summary>
+        public void RecordOmen(Omen omen, bool blessing)
+        {
+            if (blessing)
+                _log.blessing = Omens.Name(omen, true);
+            else
+                _log.curse = Omens.Name(omen, false);
+            _log.omenStep = _run.State == RunState.Map ? _run.StepIndex : _run.StepIndex + 1;
         }
 
         public void OpenShop()
@@ -171,6 +183,11 @@ namespace ArmyRoguelike.View
             public int stepReached;
             public int goldLeft;
             public List<string> draft = new List<string>();
+
+            /// <summary>From the Moon Shrine: the blessing picked or the curse taken (empty if none), and at which step.</summary>
+            public string blessing = "";
+            public string curse = "";
+            public int omenStep;
             public List<MapStep> map = new List<MapStep>();
             public List<TrainerVisit> trainers = new List<TrainerVisit>();
             public List<Choice> choices = new List<Choice>();
@@ -210,6 +227,10 @@ namespace ArmyRoguelike.View
             public int goldAfter;
             public string logFile;
             public int stolenGold;
+
+            /// <summary>Moon Shrine fights only: "held", "broken" or "army lost", and its HP at the end.</summary>
+            public string shrine;
+            public int shrineHpLeft;
         }
 
         [Serializable]
