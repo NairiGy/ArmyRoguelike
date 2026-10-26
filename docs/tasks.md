@@ -29,6 +29,8 @@ and move done items to the "Done" section at the bottom now and then.
 ## Gameplay (mechanics chat)
 
 - [ ] Playtest Prototype 5 (Act 1) and summarise from the logs.
+- [ ] Zone of control is hard to notice: the user only notices it when a unit can still get away. Consider showing enemies' reach (the tiles next to them) while a unit is selected. Ask before building.
+- [ ] Later (parked ideas, see "Later / maybe" in the design note): Banners, more acts, terrain features, post-battle reward choice, elite nodes, difficulty scaling.
 
 ## Sound
 
