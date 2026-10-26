@@ -243,6 +243,12 @@ Built 2026-10-26 on branch `feature/moon-shrine`, not yet playtested. Other scen
 | Night | Start of your turn: a random unit of yours and the 3x3 around it are shrouded until your next turn; enemies can't hit units there from range (point blank still works) | The shroud covers an enemy; your ranged attacks, fireballs and bombs can't reach it |
 | Moon | Start of your turn: a random unit of yours gets a 4-point shield until your next turn | The shield goes to an enemy |
 
+## Test mode (for testing only)
+
+- Editor and dev builds only: a "Test battle" button on the draft screen opens a setup screen.
+- Pick any 1–4 unit types (any tier, repeats allowed), any encounter (factions, bosses, Moon Shrine; for the Necromancer, which factions count as beaten) and optionally any blessing or curse. No items for now.
+- The battle uses the normal rules; afterwards it returns to the setup screen. No run, gold or map, and no run log; battle logs are marked `test: true`.
+
 ## Later / maybe
 
 - Drawn spell cards during battle.

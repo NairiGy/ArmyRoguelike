@@ -28,6 +28,7 @@ namespace ArmyRoguelike.View
             _log.battleNumber = context.Step;
             _log.encounter = context.Encounter;
             _log.ambush = context.Ambush;
+            _log.test = context.Test;
             _log.layout = context.Layout;
             _log.goldAtStart = context.Gold;
             _goldIfWon = context.GoldIfWon;
@@ -486,6 +487,9 @@ namespace ArmyRoguelike.View
 
             /// <summary>Ended with the debug "Win battle" button instead of being played.</summary>
             public bool skipped;
+
+            /// <summary>Started from the test setup screen (any army, encounter and omen), not part of a run.</summary>
+            public bool test;
             public string layout;
 
             /// <summary>Gold carried off by cutpurses that escaped.</summary>

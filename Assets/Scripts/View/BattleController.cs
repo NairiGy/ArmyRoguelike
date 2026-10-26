@@ -21,9 +21,13 @@ namespace ArmyRoguelike.View
         public readonly string Layout;
         public readonly string LayoutRule;
 
+        /// <summary>A test battle from the test setup screen, outside any run.</summary>
+        public readonly bool Test;
+
         public BattleContext(int step, int steps, string encounter, int gold, int runSeed, bool ambush, bool boss,
-            string layout = "", string layoutRule = "")
+            string layout = "", string layoutRule = "", bool test = false)
         {
+            Test = test;
             Step = step;
             Steps = steps;
             Encounter = encounter;
@@ -1123,8 +1127,9 @@ namespace ArmyRoguelike.View
                 GUI.Box(new Rect(Margin, ReferenceHeight - 80, 180, 30), _markerNote);
         }
 
-        private string Header =>
-            $"Step {_context.Step}/{_context.Steps}: {(_context.Boss ? "Boss " : "")}{(_context.Ambush ? "Ambush! " : "")}{_context.Encounter} ({_context.Layout})    Gold {_context.Gold}";
+        private string Header => _context.Test
+            ? $"TEST: {(_context.Boss ? "Boss " : "")}{_context.Encounter} ({_context.Layout})"
+            : $"Step {_context.Step}/{_context.Steps}:{(_context.Boss ? "Boss " : "")}{(_context.Ambush ? "Ambush! " : "")}{_context.Encounter} ({_context.Layout})    Gold {_context.Gold}";
 
         /// <summary>For a ritual fight: how long the shrine must hold and when more enemies arrive.</summary>
         private string RitualLine
@@ -1298,12 +1303,12 @@ namespace ArmyRoguelike.View
             else if (Battle.ObjectiveLost)
             {
                 GUILayout.Label("The shrine broke", style);
-                GUILayout.Label("No gold, and a curse follows you. The run goes on.", centred);
+                GUILayout.Label(_context.Test ? "In a run: no gold and a random curse." : "No gold, and a curse follows you. The run goes on.", centred);
             }
             else
             {
                 GUILayout.Label("Defeat", style);
-                GUILayout.Label("The run is over.", centred);
+                GUILayout.Label(_context.Test ? "In a run, this would end it." : "The run is over.", centred);
             }
 
             if (GUILayout.Button("Continue"))
