@@ -80,10 +80,22 @@ namespace ArmyRoguelike.View
             }
         }
 
-        /// <summary>The item picked after breaking the ritual (null item: left them all).</summary>
-        public void RecordRewardItem(Equipment item, ArmyMember member, Equipment replaced)
+        /// <summary>
+        /// An item pick after breaking the ritual or beating an elite (null item: left them all). Call after the
+        /// pick, with the items that were offered.
+        /// </summary>
+        public void RecordRewardItem(IEnumerable<Equipment> offered, Equipment item, ArmyMember member, Equipment replaced)
         {
-            _log.rewardItem = item == null ? "left" : $"{item.Name} -> {member.Stats.Name}{(replaced != null ? $" (replaced {replaced.Name})" : "")}";
+            _log.rewardItems.Add(new RewardPick
+            {
+                // The pick has already moved the run on to the next step, so the fight was on the previous one.
+                step = _run.StepIndex,
+                encounter = _run.CurrentEncounter?.Name ?? "",
+                offered = offered.Select(o => o.Name).ToList(),
+                item = item?.Name ?? "left",
+                unit = member?.Stats.Name ?? "",
+                replaced = replaced?.Name ?? "",
+            });
         }
 
         public void OpenShop()
@@ -209,8 +221,8 @@ namespace ArmyRoguelike.View
             /// <summary>Curses taken by losing scenario fights, in order.</summary>
             public List<CurseEntry> curses = new List<CurseEntry>();
 
-            /// <summary>From Break the Ritual: "Item -> Unit", "left", or empty if not won.</summary>
-            public string rewardItem = "";
+            /// <summary>Item picks after breaking the ritual or beating an elite, in order.</summary>
+            public List<RewardPick> rewardItems = new List<RewardPick>();
             public List<MapStep> map = new List<MapStep>();
             public List<TrainerVisit> trainers = new List<TrainerVisit>();
             public List<Choice> choices = new List<Choice>();
@@ -269,6 +281,19 @@ namespace ArmyRoguelike.View
         {
             public string curse;
             public int step;
+        }
+
+        [Serializable]
+        private sealed class RewardPick
+        {
+            public int step;
+            public string encounter;
+            public List<string> offered = new List<string>();
+
+            /// <summary>The item taken, or "left".</summary>
+            public string item;
+            public string unit;
+            public string replaced;
         }
 
         [Serializable]

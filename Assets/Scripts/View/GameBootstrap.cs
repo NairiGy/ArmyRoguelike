@@ -777,9 +777,10 @@ namespace ArmyRoguelike.View
                         Do(() =>
                         {
                             var replaced = taker.Equipment;
+                            var offered = _run.RewardItems.ToList();
                             if (!_run.TakeRewardItem(item, taker))
                                 return;
-                            _runLog.RecordRewardItem(item, taker, replaced);
+                            _runLog.RecordRewardItem(offered, item, taker, replaced);
                             _lastNote = $"The {taker.Stats.Name} takes the {item.Name}.";
                             _selectedReward = null;
                         });
@@ -797,8 +798,9 @@ namespace ArmyRoguelike.View
             if (GUILayout.Button("Leave the items", GUILayout.Height(32)))
                 Do(() =>
                 {
+                    var offered = _run.RewardItems.ToList();
                     _run.SkipRewardItem();
-                    _runLog.RecordRewardItem(null, null, null);
+                    _runLog.RecordRewardItem(offered, null, null, null);
                     _lastNote = null;
                     _selectedReward = null;
                 });
