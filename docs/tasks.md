@@ -9,6 +9,23 @@ and move done items to the "Done" section at the bottom now and then.
 
 ## Visuals (art chat, branch `experiment/art-style`)
 
+### Art needed for gameplay features
+
+Gameplay chats add a row when a feature ships with placeholder visuals. The art chat takes work from this
+table and sets the Status (Needed / In progress / Done, with the date) when it starts and finishes a row.
+
+| Feature | What needs art | Now (placeholder) | Status |
+|---|---|---|---|
+| Moon Shrine | Shrine statue | Code-drawn pillar with a crescent (`PlaceholderArt.MakeShrine`) | Needed |
+| Break the Ritual | Totem statue | Code-drawn post with three faces (`PlaceholderArt.MakeTotem`) | Needed |
+| Omens | Sun mark and shroud tiles; the sun beam striking | Flat tile colours (`SunMarkColor`, `ShroudColor` in `BattleController`); a text popup and tile flash | Needed |
+| Omens | Moon shield on a unit | The generic shield status pip | Needed |
+| Moon Shrine | Reinforcements arriving at the edge | The rise animation and a text popup | Needed |
+| Scenarios | Blessing pick and item pick screens | Plain IMGUI panels (part of the UI pass) | Needed |
+| Zone of control | Enemy reach tiles, orange "costs extra AP" move tiles, dotted link to the enemies holding the selected unit | Flat colours (`EnemyReachColor`, `CostlyMoveColor`) and a red dotted line (`EngagedLinkColor`) in `BattleController` | Needed |
+
+### Other visual work
+
 - [ ] Painted aurora: ChatGPT's free image limit was hit on 2026-10-25; retry the prompt saved in the ChatGPT chat "Generate Crescent Moon Image". Then replace the code aurora with it (maybe for another setting).
 - [ ] Decide how statues meet the ground, on the warrior first (needs ChatGPT for one image):
   1. Have ChatGPT redraw the warrior standing on nothing (no ground, no slab, feet at the bottom of the image).
@@ -28,8 +45,8 @@ and move done items to the "Done" section at the bottom now and then.
 
 ## Gameplay (mechanics chat)
 
-- [ ] Next (agreed 2026-10-27): zone of control is hard to notice: the user only notices it when a unit can still get away. Show enemies' reach (the tiles next to them) while a unit is selected. Design with the user before building.
-- [ ] Then: playtest Prototype 5 (Act 1, now with both scenario fights) as a full run and summarise from the logs.
+- [x] Zone of control made visible while a unit is selected (2026-10-27, branch `feature/zoc-visibility`): enemy reach tiles in faint red, move tiles that cost extra AP in orange, a dotted link to each enemy holding the selected unit, and "Engaged by ..." in the HUD and enemy hover. Not playtested; art row added above.
+- [ ] Next: playtest Prototype 5 (Act 1, now with both scenario fights) as a full run and summarise from the logs.
 - [ ] Moon Shrine balance: 3 test battles with a tier-1 Warrior/Archer/Rogue were all lost (army wiped twice, shrine broken once); no blessing earned in play yet. Leave for the general balance pass (user's call).
 - [ ] More map events and node types: the user wants to think about what else to add. Ideas parked from the scenario list: assassinate the leader, rescue a captive, hold the ground, break through, crumbling tower.
 - [x] Moon Shrine scenario node with blessings and curses (2026-10-26), merged into `experiment/art-style`. Tested in test mode only.

@@ -224,5 +224,29 @@ namespace ArmyRoguelike.Tests
                 b.EndPlayerTurn();
             Assert.AreEqual(Phase.Defeat, b.Phase, "a passive player should lose");
         }
+
+        [Test]
+        public void ZoneOfControlDisplay_ReachTiles_CostlyMoves_EngagedBy()
+        {
+            // Rogue at (3,3) next to a wolf at (3,4); a rock at (2,4) next to the wolf.
+            var b = Started(new[] { UnitStats.Rogue }, new[] { new GridPos(3, 0) },
+                new[] { (UnitStats.Wolf, new GridPos(3, 4)) }, new GridPos(2, 4));
+            var rogue = Player(b);
+            var wolf = Enemy(b);
+            rogue.Pos = new GridPos(3, 3);
+
+            var reach = b.EnemyReachTiles(rogue);
+            CollectionAssert.AreEquivalent(new[] { new GridPos(3, 3), new GridPos(4, 4), new GridPos(3, 5) }, reach,
+                "free tiles next to the wolf (the rock is left out), plus the rogue's own");
+            CollectionAssert.AreEqual(new[] { wolf }, b.EngagedBy(rogue, rogue.Pos).ToList());
+
+            var costly = b.CostlyMoveTiles(rogue);
+            Assert.IsTrue(costly.Contains(new GridPos(3, 2)), "stepping away pays zone of control");
+            Assert.IsTrue(b.GetReachable(rogue).Keys.All(costly.Contains), "every move starts by leaving the wolf's reach");
+
+            rogue.Pos = new GridPos(0, 0);
+            Assert.AreEqual(0, b.EngagedBy(rogue, rogue.Pos).Count());
+            Assert.AreEqual(0, b.CostlyMoveTiles(rogue).Count, "nothing costs extra away from enemies");
+        }
     }
 }

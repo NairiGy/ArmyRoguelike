@@ -239,6 +239,8 @@ Goal: battles that don't repeat and a boss that checks the build. The run is a s
 
 **Zone of control** — each step out of a tile next to an enemy costs +2 AP, both sides.
 
+**Showing zone of control** (2026-10-27, not playtested) — only while one of your units is selected: tiles next to enemies (their reach) get a faint red tint, move tiles whose cheapest path pays zone-of-control AP are orange instead of blue, and a dotted red link runs to each enemy holding the selected unit. The HUD and the enemy hover say "Engaged by ...: each step out of their reach costs +2 AP". A step-by-step path preview is parked for later if this isn't clear enough.
+
 ## Moon Shrine: the first non-"kill all" scenario
 
 Built 2026-10-26 on branch `feature/moon-shrine`, not yet playtested. Other scenario ideas, ranked, for later: break the ritual (built next, see below), survive waves, assassinate the leader, rescue a captive, hold the ground, break through, crumbling tower; puzzles last (fixed puzzles clash with a random army; maybe as a ? event with a fixed squad).

@@ -12,11 +12,18 @@ namespace ArmyRoguelike.View
 
         private readonly List<SpriteRenderer> _dots = new List<SpriteRenderer>();
 
-        public static IntentView Create(Transform parent)
+        private Color _color = DotColor;
+
+        public static IntentView Create(Transform parent) => Create(parent, DotColor);
+
+        /// <summary>A dotted line in another colour, e.g. the zone-of-control link between engaged units.</summary>
+        public static IntentView Create(Transform parent, Color color)
         {
             var go = new GameObject("Intent");
             go.transform.SetParent(parent, false);
-            return go.AddComponent<IntentView>();
+            var view = go.AddComponent<IntentView>();
+            view._color = color;
+            return view;
         }
 
         public void Show(Vector3 from, Vector3 to)
@@ -48,7 +55,7 @@ namespace ArmyRoguelike.View
             sr.transform.SetParent(transform, false);
             sr.transform.localScale = new Vector3(DotSize, DotSize, 1f);
             sr.sprite = PlaceholderArt.Pixel;
-            sr.color = DotColor;
+            sr.color = _color;
             sr.sortingOrder = 15000;
             return sr;
         }

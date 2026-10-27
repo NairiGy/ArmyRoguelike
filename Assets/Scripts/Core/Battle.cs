@@ -448,8 +448,31 @@ namespace ArmyRoguelike.Core
         /// True if the unit, standing with its anchor here, is next to a living enemy (inside its reach).
         /// Objectives (shrine, totems) can't attack, so they have no reach.
         /// </summary>
-        public bool InEnemyReach(Unit unit, GridPos anchor) =>
-            _units.Any(u => u.IsPlaced && u.IsAlive && u.Team != unit.Team && !u.IsObjective && Distance(anchor, unit.Size, u) == 1);
+        public bool InEnemyReach(Unit unit, GridPos anchor) => EngagedBy(unit, anchor).Any();
+
+        /// <summary>The enemies whose reach holds the unit standing here: leaving their reach costs <see cref="ZocCost"/> extra.</summary>
+        public IEnumerable<Unit> EngagedBy(Unit unit, GridPos anchor) =>
+            _units.Where(u => u.IsPlaced && u.IsAlive && u.Team != unit.Team && !u.IsObjective && Distance(anchor, unit.Size, u) == 1);
+
+        /// <summary>
+        /// Tiles inside the reach of the unit's enemies (next to them), where stepping out again costs extra.
+        /// Rocks and occupied tiles are left out.
+        /// </summary>
+        public HashSet<GridPos> EnemyReachTiles(Unit unit)
+        {
+            var tiles = new HashSet<GridPos>();
+            foreach (var e in _units.Where(u => u.IsPlaced && u.IsAlive && u.Team != unit.Team && !u.IsObjective))
+            foreach (var n in Cells(e).SelectMany(c => c.Neighbours()))
+                if (IsFree(n) || UnitAt(n) == unit)
+                    tiles.Add(n);
+            return tiles;
+        }
+
+        /// <summary>
+        /// Reachable tiles whose cheapest path leaves an enemy's reach at least once (so it costs zone-of-control AP).
+        /// </summary>
+        public HashSet<GridPos> CostlyMoveTiles(Unit unit) =>
+            new HashSet<GridPos>(GetReachable(unit).Keys.Where(t => FindPath(unit, t) is List<GridPos> path && ZocSteps(unit, path) > 0));
 
         /// <summary>
         /// AP for one step. Zone of control: stepping out of a tile next to an enemy costs

@@ -54,7 +54,20 @@ The game is worked on in several chats, one per big topic (visuals and art, game
   - `CLAUDE.md` (this file): how we work. `docs/design-note.md`: what has been decided. `docs/tasks.md`: what is left to do.
 - At the start of a session, read all three. At the end of a piece of work, update `docs/tasks.md` (tick done items, add new ones) and record any decision in the design note, so the other chats know.
 - Work found for another topic goes into that topic's section of `docs/tasks.md`.
+- Gameplay chats add a row to the "Art needed for gameplay features" table in `docs/tasks.md` whenever a feature ships with placeholder visuals. The art chat takes work from that table and sets each row's Status when it starts and finishes it.
 - Merges and decisions that affect more than one topic are the user's call. When asked for a status or a plan, answer from the three files.
+
+### Roles
+
+The user's first message in a chat names its role. Stay inside it; put work for other roles into their section of `docs/tasks.md`.
+
+| Role | Owns | Hands off |
+|---|---|---|
+| Gameplay and mechanics | `Assets/Scripts/Core`, the tests, gameplay logic in `Assets/Scripts/View` (rules, HUD text, screens' flow), `PlaytestLogger` / `RunLogger`, `GamepediaWriter`, the design note's rules sections | Placeholder visuals → the "Art needed" table |
+| Visuals and art | `Assets/Art`, `BattleScenery` and the scenery scripts, statues and `PlaceholderArt` look, highlight and effect styling, the UI look, the design note's "Visual direction" | Gameplay questions or bugs → the Gameplay section of `docs/tasks.md` |
+| Sound, marketing (later) | Their own folders once started | Work for others → their sections of `docs/tasks.md` |
+
+Some files are shared (`BattleController`, `UnitView`, `PlaceholderArt`): gameplay adds the placeholder, art restyles it. Don't edit one while another chat is working in it.
 
 The chats share one project folder, so:
 

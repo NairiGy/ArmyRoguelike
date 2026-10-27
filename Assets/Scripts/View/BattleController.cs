@@ -60,6 +60,11 @@ namespace ArmyRoguelike.View
         private static readonly Color RaiseColor = new Color(0.7f, 0.4f, 1f, 0.6f);
         private static readonly Color BombZoneColor = new Color(1f, 0.45f, 0.1f, 0.4f);
         private static readonly Color MineSpotColor = new Color(1f, 0.9f, 0.3f, 0.5f);
+        // Zone of control, while one of your units is selected: tiles next to enemies (their reach), move tiles
+        // that cost extra AP to get to, and a dotted link to each enemy holding the selected unit.
+        private static readonly Color EnemyReachColor = new Color(0.9f, 0.25f, 0.2f, 0.18f);
+        private static readonly Color CostlyMoveColor = new Color(1f, 0.6f, 0.2f, 0.45f);
+        private static readonly Color EngagedLinkColor = new Color(0.95f, 0.3f, 0.25f, 0.9f);
         private static readonly Color SunMarkColor = new Color(1f, 0.85f, 0.2f, 0.6f);
         private static readonly Color ShroudColor = new Color(0.25f, 0.2f, 0.55f, 0.45f);
 
@@ -137,6 +142,7 @@ namespace ArmyRoguelike.View
             var clicked = !_busy && !_confirmEndTurn && Mouse.current.leftButton.wasPressedThisFrame && _hovered.HasValue;
 
             _intent.Hide();
+            HideEngagedLinks();
             switch (Battle.Phase)
             {
                 case Phase.Placement:
@@ -528,9 +534,15 @@ namespace ArmyRoguelike.View
                 return;
             }
 
+            // Zone of control: enemy reach underneath, then move tiles, orange where getting there costs extra AP.
+            foreach (var p in Battle.EnemyReachTiles(_selected))
+                if (p != _selected.Pos)
+                    _board.SetHighlight(p, EnemyReachColor);
             var reachable = Battle.GetReachable(_selected);
+            var costly = Battle.CostlyMoveTiles(_selected);
             foreach (var p in reachable.Keys)
-                _board.SetHighlight(p, MoveColor);
+                _board.SetHighlight(p, costly.Contains(p) ? CostlyMoveColor : MoveColor);
+            DrawEngagedLinks(_selected);
             foreach (var enemy in Battle.Living(Team.Enemy))
             {
                 if (Battle.CanAttack(_selected, enemy))
@@ -552,6 +564,25 @@ namespace ArmyRoguelike.View
             if (_hoveredUnit != null && _hoveredUnit.Team == Team.Enemy && !Battle.CanAttack(_selected, _hoveredUnit) &&
                 Battle.FindAttackSpot(_selected, _hoveredUnit) is var spot && spot.HasValue)
                 _board.SetHighlight(spot.Value.tile, HoverColor);
+        }
+
+        private readonly List<IntentView> _engagedLinks = new List<IntentView>();
+
+        /// <summary>A dotted link from the unit to each enemy whose reach holds it.</summary>
+        private void DrawEngagedLinks(Unit unit)
+        {
+            var holders = Battle.EngagedBy(unit, unit.Pos).ToList();
+            while (_engagedLinks.Count < holders.Count)
+                _engagedLinks.Add(IntentView.Create(transform, EngagedLinkColor));
+            var from = _board.ViewOf(unit).transform.position + Vector3.up * 0.1f;
+            for (var i = 0; i < holders.Count; i++)
+                _engagedLinks[i].Show(from, _board.ViewOf(holders[i]).transform.position + Vector3.up * 0.1f);
+        }
+
+        private void HideEngagedLinks()
+        {
+            foreach (var link in _engagedLinks)
+                link.Hide();
         }
 
         /// <summary>Shrouded tiles, and the tiles a sun beam will strike at the start of the enemy turn.</summary>
@@ -1209,6 +1240,9 @@ namespace ArmyRoguelike.View
                 var abilities = AbilityLines(_selected);
                 if (abilities.Length > 0)
                     info += "\n" + abilities;
+                var engaged = EngagedLine(_selected);
+                if (engaged.Length > 0)
+                    info += "\n" + engaged;
             }
 
             var style = TextStyle;
@@ -1360,6 +1394,9 @@ namespace ArmyRoguelike.View
                     text += $"\nLobs a bomb ({_hoveredUnit.Stats.BombDamage} damage, 3x3) that explodes next enemy turn";
                 if (_hoveredUnit.Team == Team.Enemy)
                     text += "\n" + IntentText(EnemyAI.PredictIntent(Battle, _hoveredUnit));
+                var engaged = EngagedLine(_hoveredUnit);
+                if (engaged.Length > 0)
+                    text += "\n" + engaged;
                 if (_selected != null && _hoveredUnit.Team == Team.Enemy && !Battle.CanAttack(_selected, _hoveredUnit) &&
                     Battle.FindAttackSpot(_selected, _hoveredUnit) is var spot && spot.HasValue)
                     text += $"\nClick: walk {spot.Value.cost} AP + attack {Battle.AttackCost} AP";
@@ -1388,6 +1425,18 @@ namespace ArmyRoguelike.View
             }
 
             return null;
+        }
+
+        /// <summary>"Engaged by ..." for a unit standing in enemy reach (zone of control), or empty.</summary>
+        private string EngagedLine(Unit u)
+        {
+            if (u.IsObjective)
+                return "";
+            var holders = Battle.EngagedBy(u, u.Pos).Select(h => h.Stats.Name).ToList();
+            if (holders.Count == 0)
+                return "";
+            var who = u.Team == Team.Player ? "it" : "it (on its turn)";
+            return $"Engaged by {string.Join(", ", holders)}: each step out of their reach costs {who} +{Battle.ZocCost} AP";
         }
 
         private static string IntentText(Intent intent)
