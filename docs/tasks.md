@@ -18,7 +18,8 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 |---|---|---|---|
 | Moon Shrine | Shrine statue | Code-drawn pillar with a crescent (`PlaceholderArt.MakeShrine`) | Needed |
 | Break the Ritual | Totem statue | Code-drawn post with three faces (`PlaceholderArt.MakeTotem`) | Needed |
-| Omens | Sun mark and shroud tiles; the sun beam striking | Flat tile colours (`SunMarkColor`, `ShroudColor` in `BattleController`); a text popup and tile flash | Needed |
+| Omens | Sun mark and the sun beam striking | Painted sigil on the tile under a faint shaft, charge, painted beam, gold light on the floor and statues, sparks, embers and a cooling scorch (`SunMark`, `Scorch`) | Done 2026-10-27, not playtested. Open: the "Sun beam!" popup is pink, clashing with the gold |
+| Omens | Shroud tiles | Flat tile colour (`ShroudColor` in `BattleController`) | Needed |
 | Omens | Moon shield on a unit | The generic shield status pip | Needed |
 | Moon Shrine | Reinforcements arriving at the edge | The rise animation and a text popup | Needed |
 | Scenarios | Blessing pick and item pick screens | Plain IMGUI panels (part of the UI pass) | Needed |

@@ -70,6 +70,8 @@ Shader "ArmyRoguelike/StatueRamp"
                 col = lerp(col, _RimColor.rgb, rim * _RimColor.a);
                 // Damage cracks the stone; a hit flashes it white for a moment.
                 col *= 1 - 0.8 * cracks(i.uv * float2(6, 8), _Crack);
+                // Light from nearby effects warms the stone, the bright parts most.
+                col += fxLight(i.wpos, 1) * (0.3 + col);
                 col = lerp(col, 1, _Flash);
                 return float4(col, c.a) * i.color;
             }

@@ -34,7 +34,7 @@ Shader "ArmyRoguelike/PaletteRamp"
             float _Scroll;
 
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; };
-            struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; };
+            struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; float2 wpos : TEXCOORD1; };
 
             v2f vert(appdata v)
             {
@@ -42,6 +42,7 @@ Shader "ArmyRoguelike/PaletteRamp"
                 o.pos = UnityObjectToClipPos(v.vertex);
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex) + float2(_Time.y * _Scroll, 0);
                 o.color = v.color;
+                o.wpos = mul(unity_ObjectToWorld, v.vertex).xy;
                 return o;
             }
 
@@ -56,6 +57,10 @@ Shader "ArmyRoguelike/PaletteRamp"
                 float4 c = tex2D(_MainTex, uv);
                 float value = saturate(lerp(luma(c.rgb) * i.color.r, i.color.b, i.color.g));
                 float3 col = tex2D(_Ramp, float2(value, 0.5)).rgb;
+                // Light from nearby effects spreads over the floor as a flat ellipse. It mostly multiplies,
+                // so the stone's own texture shows through instead of a flat wash.
+                float3 light = fxLight(i.wpos, 2);
+                col = col * (1 + light * 3) + light * 0.03;
                 return float4(col, c.a * i.color.a);
             }
             ENDCG

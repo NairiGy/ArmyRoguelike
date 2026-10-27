@@ -189,19 +189,36 @@ namespace ArmyRoguelike.View
             Object.Destroy(sr.gameObject);
         }
 
-        private static IEnumerator Ring(Vector3 pos)
+        /// <summary>A sun beam hitting the floor: a white-gold flash, a wide shockwave, sparks and dust.</summary>
+        public static void SunBurst(Vector3 pos)
+        {
+            Host.StartCoroutine(Puff(Dot(pos, new Color(1f, 0.95f, 0.8f, 1f), 0.9f, true), Vector3.zero, 0.25f, 2.5f));
+            Host.StartCoroutine(Ring(pos, 32, 1.7f, 0.45f, new Color(1f, 0.85f, 0.5f), 0.08f));
+            for (var i = 0; i < 22; i++)
+            {
+                var dir = new Vector3(Random.Range(-1f, 1f), Random.Range(0.5f, 1.8f), 0f) * Random.Range(1.2f, 2.6f);
+                var spark = Dot(pos, new Color(1f, Random.Range(0.75f, 0.95f), 0.5f, 1f), Random.Range(0.03f, 0.06f), true);
+                Host.StartCoroutine(Fling(spark, dir, Random.Range(0.4f, 0.75f), 4.5f));
+            }
+
+            Dust(pos, 10, 0.8f);
+        }
+
+        private static IEnumerator Ring(Vector3 pos) => Ring(pos, 16, 0.9f, 0.3f, new Color(1f, 0.85f, 0.6f), 0.06f);
+
+        private static IEnumerator Ring(Vector3 pos, int count, float radius, float time, Color color, float size)
         {
             // Dots racing outwards along a flattened circle read as a shockwave on the iso floor.
-            var dots = new SpriteRenderer[16];
+            var dots = new SpriteRenderer[count];
             for (var i = 0; i < dots.Length; i++)
-                dots[i] = Dot(pos, new Color(1f, 0.85f, 0.6f, 0.7f), 0.06f, true);
-            for (var t = 0f; t < 1f; t += Time.deltaTime / 0.3f)
+                dots[i] = Dot(pos, color, size, true);
+            for (var t = 0f; t < 1f; t += Time.deltaTime / time)
             {
                 for (var i = 0; i < dots.Length; i++)
                 {
                     var a = i * Mathf.PI * 2f / dots.Length;
-                    dots[i].transform.position = pos + new Vector3(Mathf.Cos(a), Mathf.Sin(a) * 0.5f, 0f) * (0.2f + 0.9f * t);
-                    dots[i].color = new Color(1f, 0.85f, 0.6f, 0.7f * (1f - t));
+                    dots[i].transform.position = pos + new Vector3(Mathf.Cos(a), Mathf.Sin(a) * 0.5f, 0f) * (0.2f + radius * t);
+                    dots[i].color = new Color(color.r, color.g, color.b, 0.7f * (1f - t));
                 }
 
                 yield return null;

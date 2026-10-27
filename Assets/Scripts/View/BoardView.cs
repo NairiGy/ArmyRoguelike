@@ -377,6 +377,29 @@ namespace ArmyRoguelike.View
                 h.enabled = false;
         }
 
+        private readonly Dictionary<GridPos, SunMark> _sunMarks = new Dictionary<GridPos, SunMark>();
+
+        /// <summary>Shows a sun mark on a tile, unless one is already there.</summary>
+        public void AddSunMark(GridPos p)
+        {
+            if (!_sunMarks.ContainsKey(p))
+                _sunMarks[p] = SunMark.Create(transform, p);
+        }
+
+        /// <summary>
+        /// A sun beam striking a tile: the mark charges up, then onImpact runs as the beam lands
+        /// (the hits show then). The afterglow carries on after this returns.
+        /// </summary>
+        public System.Collections.IEnumerator SunStrike(GridPos p, System.Action onImpact)
+        {
+            AddSunMark(p);
+            var mark = _sunMarks[p];
+            _sunMarks.Remove(p);
+            yield return mark.Charge();
+            mark.Impact();
+            onImpact?.Invoke();
+        }
+
         /// <summary>World-space centre of the board, for framing the camera.</summary>
         public Vector3 Centre => IsoMath.GridToWorld((Battle.Board.Width - 1) * 0.5f, (Battle.Board.Height - 1) * 0.5f);
     }

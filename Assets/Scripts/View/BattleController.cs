@@ -65,7 +65,6 @@ namespace ArmyRoguelike.View
         private static readonly Color EnemyReachColor = new Color(0.9f, 0.25f, 0.2f, 0.18f);
         private static readonly Color CostlyMoveColor = new Color(1f, 0.6f, 0.2f, 0.45f);
         private static readonly Color EngagedLinkColor = new Color(0.95f, 0.3f, 0.25f, 0.9f);
-        private static readonly Color SunMarkColor = new Color(1f, 0.85f, 0.2f, 0.6f);
         private static readonly Color ShroudColor = new Color(0.25f, 0.2f, 0.55f, 0.45f);
 
         // Wolf tints: warm while the leader's aura reaches them, pale and cold once the leader is dead.
@@ -591,7 +590,7 @@ namespace ArmyRoguelike.View
             foreach (var p in Battle.Shroud.Keys)
                 _board.SetHighlight(p, ShroudColor);
             foreach (var p in Battle.SunMarks)
-                _board.SetHighlight(p, SunMarkColor);
+                _board.AddSunMark(p);
         }
 
         /// <summary>Every waiting bomb shows its blast area, so it can be dodged.</summary>
@@ -770,9 +769,16 @@ namespace ArmyRoguelike.View
                 {
                     // A sun beam leaves any mine or bomb on its tile alone.
                     if (blast.Cause == "sun")
-                        DamagePopup.Spawn(IsoMath.GridToWorld(blast.Center) + Vector3.up * 0.9f, "Sun beam!", DamagePopup.AbilityColor, 44);
-                    else
-                        _board.RemoveHazard(blast.Center);
+                    {
+                        yield return _board.SunStrike(blast.Center, () =>
+                            DamagePopup.Spawn(IsoMath.GridToWorld(blast.Center) + Vector3.up * 0.9f, "Sun beam!", DamagePopup.AbilityColor, 44));
+                        foreach (var hit in blast.Hits)
+                            ShowHit(hit);
+                        yield return PlayHitReactions(blast.Hits);
+                        break;
+                    }
+
+                    _board.RemoveHazard(blast.Center);
                     StartCoroutine(_board.Flash(blast.Area, BlastTime));
                     StartCoroutine(Shake(0.06f + 0.02f * blast.ChainDepth, BlastTime));
                     foreach (var hit in blast.Hits)
@@ -931,7 +937,12 @@ namespace ArmyRoguelike.View
                     DamagePopup.Spawn(view.TopWorld + Vector3.up * 0.25f, text, omen.Blessing ? DamagePopup.HealColor : DamagePopup.DamageColor, 40);
                     view.RefreshStatus();
                     foreach (var p in omen.Tiles)
-                        _board.SetHighlight(p, omen.Omen == Omen.Sun ? SunMarkColor : ShroudColor);
+                    {
+                        if (omen.Omen == Omen.Sun)
+                            _board.AddSunMark(p);
+                        else
+                            _board.SetHighlight(p, ShroudColor);
+                    }
                     yield return new WaitForSeconds(0.35f);
                     break;
                 }

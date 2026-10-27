@@ -36,4 +36,24 @@ float cracks(float2 p, float damage)
     return (1 - smoothstep(0.02, 0.07, edge)) * step(id, damage * 1.2 - 0.05);
 }
 
+// Up to four short-lived lights from effects (a sun beam striking, say), set globally by FxLight:
+// xy world position, z radius, w strength, and a colour each. Squash > 1 stretches the falloff
+// sideways, so on the isometric floor the light spreads as a flat ellipse.
+float4 _FxLights[4];
+float4 _FxLightColors[4];
+
+float3 fxLight(float2 wpos, float squash)
+{
+    float3 sum = 0;
+    for (int k = 0; k < 4; k++)
+    {
+        float2 d = (wpos - _FxLights[k].xy) * float2(1, squash);
+        float r = max(_FxLights[k].z, 0.001);
+        float f = saturate(1 - dot(d, d) / (r * r));
+        // Cubed, so the light is strong in the middle and falls away quickly.
+        sum += _FxLightColors[k].rgb * _FxLights[k].w * f * f * f;
+    }
+    return sum;
+}
+
 #endif
