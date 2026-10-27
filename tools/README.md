@@ -19,3 +19,9 @@ unity test . --mode EditMode                     # the official test run
 unity run . -- -executeMethod GamepediaExporter.ExportFromCommandLine   # gamepedia with statue images
 unity run . -- -executeMethod PreviewCapture.CaptureFromCommandLine -previewOut out.png -previewPlaceArmy -previewEncounter 2 -previewUnits "Warrior,Juggernaut"
 ```
+
+`make_sfx.sh` cuts the sound clips (`Assets/Audio/Resources/Sfx`) out of the raw Freesound downloads with ffmpeg; the sources and cut points are in the script, the credits in `Assets/Audio/CREDITS.md`:
+
+```bash
+tools/make_sfx.sh "$HOME/Desktop/sound sources" Assets/Audio/Resources/Sfx
+```

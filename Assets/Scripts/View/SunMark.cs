@@ -116,6 +116,7 @@ namespace ArmyRoguelike.View
             _beam.transform.localPosition = new Vector3(0f, BeamHeight * 0.5f, 0f);
 
             _light = FxLight.Add(pos, LightColor, 1f);
+            Sfx.Play("sun_mark", pos);
             Apply();
         }
 
@@ -187,6 +188,7 @@ namespace ArmyRoguelike.View
         public IEnumerator Charge()
         {
             _appear = 1f;
+            Sfx.Play("sun_charge", transform.position, pitch: 0f);
             const float time = 0.5f;
             for (var t = 0f; t < 1f; t += Time.deltaTime / time)
             {
@@ -213,6 +215,8 @@ namespace ArmyRoguelike.View
             var pos = transform.position;
             Fx.SunBurst(pos);
             Fx.Shake(0.13f, 0.35f);
+            Sfx.Play("sun_impact", pos);
+            Sfx.Play("sun_sizzle", pos, 0.6f);
             Scorch.Create(transform.parent, Tile, _floorOrder);
 
             // The blast: wide, white-hot, everything around lit gold.

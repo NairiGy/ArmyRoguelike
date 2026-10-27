@@ -34,6 +34,18 @@ A roguelike army-builder: lead a small squad across a Slay the Spire–style map
 - **Effects:** painted where they sit still, code where they move. ChatGPT paints the textures (glowing parts on black, drawn additively; burns on white, multiplied onto the floor), imported with mipmaps at 512 px into `Art/Effects/Resources/Effects`; code animates them, adds particles, and lights the floor and statues around them through `FxLight` (up to four effect lights, read by the scenery and statue shaders). Floor effects draw above every tile and below anything standing. Each effect sprite gets a material of its own (sprites sharing one get batched and can be drawn with the wrong texture). Done this way: the sun omen (sigil, painted beam, scorch), the moon shield (moon sigil, veil of moonlight) and a lightning strike (three painted bolts on one sheet, flickered between; test key L, no rule uses it yet). For now effects look the same whichever side they help.
 - **Still open:** placeholder statues for the other factions, terrain, the other effects, UI/HUD, how evolution tiers look, and the unit labels that currently sit over the statues.
 
+## Sound
+
+- **Mood:** night on a tower roof above the clouds, living stone statues; magic sounds weighty and a bit ancient, not sci-fi.
+- **Sources:** ElevenLabs Sound Effects is the main source (decided 2026-10-27 after the sun mark and sun charge). Free libraries whose licence allows commercial use (Freesound CC0 only, Kenney CC0, Sonniss GDC bundles) are the fallback, mostly for natural recordings such as thunder and glass. The free ElevenLabs plan needs an elevenlabs.io credit; a paid plan before release removes that. Raw files stay outside the repo, in `Desktop/sound sources/`; the trimmed clips go in `Assets/Audio/Resources/Sfx`, each listed with source, licence and (for generated ones) the prompt in `Assets/Audio/CREDITS.md`.
+- **Workflow for a new sound:**
+  1. Write 3-4 prompts that describe the moment and the mood ("warm, heavy, ancient magic, not sci-fi, no electronic sounds"), with the length set to the effect's timing. Generate 4 variations each in ElevenLabs (the user is signed in in the browser pane; sharing to the Explore page is off).
+  2. Download every variation (standing OK) and cut them with `tools/make_sfx.sh`: hits start at 0 ms, a build-up ends on its loudest point, levels set by peak and checked in LUFS against the other sounds.
+  3. Add them as numbered variants (`name_1`, `name_2`, ...). In a test battle the effects playground (F1) can lock one variant, so each is heard with its effect and the visuals, not alone.
+  4. The user picks; keep the winners (several can stay as random variants), drop the rest from the script, and credit the prompts.
+- **How it plays:** `Sfx.Play("name")` on the same line as the visual moment it belongs to, so sound and animation stay in sync; clips are trimmed so the hit is at 0 ms. Loops (`*_loop`) follow the object that owns them. Sound is 2D with a gentle left-right pan from the screen position.
+- **Volume:** master × effects, saved in PlayerPrefs. An AudioMixer comes later, with music and ambience.
+
 ## Design goals
 
 - Fun from the very first turn, with real choices.

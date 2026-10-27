@@ -109,6 +109,8 @@ namespace ArmyRoguelike.View
             _logger = new PlaytestLogger(board.Battle, context);
             _toPlace = NextUnplaced();
             RefreshUnitStates();
+            if (context.Test)
+                FxPlayground.Create(transform, board, () => _hovered);
         }
 
         /// <summary>File name of this battle's playtest log once saved, for the run log.</summary>
@@ -1121,7 +1123,7 @@ namespace ArmyRoguelike.View
         {
             var scale = Screen.height / ReferenceHeight;
             var gui = new Vector2(screen.x / scale, (Screen.height - screen.y) / scale);
-            return _panels.Any(r => r.Contains(gui));
+            return _panels.Any(r => r.Contains(gui)) || FxPlayground.IsOver(screen);
         }
 
         private static GUIStyle TextStyle => new GUIStyle(GUI.skin.label) { wordWrap = true, fontSize = 12 };

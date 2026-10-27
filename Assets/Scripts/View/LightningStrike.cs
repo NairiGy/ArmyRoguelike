@@ -42,7 +42,8 @@ namespace ArmyRoguelike.View
             var sky = FxLight.Add(pos, FlashColor, 40f);
             var near = FxLight.Add(pos, FlashColor, 3f);
 
-            // The sky flickers twice before the bolt.
+            // The sky flickers twice before the bolt, under a far-off rumble.
+            Sfx.Play("lightning_rumble", pos, 0.5f, 0.1f);
             foreach (var (on, off) in new[] { (0.05f, 0.12f), (0.04f, 0.18f) })
             {
                 sky.Strength = 0.25f;
@@ -63,6 +64,7 @@ namespace ArmyRoguelike.View
 
             Fx.BoltBurst(pos);
             Fx.Shake(0.16f, 0.3f);
+            Sfx.Play("lightning_strike", pos);
             Scorch.Create(parent, tile, -300 + (tile.X + tile.Y) * 4, true);
 
             // Flicker between the shapes, bright then fading, with the light pulsing along.

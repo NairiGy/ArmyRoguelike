@@ -90,6 +90,7 @@ namespace ArmyRoguelike.View
 
             _veil = NewRenderer("Veil", Load(ref _veilSprite, "Effects/MoonVeil"), VeilMaterial);
             _light = FxLight.Add(transform.position, Silver, 1.3f);
+            Sfx.Play("moon_cast", transform.position);
             StartCoroutine(Cast());
         }
 
@@ -161,6 +162,8 @@ namespace ArmyRoguelike.View
             Fx.Ripple(_view.BodyBase, Silver);
             if (Points <= 0)
                 Shatter();
+            else
+                Sfx.Play("moon_absorb", transform.position);
             return taken;
         }
 
@@ -171,6 +174,7 @@ namespace ArmyRoguelike.View
                 return;
             _ending = true;
             Fx.Shards(_view.BodyBase + Vector3.up * _view.BodyHeight * 0.5f, Silver, _view.BodyHeight);
+            Sfx.Play("moon_shatter", transform.position);
             StartCoroutine(FadeOut(0.25f));
         }
 
@@ -180,6 +184,7 @@ namespace ArmyRoguelike.View
             if (_ending)
                 return;
             _ending = true;
+            Sfx.Play("moon_fade", transform.position, 0.6f);
             StartCoroutine(FadeOut(0.8f));
         }
 

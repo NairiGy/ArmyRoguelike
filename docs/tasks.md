@@ -61,8 +61,16 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [ ] Crossbowman's role text says "Hides behind cover", but its AI just walks to the cheapest tile with a shot (only the Camp layout starts it behind rocks). Fix the text or give it cover-seeking AI. Ask first.
 - [ ] Goblin Bomber hover intent only checks the nearest unit: it shows "attack" when it will bomb a farther unit, and ignores backing off. Decide whether the intent should match.
 
-## Sound
+## Sound (sound chat, branch `feature/sound`, worktree `../ArmyRoguelike-sound`)
 
+- [x] Sound setup (2026-10-27): `Sfx` (View) plays clips from `Assets/Audio/Resources/Sfx`, numbered variants picked at random, saved master and effects volume; `SfxImport` (Editor) sets import settings. Calls added to `SunMark`, `MoonShieldView` and `LightningStrike` (one line per moment). Compiles, tests pass; no clips yet, so it is silent.
+- [x] Clips for the three effects (2026-10-27): 13 clips cut from 13 Freesound CC0 recordings by `tools/make_sfx.sh`, credited in `Assets/Audio/CREDITS.md`; raw files in `Desktop/sound sources/`. Sun: the hum loop was dropped after the first listen (didn't fit, not needed); a short `sun_mark` swell played when the mark appears instead, later replaced by two ElevenLabs-generated variants (`sun_mark_1`, `_2`). Then made hotter: a flame burst under the impact and a steaming scorch (`sun_sizzle`; a water-on-a-hot-stove variant was dropped). Charge: 13 variants all approved and kept, played at random (`sun_charge_1` the reverse cymbal, `_2`-`_13` ElevenLabs). Lightning: the electric crackle before the bolt became a muffled far-off rumble (`lightning_rumble`); only the close strike is kept (the second variant sounded distant, 8 LU quieter); then, too aggressive and loud: highs cut at 6 kHz and brought down from -9.4 to -17.5 LUFS, just under the sun impact. Moon shield approved as is.
+- [x] Effects playground (2026-10-27, `FxPlayground`): in test battles F1 opens a panel; keys 5-0 play the sun mark, sun strike, moon shield, a hit on it, its fade and lightning on the hovered tile or unit (visual and sound only), one button per sound and variant, master/effects volume sliders, and (added later) a row per sound to lock one variant so the effects always play it. Touches `BattleController` in two lines (created in `Init` for test battles; `IsOverHud` also checks the panel). Not tried in game yet.
+- [ ] Volume sliders in the game itself: the volumes are saved, but only the test playground can change them (part of the UI pass; ask first).
+- [x] Sun charge picked in the playground (2026-10-27): all 13 fit, all kept.
+- [ ] Sun scorch sizzle: the steaming one is better, but the user may want no sizzle at all. Decide after hearing it in play.
+- [ ] Before release: ElevenLabs free-plan sounds (`sun_mark_1`, `_2`, `sun_charge_2`-`_13` and any later ones) need "elevenlabs.io" in the game credits, or regenerate them on a paid plan. See `Assets/Audio/CREDITS.md`.
+- [ ] Unused ElevenLabs generations the user liked, for later effects: "warm golden glow" #1, #3, #4 and all four "heavy stone rune lighting up with heat" (in the ElevenLabs history, sharing to Explore is off).
 - [ ] Sound pass: effects for moves, hits, deaths, mines and bombs, ambience (wind, braziers). Not started.
 
 ## Marketing
