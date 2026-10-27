@@ -7,10 +7,20 @@ TMP="$OUT/.tmp.wav"
 FMT="-ar 44100 -ac 1 -c:a pcm_s16le"
 ON="silenceremove=start_periods=1:start_threshold=-40dB"
 
+# peak_of FILE : the file's peak level in dB
+peak_of() { ffmpeg -hide_banner -i "$1" -af volumedetect -f null - 2>&1 | sed -n 's/.*max_volume: \(-\?[0-9.]*\) dB/\1/p'; }
+
+# loud NAME LUFS : rescale the clip to an integrated loudness (so variants sound equally loud), peaks limited to -1 dB
+loud() {
+  local f="$OUT/$1.wav" lufs
+  lufs=$(ffmpeg -hide_banner -i "$f" -af ebur128 -f null - 2>&1 | grep -E '^\s+I:' | tail -1 | awk '{print $2}')
+  ffmpeg -v error -y -i "$f" -af "volume=$(awk "BEGIN{print $2 - ($lufs)}")dB,alimiter=limit=0.89:level=false" $FMT "$TMP" && mv "$TMP" "$f"
+}
+
 # norm NAME PEAK_DB : rescale the clip so its peak sits at PEAK_DB
 norm() {
   local f="$OUT/$1.wav" peak
-  peak=$(ffmpeg -hide_banner -i "$f" -af volumedetect -f null - 2>&1 | sed -n 's/.*max_volume: \(-\?[0-9.]*\) dB/\1/p')
+  peak=$(peak_of "$f")
   ffmpeg -v error -y -i "$f" -af "volume=$(awk "BEGIN{print $2 - ($peak)}")dB" $FMT "$TMP" && mv "$TMP" "$f"
   echo "$1: $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$f") s"
 }
@@ -19,11 +29,12 @@ cut() { ffmpeg -v error -y "$@"; }
 # Sun: mark appears, two variants generated with ElevenLabs Sound Effects (A2 stone sigil, B2 golden glow)
 cut -i elevenlabs_sun_mark_A2_stone_sigil.wav -af "silenceremove=start_periods=1:start_threshold=-50dB,afade=t=out:st=1.4:d=0.5" $FMT "$OUT/sun_mark_1.wav"; norm sun_mark_1 -6
 cut -i elevenlabs_sun_mark_B2_golden_glow.wav -af "afade=t=in:d=0.03,afade=t=out:st=1.3:d=0.7" $FMT "$OUT/sun_mark_2.wav"; norm sun_mark_2 -6
-# Sun: charge, 13 candidates while one is chosen in the playground. Each is 0.5 s and ends on its loudest point.
-# 1 is the reverse cymbal (lower); 2-13 are ElevenLabs generations E1-E4, F1-F4, G1-G4 (prompts in CREDITS.md).
+# Sun: charge, 12 variants played at random. Each is 0.5 s and ends on its loudest point.
+# 1 is the reverse cymbal (lower); 2-12 are ElevenLabs generations E1-E4, F1-F4, G1, G3, G4 (prompts in CREDITS.md).
+rm -f "$OUT"/sun_charge_*.wav
 cut -ss 1.82 -t 0.40 -i 130387*.aiff -af "aresample=44100,asetrate=35280,aresample=44100,afade=t=in:d=0.1" $FMT "$OUT/sun_charge_1.wav"; norm sun_charge_1 -4
 n=2
-for c in E1:0 E2:0 E3:0 E4:0 F1:0 F2:0 F3:0 F4:0 G1:0.15 G2:0 G3:0.05 G4:0.1; do
+for c in E1:0 E2:0 E3:0 E4:0 F1:0 F2:0 F3:0 F4:0 G1:0.15 G3:0.05 G4:0.1; do   # G2 dropped in the audition
   cut -ss "${c#*:}" -t 0.5 -i "elevenlabs_sun_charge_${c%%:*}.wav" -af "afade=t=in:d=0.03,afade=t=out:st=0.49:d=0.01" $FMT "$OUT/sun_charge_$n.wav"; norm "sun_charge_$n" -4
   n=$((n+1))
 done
@@ -46,3 +57,28 @@ cut -i 715784*.wav -af "lowpass=f=5000,afade=t=in:d=0.1,afade=t=out:st=0.4:d=0.4
 cut -ss 12.0 -t 1.1 -i 616992*.wav -af "lowpass=f=300,lowpass=f=300,afade=t=in:d=0.15,afade=t=out:st=0.4:d=0.7" $FMT "$OUT/lightning_rumble.wav"; norm lightning_rumble -10
 # Lightning: strike (a close crack and a short roll; highs cut and kept a little quieter than the sun impact)
 cut -ss 7.44 -t 2.8 -i 243614*.wav -af "lowpass=f=6000,afade=t=in:d=0.02,afade=t=out:st=1.6:d=1.2" $FMT "$OUT/lightning_strike.wav"; norm lightning_strike -9
+
+# Units (stone statues, shared by every unit): ElevenLabs generations, prompts by letter in CREDITS.md.
+# SOURCES lists what to keep, in order: "A4" is one variation, a bare "D" is all four (D1-D4). Clips are numbered in
+# that order, skipping near-silent generations (peak under -30 dB). Each starts on its hit; steps are kept quiet
+# because they are frequent.
+# unit SOUND LENGTH FADE_FROM LUFS "SOURCES"
+unit() {
+  local n=1 peak id ids=()
+  for id in $5; do
+    if [ ${#id} -eq 1 ]; then ids+=("${id}1" "${id}2" "${id}3" "${id}4"); else ids+=("$id"); fi
+  done
+  rm -f "$OUT"/unit_$1_*.wav
+  for id in "${ids[@]}"; do
+    peak=$(peak_of "elevenlabs_unit_$1_$id.wav")
+    if awk "BEGIN{exit !($peak < -30)}"; then echo "unit_$1: skipped $id (near-silent)"; continue; fi
+    cut -i "elevenlabs_unit_$1_$id.wav" -af "silenceremove=start_periods=1:start_threshold=-45dB,atrim=0:$2,afade=t=out:st=$3:d=$(awk "BEGIN{print $2 - $3}")" $FMT "$OUT/unit_$1_$n.wav"
+    loud "unit_$1_$n" $4
+    echo "unit_$1_$n = $id"
+    n=$((n+1))
+  done
+}
+unit attack 0.5 0.25 -20 "A2 A3 A4 B3 C2"       # the blow landing (melee); kept in the audition
+unit hurt 0.4 0.2 -24 "G2 G3 G4 H1 H4 I1 I3"   # a short, simple knock on the unit that takes damage, smaller than dying; kept in the audition (crumbling rounds A-F rejected)
+unit die 2.0 1.2 -21 "A3 B3 C1 C2"           # the statue crumbling into rubble; kept in the audition
+unit step 0.4 0.15 -30 "A4 C1 D E1 E2 E4"   # one heavy step, at each tile; kept in the audition (A1 kept aside for other ground)

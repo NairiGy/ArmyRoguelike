@@ -448,6 +448,7 @@ namespace ArmyRoguelike.View
 
                 SetWorldPosition(to);
                 Fx.Dust(to, 3, 0.18f);
+                Sfx.Play("unit_step", to, pitch: 0.08f);
                 for (var t = 0f; t < 1f; t += Time.deltaTime / 0.06f)
                 {
                     _body.transform.localPosition = _bodyRest + Vector3.down * (Mathf.Sin(t * Mathf.PI) * 0.02f);
@@ -515,6 +516,7 @@ namespace ArmyRoguelike.View
                 else
                 {
                     Fx.Impact(Vector3.Lerp(home, target, 0.75f) + Vector3.up * 0.25f, new Color(1f, 0.9f, 0.7f));
+                    Sfx.Play("unit_attack", target);
                     onImpact();
                     yield return new WaitForSeconds(0.06f);
                 }
@@ -534,6 +536,7 @@ namespace ArmyRoguelike.View
         {
             var home = transform.position;
             Fx.Chips(BodyCentre, StoneColor);
+            Sfx.Play("unit_hurt", home);
             for (var t = 0f; t < 1f; t += Time.deltaTime / 0.24f)
             {
                 // White for the first instant, then a red tint that fades back.
@@ -558,6 +561,7 @@ namespace ArmyRoguelike.View
             SetBarsVisible(false);
             Fx.Rubble(transform.position, StoneColor, (BodyCentre - transform.position).y * 2f);
             Fx.Shake(0.04f, 0.18f);
+            Sfx.Play("unit_die", transform.position);
             var start = _body.color;
             var shadowStart = _shadow.color;
             for (var t = 0f; t < 1f; t += Time.deltaTime / 0.45f)
@@ -590,16 +594,7 @@ namespace ArmyRoguelike.View
         /// <summary>A bone pile pulls itself back up into a statue.</summary>
         public IEnumerator Raise()
         {
-            _body.sprite = PlaceholderArt.Statue(Unit.Stats.Kind);
-            _showingBones = false;
-            _shadow.color = ShadowColor;
-            _shadow.enabled = true;
-            if (_base != null)
-            {
-                _base.color = Color.white;
-                _base.enabled = true;
-            }
-            SetGridPosition(Unit.Pos);
+            UndoCrumble();
             _body.color = new Color(0.75f, 0.55f, 1f);
             for (var t = 0f; t < 1f; t += Time.deltaTime / 0.5f)
             {
@@ -611,6 +606,33 @@ namespace ArmyRoguelike.View
             ApplyColor();
             RefreshHp(Unit.Hp);
             SetBarsVisible(true);
+        }
+
+        /// <summary>Stands a crumbled statue straight back up, with no animation (the effects playground's death demo).</summary>
+        public void Restore()
+        {
+            gameObject.SetActive(true);
+            UndoCrumble();
+            _body.transform.localPosition = _bodyRest;
+            ApplyColor();
+            RefreshHp(Unit.Hp);
+            SetBarsVisible(true);
+            RefreshStatus();
+        }
+
+        /// <summary>Puts back what Die took away: the statue sprite, its shadow and base, and its place on the board.</summary>
+        private void UndoCrumble()
+        {
+            _body.sprite = PlaceholderArt.Statue(Unit.Stats.Kind);
+            _showingBones = false;
+            _shadow.color = ShadowColor;
+            _shadow.enabled = true;
+            if (_base != null)
+            {
+                _base.color = Color.white;
+                _base.enabled = true;
+            }
+            SetGridPosition(Unit.Pos);
         }
 
         private void SetBarsVisible(bool visible)
