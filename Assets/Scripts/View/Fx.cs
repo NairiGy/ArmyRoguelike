@@ -190,18 +190,46 @@ namespace ArmyRoguelike.View
         }
 
         /// <summary>A sun beam hitting the floor: a white-gold flash, a wide shockwave, sparks and dust.</summary>
-        public static void SunBurst(Vector3 pos)
+        public static void SunBurst(Vector3 pos) =>
+            Burst(pos, new Color(1f, 0.95f, 0.8f), new Color(1f, 0.85f, 0.5f), new Color(1f, 0.85f, 0.5f));
+
+        /// <summary>A lightning bolt hitting the floor: the same burst in white and electric blue.</summary>
+        public static void BoltBurst(Vector3 pos) =>
+            Burst(pos, new Color(0.9f, 0.95f, 1f), new Color(0.65f, 0.8f, 1f), new Color(0.75f, 0.88f, 1f));
+
+        private static void Burst(Vector3 pos, Color flash, Color ring, Color spark)
         {
-            Host.StartCoroutine(Puff(Dot(pos, new Color(1f, 0.95f, 0.8f, 1f), 0.9f, true), Vector3.zero, 0.25f, 2.5f));
-            Host.StartCoroutine(Ring(pos, 32, 1.7f, 0.45f, new Color(1f, 0.85f, 0.5f), 0.08f));
+            Host.StartCoroutine(Puff(Dot(pos, new Color(flash.r, flash.g, flash.b, 1f), 0.9f, true), Vector3.zero, 0.25f, 2.5f));
+            Host.StartCoroutine(Ring(pos, 32, 1.7f, 0.45f, ring, 0.08f));
             for (var i = 0; i < 22; i++)
             {
                 var dir = new Vector3(Random.Range(-1f, 1f), Random.Range(0.5f, 1.8f), 0f) * Random.Range(1.2f, 2.6f);
-                var spark = Dot(pos, new Color(1f, Random.Range(0.75f, 0.95f), 0.5f, 1f), Random.Range(0.03f, 0.06f), true);
-                Host.StartCoroutine(Fling(spark, dir, Random.Range(0.4f, 0.75f), 4.5f));
+                var c = Color.Lerp(spark, Color.white, Random.Range(0f, 0.6f));
+                var dot = Dot(pos, new Color(c.r, c.g, c.b, 1f), Random.Range(0.03f, 0.06f), true);
+                Host.StartCoroutine(Fling(dot, dir, Random.Range(0.4f, 0.75f), 4.5f));
             }
 
             Dust(pos, 10, 0.8f);
+        }
+
+        /// <summary>A shield taking a blow: a soft flash and a ring of light rippling out over the floor.</summary>
+        public static void Ripple(Vector3 pos, Color tint)
+        {
+            Host.StartCoroutine(Puff(Dot(pos, new Color(tint.r, tint.g, tint.b, 0.6f), 0.5f, true), Vector3.zero, 0.25f, 2.2f));
+            Host.StartCoroutine(Ring(pos, 24, 0.9f, 0.35f, tint, 0.05f));
+        }
+
+        /// <summary>A shield breaking: glowing specks burst off a statue's height and fall.</summary>
+        public static void Shards(Vector3 centre, Color tint, float height)
+        {
+            Host.StartCoroutine(Puff(Dot(centre, new Color(tint.r, tint.g, tint.b, 0.8f), 0.7f, true), Vector3.zero, 0.2f, 2f));
+            for (var i = 0; i < 26; i++)
+            {
+                var from = centre + new Vector3(Random.Range(-0.25f, 0.25f), Random.Range(-0.5f, 0.5f) * height, 0f);
+                var dir = (from - centre + new Vector3(0f, 0.3f, 0f)).normalized * Random.Range(0.8f, 1.8f);
+                var shard = Dot(from, new Color(tint.r, tint.g, tint.b, 1f), Random.Range(0.025f, 0.05f), true);
+                Host.StartCoroutine(Fling(shard, dir, Random.Range(0.4f, 0.8f), 3f));
+            }
         }
 
         private static IEnumerator Ring(Vector3 pos) => Ring(pos, 16, 0.9f, 0.3f, new Color(1f, 0.85f, 0.6f), 0.06f);

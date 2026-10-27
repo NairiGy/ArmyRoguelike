@@ -61,7 +61,7 @@ namespace ArmyRoguelike.View
         }
 
         /// <summary>The painted shaft of light, one unit wide; the shader repeats it up the beam.</summary>
-        private static Sprite BeamSprite
+        internal static Sprite BeamSprite
         {
             get
             {

@@ -196,6 +196,15 @@ namespace ArmyRoguelike.View
         /// <summary>The middle of the statue's body, where blows land.</summary>
         private Vector3 BodyCentre => transform.position + Vector3.up * (_bodyRest.y + _body.sprite.bounds.max.y * _body.transform.lossyScale.y * 0.45f);
 
+        /// <summary>Where the statue's feet rest (at rest, not bobbing), for effects wrapped around it.</summary>
+        public Vector3 BodyBase => transform.position + _bodyRest;
+
+        /// <summary>The statue's height in world units.</summary>
+        public float BodyHeight => _body.sprite.bounds.max.y * _body.transform.lossyScale.y;
+
+        /// <summary>The statue's sorting order, for effects drawn just in front of it.</summary>
+        public int BodyOrder => _body.sortingOrder;
+
         /// <summary>Big units get a wider HP bar.</summary>
         private float BarScale => Unit.Size;
 
@@ -213,6 +222,7 @@ namespace ArmyRoguelike.View
         // ---------- Status markers ----------
 
         private static readonly Color ShieldColor = new Color(0.4f, 0.9f, 1f);
+        private static readonly Color MoonShieldColor = new Color(0.85f, 0.88f, 0.95f);
         private static readonly Color SnareColor = new Color(0.45f, 0.85f, 0.3f);
         private static readonly Color SlowColor = new Color(0.65f, 0.8f, 1f);
         private static readonly Color PoisonColor = new Color(0.75f, 0.35f, 0.95f);
@@ -221,7 +231,7 @@ namespace ArmyRoguelike.View
         private readonly List<SpriteRenderer> _statusIcons = new List<SpriteRenderer>();
 
         /// <summary>
-        /// Small coloured squares to the right of the HP bar: cyan = ward shield, green = snared,
+        /// Small coloured squares to the right of the HP bar: cyan = ward shield, silver = moon shield, green = snared,
         /// light blue = slowed, gold = carrying stolen gold, purple = poisoned. The HUD hover text spells them out.
         /// </summary>
         public void RefreshStatus()
@@ -229,8 +239,10 @@ namespace ArmyRoguelike.View
             var colors = new List<Color>();
             if (Unit.IsAlive)
             {
-                if (Unit.Shield > 0 || Unit.MoonShield > 0)
+                if (Unit.Shield > 0)
                     colors.Add(ShieldColor);
+                if (Unit.MoonShield > 0)
+                    colors.Add(MoonShieldColor);
                 if (Unit.IsSnared)
                     colors.Add(SnareColor);
                 if (Unit.IsSlowed)

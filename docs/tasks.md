@@ -20,7 +20,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 | Break the Ritual | Totem statue | Code-drawn post with three faces (`PlaceholderArt.MakeTotem`) | Needed |
 | Omens | Sun mark and the sun beam striking | Painted sigil on the tile under a faint shaft, charge, painted beam, gold light on the floor and statues, sparks, embers and a cooling scorch (`SunMark`, `Scorch`) | Done 2026-10-27, not playtested. Open: the "Sun beam!" popup is pink, clashing with the gold |
 | Omens | Shroud tiles | Flat tile colour (`ShroudColor` in `BattleController`) | Needed |
-| Omens | Moon shield on a unit | The generic shield status pip | Needed |
+| Omens | Moon shield on a unit | Moonlight touches the unit, a silver moon sigil on the floor and a veil of moonlight around the statue; flashes and fades as it absorbs, shatters when used up, fades at the next turn; its own silver status pip (`MoonShieldView`) | Done 2026-10-27, not playtested. Silver on both sides for now |
 | Moon Shrine | Reinforcements arriving at the edge | The rise animation and a text popup | Needed |
 | Scenarios | Blessing pick and item pick screens | Plain IMGUI panels (part of the UI pass) | Needed |
 | Zone of control | Enemy reach tiles, orange "costs extra AP" move tiles, dotted link to the enemies holding the selected unit | Flat colours (`EnemyReachColor`, `CostlyMoveColor`) and a red dotted line (`EngagedLinkColor`) in `BattleController` | Needed |
@@ -37,7 +37,9 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [ ] Painted statues for the other factions (goblins, bandits, elementals, bosses) and for evolved units; they are still grey placeholders.
 - [ ] Labels and health bars over the statues: restyle (part of the UI pass).
 - [ ] UI/HUD pass (IMGUI panels are still placeholders).
-- [ ] Lightning at night (planned, later).
+- [ ] Decide whether effects change colour by team (e.g. a moon shield on an enemy in ember red instead of silver). User's call; everything is silver/gold for both sides for now.
+- [x] Lightning strike effect onto a tile (2026-10-27, `LightningStrike`): sky flickers, a painted bolt flickering between three shapes, the board flashes white-blue, sparks and a scorch. No rule uses it yet; in test battles press L to strike the hovered tile. Not playtested.
+- [ ] Lightning at night (ambient bolts around the tower, planned, later); can reuse the bolt art.
 - [ ] Platform built from pieces (painted slabs per tile plus edge and wall pieces along the outline) instead of one painting, so boards can be any size or shape (16x16 already works by zooming out; odd shapes need this). Later, when non-rectangular boards are planned.
 - [x] Highlights that fit the theme: smooth glowing tiles with a gentle pulse (2026-10-25). Not yet playtested; path markers not done.
 - [x] Feel pass: attack wind-up, hit-stop, projectiles, heavy steps with dust; hit flash and chips, cracks as HP drops, crumbling deaths, popping damage numbers, explosions with shake (2026-10-25). Not yet playtested.

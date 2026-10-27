@@ -400,6 +400,42 @@ namespace ArmyRoguelike.View
             onImpact?.Invoke();
         }
 
+        private readonly Dictionary<Unit, MoonShieldView> _moonShields = new Dictionary<Unit, MoonShieldView>();
+
+        /// <summary>
+        /// The moon shields a unit this turn: last turn's shields fade first (shields cast earlier this turn,
+        /// by a second moon omen, stay).
+        /// </summary>
+        public void ShowMoonShield(Unit unit, int points, int turn)
+        {
+            foreach (var kv in new List<KeyValuePair<Unit, MoonShieldView>>(_moonShields))
+            {
+                if (kv.Value != null && kv.Value.CastTurn == turn && kv.Key != unit)
+                    continue;
+                if (kv.Value != null)
+                    kv.Value.Fade();
+                _moonShields.Remove(kv.Key);
+            }
+
+            var view = ViewOf(unit);
+            if (view != null)
+                _moonShields[unit] = MoonShieldView.Create(view, points, turn);
+        }
+
+        /// <summary>
+        /// A shield absorbed damage on a unit. Moon shields soak damage before ward shields, so the moon
+        /// shield (if any) takes this first. Returns whether a moon shield took it.
+        /// </summary>
+        public bool MoonShieldAbsorb(Unit unit, int amount)
+        {
+            if (!_moonShields.TryGetValue(unit, out var shield) || shield == null || shield.Points <= 0)
+                return false;
+            shield.Absorb(amount);
+            if (shield.Points <= 0)
+                _moonShields.Remove(unit);
+            return true;
+        }
+
         /// <summary>World-space centre of the board, for framing the camera.</summary>
         public Vector3 Centre => IsoMath.GridToWorld((Battle.Board.Width - 1) * 0.5f, (Battle.Board.Height - 1) * 0.5f);
     }

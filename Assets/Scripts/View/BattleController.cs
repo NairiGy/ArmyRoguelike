@@ -138,6 +138,10 @@ namespace ArmyRoguelike.View
 
             _hovered = HoveredTile();
             _hoveredUnit = _hovered.HasValue ? Battle.UnitAt(_hovered.Value) : null;
+
+            // Test battles only: L strikes the hovered tile with lightning, to try the effect (no rules yet).
+            if (_context.Test && keyboard != null && keyboard.lKey.wasPressedThisFrame && _hovered.HasValue)
+                StartCoroutine(LightningStrike.Strike(_board.transform, _hovered.Value));
             var clicked = !_busy && !_confirmEndTurn && Mouse.current.leftButton.wasPressedThisFrame && _hovered.HasValue;
 
             _intent.Hide();
@@ -936,6 +940,8 @@ namespace ArmyRoguelike.View
                     var text = omen.Omen == Omen.Sun ? "Sun mark" : omen.Omen == Omen.Night ? "Shrouded" : $"Moon shield {Battle.MoonShield}";
                     DamagePopup.Spawn(view.TopWorld + Vector3.up * 0.25f, text, omen.Blessing ? DamagePopup.HealColor : DamagePopup.DamageColor, 40);
                     view.RefreshStatus();
+                    if (omen.Omen == Omen.Moon)
+                        _board.ShowMoonShield(omen.Unit, Battle.MoonShield, Battle.TurnNumber);
                     foreach (var p in omen.Tiles)
                     {
                         if (omen.Omen == Omen.Sun)
@@ -985,7 +991,8 @@ namespace ArmyRoguelike.View
                     DamagePopup.Spawn(at, "Dodge!", DamagePopup.AbilityColor, 48);
                     break;
                 case EffectKind.Absorb:
-                    DamagePopup.Spawn(at, $"Shield -{effect.Amount}", DamagePopup.HealColor, 44);
+                    var moon = _board.MoonShieldAbsorb(effect.Unit, effect.Amount);
+                    DamagePopup.Spawn(at, $"{(moon ? "Moon shield" : "Shield")} -{effect.Amount}", DamagePopup.HealColor, 44);
                     view.RefreshStatus();
                     break;
                 case EffectKind.Refund:

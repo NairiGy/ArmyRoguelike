@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace ArmyRoguelike.View
 {
-    /// <summary>The burn a sun beam leaves: glowing embers that cool, then the char fades away.</summary>
+    /// <summary>The burn a sun beam or lightning leaves: glowing embers that cool, then the char fades away.</summary>
     public sealed class Scorch : MonoBehaviour
     {
         private const float Width = 2f;
@@ -18,6 +18,7 @@ namespace ArmyRoguelike.View
 
         private SpriteRenderer _burnRenderer;
         private SpriteRenderer _emberRenderer;
+        private bool _electric;
 
         private static Sprite ScorchSprite
         {
@@ -58,9 +59,11 @@ namespace ArmyRoguelike.View
             }
         }
 
-        public static void Create(Transform parent, GridPos tile, int order)
+        /// <summary>Burns a tile. Electric scorches (lightning) flash blue-white and die fast instead of smouldering gold to red.</summary>
+        public static void Create(Transform parent, GridPos tile, int order, bool electric = false)
         {
             var scorch = new GameObject($"Scorch {tile}").AddComponent<Scorch>();
+            scorch._electric = electric;
             scorch.transform.SetParent(parent, false);
             scorch.transform.position = IsoMath.GridToWorld(tile);
             // A random turn so repeated strikes don't leave identical marks.
@@ -86,11 +89,15 @@ namespace ArmyRoguelike.View
 
         private IEnumerator Start()
         {
-            for (var t = 0f; t < 1f; t += Time.deltaTime / CoolTime)
+            // Lightning burns flash and die fast; the sun's embers smoulder.
+            var cool = _electric ? 0.7f : CoolTime;
+            for (var t = 0f; t < 1f; t += Time.deltaTime / cool)
             {
-                // White-hot, through orange, to a dull red, then out.
+                // White-hot, through orange, to a dull red, then out (lightning: white-blue to violet).
                 var heat = 1f - t;
-                var c = Color.Lerp(new Color(1f, 0.25f, 0.05f), new Color(1f, 0.85f, 0.5f), heat * heat);
+                var c = _electric
+                    ? Color.Lerp(new Color(0.15f, 0.25f, 0.7f), new Color(0.85f, 0.92f, 1f), heat * heat)
+                    : Color.Lerp(new Color(1f, 0.25f, 0.05f), new Color(1f, 0.85f, 0.5f), heat * heat);
                 _emberRenderer.color = new Color(c.r, c.g, c.b, heat);
                 _burnRenderer.color = new Color(1f, 1f, 1f, Mathf.Clamp01(t * 4f));
                 yield return null;
