@@ -49,13 +49,16 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 ## Gameplay (mechanics chat)
 
 - [x] Zone of control made visible while a unit is selected (2026-10-27, branch `feature/zoc-visibility`): enemy reach tiles in faint red, move tiles that cost extra AP in orange, a dotted link to each enemy holding the selected unit, and "Engaged by ..." in the HUD and enemy hover. Not playtested; art row added above.
-- [ ] Next: playtest Prototype 5 (Act 1, now with both scenario fights) as a full run and summarise from the logs.
+- [x] Full Act 1 playtest (2026-10-27, logs in `../ArmyRoguelike-sound/Playtests`): won in under 7 minutes with only 4 fights; one faction fight, Rogue at +10 Bloodthirst, Giant dead in 2 turns, Break the Ritual easy, Moon Shrine held at 4 HP. Led to the 12-step act below.
+- [x] Act 1 is 12 steps with elites (harder rematches that pay an item pick); battles bring unbeaten factions, then rematches; Bloodthirst capped at +3; run log now gets each battle's log file even when Continue is clicked early (2026-10-28, branch `feature/act1-12-steps`). Not playtested.
+- [ ] Next: playtest the 12-step Act 1 as a full run and summarise from the logs. Then decide on new node types and events, and the balance pass.
+- [ ] Later: split fights into difficulty pools (and add more fights); each map step draws from a pool.
 - [ ] Moon Shrine balance: 3 test battles with a tier-1 Warrior/Archer/Rogue were all lost (army wiped twice, shrine broken once); no blessing earned in play yet. Leave for the general balance pass (user's call).
 - [ ] More map events and node types: the user wants to think about what else to add. Ideas parked from the scenario list: assassinate the leader, rescue a captive, hold the ground, break through, crumbling tower.
 - [x] Moon Shrine scenario node with blessings and curses (2026-10-26), merged into `experiment/art-style`. Tested in test mode only.
 - [x] Test mode: "Test battle" on the draft screen (editor and dev builds) starts any army against any encounter with any omen (2026-10-26).
 - [x] Break the Ritual scenario node: smash 3 goblin totems before enemy turn 4 for an item pick, or take a curse (2026-10-27, branch `feature/break-ritual`). Not playtested; in test mode as "Break the Ritual".
-- [ ] Later (parked ideas, see "Later / maybe" in the design note): Banners, more acts, terrain features, post-battle reward choice, elite nodes, difficulty scaling.
+- [ ] Later (parked ideas, see "Later / maybe" in the design note): Banners, more acts, terrain features, post-battle reward choice, difficulty scaling.
 - [x] Gamepedia documents enemy AI: per-enemy actions and traits, shared AI rules, each behaviour's decision list, hover intent (2026-10-26, branch `docs/enemy-ai-wiki`, worktree `../ArmyRoguelike-enemy-ai-wiki`). Not merged yet; after merging, re-export with Tools → Export Gamepedia to get the statue images back (the committed page is text only).
 - [ ] When merging `docs/enemy-ai-wiki`: the scenario targeting rules (Moon Shrine: go for the shrine unless a defender is adjacent; Break the Ritual: go for whoever is within 2 tiles of a totem; totems never act and have no intent) need documenting there. When adding enemy AI: add a value to `EnemyBehaviour` in `EnemyAI.cs` and its name and decision list in `GamepediaWriter.BehaviourSteps`; the export fails until the text exists.
 - [ ] Crossbowman's role text says "Hides behind cover", but its AI just walks to the cheapest tile with a shot (only the Camp layout starts it behind rocks). Fix the text or give it cover-seeking AI. Ask first.

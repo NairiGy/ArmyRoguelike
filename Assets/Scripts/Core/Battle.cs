@@ -101,6 +101,9 @@ namespace ArmyRoguelike.Core
         public const int CollisionDamage = 2;
         public const int TauntRange = 3;
 
+        /// <summary>Most damage Bloodthirst can add over a whole run.</summary>
+        public const int BloodthirstCap = 3;
+
         /// <summary>Zone of control: extra AP for each step out of a tile next to an enemy.</summary>
         public const int ZocCost = 2;
 
@@ -1393,7 +1396,8 @@ namespace ArmyRoguelike.Core
 
             if (!target.IsAlive && hostile && source.IsAlive)
             {
-                if (source.Has(Ability.Bloodthirst))
+                // Bloodthirst stops growing once the run-long bonus reaches the cap.
+                if (source.Has(Ability.Bloodthirst) && (source.Member?.BonusDamage ?? 0) + source.GainedDamage < BloodthirstCap)
                 {
                     source.GainedDamage++;
                     after.Add(new EffectEvent(EffectKind.Bloodthirst, source, 1, source.Hp, source));

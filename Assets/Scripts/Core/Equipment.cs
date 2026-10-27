@@ -95,7 +95,7 @@ namespace ArmyRoguelike.Core
                 case Ability.FirstShotDouble: return "the first attack each turn deals double damage";
                 case Ability.PreyOnSnared: return $"snared enemies take +{Battle.PreyBonus} damage from everyone";
                 case Ability.Volley: return "shots hit the 3x3 around the target for 1 less damage, friend or foe";
-                case Ability.Bloodthirst: return "+1 damage per kill, kept for the run";
+                case Ability.Bloodthirst: return $"+1 damage per kill, kept for the run (up to +{Battle.BloodthirstCap})";
                 case Ability.Pincer: return $"+{Battle.PincerBonus} damage if an ally stands on the far side of the target";
                 case Ability.KillRefund: return $"a kill refunds {Battle.KillRefundAp} AP";
                 case Ability.Poison: return $"hits poison: {Battle.PoisonDamage} damage at the start of the target's next {Battle.PoisonTurns} turns";

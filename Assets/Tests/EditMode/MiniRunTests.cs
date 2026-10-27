@@ -162,35 +162,116 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Map_Act1_EachFactionOnce_BossLast()
+        public void Map_Act1_TwelveSteps_FightsGuaranteed_BossLast()
         {
+            bool IsFight(MapNode n) => n.Kind == NodeKind.Battle || n.Kind == NodeKind.Elite || n.Kind == NodeKind.Ritual;
             for (var seed = 0; seed < 50; seed++)
             {
                 var run = NewRun(seed);
-                Assert.AreEqual(Run.Steps, run.Map.Count);
+                Assert.AreEqual(12, run.Map.Count);
                 foreach (var step in Run.TrainerSteps)
                     Assert.IsTrue(run.Map[step].Any(n => n.Kind == NodeKind.Trainer), $"trainer at step {step + 1}");
+                foreach (var step in Run.FightSteps)
+                    Assert.IsTrue(run.Map[step].All(IsFight), $"step {step + 1} is two fights");
                 Assert.IsTrue(run.Map[0].All(n => n.Kind == NodeKind.Battle), "the run opens with a fight");
                 Assert.AreNotEqual(run.Map[0][0].Encounter, run.Map[0][1].Encounter);
+                Assert.IsTrue(run.Map[0].All(n => Encounter.Regular.Contains(n.Encounter)), "step 1 is filled in from the start");
+                Assert.IsTrue(run.Map.Skip(1).SelectMany(s => s).Where(n => n.Kind == NodeKind.Battle || n.Kind == NodeKind.Elite)
+                    .All(n => n.Encounter == null), "later fights are decided when the run gets there");
+                Assert.AreEqual(2, run.Map.SelectMany(s => s).Count(n => n.Kind == NodeKind.Elite));
                 for (var i = 0; i < Run.Steps - 1; i++)
-                {
                     Assert.AreEqual(2, run.Map[i].Count);
-                    var a = run.Map[i][0];
-                    var b = run.Map[i][1];
-                    Assert.IsFalse(a.Kind == b.Kind && a.Encounter == b.Encounter, "no identical pair");
-                }
 
                 var last = run.Map[Run.Steps - 1].Single();
                 Assert.AreEqual(NodeKind.Boss, last.Kind);
                 Assert.IsTrue(Encounter.Bosses.Contains(last.Encounter));
-
-                var battles = run.Map.Take(Run.Steps - 1).SelectMany(s => s).Where(n => n.Kind == NodeKind.Battle).Select(n => n.Encounter).ToList();
-                CollectionAssert.AreEquivalent(Encounter.Regular, battles, "every faction exactly once on the map");
             }
         }
 
         [Test]
-        public void Map_BothScenarios_AtSteps3And5_NextToABattle()
+        public void Map_BattlesBringNewFactions_ThenRematches_ElitesRematchBeatenOnes()
+        {
+            for (var seed = 0; seed < 20; seed++)
+            {
+                var run = NewRun(seed);
+                var met = new System.Collections.Generic.List<Encounter>();
+                while (run.State == RunState.Map && !run.IsFinalStep)
+                {
+                    var choices = run.CurrentChoices;
+                    var fights = choices.Where(n => n.Kind == NodeKind.Battle || n.Kind == NodeKind.Elite).ToList();
+                    foreach (var n in fights)
+                        Assert.IsNotNull(n.Encounter, $"seed {seed} step {run.StepIndex + 1}");
+                    if (fights.Count == 2)
+                        Assert.AreNotEqual(fights[0].Encounter.Base ?? fights[0].Encounter, fights[1].Encounter.Base ?? fights[1].Encounter);
+                    foreach (var n in choices.Where(n => n.Kind == NodeKind.Battle))
+                    {
+                        Assert.IsTrue(Encounter.Regular.Contains(n.Encounter));
+                        Assert.AreEqual(Encounter.Regular.All(run.Fought.Contains), n.IsRematch);
+                        if (!n.IsRematch)
+                            Assert.IsFalse(run.Fought.Contains(n.Encounter), "a new faction while there are some left");
+                    }
+
+                    foreach (var n in choices.Where(n => n.Kind == NodeKind.Elite))
+                    {
+                        Assert.IsTrue(n.Encounter.IsElite);
+                        Assert.IsTrue(run.Fought.Contains(n.Encounter.Base), "an elite is a faction already beaten");
+                    }
+
+                    // Prefer fights, so the run beats factions and reaches the rematch rules.
+                    var pick = run.CurrentChoices.ToList().FindIndex(n => n.Kind == NodeKind.Battle);
+                    run.ChooseNode(pick >= 0 ? pick : 0);
+                    PlayThroughNode(run);
+                }
+
+                Assert.AreEqual(Run.Steps - 1, run.StepIndex, $"seed {seed}");
+            }
+        }
+
+        [Test]
+        public void Elite_Won_PaysGoldAndAnItemPick()
+        {
+            var run = NewRun(2);
+            while (!run.CurrentChoices.Any(n => n.Kind == NodeKind.Elite))
+            {
+                var battle = run.CurrentChoices.ToList().FindIndex(n => n.Kind == NodeKind.Battle);
+                run.ChooseNode(battle >= 0 ? battle : 0);
+                PlayThroughNode(run);
+            }
+
+            var gold = run.Gold;
+            run.ChooseNode(run.CurrentChoices.ToList().FindIndex(n => n.Kind == NodeKind.Elite));
+            Assert.IsTrue(run.CurrentEncounter.IsElite);
+            WinCurrentBattle(run, 3);
+            var earned = run.FinishBattle();
+            Assert.AreEqual(gold + earned, run.Gold);
+            Assert.Greater(earned, 0);
+            Assert.AreEqual(RunState.ItemReward, run.State);
+            Assert.IsFalse(run.Fought.Contains(run.CurrentEncounter), "the elite itself isn't a faction for the Necromancer");
+        }
+
+        [Test]
+        public void EliteEncounters_MoreOfTheSameEnemies()
+        {
+            for (var seed = 0; seed < 30; seed++)
+            {
+                int Count(Encounter e, UnitStats s) =>
+                    e.CreateBattle(ArmyMember.StartingArmy(), new System.Random(seed)).Living(Team.Enemy).Count(u => u.Stats == s);
+                Assert.AreEqual(2, Count(Encounter.EliteWolves, UnitStats.PackLeader), $"seed {seed}");
+                Assert.AreEqual(4, Count(Encounter.EliteWolves, UnitStats.Wolf), $"seed {seed}");
+                Assert.AreEqual(4, Count(Encounter.EliteGoblins, UnitStats.GoblinBomber));
+                Assert.AreEqual(3, Count(Encounter.EliteGoblins, UnitStats.Goblin));
+                Assert.AreEqual(3, Count(Encounter.EliteBandits, UnitStats.Crossbowman), $"seed {seed}");
+                Assert.AreEqual(2, Count(Encounter.EliteBandits, UnitStats.Cutpurse));
+                Assert.AreEqual(2, Count(Encounter.EliteBandits, UnitStats.Brute), $"seed {seed}");
+                Assert.AreEqual(4, Count(Encounter.EliteElementals, UnitStats.Elemental), $"seed {seed}");
+            }
+
+            foreach (var faction in Encounter.Regular)
+                Assert.AreEqual(faction, Encounter.EliteOf(faction).Base);
+        }
+
+        [Test]
+        public void Map_BothScenarios_AtSteps4And8_NextToABattle()
         {
             var shrineSteps = new System.Collections.Generic.HashSet<int>();
             for (var seed = 0; seed < 50; seed++)
@@ -199,7 +280,7 @@ namespace ArmyRoguelike.Tests
                 int StepOf(Encounter e) => Enumerable.Range(0, Run.Steps).Single(i => run.Map[i].Any(n => n.Kind == NodeKind.Ritual && n.Encounter == e));
                 var shrine = StepOf(Encounter.MoonShrine);
                 var ritual = StepOf(Encounter.BreakRitual);
-                CollectionAssert.AreEquivalent(new[] { 2, 4 }, new[] { shrine, ritual }, $"seed {seed}");
+                CollectionAssert.AreEquivalent(new[] { 3, 7 }, new[] { shrine, ritual }, $"seed {seed}");
                 foreach (var step in new[] { shrine, ritual })
                     Assert.IsTrue(run.Map[step].Any(n => n.Kind == NodeKind.Battle));
                 shrineSteps.Add(shrine);
@@ -278,7 +359,7 @@ namespace ArmyRoguelike.Tests
             for (var seed = 0; seed < 10; seed++)
             {
                 var run = NewRun(seed);
-                while (run.State == RunState.Map && run.StepIndex < 5)
+                while (run.State == RunState.Map && run.StepIndex < 8)
                 {
                     var scenario = run.CurrentChoices.ToList().FindIndex(n => n.Kind == NodeKind.Ritual);
                     run.ChooseNode(scenario >= 0 ? scenario : 0);
@@ -699,7 +780,7 @@ namespace ArmyRoguelike.Tests
 
             var kills = b.Units.Count(u => u.Team == Team.Enemy);
             run.FinishBattle();
-            Assert.AreEqual(kills, run.Army.Single(m => m.Stats == UnitStats.Rogue).BonusDamage);
+            Assert.AreEqual(System.Math.Min(kills, Battle.BloodthirstCap), run.Army.Single(m => m.Stats == UnitStats.Rogue).BonusDamage);
         }
 
         // ---------- Walk up and attack ----------

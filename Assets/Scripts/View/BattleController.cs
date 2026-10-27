@@ -24,10 +24,14 @@ namespace ArmyRoguelike.View
         /// <summary>A test battle from the test setup screen, outside any run.</summary>
         public readonly bool Test;
 
+        /// <summary>An elite fight: a harder rematch that pays an item pick.</summary>
+        public readonly bool Elite;
+
         public BattleContext(int step, int steps, string encounter, int gold, int runSeed, bool ambush, bool boss,
-            string layout = "", string layoutRule = "", bool test = false)
+            string layout = "", string layoutRule = "", bool test = false, bool elite = false)
         {
             Test = test;
+            Elite = elite;
             Step = step;
             Steps = steps;
             Encounter = encounter;
@@ -114,7 +118,8 @@ namespace ArmyRoguelike.View
         }
 
         /// <summary>File name of this battle's playtest log once saved, for the run log.</summary>
-        public string LogFile => _logger?.SavedFile;
+        /// <remarks>Saves first: "Continue" can be clicked while the last turn is still animating, before it saved.</remarks>
+        public string LogFile => _logger?.Save() ?? _logger?.SavedFile;
 
         private void Update()
         {
@@ -1361,6 +1366,8 @@ namespace ArmyRoguelike.View
                     GUILayout.Label("The shrine held. Choose a blessing next.", centred);
                 if (Battle.TotemsBroken)
                     GUILayout.Label("The guards flee. Choose an item next.", centred);
+                else if (_context.Elite)
+                    GUILayout.Label(_context.Test ? "Elite beaten. In a run: an item pick." : "Elite beaten. Choose an item next.", centred);
                 if (Battle.StolenGold > 0)
                     GUILayout.Label($"Cutpurses got away with {Battle.StolenGold} gold.", centred);
             }

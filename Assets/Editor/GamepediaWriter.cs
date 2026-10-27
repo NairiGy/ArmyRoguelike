@@ -122,10 +122,14 @@ public static class GamepediaWriter
     private static void Encounters(StringBuilder html)
     {
         html.Append("<section id=\"encounters\"><h2>Encounters</h2><p>Battles are on an 8x8 board; you place your army in the back two rows. ");
-        html.Append("Kill every enemy to win. Each faction appears at most once per run; Act 1 ends with one of the bosses. ");
+        html.Append("Kill every enemy to win. Battles bring factions you haven't beaten yet, then normal-strength rematches; Act 1 ends with one of the bosses. ");
         html.Append("Every encounter has a layout template: fixed rules, with the exact rocks and start tiles varied each time.</p>");
         html.Append("<h3>Factions</h3><div class=\"grid\">");
         foreach (var enc in Encounter.Regular)
+            EncounterCard(html, enc, enc.EnemySummary());
+        html.Append("</div><h3>Elites</h3><p>A harder rematch of a faction you've beaten: more of the same enemies. High risk, high reward: ");
+        html.Append("normal gold plus a pick of 1 of " + Run.RewardItemCount + " items.</p><div class=\"grid\">");
+        foreach (var enc in Encounter.Elites)
             EncounterCard(html, enc, enc.EnemySummary());
         html.Append("</div><h3>Bosses</h3><div class=\"grid\">");
         EncounterCard(html, Encounter.Necromancer, new[] { "Necromancer", "2 raised units from each faction you beat this act (Skeletons fill up to 4)" });
@@ -201,9 +205,12 @@ public static class GamepediaWriter
     {
         html.Append("<section id=\"run\"><h2>Run &amp; map</h2><ul>");
         html.Append($"<li>Draft {Run.DraftSize} different base units. Army size up to {Run.MaxArmySize}.</li>");
-        html.Append($"<li>Act 1 has {Run.Steps} steps; each step offers 2 nodes. The four factions are shuffled onto four battle nodes (two at step 1, one at steps 3 and 5), so none repeats. ");
+        html.Append($"<li>Act 1 has {Run.Steps} steps; each step offers 2 nodes. At steps {string.Join(", ", Run.FightSteps.Select(s => s + 1))} both choices are fights, ");
+        html.Append($"so every run has at least {Run.FightSteps.Count} fights before the boss. ");
         html.Append($"Steps {string.Join(" and ", Run.TrainerSteps.Select(s => s + 1))} offer a Trainer; the last step is a boss (Necromancer or Giant).</li>");
-        html.Append("<li>The other choices are shops and ? events, plus the two scenario fights next to the battles at steps 3 and 5: the Moon Shrine at one, Break the Ritual at the other.</li>");
+        html.Append("<li>A <b>Battle</b> brings a faction you haven't beaten yet; once you've met them all it's a normal-strength rematch. ");
+        html.Append("An <b>Elite</b> (steps 6 and 10) is a harder rematch of a faction you've beaten. Both show their faction when you reach their step.</li>");
+        html.Append("<li>The two scenario fights sit at steps 4 and 8, next to a battle: the Moon Shrine at one, Break the Ritual at the other. Shops and ? events fill the rest.</li>");
         html.Append($"<li>Won battle: {Run.BaseGold} gold + {Run.GoldPerSurvivor} per surviving unit (+{Run.AmbushBonusGold} for an ambush). Gold carried off by escaped cutpurses is lost.</li>");
         html.Append($"<li><b>Trainer</b>: each unit can evolve one tier per visit. The first evolution of a visit is free, the second costs {Run.SecondEvolutionPrice} gold, each after that {Run.LaterEvolutionPrice}.</li>");
         html.Append($"<li><b>Shop</b>: {Run.ShopSize} items and a random base-unit recruit for {Run.RecruitPrice} gold (if the army has room).</li>");

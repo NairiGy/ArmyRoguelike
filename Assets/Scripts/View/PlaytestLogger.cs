@@ -28,6 +28,7 @@ namespace ArmyRoguelike.View
             _log.battleNumber = context.Step;
             _log.encounter = context.Encounter;
             _log.ambush = context.Ambush;
+            _log.elite = context.Elite;
             _log.test = context.Test;
             _log.layout = context.Layout;
             _log.goldAtStart = context.Gold;
@@ -491,6 +492,9 @@ namespace ArmyRoguelike.View
             public int turns;
             public int survivors;
             public bool ambush;
+
+            /// <summary>An elite fight (harder rematch of a faction).</summary>
+            public bool elite;
 
             /// <summary>Ended with the debug "Win battle" button instead of being played.</summary>
             public bool skipped;

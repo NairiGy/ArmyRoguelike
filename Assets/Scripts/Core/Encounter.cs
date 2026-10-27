@@ -71,6 +71,15 @@ namespace ArmyRoguelike.Core
             _generate = generate;
         }
 
+        /// <summary>For an elite: the faction it's the harder version of. Null otherwise.</summary>
+        public Encounter Base { get; private set; }
+
+        /// <summary>A harder rematch of a faction: more of the same enemies. Pays an item pick on top of gold.</summary>
+        public bool IsElite => Base != null;
+
+        private static Encounter Elite(Encounter faction, string layoutRule, Func<Random, IReadOnlyList<Encounter>, Plan> generate) =>
+            new Encounter("Elite " + faction.Name, faction.Layout, layoutRule, false, null, generate) { Base = faction };
+
         /// <summary>
         /// Generates a board and creates the battle. <paramref name="fought"/> is the factions beaten earlier
         /// in the act (the Necromancer builds his army from them). Retries until the rules hold.
@@ -352,6 +361,88 @@ namespace ArmyRoguelike.Core
 
         /// <summary>The factions Act 1 battles are drawn from; each appears at most once per run.</summary>
         public static readonly IReadOnlyList<Encounter> Regular = new[] { Wolves, Goblins, Bandits, Elementals };
+
+        // ---------- Elites: harder rematches of the factions (more of the same enemies) ----------
+
+        public static readonly Encounter EliteWolves = Elite(Wolves,
+            "Open ground with a mirrored pair of rocks; two packs, each bunched around its own leader.",
+            (rng, _) =>
+            {
+                var plan = new Plan();
+                MirroredPair(plan, rng.Next(0, 4), 3 + rng.Next(2));
+                var leaders = new[] { P(1 + rng.Next(2), 7), P(5 + rng.Next(2), 7) };
+                foreach (var leader in leaders)
+                {
+                    plan.Enemies.Add((UnitStats.PackLeader, leader));
+                    foreach (var t in FreeTiles(plan, rng, 5, 7).Where(t => t.StepsTo(leader) <= 2).Take(2))
+                        plan.Enemies.Add((UnitStats.Wolf, t));
+                }
+
+                return plan;
+            });
+
+        public static readonly Encounter EliteGoblins = Elite(Goblins,
+            "A rock ridge across the middle with only two gaps; four bombers lob over it from the back row.",
+            (rng, _) =>
+            {
+                var plan = new Plan();
+                var gaps = Enumerable.Range(0, Size).OrderBy(_ => rng.Next()).Take(2).ToList();
+                for (var x = 0; x < Size; x++)
+                    if (!gaps.Contains(x))
+                        plan.Rocks.Add(P(x, 4));
+                PlaceRandom(plan, rng, UnitStats.GoblinBomber, 4, 7, 7);
+                PlaceRandom(plan, rng, UnitStats.Goblin, 3, 5, 5);
+                return plan;
+            });
+
+        public static readonly Encounter EliteBandits = Elite(Bandits,
+            "Three rocks of cover in the middle with a crossbowman behind each, cutpurses on the flanks, two brutes in the centre.",
+            (rng, _) =>
+            {
+                var plan = new Plan();
+                var columns = Enumerable.Range(0, Size).OrderBy(_ => rng.Next()).Take(3).ToList();
+                foreach (var x in columns)
+                {
+                    var rock = P(x, 4 + rng.Next(2));
+                    plan.Rocks.Add(rock);
+                    plan.Enemies.Add((UnitStats.Crossbowman, P(rock.X, rock.Y + 1)));
+                }
+
+                // Cutpurses on the flanks; a crossbowman may already stand there, so fall back to the back rows.
+                foreach (var onFlank in new Func<GridPos, bool>[] { t => t.X <= 1, t => t.X >= Size - 2 })
+                {
+                    var free = FreeTiles(plan, rng, 5, 7);
+                    plan.Enemies.Add((UnitStats.Cutpurse, free.Where(onFlank).DefaultIfEmpty(free[0]).First()));
+                }
+                foreach (var t in FreeTiles(plan, rng, 5, 7).Where(t => t.X >= 2 && t.X <= 5).Take(2))
+                    plan.Enemies.Add((UnitStats.Brute, t));
+                return plan;
+            });
+
+        public static readonly Encounter EliteElementals = Elite(Elementals,
+            "Two mirrored pairs of crystals; four elementals spread across the back.",
+            (rng, _) =>
+            {
+                var plan = new Plan();
+                MirroredPair(plan, rng.Next(0, 4), 2 + rng.Next(2));
+                MirroredPair(plan, rng.Next(0, 4), 4 + rng.Next(2));
+                // Spread out where the crystals allow it; any fourth that doesn't fit 3 apart goes 2 apart.
+                var picked = new List<GridPos>();
+                foreach (var spacing in new[] { 3, 2 })
+                foreach (var t in FreeTiles(plan, rng, 5, 7))
+                    if (picked.Count < 4 && picked.All(p => p.StepsTo(t) >= spacing))
+                        picked.Add(t);
+
+                foreach (var t in picked)
+                    plan.Enemies.Add((UnitStats.Elemental, t));
+                return plan;
+            });
+
+        /// <summary>The elite version of each faction, in the same order as <see cref="Regular"/>.</summary>
+        public static readonly IReadOnlyList<Encounter> Elites = new[] { EliteWolves, EliteGoblins, EliteBandits, EliteElementals };
+
+        /// <summary>The elite version of a faction.</summary>
+        public static Encounter EliteOf(Encounter faction) => Elites.First(e => e.Base == faction);
 
         /// <summary>Act 1 ends with one of these, picked per run.</summary>
         public static readonly IReadOnlyList<Encounter> Bosses = new[] { Necromancer, Giant };

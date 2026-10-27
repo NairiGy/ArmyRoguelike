@@ -43,6 +43,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>A scenario fight (Moon Shrine or Break the Ritual): win for a reward; lose it and take a curse.</summary>
         Ritual,
+
+        /// <summary>A harder rematch of a faction you've beaten: high risk, pays gold plus an item pick.</summary>
+        Elite,
     }
 
     public enum EventKind
@@ -68,8 +71,14 @@ namespace ArmyRoguelike.Core
     {
         public readonly NodeKind Kind;
 
-        /// <summary>For battle and boss nodes.</summary>
-        public readonly Encounter Encounter;
+        /// <summary>
+        /// For fight nodes. Battle and elite nodes get theirs when the run reaches their step, because it
+        /// depends on which factions have been beaten by then; until then it is null.
+        /// </summary>
+        public Encounter Encounter { get; internal set; }
+
+        /// <summary>A battle against a faction already beaten (every faction has been met), at normal strength.</summary>
+        public bool IsRematch { get; internal set; }
 
         public MapNode(NodeKind kind, Encounter encounter = null)
         {
@@ -83,7 +92,10 @@ namespace ArmyRoguelike.Core
             {
                 switch (Kind)
                 {
-                    case NodeKind.Battle: return $"Battle: {Encounter.Name}";
+                    case NodeKind.Battle:
+                        return Encounter == null ? "Battle" : $"Battle: {Encounter.Name}{(IsRematch ? " (rematch)" : "")}";
+                    case NodeKind.Elite:
+                        return Encounter == null ? "Elite" : $"Elite: {Encounter.Base.Name}";
                     case NodeKind.Boss: return $"Boss: {Encounter.Name}";
                     case NodeKind.Shop: return "Shop";
                     case NodeKind.Trainer: return "Trainer";
@@ -129,7 +141,7 @@ namespace ArmyRoguelike.Core
         public const int DraftSize = 3;
         public const int MaxArmySize = 4;
         public const int RecruitPrice = 15;
-        public const int Steps = 7;
+        public const int Steps = 12;
         public const int GambleCost = 10;
         public const int GambleWin = 25;
         public const int AmbushBonusGold = 5;
@@ -137,7 +149,10 @@ namespace ArmyRoguelike.Core
         public const int ShrineHp = 2;
 
         /// <summary>Map steps (0-based) that always offer a Trainer as one of the two choices.</summary>
-        public static readonly IReadOnlyList<int> TrainerSteps = new[] { 3, 5 };
+        public static readonly IReadOnlyList<int> TrainerSteps = new[] { 4, 8 };
+
+        /// <summary>Map steps (0-based) where both choices are fights, so every run has at least this many before the boss.</summary>
+        public static readonly IReadOnlyList<int> FightSteps = new[] { 0, 3, 5, 7, 9 };
 
         private readonly Random _rng;
         private readonly List<Equipment> _offers = new List<Equipment>();
@@ -188,6 +203,7 @@ namespace ArmyRoguelike.Core
             Seed = seed;
             _rng = new Random(seed);
             GenerateMap();
+            ResolveStep();
         }
 
         public IReadOnlyList<MapNode> CurrentChoices => _map[StepIndex];
@@ -212,29 +228,71 @@ namespace ArmyRoguelike.Core
         // ---------- Map ----------
 
         /// <summary>
-        /// Act 1, 7 steps. The four factions are shuffled and each appears on exactly one battle node, so
-        /// no faction can come up twice: step 1 offers two of them, steps 3 and 5 one each. The two scenario
-        /// fights are the other choices at steps 3 and 5, the Moon Shrine at one and Break the Ritual at the
-        /// other. Shops, ? events and Trainers (steps 4 and 6) fill the rest, and step 7 is one of the two bosses.
+        /// Act 1, 12 steps. Steps 1, 4, 6, 8 and 10 offer two fights, so every run has at least five before the
+        /// boss. A battle brings a faction you haven't beaten yet (a normal-strength rematch once you've met them
+        /// all); an elite is a harder rematch of one you have beaten. Battle and elite nodes are filled in when
+        /// the run reaches their step (see <see cref="ResolveStep"/>). The two scenario fights sit at steps 4
+        /// and 8 in random order; Trainers at 5 and 9; shops and ? events fill the rest; step 12 is a boss.
         /// </summary>
         private void GenerateMap()
         {
-            var factions = Encounter.Regular.OrderBy(_ => _rng.Next()).ToList();
-            MapNode Fight(int i) => new MapNode(NodeKind.Battle, factions[i]);
+            MapNode Battle() => new MapNode(NodeKind.Battle);
+            MapNode Elite() => new MapNode(NodeKind.Elite);
             var shop = new MapNode(NodeKind.Shop);
             var unknown = new MapNode(NodeKind.Event);
             var trainer = new MapNode(NodeKind.Trainer);
-            var shrine = new MapNode(NodeKind.Ritual, Encounter.MoonShrine);
-            var breakRitual = new MapNode(NodeKind.Ritual, Encounter.BreakRitual);
-            var shrineAtStep3 = _rng.Next(2) == 0;
+            var scenarios = new[] { Encounter.MoonShrine, Encounter.BreakRitual }.OrderBy(_ => _rng.Next())
+                .Select(e => new MapNode(NodeKind.Ritual, e)).ToList();
 
-            AddStep(Fight(0), Fight(1));
+            AddStep(Battle(), Battle());
             AddStep(shop, unknown);
-            AddStep(Fight(2), shrineAtStep3 ? shrine : breakRitual);
+            AddStep(Battle(), unknown);
+            AddStep(scenarios[0], Battle());
             AddStep(trainer, shop);
-            AddStep(Fight(3), shrineAtStep3 ? breakRitual : shrine);
+            AddStep(Elite(), Battle());
+            AddStep(shop, unknown);
+            AddStep(scenarios[1], Battle());
             AddStep(trainer, unknown);
+            AddStep(Elite(), Battle());
+            AddStep(shop, unknown);
             _map.Add(new[] { new MapNode(NodeKind.Boss, Encounter.Bosses[_rng.Next(Encounter.Bosses.Count)]) });
+        }
+
+        /// <summary>
+        /// Picks the factions for the current step's battle and elite nodes, now that it's known who has been
+        /// beaten. A battle takes a faction not beaten yet (a normal-strength rematch if every faction has been
+        /// met); an elite takes a beaten one. The two nodes of a step never share a faction.
+        /// </summary>
+        private void ResolveStep()
+        {
+            if (StepIndex >= _map.Count)
+                return;
+            var taken = _map[StepIndex].Where(n => n.Encounter != null).Select(n => n.Encounter.Base ?? n.Encounter).ToList();
+            foreach (var node in _map[StepIndex].Where(n => n.Encounter == null))
+            {
+                Encounter faction;
+                if (node.Kind == NodeKind.Elite)
+                {
+                    var beaten = Fought.Where(f => !taken.Contains(f)).ToList();
+                    var pool = beaten.Count > 0 ? beaten : Encounter.Regular.Where(f => !taken.Contains(f)).ToList();
+                    faction = pool[_rng.Next(pool.Count)];
+                    node.Encounter = Encounter.EliteOf(faction);
+                }
+                else if (node.Kind == NodeKind.Battle)
+                {
+                    var fresh = Encounter.Regular.Where(f => !Fought.Contains(f) && !taken.Contains(f)).ToList();
+                    node.IsRematch = fresh.Count == 0;
+                    var pool = fresh.Count > 0 ? fresh : Encounter.Regular.Where(f => !taken.Contains(f)).ToList();
+                    faction = pool[_rng.Next(pool.Count)];
+                    node.Encounter = faction;
+                }
+                else
+                {
+                    continue;
+                }
+
+                taken.Add(faction);
+            }
         }
 
         private void AddStep(MapNode a, MapNode b) => _map.Add(new[] { a, b }.OrderBy(_ => _rng.Next()).ToList());
@@ -262,6 +320,7 @@ namespace ArmyRoguelike.Core
                 case NodeKind.Battle:
                 case NodeKind.Boss:
                 case NodeKind.Ritual:
+                case NodeKind.Elite:
                     CurrentEncounter = CurrentNode.Encounter;
                     State = RunState.Battle;
                     break;
@@ -285,6 +344,7 @@ namespace ArmyRoguelike.Core
             StepIndex++;
             State = RunState.Map;
             CurrentNode = null;
+            ResolveStep();
         }
 
         public bool IsFinalStep => StepIndex == Steps - 1;
@@ -415,7 +475,8 @@ namespace ArmyRoguelike.Core
                 return earned;
             }
 
-            if (CurrentEncounter == Encounter.BreakRitual)
+            // Breaking the ritual or beating an elite pays an item pick on top of the gold.
+            if (CurrentEncounter == Encounter.BreakRitual || CurrentEncounter.IsElite)
             {
                 _rewardItems.Clear();
                 _rewardItems.AddRange(Equipment.Catalog.OrderBy(_ => _rng.Next()).Take(RewardItemCount));

@@ -130,7 +130,8 @@ namespace ArmyRoguelike.View
             FrameCamera(Camera.main, board);
             BattleScenery.Apply(Camera.main, board, BattleScenery.MainPalette, false, BattleScenery.MainSetting);
             var context = new BattleContext(_run.StepIndex + 1, Run.Steps, _run.CurrentEncounter.Name, _run.Gold, _run.Seed,
-                _run.IsAmbush, _run.CurrentEncounter.IsBoss, _run.CurrentEncounter.Layout, _run.CurrentEncounter.LayoutRule);
+                _run.IsAmbush, _run.CurrentEncounter.IsBoss, _run.CurrentEncounter.Layout, _run.CurrentEncounter.LayoutRule,
+                elite: _run.CurrentEncounter.IsElite);
             _controller = _battleRoot.AddComponent<BattleController>();
             _controller.Init(board, Camera.main, context, () => Do(FinishBattle));
         }
@@ -203,7 +204,7 @@ namespace ArmyRoguelike.View
             FrameCamera(Camera.main, board);
             BattleScenery.Apply(Camera.main, board, BattleScenery.MainPalette, false, BattleScenery.MainSetting);
             var context = new BattleContext(0, 0, _testEncounter.Name, 0, seed, false, _testEncounter.IsBoss,
-                _testEncounter.Layout, _testEncounter.LayoutRule, test: true);
+                _testEncounter.Layout, _testEncounter.LayoutRule, test: true, elite: _testEncounter.IsElite);
             _controller = _battleRoot.AddComponent<BattleController>();
             _controller.Init(board, Camera.main, context, () => Do(FinishTestBattle));
         }
@@ -251,7 +252,7 @@ namespace ArmyRoguelike.View
 
             GUILayout.Space(10);
             GUILayout.Label("Encounter:");
-            foreach (var enc in Encounter.Regular.Concat(Encounter.Bosses).Concat(new[] { Encounter.MoonShrine, Encounter.BreakRitual }))
+            foreach (var enc in Encounter.Regular.Concat(Encounter.Elites).Concat(Encounter.Bosses).Concat(new[] { Encounter.MoonShrine, Encounter.BreakRitual }))
             {
                 var pick = enc;
                 if (GUILayout.Button((enc == _testEncounter ? "> " : "") + enc.Name + (enc.IsBoss ? " (boss)" : "")))
@@ -504,7 +505,7 @@ namespace ArmyRoguelike.View
                     if (past && !chosen)
                         GUI.color = new Color(1f, 1f, 1f, 0.35f);
                     var index = i;
-                    if (GUILayout.Button(label, GUILayout.Height(current ? 34 : 26)) && current)
+                    if (GUILayout.Button(label, GUILayout.Height(current ? 30 : 22)) && current)
                         Do(() => ChooseNode(index));
                     GUI.color = oldColor;
                     GUI.enabled = true;
@@ -517,6 +518,7 @@ namespace ArmyRoguelike.View
             GUILayout.Label("? = something unexpected. Shops sell items and a recruit. Trainers evolve every unit one tier, for free.");
             GUILayout.Label("Moon Shrine: defend it for 5 enemy turns to earn a blessing. If it breaks, you take a curse.");
             GUILayout.Label("Break the Ritual: smash 3 totems before enemy turn 4 to earn an item. If the summoning completes, you take a curse.");
+            GUILayout.Label("Battle: a faction you haven't beaten (a rematch once you've met them all). Elite: a harder rematch of a faction you beat; pays an item too. Battles and elites show their faction when you reach their step.");
             DrawArmy();
             GUILayout.EndArea();
         }
@@ -746,10 +748,12 @@ namespace ArmyRoguelike.View
         {
             const float w = 560;
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 40, w, 620), GUI.skin.box);
-            GUILayout.Label("The ritual is broken", Title);
+            var elite = _run.CurrentEncounter != null && _run.CurrentEncounter.IsElite;
+            GUILayout.Label(elite ? $"{_run.CurrentEncounter.Name} beaten" : "The ritual is broken", Title);
             if (!string.IsNullOrEmpty(_lastNote))
                 GUILayout.Label(_lastNote);
-            GUILayout.Label("The guards left their loot behind. Pick one item for one unit (it replaces that unit's item).");
+            GUILayout.Label((elite ? "They left their loot behind." : "The guards left their loot behind.") +
+                            " Pick one item for one unit (it replaces that unit's item).");
             GUILayout.Space(6);
             foreach (var item in _run.RewardItems)
             {

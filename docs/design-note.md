@@ -177,7 +177,7 @@ Goal: find out whether building up the army across fights feels good.
 |---|---|
 | Warrior | **Shield Wall:** allies next to it take 1 less damage (min 1), from any source |
 | Archer | **Steady Aim:** +1 damage if it hasn't moved this turn |
-| Rogue | **Bloodthirst:** +1 damage per enemy kill, kept for the run |
+| Rogue | **Bloodthirst:** +1 damage per enemy kill, kept for the run (capped at +3 since 2026-10-28) |
 | Sapper | **Mines** (see below) |
 
 **Items with abilities** (in the shop/cart pool next to the 6 stat items): Vampire Fang (heal 2 on a kill, 9g), Thorned Mail (melee attackers take 1, 8g), Spring Boots (first tile each turn is free, 7g), Lucky Charm (once per battle, survive a killing blow at 1 HP, 10g). There are no other "earned" abilities: abilities come from unit types and items only.
@@ -209,7 +209,7 @@ Goal: find out whether building up the army across fights feels good.
 
 Goal: battles that don't repeat and a boss that checks the build. The run is a single Act 1 for now; later acts come after this one feels good.
 
-**Map (7 steps)** — the four factions are shuffled onto four battle nodes, so no faction appears twice in a run:
+**Map (7 steps, replaced on 2026-10-28 by the 12-step act below)** — the four factions are shuffled onto four battle nodes, so no faction appears twice in a run:
 
 | Step | Choice |
 |---|---|
@@ -259,7 +259,7 @@ Goal: battles that don't repeat and a boss that checks the build. The run is a s
 
 Built 2026-10-26 on branch `feature/moon-shrine`, not yet playtested. Other scenario ideas, ranked, for later: break the ritual (built next, see below), survive waves, assassinate the leader, rescue a captive, hold the ground, break through, crumbling tower; puzzles last (fixed puzzles clash with a random army; maybe as a ? event with a fixed squad).
 
-- **Map:** a new node type (`NodeKind.Ritual`), once per run, as the other choice next to the battle at step 3 or step 5. May later merge into battle nodes as a variant.
+- **Map:** a new node type (`NodeKind.Ritual`), once per run, as the other choice next to a battle (now at step 4 or 8 of the 12-step act). May later merge into battle nodes as a variant.
 - **Board** *(placeholders)*: the shrine (15 HP, can't act or move) stands at (3,3). You deploy within 2 steps of it, not in the back rows. 3 Elementals start on edge tiles at least 4 steps away; 2 more walk in from the edges after enemy turns 1 and 3. One mirrored pair of crystals.
 - **Win:** survive 5 enemy turns; the ritual completes and the rest flee. Killing everyone wins early only once no reinforcements are left. Pays normal gold, then you pick a **blessing**.
 - **Loss:** the shrine breaks: no gold, a random **curse**, and the run goes on. Losing the whole army still ends the run.
@@ -277,13 +277,38 @@ Built 2026-10-26 on branch `feature/moon-shrine`, not yet playtested. Other scen
 
 Built 2026-10-27 on branch `feature/break-ritual`, not yet playtested. The mirror of the Moon Shrine: attack instead of defend.
 
-- **Map:** every run has both scenario nodes, next to the battles at steps 3 and 5: the Moon Shrine at one, Break the Ritual at the other. So ? events now only appear at steps 2 and 6.
+- **Map:** every run has both scenario nodes, next to battles (now steps 4 and 8 of the 12-step act): the Moon Shrine at one, Break the Ritual at the other.
 - **Board** *(placeholders)*: 3 totems (6 HP, can't move or act) on rows 5–6, at least 3 steps apart; a mirrored pair of rocks on row 3. Goblin guards: 3 bombers on the back row, 2 runners on rows 4–5. You deploy in your back two rows.
 - **Win:** smash every totem before the summoning completes at the start of enemy turn 4 (you get 4 turns). The guards flee. Normal gold, then pick 1 of 3 random items for one unit (it replaces that unit's item), or leave them.
 - **Loss:** the summoning completes with a totem standing: no gold and a random curse, and the run goes on. Losing the whole army still ends the run.
 - **Guard AI:** guards go for whichever of your units is within 2 tiles of a totem (nearest first); otherwise they fight as usual. Taunt still wins. Their own bombs don't hurt the totems; your blasts do.
 - **Curses:** losing both scenarios gives two curses, always different omens.
 - **Zone of control:** the shrine and totems can't attack, so they have none (this also changed the Moon Shrine: enemies next to it can leave freely).
+
+## Act 1, 12 steps, with elites
+
+Decided and built 2026-10-28 (branch `feature/act1-12-steps`), not yet playtested. Why: the first full playtest of the 7-step act was won in under 7 minutes with only 4 fights (the scenarios had replaced faction battles), and a Rogue snowballed to +10 damage. Goal: about 15–20 minutes, a run that ramps up.
+
+| Step | Choice |
+|---|---|
+| 1 | Battle / Battle |
+| 2 | Shop / ? |
+| 3 | Battle / ? |
+| 4 | Scenario / Battle |
+| 5 | Trainer / Shop |
+| 6 | Elite / Battle |
+| 7 | Shop / ? |
+| 8 | Scenario (the other one) / Battle |
+| 9 | Trainer / ? |
+| 10 | Elite / Battle |
+| 11 | Shop / ? |
+| 12 | Boss |
+
+- **At least 5 fights before the boss** (steps 1, 4, 6, 8, 10 are two fights), up to 7. The two Trainers stay (enough for tier 3).
+- **Battle:** a faction you haven't beaten yet; once you've met all four, a normal-strength rematch. **Elite:** a harder rematch of a faction you've beaten. Both get their faction when the run reaches their step (the map shows "Battle" / "Elite" until then); the two fights of a step never share a faction.
+- **Elites are high risk, high reward**, always a choice: normal gold plus a pick of 1 of 3 items. First version is more of the same enemies, no new types *(placeholders)*: Wolves 2 leaders + 4 wolves; Goblins 4 bombers + 3 runners behind a ridge with only 2 gaps; Bandits 3 crossbowmen behind cover, 2 cutpurses, 2 brutes; Elementals 4.
+- **Bloodthirst capped at +3 for the run.**
+- **Later:** fights get split into difficulty pools (and more fights added); each step then draws from a pool. New node types and events after a playtest of this act.
 
 ## Test mode (for testing only)
 

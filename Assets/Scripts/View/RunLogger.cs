@@ -38,12 +38,16 @@ namespace ArmyRoguelike.View
 
         public void RecordBattle(Battle battle, int goldEarned, string logFile, bool ambush)
         {
+            // FinishBattle has already moved on, so the battle was on the previous step unless the run is still there.
+            var step = _run.State == RunState.Map ? _run.StepIndex : _run.StepIndex + 1;
+            var node = step - 1 < _run.Chosen.Count ? _run.Map[step - 1][_run.Chosen[step - 1]] : null;
             _log.battles.Add(new BattleResult
             {
-                // FinishBattle has already moved on, so the battle was on the previous step unless the run ended.
-                step = _run.State == RunState.Map ? _run.StepIndex : _run.StepIndex + 1,
+                step = step,
                 encounter = battle == null ? "" : _run.CurrentEncounter?.Name,
                 ambush = ambush,
+                elite = _run.CurrentEncounter != null && _run.CurrentEncounter.IsElite,
+                rematch = !ambush && node != null && node.IsRematch,
                 skipped = battle != null && battle.WasSkipped,
                 result = battle != null && battle.Phase == Phase.Victory ? "victory" : "defeat",
                 turns = battle?.TurnNumber ?? 0,
@@ -237,6 +241,10 @@ namespace ArmyRoguelike.View
             public int step;
             public string encounter;
             public bool ambush;
+
+            /// <summary>An elite (harder rematch), or a normal-strength rematch of a faction already beaten.</summary>
+            public bool elite;
+            public bool rematch;
             public bool skipped;
             public string result;
             public int turns;
