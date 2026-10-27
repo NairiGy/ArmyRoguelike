@@ -241,7 +241,7 @@ Goal: battles that don't repeat and a boss that checks the build. The run is a s
 
 ## Moon Shrine: the first non-"kill all" scenario
 
-Built 2026-10-26 on branch `feature/moon-shrine`, not yet playtested. Other scenario ideas, ranked, for later: break the ritual (destroy totems before turn N), survive waves, assassinate the leader, rescue a captive, hold the ground, break through, crumbling tower; puzzles last (fixed puzzles clash with a random army; maybe as a ? event with a fixed squad).
+Built 2026-10-26 on branch `feature/moon-shrine`, not yet playtested. Other scenario ideas, ranked, for later: break the ritual (built next, see below), survive waves, assassinate the leader, rescue a captive, hold the ground, break through, crumbling tower; puzzles last (fixed puzzles clash with a random army; maybe as a ? event with a fixed squad).
 
 - **Map:** a new node type (`NodeKind.Ritual`), once per run, as the other choice next to the battle at step 3 or step 5. May later merge into battle nodes as a variant.
 - **Board** *(placeholders)*: the shrine (15 HP, can't act or move) stands at (3,3). You deploy within 2 steps of it, not in the back rows. 3 Elementals start on edge tiles at least 4 steps away; 2 more walk in from the edges after enemy turns 1 and 3. One mirrored pair of crystals.
@@ -257,10 +257,22 @@ Built 2026-10-26 on branch `feature/moon-shrine`, not yet playtested. Other scen
 | Night | Start of your turn: a random unit of yours and the 3x3 around it are shrouded until your next turn; enemies can't hit units there from range (point blank still works) | The shroud covers an enemy; your ranged attacks, fireballs and bombs can't reach it |
 | Moon | Start of your turn: a random unit of yours gets a 4-point shield until your next turn | The shield goes to an enemy |
 
+## Break the Ritual: the second scenario
+
+Built 2026-10-27 on branch `feature/break-ritual`, not yet playtested. The mirror of the Moon Shrine: attack instead of defend.
+
+- **Map:** every run has both scenario nodes, next to the battles at steps 3 and 5: the Moon Shrine at one, Break the Ritual at the other. So ? events now only appear at steps 2 and 6.
+- **Board** *(placeholders)*: 3 totems (6 HP, can't move or act) on rows 5–6, at least 3 steps apart; a mirrored pair of rocks on row 3. Goblin guards: 3 bombers on the back row, 2 runners on rows 4–5. You deploy in your back two rows.
+- **Win:** smash every totem before the summoning completes at the start of enemy turn 4 (you get 4 turns). The guards flee. Normal gold, then pick 1 of 3 random items for one unit (it replaces that unit's item), or leave them.
+- **Loss:** the summoning completes with a totem standing: no gold and a random curse, and the run goes on. Losing the whole army still ends the run.
+- **Guard AI:** guards go for whichever of your units is within 2 tiles of a totem (nearest first); otherwise they fight as usual. Taunt still wins. Their own bombs don't hurt the totems; your blasts do.
+- **Curses:** losing both scenarios gives two curses, always different omens.
+- **Zone of control:** the shrine and totems can't attack, so they have none (this also changed the Moon Shrine: enemies next to it can leave freely).
+
 ## Test mode (for testing only)
 
 - Editor and dev builds only: a "Test battle" button on the draft screen opens a setup screen.
-- Pick any 1–4 unit types (any tier, repeats allowed), any encounter (factions, bosses, Moon Shrine; for the Necromancer, which factions count as beaten) and optionally any blessing or curse. No items for now.
+- Pick any 1–4 unit types (any tier, repeats allowed), any encounter (factions, bosses, Moon Shrine, Break the Ritual; for the Necromancer, which factions count as beaten) and optionally any blessing or curse. No items for now.
 - The battle uses the normal rules; afterwards it returns to the setup screen. No run, gold or map, and no run log; battle logs are marked `test: true`.
 
 ## Later / maybe

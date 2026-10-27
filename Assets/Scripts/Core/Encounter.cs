@@ -41,6 +41,10 @@ namespace ArmyRoguelike.Core
             public int RitualTurns;
             public readonly List<(int afterEnemyTurn, UnitStats stats)> Waves = new List<(int, UnitStats)>();
 
+            // Break the Ritual only: totem tiles and the enemy turn the summoning completes on.
+            public readonly List<GridPos> Totems = new List<GridPos>();
+            public int SummonTurn;
+
             /// <summary>The tiles the player deploys on: the ritual zone, or the back two rows.</summary>
             public IEnumerable<GridPos> PlayerTiles()
             {
@@ -52,6 +56,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>A ritual fight: defend an objective in the middle instead of killing everyone.</summary>
         public bool IsRitual => this == MoonShrine;
+
+        /// <summary>A scenario fight (Moon Shrine or Break the Ritual): its own map node, rewards and curse on a loss.</summary>
+        public bool IsScenario => this == MoonShrine || this == BreakRitual;
 
         private Encounter(string name, string layout, string layoutRule, bool isBoss, UnitStats raised,
             Func<Random, IReadOnlyList<Encounter>, Plan> generate)
@@ -83,6 +90,8 @@ namespace ArmyRoguelike.Core
             var battle = new Battle(new Board(Size, Size, plan.Rocks), army, plan.Enemies) { Rng = new Random(rng.Next()) };
             if (plan.Objective.HasValue)
                 battle.SetupRitual(UnitStats.MoonShrine, plan.Objective.Value, plan.DeployZone, plan.RitualTurns, plan.Waves);
+            if (plan.Totems.Count > 0)
+                battle.SetupSummoning(UnitStats.Totem, plan.Totems, plan.SummonTurn);
             return battle;
         }
 
@@ -106,6 +115,9 @@ namespace ArmyRoguelike.Core
             var occupied = new HashSet<GridPos>();
             if (plan.Objective.HasValue)
                 occupied.Add(plan.Objective.Value);
+            foreach (var t in plan.Totems)
+                if (!In(t) || rocks.Contains(t) || playerTiles.Contains(t) || !occupied.Add(t))
+                    return false;
             foreach (var (stats, pos) in plan.Enemies)
             foreach (var c in Battle.Footprint(pos, stats.Size))
                 if (!In(c) || rocks.Contains(c) || playerTiles.Contains(c) || !occupied.Add(c))
@@ -145,7 +157,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Random free tiles in the given rows, avoiding rocks and units already placed.</summary>
         private static List<GridPos> FreeTiles(Plan plan, Random rng, int minY, int maxY)
         {
-            var taken = new HashSet<GridPos>(plan.Rocks.Concat(plan.Enemies.SelectMany(e => Battle.Footprint(e.pos, e.stats.Size))));
+            var taken = new HashSet<GridPos>(plan.Rocks.Concat(plan.Totems).Concat(plan.Enemies.SelectMany(e => Battle.Footprint(e.pos, e.stats.Size))));
             var tiles = new List<GridPos>();
             for (var y = minY; y <= maxY; y++)
             for (var x = 0; x < Size; x++)
@@ -277,6 +289,33 @@ namespace ArmyRoguelike.Core
                 foreach (var turn in RitualWaveTurns)
                     for (var i = 0; i < RitualWaveSize; i++)
                         plan.Waves.Add((turn, UnitStats.Elemental));
+                return plan;
+            });
+
+        // ---------- Break the Ritual ----------
+
+        /// <summary>Break the Ritual: how many totems, and the enemy turn the summoning completes on.</summary>
+        public const int TotemCount = 3;
+
+        public const int SummonTurn = 4;
+
+        public static readonly Encounter BreakRitual = new Encounter("Break the Ritual", "Totem Grounds",
+            "Three goblin totems stand on the far half. Smash them all before the summoning completes at the start of enemy turn 4.",
+            false, null,
+            (rng, _) =>
+            {
+                var plan = new Plan { SummonTurn = SummonTurn };
+                MirroredPair(plan, rng.Next(0, 3), 3);
+                foreach (var t in FreeTiles(plan, rng, 5, 6))
+                {
+                    if (plan.Totems.Count == TotemCount)
+                        break;
+                    if (plan.Totems.All(p => p.StepsTo(t) >= 3))
+                        plan.Totems.Add(t);
+                }
+
+                PlaceRandom(plan, rng, UnitStats.GoblinBomber, 3, 7, 7);
+                PlaceRandom(plan, rng, UnitStats.Goblin, 2, 4, 5);
                 return plan;
             });
 

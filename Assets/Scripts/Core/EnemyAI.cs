@@ -49,9 +49,13 @@ namespace ArmyRoguelike.Core
         private const int NecromancerComfortDistance = 3;
         private const int BomberComfortDistance = 2;
 
+        /// <summary>Break the Ritual: a player unit this close to a totem counts as threatening it.</summary>
+        public const int TotemThreatRange = 2;
+
         /// <summary>
         /// The player unit this enemy wants to attack: a taunter in range first; in a ritual fight a defender
-        /// next to it, else the objective; otherwise nearest in steps, then lowest HP, then lowest id.
+        /// next to it, else the objective; in Break the Ritual the nearest unit threatening a totem;
+        /// otherwise nearest in steps, then lowest HP, then lowest id.
         /// </summary>
         public static Unit ChooseTarget(Battle battle, Unit enemy)
         {
@@ -76,6 +80,20 @@ namespace ArmyRoguelike.Core
                 return blocker ?? objective;
             }
 
+            // Break the Ritual: guards go for whoever threatens a totem (within reach of one), nearest first.
+            var totems = battle.Totems.Where(t => t.IsAlive).ToList();
+            if (totems.Count > 0)
+            {
+                var threat = battle.Living(Team.Player)
+                    .Where(u => totems.Any(t => Battle.Distance(t, u) <= TotemThreatRange))
+                    .OrderBy(u => Battle.Distance(enemy, u))
+                    .ThenBy(u => u.Hp)
+                    .ThenBy(u => u.Id)
+                    .FirstOrDefault();
+                if (threat != null)
+                    return threat;
+            }
+
             return battle.Living(Team.Player)
                 .OrderBy(u => Battle.Distance(enemy, u))
                 .ThenBy(u => u.Hp)
@@ -94,6 +112,9 @@ namespace ArmyRoguelike.Core
         /// <summary>What this enemy would do first if its turn started now. Used to show intent on hover.</summary>
         public static Intent PredictIntent(Battle battle, Unit enemy)
         {
+            if (enemy.IsObjective)
+                return new Intent(IntentKind.None, null);
+
             if (enemy.CarryingLoot > 0)
                 return new Intent(IntentKind.Flee, enemy);
 

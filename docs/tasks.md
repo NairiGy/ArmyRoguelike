@@ -28,11 +28,16 @@ and move done items to the "Done" section at the bottom now and then.
 
 ## Gameplay (mechanics chat)
 
-- [ ] Playtest Prototype 5 (Act 1) and summarise from the logs.
-- [ ] Zone of control is hard to notice: the user only notices it when a unit can still get away. Consider showing enemies' reach (the tiles next to them) while a unit is selected. Ask before building.
+- [ ] Next (agreed 2026-10-27): zone of control is hard to notice: the user only notices it when a unit can still get away. Show enemies' reach (the tiles next to them) while a unit is selected. Design with the user before building.
+- [ ] Then: playtest Prototype 5 (Act 1, now with both scenario fights) as a full run and summarise from the logs.
+- [ ] Moon Shrine balance: 3 test battles with a tier-1 Warrior/Archer/Rogue were all lost (army wiped twice, shrine broken once); no blessing earned in play yet. Leave for the general balance pass (user's call).
+- [ ] More map events and node types: the user wants to think about what else to add. Ideas parked from the scenario list: assassinate the leader, rescue a captive, hold the ground, break through, crumbling tower.
+- [x] Moon Shrine scenario node with blessings and curses (2026-10-26), merged into `experiment/art-style`. Tested in test mode only.
+- [x] Test mode: "Test battle" on the draft screen (editor and dev builds) starts any army against any encounter with any omen (2026-10-26).
+- [x] Break the Ritual scenario node: smash 3 goblin totems before enemy turn 4 for an item pick, or take a curse (2026-10-27, branch `feature/break-ritual`). Not playtested; in test mode as "Break the Ritual".
 - [ ] Later (parked ideas, see "Later / maybe" in the design note): Banners, more acts, terrain features, post-battle reward choice, elite nodes, difficulty scaling.
 - [x] Gamepedia documents enemy AI: per-enemy actions and traits, shared AI rules, each behaviour's decision list, hover intent (2026-10-26, branch `docs/enemy-ai-wiki`, worktree `../ArmyRoguelike-enemy-ai-wiki`). Not merged yet; after merging, re-export with Tools → Export Gamepedia to get the statue images back (the committed page is text only).
-- [ ] When adding enemy AI (e.g. Moon Shrine elementals going for the shrine): add a value to `EnemyBehaviour` in `EnemyAI.cs` and its name and decision list in `GamepediaWriter.BehaviourSteps`; the export fails until the text exists.
+- [ ] When merging `docs/enemy-ai-wiki`: the scenario targeting rules (Moon Shrine: go for the shrine unless a defender is adjacent; Break the Ritual: go for whoever is within 2 tiles of a totem; totems never act and have no intent) need documenting there. When adding enemy AI: add a value to `EnemyBehaviour` in `EnemyAI.cs` and its name and decision list in `GamepediaWriter.BehaviourSteps`; the export fails until the text exists.
 - [ ] Crossbowman's role text says "Hides behind cover", but its AI just walks to the cheapest tile with a shot (only the Camp layout starts it behind rocks). Fix the text or give it cover-seeking AI. Ask first.
 - [ ] Goblin Bomber hover intent only checks the nearest unit: it shows "attack" when it will bomb a farther unit, and ignores backing off. Decide whether the intent should match.
 

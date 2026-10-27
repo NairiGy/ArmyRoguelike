@@ -55,17 +55,31 @@ namespace ArmyRoguelike.View
                 stolenGold = _run.LastStolen,
                 shrine = battle?.Objective == null ? "" : battle.Phase == Phase.Victory ? "held" : battle.ObjectiveLost ? "broken" : "army lost",
                 shrineHpLeft = battle?.Objective?.Hp ?? 0,
+                ritual = battle == null || battle.Totems.Count == 0 ? ""
+                    : battle.TotemsBroken ? "broken" : battle.SummoningComplete ? "summoned" : battle.Phase == Phase.Victory ? "won" : "army lost",
+                totemsLeft = battle?.Totems.Count(t => t.IsAlive) ?? 0,
             });
         }
 
-        /// <summary>The blessing picked after holding the Moon Shrine, or the curse taken after losing it.</summary>
+        /// <summary>The blessing picked after holding the Moon Shrine, or a curse taken after losing a scenario fight.</summary>
         public void RecordOmen(Omen omen, bool blessing)
         {
+            var step = _run.State == RunState.Map ? _run.StepIndex : _run.StepIndex + 1;
             if (blessing)
+            {
                 _log.blessing = Omens.Name(omen, true);
+                _log.blessingStep = step;
+            }
             else
-                _log.curse = Omens.Name(omen, false);
-            _log.omenStep = _run.State == RunState.Map ? _run.StepIndex : _run.StepIndex + 1;
+            {
+                _log.curses.Add(new CurseEntry { curse = Omens.Name(omen, false), step = step });
+            }
+        }
+
+        /// <summary>The item picked after breaking the ritual (null item: left them all).</summary>
+        public void RecordRewardItem(Equipment item, ArmyMember member, Equipment replaced)
+        {
+            _log.rewardItem = item == null ? "left" : $"{item.Name} -> {member.Stats.Name}{(replaced != null ? $" (replaced {replaced.Name})" : "")}";
         }
 
         public void OpenShop()
@@ -184,10 +198,15 @@ namespace ArmyRoguelike.View
             public int goldLeft;
             public List<string> draft = new List<string>();
 
-            /// <summary>From the Moon Shrine: the blessing picked or the curse taken (empty if none), and at which step.</summary>
+            /// <summary>From the Moon Shrine: the blessing picked (empty if none), and at which step.</summary>
             public string blessing = "";
-            public string curse = "";
-            public int omenStep;
+            public int blessingStep;
+
+            /// <summary>Curses taken by losing scenario fights, in order.</summary>
+            public List<CurseEntry> curses = new List<CurseEntry>();
+
+            /// <summary>From Break the Ritual: "Item -> Unit", "left", or empty if not won.</summary>
+            public string rewardItem = "";
             public List<MapStep> map = new List<MapStep>();
             public List<TrainerVisit> trainers = new List<TrainerVisit>();
             public List<Choice> choices = new List<Choice>();
@@ -231,6 +250,17 @@ namespace ArmyRoguelike.View
             /// <summary>Moon Shrine fights only: "held", "broken" or "army lost", and its HP at the end.</summary>
             public string shrine;
             public int shrineHpLeft;
+
+            /// <summary>Break the Ritual only: "broken", "summoned" or "army lost", and totems still standing at the end.</summary>
+            public string ritual;
+            public int totemsLeft;
+        }
+
+        [Serializable]
+        private sealed class CurseEntry
+        {
+            public string curse;
+            public int step;
         }
 
         [Serializable]

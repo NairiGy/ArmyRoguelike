@@ -171,6 +171,9 @@ namespace ArmyRoguelike.View
                 case UnitKind.Shrine:
                     sprite = MakeShrine();
                     break;
+                case UnitKind.Totem:
+                    sprite = MakeTotem();
+                    break;
                 case UnitKind.Goblin:
                 case UnitKind.GoblinBomber:
                     sprite = MakeGoblin(kind == UnitKind.GoblinBomber);
@@ -624,6 +627,34 @@ namespace ArmyRoguelike.View
             // Crossbow arms and bolt.
             Fill(tex, 7, 27, 24, 28);
             Fill(tex, 15, 24, 16, 31);
+            Shade(tex, w, h);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);
+        }
+
+        /// <summary>A goblin totem: a stacked post of three crude faces with horns on top.</summary>
+        private static Sprite MakeTotem()
+        {
+            const int w = 28, h = 48;
+            var tex = NewTexture(w, h);
+            Plinth(tex, w, 9);
+            for (var i = 0; i < 3; i++)
+            {
+                var y0 = 4 + i * 11;
+                Fill(tex, 9, y0, 18, y0 + 9, i % 2 == 0 ? 1f : 0.85f);
+                // Eyes and mouth.
+                Fill(tex, 11, y0 + 6, 12, y0 + 7, 0.25f);
+                Fill(tex, 15, y0 + 6, 16, y0 + 7, 0.25f);
+                Fill(tex, 12, y0 + 2, 15, y0 + 3, 0.3f);
+            }
+
+            // Horns.
+            for (var i = 0; i < 6; i++)
+            {
+                Fill(tex, 8 - i / 2, 37 + i, 9 - i / 2, 37 + i);
+                Fill(tex, 18 + i / 2, 37 + i, 19 + i / 2, 37 + i);
+            }
+
             Shade(tex, w, h);
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);

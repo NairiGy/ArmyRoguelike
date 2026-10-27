@@ -213,6 +213,44 @@ namespace ArmyRoguelike.Core
         /// <summary>Ritual turns left to survive, counting the coming enemy turn. 0 in a normal fight.</summary>
         public int RitualTurnsLeft => RitualTurns == 0 ? 0 : Math.Max(0, RitualTurns - Math.Max(0, TurnNumber - 1));
 
+        // ---------- Break the Ritual (smash the totems) ----------
+
+        private readonly List<Unit> _totems = new List<Unit>();
+
+        /// <summary>The enemy totems to smash in Break the Ritual (empty in other fights).</summary>
+        public IReadOnlyList<Unit> Totems => _totems;
+
+        /// <summary>The summoning completes at the start of this enemy turn unless every totem is smashed. 0 = none.</summary>
+        public int SummonTurn { get; private set; }
+
+        /// <summary>The fight was lost because the summoning completed with totems still standing.</summary>
+        public bool SummoningComplete { get; private set; }
+
+        /// <summary>The fight was won by smashing every totem in time.</summary>
+        public bool TotemsBroken => _totems.Count > 0 && Phase == Phase.Victory && _totems.All(t => !t.IsAlive);
+
+        /// <summary>Your turns left before the summoning completes, counting this one. 0 when there is no summoning.</summary>
+        public int SummonTurnsLeft => SummonTurn == 0 ? 0 : Math.Max(0, SummonTurn - TurnNumber + 1);
+
+        /// <summary>
+        /// Turns this into Break the Ritual: totems stand on the given tiles, and the fight is lost if any is still
+        /// standing at the start of enemy turn <paramref name="summonTurn"/>.
+        /// </summary>
+        internal void SetupSummoning(UnitStats totem, IEnumerable<GridPos> tiles, int summonTurn)
+        {
+            foreach (var tile in tiles)
+            {
+                var unit = new Unit(_nextId++, Team.Enemy, totem) { Pos = tile, IsPlaced = true, IsDone = true };
+                _units.Add(unit);
+                _totems.Add(unit);
+            }
+
+            SummonTurn = summonTurn;
+        }
+
+        /// <summary>A scenario fight (Moon Shrine or Break the Ritual) was lost with the army still standing: it costs a curse.</summary>
+        public bool ScenarioLost => ObjectiveLost || (SummoningComplete && LivingArmy.Any());
+
         // ---------- Omens ----------
 
         /// <summary>Omens in play: each one and the side it helps (the player for a blessing, the enemy for a curse).</summary>
@@ -406,9 +444,12 @@ namespace ArmyRoguelike.Core
         public bool IsShielded(Unit unit) =>
             _units.Any(w => w != unit && w.Team == unit.Team && w.IsPlaced && w.IsAlive && w.Has(Ability.ShieldWall) && Distance(w, unit) == 1);
 
-        /// <summary>True if the unit, standing with its anchor here, is next to a living enemy (inside its reach).</summary>
+        /// <summary>
+        /// True if the unit, standing with its anchor here, is next to a living enemy (inside its reach).
+        /// Objectives (shrine, totems) can't attack, so they have no reach.
+        /// </summary>
         public bool InEnemyReach(Unit unit, GridPos anchor) =>
-            _units.Any(u => u.IsPlaced && u.IsAlive && u.Team != unit.Team && Distance(anchor, unit.Size, u) == 1);
+            _units.Any(u => u.IsPlaced && u.IsAlive && u.Team != unit.Team && !u.IsObjective && Distance(anchor, unit.Size, u) == 1);
 
         /// <summary>
         /// AP for one step. Zone of control: stepping out of a tile next to an enemy costs
@@ -983,6 +1024,14 @@ namespace ArmyRoguelike.Core
                 u.IsDone = true;
             ActiveUnit = null;
 
+            // Break the Ritual: with totems still standing, the summoning completes as the enemy turn begins.
+            if (SummonTurn > 0 && TurnNumber >= SummonTurn && _totems.Any(t => t.IsAlive))
+            {
+                SummoningComplete = true;
+                Phase = Phase.Defeat;
+                return events;
+            }
+
             Phase = Phase.EnemyTurn;
             BeginTurn(Team.Enemy, events);
 
@@ -999,8 +1048,8 @@ namespace ArmyRoguelike.Core
             {
                 if (IsOver)
                     break;
-                // A skeleton raised earlier this phase waits until the next enemy turn.
-                if (enemy.IsAlive && !enemy.IsDone)
+                // A skeleton raised earlier this phase waits until the next enemy turn. Totems never act.
+                if (enemy.IsAlive && !enemy.IsDone && !enemy.IsObjective)
                     EnemyAI.TakeTurn(this, enemy, events);
                 enemy.IsDone = true;
             }
@@ -1288,6 +1337,10 @@ namespace ArmyRoguelike.Core
                 after.Add(new EffectEvent(EffectKind.Dodge, target, 0, target.Hp, target));
                 amount = 0;
             }
+
+            // Totems are warded against their own side: goblin bombs landing around them don't hurt them.
+            if (target.IsObjective && target.Team == Team.Enemy && source != null && source.Team == target.Team)
+                amount = 0;
 
             if (target.MoonShield > 0 && amount > 0)
             {
@@ -1652,7 +1705,8 @@ namespace ArmyRoguelike.Core
         {
             if (IsOver || Phase == Phase.Placement)
                 return;
-            if (!Living(Team.Enemy).Any() && _waves.Count == 0)
+            // Smashing the last totem wins Break the Ritual; the guards flee.
+            if ((!Living(Team.Enemy).Any() && _waves.Count == 0) || (_totems.Count > 0 && _totems.All(t => !t.IsAlive)))
                 Phase = Phase.Victory;
             else if (!LivingArmy.Any() || (Objective != null && !Objective.IsAlive))
                 Phase = Phase.Defeat;

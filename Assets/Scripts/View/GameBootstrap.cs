@@ -141,12 +141,14 @@ namespace ArmyRoguelike.View
             var ambush = _run.IsAmbush;
             var earned = _run.FinishBattle();
             _runLog.RecordBattle(battle, earned, _controller.LogFile, ambush);
-            if (battle.ObjectiveLost)
-                _runLog.RecordOmen(_run.Curse.Value, false);
+            var curse = battle.ScenarioLost ? _run.LastCurse : null;
+            if (curse.HasValue)
+                _runLog.RecordOmen(curse.Value, false);
             Destroy(_battleRoot);
             _battleRoot = null;
             _controller = null;
-            _lastNote = battle.ObjectiveLost ? $"The shrine broke. {Omens.Name(_run.Curse.Value, false)}: {Omens.Describe(_run.Curse.Value, false)}"
+            _lastNote = curse.HasValue
+                ? $"{(battle.SummoningComplete ? "The summoning completed" : "The shrine broke")}. {Omens.Name(curse.Value, false)}: {Omens.Describe(curse.Value, false)}"
                 : battle.Phase != Phase.Victory ? null
                 : _run.LastStolen > 0 ? $"Battle won: +{earned} gold, but cutpurses got away with {_run.LastStolen}."
                 : $"Battle won: +{earned} gold.";
@@ -249,7 +251,7 @@ namespace ArmyRoguelike.View
 
             GUILayout.Space(10);
             GUILayout.Label("Encounter:");
-            foreach (var enc in Encounter.Regular.Concat(Encounter.Bosses).Concat(new[] { Encounter.MoonShrine }))
+            foreach (var enc in Encounter.Regular.Concat(Encounter.Bosses).Concat(new[] { Encounter.MoonShrine, Encounter.BreakRitual }))
             {
                 var pick = enc;
                 if (GUILayout.Button((enc == _testEncounter ? "> " : "") + enc.Name + (enc.IsBoss ? " (boss)" : "")))
@@ -355,6 +357,9 @@ namespace ArmyRoguelike.View
                     break;
                 case RunState.Event:
                     DrawEvent(width);
+                    break;
+                case RunState.ItemReward:
+                    DrawItemReward(width);
                     break;
                 case RunState.Blessing:
                     DrawBlessing(width);
@@ -475,8 +480,8 @@ namespace ArmyRoguelike.View
             GUILayout.Label($"Gold: {_run.Gold}    Beaten: {(_run.Fought.Count > 0 ? string.Join(", ", _run.Fought.Select(f => f.Name)) : "nobody yet")}");
             if (_run.Blessing.HasValue)
                 GUILayout.Label(Omens.Name(_run.Blessing.Value, true));
-            if (_run.Curse.HasValue)
-                GUILayout.Label(Omens.Name(_run.Curse.Value, false));
+            foreach (var curse in _run.Curses)
+                GUILayout.Label(Omens.Name(curse, false));
             if (!string.IsNullOrEmpty(_lastNote))
                 GUILayout.Label(_lastNote);
             GUILayout.Space(6);
@@ -511,6 +516,7 @@ namespace ArmyRoguelike.View
             GUILayout.Space(8);
             GUILayout.Label("? = something unexpected. Shops sell items and a recruit. Trainers evolve every unit one tier, for free.");
             GUILayout.Label("Moon Shrine: defend it for 5 enemy turns to earn a blessing. If it breaks, you take a curse.");
+            GUILayout.Label("Break the Ritual: smash 3 totems before enemy turn 4 to earn an item. If the summoning completes, you take a curse.");
             DrawArmy();
             GUILayout.EndArea();
         }
@@ -731,6 +737,67 @@ namespace ArmyRoguelike.View
 
             GUILayout.FlexibleSpace();
             DrawArmy();
+            GUILayout.EndArea();
+        }
+
+        private Equipment _selectedReward;
+
+        private void DrawItemReward(float screenWidth)
+        {
+            const float w = 560;
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 40, w, 620), GUI.skin.box);
+            GUILayout.Label("The ritual is broken", Title);
+            if (!string.IsNullOrEmpty(_lastNote))
+                GUILayout.Label(_lastNote);
+            GUILayout.Label("The guards left their loot behind. Pick one item for one unit (it replaces that unit's item).");
+            GUILayout.Space(6);
+            foreach (var item in _run.RewardItems)
+            {
+                var marker = item == _selectedReward ? "> " : "";
+                if (GUILayout.Button($"{marker}{item.Name}   {item.Effect}"))
+                    _selectedReward = item;
+            }
+
+            GUILayout.Space(8);
+            if (_selectedReward != null && _run.RewardItems.Contains(_selectedReward))
+            {
+                GUILayout.Label($"Give the {_selectedReward.Name} to:");
+                foreach (var member in _run.Army)
+                {
+                    var current = member.Equipment != null ? $"replaces {member.Equipment.Name}" : "empty slot";
+                    GUI.enabled = _run.CanTakeRewardItem(_selectedReward, member);
+                    if (GUILayout.Button($"{member.Stats.Name}   ({current})"))
+                    {
+                        var taker = member;
+                        var item = _selectedReward;
+                        Do(() =>
+                        {
+                            var replaced = taker.Equipment;
+                            if (!_run.TakeRewardItem(item, taker))
+                                return;
+                            _runLog.RecordRewardItem(item, taker, replaced);
+                            _lastNote = $"The {taker.Stats.Name} takes the {item.Name}.";
+                            _selectedReward = null;
+                        });
+                    }
+
+                    GUI.enabled = true;
+                }
+            }
+            else
+            {
+                DrawArmy();
+            }
+
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Leave the items", GUILayout.Height(32)))
+                Do(() =>
+                {
+                    _run.SkipRewardItem();
+                    _runLog.RecordRewardItem(null, null, null);
+                    _lastNote = null;
+                    _selectedReward = null;
+                });
             GUILayout.EndArea();
         }
 

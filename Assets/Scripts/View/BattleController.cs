@@ -1136,6 +1136,14 @@ namespace ArmyRoguelike.View
         {
             get
             {
+                if (Battle.SummonTurn > 0)
+                {
+                    var left = Battle.SummonTurnsLeft;
+                    var standing = Battle.Totems.Count(t => t.IsAlive);
+                    return $"\nRitual: smash the totems ({standing}/{Battle.Totems.Count} standing). " +
+                           (left <= 1 ? "The summoning completes after this turn!" : $"The summoning completes in {left} turns.");
+                }
+
                 if (Battle.Objective == null)
                     return "";
                 var line = $"\nRitual: survive {Battle.RitualTurnsLeft} more enemy turn{(Battle.RitualTurnsLeft == 1 ? "" : "s")}. " +
@@ -1293,16 +1301,18 @@ namespace ArmyRoguelike.View
             if (Battle.Phase == Phase.Victory)
             {
                 var survivors = Battle.LivingArmy.Count();
-                GUILayout.Label(Battle.RitualComplete ? "The ritual is complete!" : "Victory!", style);
+                GUILayout.Label(Battle.RitualComplete ? "The ritual is complete!" : Battle.TotemsBroken ? "The ritual is broken!" : "Victory!", style);
                 GUILayout.Label($"{survivors} survived: +{_context.GoldIfWon(survivors)} gold", centred);
                 if (Battle.Objective != null)
                     GUILayout.Label("The shrine held. Choose a blessing next.", centred);
+                if (Battle.TotemsBroken)
+                    GUILayout.Label("The guards flee. Choose an item next.", centred);
                 if (Battle.StolenGold > 0)
                     GUILayout.Label($"Cutpurses got away with {Battle.StolenGold} gold.", centred);
             }
-            else if (Battle.ObjectiveLost)
+            else if (Battle.ScenarioLost)
             {
-                GUILayout.Label("The shrine broke", style);
+                GUILayout.Label(Battle.SummoningComplete ? "The summoning completed" : "The shrine broke", style);
                 GUILayout.Label(_context.Test ? "In a run: no gold and a random curse." : "No gold, and a curse follows you. The run goes on.", centred);
             }
             else
@@ -1320,7 +1330,9 @@ namespace ArmyRoguelike.View
         {
             if (_hoveredUnit != null && _hoveredUnit.IsObjective)
                 return $"{_hoveredUnit.Stats.Name}  HP {_hoveredUnit.Hp}/{_hoveredUnit.MaxHp}\n{_hoveredUnit.Stats.Role}\n" +
-                       "Enemies go for it unless one of your units is next to them.";
+                       (_hoveredUnit.Team == Team.Player
+                           ? "Enemies go for it unless one of your units is next to them."
+                           : $"Guards go for any of your units within {EnemyAI.TotemThreatRange} tiles of a totem. Their own bombs don't hurt it.");
 
             if (_hoveredUnit != null && _hoveredUnit != _selected)
             {

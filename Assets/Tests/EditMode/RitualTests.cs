@@ -153,6 +153,107 @@ namespace ArmyRoguelike.Tests
             }
         }
 
+        // ---------- Break the Ritual ----------
+
+        private static Battle Summoning((UnitStats, GridPos)[] enemies, GridPos[] totems, int summonTurn = 4)
+        {
+            var b = new Battle(new Board(8, 8, BoxRocks), new[] { UnitStats.Warrior }, enemies);
+            b.SetupSummoning(UnitStats.Totem, totems, summonTurn);
+            return b;
+        }
+
+        [Test]
+        public void BreakRitual_SmashingEveryTotemWins_GuardsFlee()
+        {
+            var b = Summoning(new[] { (UnitStats.Wolf, BoxedTile) }, new[] { new GridPos(3, 2), new GridPos(5, 2) });
+            Start(b, new GridPos(3, 1));
+            var warrior = Player(b);
+            warrior.Ap = 99;
+            b.PlayerAttack(warrior, b.Totems[0]);
+            b.PlayerAttack(warrior, b.Totems[0]);
+            Assert.IsFalse(b.Totems[0].IsAlive);
+            Assert.IsFalse(b.IsOver, "one totem still stands");
+
+            warrior.Pos = new GridPos(5, 1);
+            b.PlayerAttack(warrior, b.Totems[1]);
+            b.PlayerAttack(warrior, b.Totems[1]);
+            Assert.AreEqual(Phase.Victory, b.Phase);
+            Assert.IsTrue(b.TotemsBroken);
+            Assert.IsTrue(b.Units.Single(u => u.Stats == UnitStats.Wolf).IsAlive, "the guards flee; nobody has to die");
+        }
+
+        [Test]
+        public void BreakRitual_SummoningCompletesAtTheStartOfTheEnemyTurn()
+        {
+            var b = Summoning(new[] { (UnitStats.Wolf, BoxedTile) }, new[] { new GridPos(3, 5) }, summonTurn: 2);
+            Start(b, new GridPos(3, 0));
+            Assert.AreEqual(2, b.SummonTurnsLeft);
+            b.EndPlayerTurn();
+            Assert.IsFalse(b.IsOver);
+            Assert.AreEqual(1, b.SummonTurnsLeft);
+            Assert.AreEqual(new GridPos(3, 5), b.Totems[0].Pos, "totems never move or act");
+
+            var events = b.EndPlayerTurn();
+            Assert.AreEqual(Phase.Defeat, b.Phase);
+            Assert.IsTrue(b.SummoningComplete);
+            Assert.IsTrue(b.ScenarioLost);
+            Assert.AreEqual(0, events.Count, "the enemies don't get to act first");
+        }
+
+        [Test]
+        public void BreakRitual_GoblinBombsDontHurtTheirTotems_YourMinesDo()
+        {
+            var b = Summoning(new[] { (UnitStats.GoblinBomber, BoxedTile) }, new[] { new GridPos(3, 5) });
+            Start(b, new GridPos(3, 0));
+            var bomber = Enemy(b, 0);
+            var totem = b.Totems[0];
+            b.Explode(new GridPos(3, 4), 3, "bomb", bomber, new System.Collections.Generic.List<BattleEvent>());
+            Assert.AreEqual(UnitStats.Totem.MaxHp, totem.Hp);
+            b.Explode(new GridPos(3, 4), 3, "mine", Player(b), new System.Collections.Generic.List<BattleEvent>());
+            Assert.AreEqual(UnitStats.Totem.MaxHp - 3, totem.Hp);
+        }
+
+        [Test]
+        public void Objectives_HaveNoZoneOfControl()
+        {
+            var b = Summoning(new[] { (UnitStats.Wolf, BoxedTile) }, new[] { new GridPos(3, 2) });
+            Start(b, new GridPos(3, 1));
+            Assert.IsFalse(b.InEnemyReach(Player(b), new GridPos(3, 1)));
+            Assert.AreEqual(Battle.MoveCost, b.GetReachable(Player(b))[new GridPos(2, 1)]);
+        }
+
+        [Test]
+        public void BreakRitual_GuardsGoForWhoeverThreatensATotem()
+        {
+            var b = new Battle(new Board(8, 8), new[] { UnitStats.Warrior, UnitStats.Archer },
+                new[] { (UnitStats.Goblin, new GridPos(0, 4)) });
+            b.SetupSummoning(UnitStats.Totem, new[] { new GridPos(6, 6) }, 4);
+            Start(b, new GridPos(0, 1), new GridPos(7, 1));
+            var goblin = Enemy(b);
+            Assert.AreEqual(Player(b, 0), EnemyAI.ChooseTarget(b, goblin), "nobody near a totem: nearest as usual");
+
+            Player(b, 1).Pos = new GridPos(6, 4);
+            Assert.AreEqual(Player(b, 1), EnemyAI.ChooseTarget(b, goblin), "the archer next to the totem comes first");
+            Assert.AreEqual(IntentKind.None, EnemyAI.PredictIntent(b, b.Totems[0]).Kind, "totems have no intent");
+        }
+
+        [Test]
+        public void BreakRitualEncounter_ThreeTotemsOnTheFarHalf_GoblinGuards()
+        {
+            for (var seed = 0; seed < 30; seed++)
+            {
+                var b = Encounter.BreakRitual.CreateBattle(ArmyMember.StartingArmy(), new System.Random(seed));
+                Assert.AreEqual(Encounter.TotemCount, b.Totems.Count, $"seed {seed}");
+                Assert.AreEqual(Encounter.SummonTurn, b.SummonTurn);
+                foreach (var t in b.Totems)
+                    Assert.IsTrue(t.Pos.Y >= 5 && t.Pos.Y <= 6);
+                var guards = b.Living(Team.Enemy).Where(u => !u.IsObjective).ToList();
+                Assert.AreEqual(3, guards.Count(g => g.Stats == UnitStats.GoblinBomber));
+                Assert.AreEqual(2, guards.Count(g => g.Stats == UnitStats.Goblin));
+                Assert.IsNull(b.Objective);
+            }
+        }
+
         // ---------- Omens ----------
 
         [Test]

@@ -130,15 +130,21 @@ public static class GamepediaWriter
         html.Append("</div><h3>Bosses</h3><div class=\"grid\">");
         EncounterCard(html, Encounter.Necromancer, new[] { "Necromancer", "2 raised units from each faction you beat this act (Skeletons fill up to 4)" });
         EncounterCard(html, Encounter.Giant, Encounter.Giant.EnemySummary());
-        html.Append("</div><h3>Ritual</h3><div class=\"grid\">");
+        html.Append("</div><h3>Scenarios</h3><div class=\"grid\">");
         var waves = $"{Encounter.RitualWaveSize} more Elementals after enemy turns {string.Join(" and ", Encounter.RitualWaveTurns)}";
         EncounterCard(html, Encounter.MoonShrine, Encounter.MoonShrine.EnemySummary().Concat(new[] { waves }));
+        EncounterCard(html, Encounter.BreakRitual, Encounter.BreakRitual.EnemySummary().Concat(new[] { $"{Encounter.TotemCount} Totems" }));
         html.Append("</div>");
         html.Append($"<p>The Moon Shrine ({UnitStats.MoonShrine.MaxHp} HP) stands at the centre; you deploy within {Encounter.RitualDeployRange} steps of it. ");
         html.Append($"Survive {Encounter.RitualTurns} enemy turns and the ritual completes: you win and pick a blessing. If the shrine breaks, ");
         html.Append("the fight is lost (no gold) and you take a random curse, but the run goes on. Losing the whole army still ends the run. ");
         html.Append("Enemies go for the shrine unless one of your units is next to them (Taunt still wins). The shrine counts as your ally for ");
         html.Append($"Shield Wall and Guard; your own blasts and volleys hurt it. Reinforcements arrive on edge tiles at least {Battle.RitualSpawnDistance} steps from it.</p>");
+        html.Append($"<p><b>Break the Ritual</b>: {Encounter.TotemCount} totems ({UnitStats.Totem.MaxHp} HP) stand on the far half, guarded by goblins. ");
+        html.Append($"Smash them all before the summoning completes at the start of enemy turn {Encounter.SummonTurn}: you win, the guards flee, ");
+        html.Append($"and you pick 1 of {Run.RewardItemCount} items for one unit. If the summoning completes, the fight is lost (no gold) and you take a random curse; ");
+        html.Append($"the run goes on. Guards go for whichever of your units is within {EnemyAI.TotemThreatRange} tiles of a totem; their own bombs don't hurt the totems. ");
+        html.Append("The shrine and totems can't attack, so they have no zone of control.</p>");
         html.Append("</section>");
     }
 
@@ -184,7 +190,7 @@ public static class GamepediaWriter
                 continue;
             var from = UnitStats.AllPlayerTypes.Where(u => u.Has(a)).Select(u => Link(u.Name))
                 .Concat(Equipment.Catalog.Where(e => e.Ability == a).Select(e => $"<i>{Esc(e.Name)}</i>"))
-                .Concat(a == Ability.Immobile ? new[] { "Turret", "Moon Shrine" } : new string[0]);
+                .Concat(a == Ability.Immobile ? new[] { "Turret", "Moon Shrine", "Totem" } : new string[0]);
             html.Append($"<tr><td>{Esc(Abilities.Name(a))}</td><td>{Esc(Abilities.Describe(a))}</td><td>{string.Join(", ", from)}</td></tr>");
         }
 
@@ -197,7 +203,7 @@ public static class GamepediaWriter
         html.Append($"<li>Draft {Run.DraftSize} different base units. Army size up to {Run.MaxArmySize}.</li>");
         html.Append($"<li>Act 1 has {Run.Steps} steps; each step offers 2 nodes. The four factions are shuffled onto four battle nodes (two at step 1, one at steps 3 and 5), so none repeats. ");
         html.Append($"Steps {string.Join(" and ", Run.TrainerSteps.Select(s => s + 1))} offer a Trainer; the last step is a boss (Necromancer or Giant).</li>");
-        html.Append("<li>The other choices are shops and ? events, plus the Moon Shrine (a ritual fight) once per run, next to the battle at step 3 or step 5.</li>");
+        html.Append("<li>The other choices are shops and ? events, plus the two scenario fights next to the battles at steps 3 and 5: the Moon Shrine at one, Break the Ritual at the other.</li>");
         html.Append($"<li>Won battle: {Run.BaseGold} gold + {Run.GoldPerSurvivor} per surviving unit (+{Run.AmbushBonusGold} for an ambush). Gold carried off by escaped cutpurses is lost.</li>");
         html.Append($"<li><b>Trainer</b>: each unit can evolve one tier per visit. The first evolution of a visit is free, the second costs {Run.SecondEvolutionPrice} gold, each after that {Run.LaterEvolutionPrice}.</li>");
         html.Append($"<li><b>Shop</b>: {Run.ShopSize} items and a random base-unit recruit for {Run.RecruitPrice} gold (if the army has room).</li>");
@@ -208,7 +214,8 @@ public static class GamepediaWriter
         html.Append($"<tr><td>Gambler</td><td>Pay {Run.GambleCost} gold for a 50% chance at {Run.GambleWin}.</td></tr>");
         html.Append($"<tr><td>Ambush</td><td>A fight against a faction you haven't met (and won't meet later on the map) that pays +{Run.AmbushBonusGold} gold. If none is left, they flee and drop gold.</td></tr>");
         html.Append($"<tr><td>Shrine</td><td>One unit gets +{Run.ShrineHp} max HP for the run.</td></tr>");
-        html.Append("</table><h3>Blessings and curses</h3><p>From the Moon Shrine: hold it and pick a blessing, lose it and take a random curse. ");
+        html.Append("</table><h3>Blessings and curses</h3><p>Hold the Moon Shrine and pick a blessing. Lose a scenario fight and take a random curse ");
+        html.Append("(losing both gives two different curses). ");
         html.Append("Either lasts the rest of the run and works every turn of every battle. Omens never pick the shrine itself.</p>");
         html.Append("<table><tr><th>Omen</th><th>Blessing</th><th>Curse</th></tr>");
         foreach (var omen in Omens.All)

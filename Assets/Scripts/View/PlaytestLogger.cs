@@ -34,6 +34,7 @@ namespace ArmyRoguelike.View
             _goldIfWon = context.GoldIfWon;
             _log.omens = battle.Omens.Select(o => Omens.Name(o.omen, o.side == Team.Player)).ToList();
             _log.ritualTurns = battle.RitualTurns;
+            _log.summonTurn = battle.SummonTurn;
         }
 
         private readonly Func<int, int> _goldIfWon;
@@ -294,6 +295,8 @@ namespace ArmyRoguelike.View
             });
             if (_battle.Objective != null)
                 _log.shrineHpAtEndTurn.Add(_battle.Objective.Hp);
+            if (_battle.Totems.Count > 0)
+                _log.totemHpAtEndTurn.Add(_battle.Totems.Sum(t => t.Hp));
         }
 
         /// <summary>
@@ -348,6 +351,10 @@ namespace ArmyRoguelike.View
             _log.ritualComplete = _battle.RitualComplete;
             _log.shrineLost = _battle.ObjectiveLost;
             _log.shrineHpLeft = _battle.Objective?.Hp ?? 0;
+            _log.totemsSmashed = _battle.Totems.Count(t => !t.IsAlive);
+            _log.totemsBroken = _battle.TotemsBroken;
+            _log.summoningComplete = _battle.SummoningComplete;
+            _log.turnRitualBroken = _battle.TotemsBroken ? _battle.TurnNumber : 0;
             _log.goldEarned = _battle.Phase == Phase.Victory ? _goldIfWon(_log.survivors) : 0;
             _log.units = Summarise();
 
@@ -510,6 +517,17 @@ namespace ArmyRoguelike.View
             public int shrineHpLeft;
             public List<int> shrineHpAtEndTurn = new List<int>();
             public int wavesArrived;
+
+            /// <summary>
+            /// Break the Ritual: the enemy turn the summoning completes on, the totems' total HP when each of your
+            /// turns ended, how many were smashed, and whether (and on which turn) the ritual was broken in time.
+            /// </summary>
+            public int summonTurn;
+            public List<int> totemHpAtEndTurn = new List<int>();
+            public int totemsSmashed;
+            public bool totemsBroken;
+            public bool summoningComplete;
+            public int turnRitualBroken;
             public List<PlacementEntry> placements = new List<PlacementEntry>();
             public List<UnitSummary> units = new List<UnitSummary>();
             public List<MarkerEntry> markers = new List<MarkerEntry>();

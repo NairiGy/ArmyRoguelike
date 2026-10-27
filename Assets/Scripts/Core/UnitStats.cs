@@ -31,6 +31,7 @@ namespace ArmyRoguelike.Core
         Elemental,
         Shard,
         Shrine,
+        Totem,
     }
 
     /// <summary>A passive rule a unit has, from its type or from an item.</summary>
@@ -446,6 +447,16 @@ namespace ArmyRoguelike.Core
             Abilities = A(Ability.Immobile), IsSummon = true, IsObjective = true,
         };
 
+        /// <summary>
+        /// A summoning totem in Break the Ritual. On the enemy side but never acts; smash all of them before the
+        /// summoning completes. Its own side's blasts don't hurt it.
+        /// </summary>
+        public static readonly UnitStats Totem = new UnitStats(UnitKind.Totem, "Totem", 6, 0, 1, 0)
+        {
+            Label = "T", Role = "Smash all the totems before the summoning completes.",
+            Abilities = A(Ability.Immobile), IsObjective = true,
+        };
+
         /// <summary>The five tree roots the player drafts their starting army from.</summary>
         public static readonly IReadOnlyList<UnitStats> BaseUnits = new[] { Warrior, Archer, Rogue, Apprentice, Sapper };
 
@@ -559,7 +570,7 @@ namespace ArmyRoguelike.Core
 
         public static readonly IReadOnlyList<UnitStats> Enemies = new[]
         {
-            Wolf, PackLeader, Goblin, GoblinBomber, Cutpurse, Crossbowman, Brute, Elemental, Shard, Skeleton, Necromancer, Ogre,
+            Wolf, PackLeader, Goblin, GoblinBomber, Cutpurse, Crossbowman, Brute, Elemental, Shard, Skeleton, Necromancer, Ogre, Totem,
         };
     }
 }
