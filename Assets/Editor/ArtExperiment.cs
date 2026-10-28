@@ -13,7 +13,7 @@ using Object = UnityEngine.Object;
 /// <summary>
 /// Art experiment (branch experiment/art-style): turns the AI-generated warrior into sprites (a cut-out
 /// 2D image, and 3D models baked from the board's isometric angle) and renders the same battle with each.
-/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artPalette] [-artHighlights] [-artUnits] [-artPlayerColour] [-artSky] [-artNoPedestal] [-artGlow] [-artBraziers] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
+/// Batch: -executeMethod ArtExperiment.RunFromCommandLine -artOut dir [-artImport] [-artScenery] [-artPalette] [-artHighlights] [-artUnits] [-artPlayerColour] [-artSky] [-artNoPedestal] [-artGround] [-artGlow] [-artBraziers] [-artGrid] [-art2DSet] [-artYawTest] [-artYawTripo 90] [-artYawMeshy 90]
 /// </summary>
 public static class ArtExperiment
 {
@@ -269,6 +269,43 @@ public static class ArtExperiment
             return;
         }
 
+        if (args.Contains("-artGround"))
+        {
+            // How the warrior meets the ground: its painted thin slab only; the slab on the code-drawn base
+            // (the current look); redrawn standing on nothing, on the code-drawn base (centred on its lowest
+            // rows, then centred between its feet); and standing on nothing with no base.
+            var slab = CutOut2D("warrior_nopedestal.png", "warrior_slab");
+            var bare = FigureLike(CutOut2D("warrior_noground.png", "warrior_noground"), slab, false);
+            var centred = FigureLike(CutOut2D("warrior_noground.png", "warrior_noground_centred"), slab, true);
+            var options = new (bool drawn, (string, Texture2D, Vector2, float) art, string name)[]
+            {
+                (false, slab, "ground_slab_only"),
+                (true, slab, "ground_slab_and_base"),
+                (true, bare, "ground_bare_on_base"),
+                (false, centred, "ground_bare_no_base"),
+                (true, centred, "ground_bare_on_centred_base"),
+            };
+            var shots = new List<Texture2D>();
+            foreach (var (drawn, art, name) in options)
+            {
+                PlaceholderArt.StatueOverrides.Clear();
+                BattleScenery.DrawnBases = drawn;
+                Override(UnitKind.Warrior, art, outDir);
+                var path = Path.Combine(outDir, name + ".png");
+                PreviewCapture.Capture(path, true);
+                var shot = new Texture2D(2, 2);
+                shot.LoadImage(File.ReadAllBytes(path));
+                // Close on the back row where the army stands.
+                shots.Add(Downscale(shot.GetPixels(430, 390, 300, 240), 300, 240, 240));
+            }
+
+            PlaceholderArt.StatueOverrides.Clear();
+            BattleScenery.DrawnBases = true;
+            Save(SideBySide(shots), Path.Combine(outDir, "ground_comparison.png"));
+            EditorApplication.Exit(0);
+            return;
+        }
+
         if (args.Contains("-artNoPedestal"))
         {
             // The warrior and wolves as now, and redrawn standing on a thin slab instead of a pedestal.
@@ -455,6 +492,39 @@ public static class ArtExperiment
             SaveSprite(StatueFolder + kind + "_figure.png", tex, pivot, ppu);
             Debug.Log($"Imported figure-only statue {kind} from {file}");
         }
+
+        // Figures drawn standing on nothing (Source/<unit>_noground.png), the way every unit is drawn now:
+        // they win over the slab versions above. The game stands them straight on the floor.
+        foreach (var file in Directory.GetFiles(Source, "*_noground.png"))
+        {
+            var unit = Path.GetFileName(file).Replace("_noground.png", "");
+            if (!Enum.TryParse<UnitKind>(unit, true, out var kind))
+                continue;
+            var (_, tex, pivot, ppu) = CutOutFigure(Path.GetFileName(file), unit + "_figure", FigureHeight(kind));
+            SaveSprite(StatueFolder + kind + "_figure.png", tex, pivot, ppu);
+            Debug.Log($"Imported statue {kind} (no ground) from {file}");
+        }
+    }
+
+    // Height of a figure drawn standing on nothing, in world units before BattleScenery.UnitScale (a tile
+    // is 1 wide). A standing human is the default; units that crouch, sit or tower get their own.
+    private const float DefaultFigureHeight = 1.1f;
+    private static readonly Dictionary<UnitKind, float> FigureHeights = new Dictionary<UnitKind, float>
+    {
+        // The staff rises well above the head; this keeps the body the size of the warrior's.
+        { UnitKind.Mage, 1.3f },
+        // Hunched forward.
+        { UnitKind.Skeleton, 1.0f },
+    };
+
+    private static float FigureHeight(UnitKind kind) => FigureHeights.TryGetValue(kind, out var h) ? h : DefaultFigureHeight;
+
+    /// <summary>A figure drawn standing on nothing: sized by its height, standing halfway between its feet.</summary>
+    private static (string, Texture2D, Vector2, float) CutOutFigure(string file, string name, float height)
+    {
+        var (_, tex, cutPivot, _) = CutOut2D(file, name);
+        var pivotX = BetweenFeet(tex) ?? cutPivot.x;
+        return (name, tex, new Vector2(pivotX, 0.02f), tex.height / height);
     }
 
     private const string TowerFolder = "Assets/Art/Environment/Resources/Tower/";
@@ -717,6 +787,66 @@ public static class ArtExperiment
 
     private static (string, Texture2D, Vector2, float) Named(string name, (Texture2D tex, Vector2 pivot) baked) =>
         (name, baked.tex, baked.pivot, baked.tex.height / StatueHeight);
+
+    /// <summary>
+    /// A figure drawn standing on nothing, sized like the same statue drawn on its slab (the slab is what
+    /// CutOut2D measures, so it can't size this one): as tall as that figure above its slab, standing on
+    /// the middle of its lowest rows (the feet).
+    /// </summary>
+    private static (string, Texture2D, Vector2, float) FigureLike((string, Texture2D, Vector2, float) figure, (string, Texture2D, Vector2, float) reference, bool betweenFeet)
+    {
+        var (name, tex, _, _) = figure;
+        var (_, refTex, refPivot, refPpu) = reference;
+        // As tall as the reference figure above its slab. The reference's pivot is level with the middle
+        // of its slab, about where the feet stand, so everything above it is the figure.
+        var ppu = refPpu / Mathf.Max(0.5f, 1f - refPivot.y) * tex.height / refTex.height;
+
+        var pixels = tex.GetPixels();
+        float sum = 0, count = 0;
+        for (var y = 0; y < tex.height * 0.04f; y++)
+        for (var x = 0; x < tex.width; x++)
+            if (pixels[y * tex.width + x].a >= 0.5f)
+            {
+                sum += x;
+                count++;
+            }
+
+        var pivotX = count > 0 ? sum / count / tex.width : 0.5f;
+        if (betweenFeet)
+            pivotX = BetweenFeet(tex) ?? pivotX;
+        return (name, tex, new Vector2(pivotX, 0.02f), ppu);
+    }
+
+    /// <summary>
+    /// Halfway between the feet: in the bottom rows, the two widest runs of solid columns (a thin sword
+    /// tip or spear butt is narrower than a foot). Null if there aren't two.
+    /// </summary>
+    private static float? BetweenFeet(Texture2D tex)
+    {
+        var pixels = tex.GetPixels();
+        var solid = new bool[tex.width];
+        for (var y = 0; y < tex.height * 0.08f; y++)
+        for (var x = 0; x < tex.width; x++)
+            if (pixels[y * tex.width + x].a >= 0.5f)
+                solid[x] = true;
+
+        var runs = new List<(int start, int length)>();
+        for (var x = 0; x < tex.width; x++)
+        {
+            if (!solid[x])
+                continue;
+            var start = x;
+            while (x < tex.width && solid[x])
+                x++;
+            runs.Add((start, x - start));
+        }
+
+        if (runs.Count < 2)
+            return null;
+        var feet = runs.OrderByDescending(r => r.length).Take(2).ToList();
+        var centre = feet.Sum(r => r.start + r.length / 2f) / 2f;
+        return centre / tex.width;
+    }
 
     // ---------- 2D: cut the statue out of the generated image ----------
 

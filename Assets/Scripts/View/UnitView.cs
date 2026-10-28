@@ -27,6 +27,8 @@ namespace ArmyRoguelike.View
         private Vector3 _bodyRest;
 
         private static readonly Color ShadowColor = new Color(0f, 0f, 0f, 0.5f);
+        private static readonly Color BareShadowColor = new Color(0f, 0f, 0f, 0.7f);
+        private Color _shadowColor;
 
         private SpriteRenderer _body;
         private SpriteRenderer _shadow;
@@ -88,9 +90,13 @@ namespace ArmyRoguelike.View
             // A soft shadow on the floor grounds the statue; it stays put while the body bobs and lunges.
             _shadow = new GameObject("Shadow").AddComponent<SpriteRenderer>();
             _shadow.transform.SetParent(transform, false);
-            _shadow.transform.localScale = Vector3.one * (0.75f * Unit.Size);
+            // A figure standing straight on the floor (no base, no painted pedestal) gets a smaller, darker
+            // shadow, tight under its feet, so it reads as standing on the stone rather than floating.
+            var bare = _base == null && PlaceholderArt.IsFigureOnly(unit.Stats.Kind);
+            _shadowColor = bare ? BareShadowColor : ShadowColor;
+            _shadow.transform.localScale = Vector3.one * ((bare ? 0.55f : 0.75f) * Unit.Size);
             _shadow.sprite = PlaceholderArt.SoftShadow;
-            _shadow.color = ShadowColor;
+            _shadow.color = _shadowColor;
 
             var top = _body.transform.localPosition.y + _body.sprite.bounds.max.y * _body.transform.localScale.y;
 
@@ -625,7 +631,7 @@ namespace ArmyRoguelike.View
         {
             _body.sprite = PlaceholderArt.Statue(Unit.Stats.Kind);
             _showingBones = false;
-            _shadow.color = ShadowColor;
+            _shadow.color = _shadowColor;
             _shadow.enabled = true;
             if (_base != null)
             {

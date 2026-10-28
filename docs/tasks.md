@@ -28,13 +28,10 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 ### Other visual work
 
 - [ ] Painted aurora: ChatGPT's free image limit was hit on 2026-10-25; retry the prompt saved in the ChatGPT chat "Generate Crescent Moon Image". Then replace the code aurora with it (maybe for another setting).
-- [ ] Decide how statues meet the ground, on the warrior first (needs ChatGPT for one image):
-  1. Have ChatGPT redraw the warrior standing on nothing (no ground, no slab, feet at the bottom of the image).
-  2. Render the warrior three ways side by side: painted thin slab only (no code base); painted slab plus code-drawn base (current); no slab plus code-drawn base.
-  3. The user picks one.
-- [ ] Then redraw the other units (archer, rogue, sapper, and the wolf if needed) the chosen way, save as `Assets/Art/Experiment/Source/<unit>_nopedestal.png` and run Tools → Art → Import Statues. Every future unit is drawn this way.
+- [x] Decide how statues meet the ground (2026-10-28): figures drawn standing on nothing, straight on the floor, no base (see "Bases and size" in the design note). The warrior is redrawn that way; not playtested.
+- [ ] Paint the units that are still grey placeholders the new way: ChatGPT, figure only, standing on nothing, plain light grey background, in the same ChatGPT chat as the warrior so the set matches; enemies in dark basalt (skeletons stay pale bone). Save as `Assets/Art/Experiment/Source/<unit>_noground.png`, give crouching or towering units a height in `ArtExperiment.FigureHeights`, and run Tools → Art → Import Statues. Done 2026-10-28: mage, skeleton (not playtested). Next, in the user's order: elemental, goblin, ogre, necromancer, cutpurse, crossbowman; then goblin bomber, brute, shard. ChatGPT's free plan allows only about 3 images a day now.
+- [ ] Archer, rogue, sapper and wolf keep their painted pedestals or slab for now (user's call); redraw them the new way later if the mix looks off.
 - [ ] Improve the player statues' colour (moon marble is better than before, not final).
-- [ ] Painted statues for the other factions (goblins, bandits, elementals, bosses) and for evolved units; they are still grey placeholders.
 - [ ] Labels and health bars over the statues: restyle (part of the UI pass).
 - [ ] UI/HUD pass (IMGUI panels are still placeholders).
 - [ ] Decide whether effects change colour by team (e.g. a moon shield on an enemy in ember red instead of silver). User's call; everything is silver/gold for both sides for now.
