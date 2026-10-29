@@ -170,6 +170,13 @@ namespace ArmyRoguelike.Tests
             walled.PlayerUseAction(Player(walled), ActionKind.ShieldBash, stuck.Pos);
             Assert.AreEqual(P(3, 2), stuck.Pos);
             Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.CollisionDamage, stuck.Hp, "slammed into the rock");
+
+            var crowd = Setup(new[] { UnitStats.Warrior }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Brute, 3, 3), Far });
+            var front = Enemy(crowd, 0);
+            var behind = Enemy(crowd, 1);
+            crowd.PlayerUseAction(Player(crowd), ActionKind.ShieldBash, front.Pos);
+            Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.CollisionDamage, front.Hp);
+            Assert.AreEqual(UnitStats.Brute.MaxHp - (Battle.CollisionDamage - 1), behind.Hp, "the unit it slams into is hurt too (the brute is Tough)");
         }
 
         [Test]

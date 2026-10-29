@@ -162,7 +162,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.ThrowBomb:
                     return $"lob a bomb 2-{Battle.PlayerBombRange} tiles away; it explodes for {Battle.PlayerBombDamage} on that tile at the start of the next enemy turn";
                 case ActionKind.PinningShot: return $"{Battle.PinDamage} damage to an enemy in shot range (needs line of sight), and it can't move on its next turn";
-                case ActionKind.ShieldBash: return $"push an enemy next to it 1 tile away; no damage, but {Battle.CollisionDamage} if it slams into a rock, unit or the edge";
+                case ActionKind.ShieldBash: return $"push an enemy next to it 1 tile away; no damage, but {Battle.CollisionDamage} if it slams into a rock, unit or the edge, and the unit it slams into takes {Battle.CollisionDamage} too";
                 case ActionKind.Vanish: return $"go invisible: enemies can't target or attack it (area blasts still hit) until it attacks, for {Battle.VanishTurns} enemy turns at most; the attack that reveals it deals +{Battle.VanishBonus}";
                 case ActionKind.Blink: return $"teleport to a free tile within {Battle.BlinkRange}, ignoring rocks and zone of control";
                 case ActionKind.Fireball: return $"{Battle.FireballDamage} damage to everyone on the tile and the 4 next to it, up to {Battle.FireballRange} tiles away";

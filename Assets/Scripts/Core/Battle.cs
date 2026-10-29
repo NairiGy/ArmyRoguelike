@@ -828,7 +828,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.ShieldBash:
                 {
                     var target = UnitAt(tile);
-                    Push(target, StraightDirection(unit.Pos, Cells(target).First(c => c.StepsTo(unit.Pos) == 1)).Value, unit, events);
+                    Push(target, StraightDirection(unit.Pos, Cells(target).First(c => c.StepsTo(unit.Pos) == 1)).Value, unit, events, hurtsBlocker: true);
                     break;
                 }
                 case ActionKind.Vanish:
@@ -981,7 +981,7 @@ namespace ArmyRoguelike.Core
         /// Shoves a unit one tile. If something is in the way it slams into it and takes collision damage.
         /// An enemy shoved onto a mine sets it off.
         /// </summary>
-        private void Push(Unit unit, GridPos dir, Unit pusher, List<BattleEvent> events)
+        private void Push(Unit unit, GridPos dir, Unit pusher, List<BattleEvent> events, bool hurtsBlocker = false)
         {
             // The shrine is rooted to its tile.
             if (!unit.IsAlive || unit.IsObjective)
@@ -990,10 +990,21 @@ namespace ArmyRoguelike.Core
             var to = from + dir;
             if (!CanStand(unit, to))
             {
+                // Whoever it slams into, if the push says so (Shield Bash), takes the same damage.
+                var blockers = hurtsBlocker
+                    ? Footprint(to, unit.Size).Select(UnitAt).Where(u => u != null && u != unit).Distinct().ToList()
+                    : new List<Unit>();
                 var after = new List<BattleEvent>();
                 var hit = Damage(unit, CollisionDamage, pusher, DamageKind.Collision, after);
                 events.Add(new PushEvent(unit, pusher, from, from, hit));
                 events.AddRange(after);
+                foreach (var blocker in blockers.Where(b => b.IsAlive))
+                {
+                    var blockerAfter = new List<BattleEvent>();
+                    events.Add(new TickEvent("collision", Damage(blocker, CollisionDamage, pusher, DamageKind.Collision, blockerAfter)));
+                    events.AddRange(blockerAfter);
+                }
+
                 return;
             }
 
