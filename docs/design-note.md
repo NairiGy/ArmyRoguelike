@@ -94,7 +94,7 @@ A roguelike army-builder: lead a small squad across a Slay the Spire–style map
 
 ## Enemy AI
 
-- Intent icons: hovering over an enemy shows who it wants to attack.
+- Intent icons: hovering over an enemy shows who it wants to attack. Holding Alt shows every enemy's intent at once (2026-10-29, small-board branch).
 
 ## Prototype 1: one battle
 

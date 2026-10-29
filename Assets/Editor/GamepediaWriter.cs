@@ -246,7 +246,7 @@ public static class GamepediaWriter
 
         html.Append("<h3 id=\"ai-intent\">Hover intent</h3>");
         html.Append("<p>Hovering an enemy shows the first thing it would do if its turn started now. It is a forecast, not a promise: your moves change it, and it only shows the first action. ");
-        html.Append("Hovering a Pack Leader also lights up its aura.</p>");
+        html.Append("Hovering a Pack Leader also lights up its aura. Hold Alt to see every enemy's intent at once.</p>");
         html.Append("<table><tr><th>Shows</th><th>When (checked in this order)</th><th>On the board</th></tr>");
         html.Append("<tr><td>Flee</td><td>It carries stolen gold.</td><td>The enemies' back row, where it will escape.</td></tr>");
         html.Append("<tr><td>Slam</td><td>It can slam, 2 or more of your units are within 2 tiles, and the slam would deal more in total than a smash.</td><td>The area within 2 tiles.</td></tr>");

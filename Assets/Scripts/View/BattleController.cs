@@ -152,6 +152,7 @@ namespace ArmyRoguelike.View
             var clicked = !_busy && !_confirmEndTurn && Mouse.current.leftButton.wasPressedThisFrame && _hovered.HasValue;
 
             _intent.Hide();
+            HideAllIntents();
             HideEngagedLinks();
             switch (Battle.Phase)
             {
@@ -622,9 +623,26 @@ namespace ArmyRoguelike.View
                 _board.SetHighlight(p, BombZoneColor);
         }
 
-        /// <summary>While hovering an enemy: what it plans to do next, and for the pack leader its aura.</summary>
+        // One intent line per enemy while Alt is held.
+        private readonly List<IntentView> _allIntents = new List<IntentView>();
+
+        /// <summary>
+        /// While hovering an enemy: what it plans to do next, and for the pack leader its aura. While Alt is
+        /// held: every enemy's intent at once.
+        /// </summary>
         private void DrawEnemyHover()
         {
+            var keyboard = Keyboard.current;
+            if (keyboard != null && keyboard.altKey.isPressed)
+            {
+                var enemies = Battle.Living(Team.Enemy).Where(e => !e.IsObjective).ToList();
+                while (_allIntents.Count < enemies.Count)
+                    _allIntents.Add(IntentView.Create(transform));
+                for (var i = 0; i < enemies.Count; i++)
+                    DrawIntent(enemies[i], _allIntents[i]);
+                return;
+            }
+
             var enemy = _hoveredUnit;
             if (enemy == null || enemy.Team != Team.Enemy)
                 return;
@@ -634,6 +652,18 @@ namespace ArmyRoguelike.View
                     if (p.StepsTo(enemy.Pos) <= Battle.LeaderAuraRange && !Battle.Board.IsObstacle(p))
                         _board.SetHighlight(p, AuraColor);
 
+            DrawIntent(enemy, _intent);
+        }
+
+        private void HideAllIntents()
+        {
+            foreach (var line in _allIntents)
+                line.Hide();
+        }
+
+        /// <summary>One enemy's intent: the tiles it will hit and a dotted line to its target.</summary>
+        private void DrawIntent(Unit enemy, IntentView line)
+        {
             var intent = EnemyAI.PredictIntent(Battle, enemy);
             if (intent.Target == null)
                 return;
@@ -644,7 +674,7 @@ namespace ArmyRoguelike.View
             {
                 case IntentKind.Raise:
                     _board.SetHighlight(intent.Target.Pos, RaiseColor);
-                    _intent.Show(from, to);
+                    line.Show(from, to);
                     break;
                 case IntentKind.Smash:
                     // Every tile around the ogre gets hit, so show the whole ring.
@@ -652,19 +682,19 @@ namespace ArmyRoguelike.View
                         _board.SetHighlight(c, SmashZoneColor);
                     _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
                     if (Battle.Distance(enemy, intent.Target) > 1)
-                        _intent.Show(from, to);
+                        line.Show(from, to);
                     break;
                 case IntentKind.Throw:
                     _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
                     if (intent.Tile.HasValue)
                         _board.SetHighlight(intent.Tile.Value, RockLandingColor);
-                    _intent.Show(from, to);
+                    line.Show(from, to);
                     break;
                 case IntentKind.Bomb:
                     foreach (var p in Battle.BombArea(intent.Target.Pos))
                         _board.SetHighlight(p, BombZoneColor);
                     _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
-                    _intent.Show(from, to);
+                    line.Show(from, to);
                     break;
                 case IntentKind.Flee:
                     // Show where it's running: the far edge it escapes from.
@@ -678,7 +708,7 @@ namespace ArmyRoguelike.View
                     break;
                 default:
                     _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
-                    _intent.Show(from, to);
+                    line.Show(from, to);
                     break;
             }
         }
