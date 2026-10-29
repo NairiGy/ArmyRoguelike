@@ -399,7 +399,7 @@ public static class ArtExperiment
             // The 2D images as a set, to judge whether they match and whether the teams read apart.
             Override(UnitKind.Warrior, CutOut2D("warrior_iso.png", "a_2d_image"), outDir);
             Override(UnitKind.Archer, CutOut2D("archer_iso.png", "archer_2d_image"), outDir);
-            if (File.Exists(Source + "wolf_iso.png"))
+            if (SourceExists("wolf_iso.png"))
             {
                 var wolf = CutOut2D("wolf_iso.png", "wolf_2d_image");
                 Override(UnitKind.Wolf, wolf, outDir);
@@ -471,9 +471,9 @@ public static class ArtExperiment
     public static void ImportStatues()
     {
         Directory.CreateDirectory(StatueFolder);
-        foreach (var file in Directory.GetFiles(Source, "*_iso.png"))
+        foreach (var file in Directory.GetFiles(Source, "*_iso*.png"))
         {
-            var unit = Path.GetFileName(file).Replace("_iso.png", "");
+            var unit = UnitPart(file, "_iso");
             if (!Enum.TryParse<UnitKind>(unit, true, out var kind))
                 continue;
             var (_, tex, pivot, ppu) = CutOut2D(Path.GetFileName(file), unit);
@@ -481,11 +481,11 @@ public static class ArtExperiment
             Debug.Log($"Imported statue {kind} from {file}");
         }
 
-        // Figure-only versions (Source/<unit>_nopedestal.png): the game prefers these and stands them on
+        // Figure-only versions (Source/<unit>_nopedestal[__<tool>].png): the game prefers these and stands them on
         // the code-drawn base.
-        foreach (var file in Directory.GetFiles(Source, "*_nopedestal.png"))
+        foreach (var file in Directory.GetFiles(Source, "*_nopedestal*.png"))
         {
-            var unit = Path.GetFileName(file).Replace("_nopedestal.png", "");
+            var unit = UnitPart(file, "_nopedestal");
             if (!Enum.TryParse<UnitKind>(unit, true, out var kind))
                 continue;
             var (_, tex, pivot, ppu) = CutOut2D(Path.GetFileName(file), unit + "_figure");
@@ -493,11 +493,11 @@ public static class ArtExperiment
             Debug.Log($"Imported figure-only statue {kind} from {file}");
         }
 
-        // Figures drawn standing on nothing (Source/<unit>_noground.png), the way every unit is drawn now:
+        // Figures drawn standing on nothing (Source/<unit>_noground[__<tool>].png), the way every unit is drawn now:
         // they win over the slab versions above. The game stands them straight on the floor.
-        foreach (var file in Directory.GetFiles(Source, "*_noground.png"))
+        foreach (var file in Directory.GetFiles(Source, "*_noground*.png"))
         {
-            var unit = Path.GetFileName(file).Replace("_noground.png", "");
+            var unit = UnitPart(file, "_noground");
             if (!Enum.TryParse<UnitKind>(unit, true, out var kind))
                 continue;
             var (_, tex, pivot, ppu) = CutOutFigure(Path.GetFileName(file), unit + "_figure", FigureHeight(kind));
@@ -515,6 +515,20 @@ public static class ArtExperiment
         { UnitKind.Mage, 1.3f },
         // Hunched forward.
         { UnitKind.Skeleton, 1.0f },
+        // Small, crouched to sprint.
+        { UnitKind.Goblin, 0.7f },
+        // Squat and wide, about the warrior's height.
+        { UnitKind.Elemental, 1.15f },
+        // Size-2 boss: UnitView already scales big bodies by 1.3, so this ends up about twice a human.
+        { UnitKind.Ogre, 1.7f },
+        // A head taller and much bulkier than a human.
+        { UnitKind.Brute, 1.3f },
+        // Small, with the bomb held above the head.
+        { UnitKind.GoblinBomber, 0.8f },
+        // Sneaking half-crouch.
+        { UnitKind.Cutpurse, 1.0f },
+        // The skull staff rises above the hood.
+        { UnitKind.Necromancer, 1.35f },
     };
 
     private static float FigureHeight(UnitKind kind) => FigureHeights.TryGetValue(kind, out var h) ? h : DefaultFigureHeight;
@@ -545,14 +559,14 @@ public static class ArtExperiment
         foreach (var (tex, pivot, widthPx) in KeyOutGreen(sheet))
             SaveSprite(TowerFolder + $"rock_{i++}.png", tex, pivot, widthPx / RockWidth);
 
-        if (File.Exists(Source + "tower_brazier.png"))
+        if (SourceExists("tower_brazier.png"))
             foreach (var (tex, pivot, widthPx) in KeyOutGreen(LoadSource("tower_brazier.png")))
                 SaveSprite(TowerFolder + "brazier.png", tex, pivot, widthPx / BrazierWidth);
 
         // The tower on its own (same framing as the painting), so clouds can pass behind it, and the
         // cloud strips that do.
         const string backdrops = "Assets/Art/Environment/Resources/Backdrops/";
-        if (File.Exists(Source + "iso_tower_only.png"))
+        if (SourceExists("iso_tower_only.png"))
         {
             var only = LoadSource("iso_tower_only.png");
             var layer = new Texture2D(only.width, only.height, TextureFormat.RGBA32, true);
@@ -562,18 +576,18 @@ public static class ArtExperiment
         }
 
         foreach (var sky in new[] { "sky_panorama", "sky_clear_panorama" })
-            if (File.Exists(Source + sky + ".png"))
+            if (SourceExists(sky + ".png"))
                 SaveTexture(backdrops + sky + ".png", SeamlessStrip(LoadSource(sky + ".png")), true);
 
         // The moons (painted full moon and stylised crescent): keyed out, centred, about one world unit
         // across at scale 1.
         foreach (var (file, sprite) in new[] { ("sky_moon.png", "moon.png"), ("sky_crescent.png", "moon_crescent.png") })
-            if (File.Exists(Source + file))
+            if (SourceExists(file))
                 foreach (var (tex, _, _) in KeyOutGreen(LoadSource(file)))
                     SaveSprite(backdrops + sprite, tex, new Vector2(0.5f, 0.5f), Mathf.Max(tex.width, tex.height));
 
         foreach (var band in new[] { "puffy", "wispy" })
-            if (File.Exists(Source + $"clouds_band_{band}.png"))
+            if (SourceExists($"clouds_band_{band}.png"))
                 SaveTexture(backdrops + $"cloud_{band}.png", SeamlessStrip(LoadSource($"clouds_band_{band}.png")), true);
 
         var slabs = LoadSource("tower_floor_slabs.png");
@@ -589,9 +603,29 @@ public static class ArtExperiment
     private static Texture2D LoadSource(string file)
     {
         var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-        tex.LoadImage(File.ReadAllBytes(Source + file));
+        tex.LoadImage(File.ReadAllBytes(SourcePath(file)));
         return tex;
     }
+
+    /// <summary>
+    /// A generated source image by its plain name ("wolf_iso.png"). Files are named after the tool that made
+    /// them ("wolf_iso__chatgpt_gpt-image.png"), so the plain name also finds "&lt;name&gt;__&lt;site&gt;_&lt;model&gt;.png".
+    /// </summary>
+    private static string SourcePath(string file)
+    {
+        if (File.Exists(Source + file))
+            return Source + file;
+        var stem = Path.GetFileNameWithoutExtension(file);
+        var tagged = Directory.GetFiles(Source, stem + "__*" + Path.GetExtension(file)).OrderBy(p => p).ToArray();
+        if (tagged.Length > 1)
+            Debug.LogWarning($"Several versions of {file}; using {Path.GetFileName(tagged[0])}");
+        return tagged.Length > 0 ? tagged[0] : Source + file;
+    }
+
+    private static bool SourceExists(string file) => File.Exists(SourcePath(file));
+
+    /// <summary>The unit a source file is for: the part of its name before the marker, e.g. "wolf" in "wolf_iso__chatgpt_gpt-image.png".</summary>
+    private static string UnitPart(string file, string marker) => Path.GetFileName(file).Split(new[] { marker }, StringSplitOptions.None)[0];
 
     /// <summary>
     /// Removes a pure green background and returns each object (they stand in one row with gaps), with
@@ -853,7 +887,7 @@ public static class ArtExperiment
     private static (string, Texture2D, Vector2, float) CutOut2D(string file, string name)
     {
         var src = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-        src.LoadImage(File.ReadAllBytes(Source + file));
+        src.LoadImage(File.ReadAllBytes(SourcePath(file)));
         var w = src.width;
         var h = src.height;
         var px = src.GetPixels();
