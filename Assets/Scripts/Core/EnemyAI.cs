@@ -151,9 +151,6 @@ namespace ArmyRoguelike.Core
             if (enemy.CarryingLoot > 0)
                 return new Intent(IntentKind.Flee, enemy);
 
-            if (enemy.Stats.Slams && battle.Living(Team.Player).Count(u => Battle.Distance(enemy, u) <= 2) >= 2)
-                return new Intent(IntentKind.Slam, enemy);
-
             if (enemy.Stats.CanRaise)
             {
                 // Intent is shown during the player's turn, so assume a full enemy AP pool.
@@ -178,16 +175,22 @@ namespace ArmyRoguelike.Core
                 return new Intent(IntentKind.Attack, target);
             }
 
-            if (enemy.Stats.AreaMelee && Battle.Distance(enemy, target) == 1)
-                return new Intent(IntentKind.Smash, target);
-            if (enemy.Stats.CanThrow)
+            if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Giant)
             {
+                // Intent is shown during the player's turn, so assume the Giant has its AP.
                 var steps = Battle.Distance(enemy, target);
-                if (steps >= 2 && steps <= enemy.Stats.ThrowRange && !RockWallsOff(battle, enemy, target))
+                var action = GiantAction(battle, enemy, target);
+                if (action == IntentKind.Slam)
+                    return new Intent(IntentKind.Slam, enemy);
+                if (action == IntentKind.None && enemy.Stats.CanThrow && steps >= 2 && steps <= enemy.Stats.ThrowRange &&
+                    !RockWallsOff(battle, enemy, target) && !battle.IsShroudedFrom(target.Pos, enemy.Team))
+                    action = IntentKind.Throw;
+                if (action == IntentKind.Throw)
                     return new Intent(IntentKind.Throw, target, battle.RockTileFor(enemy, target));
+                return new Intent(IntentKind.Smash, target);
             }
 
-            return new Intent(enemy.Stats.AreaMelee ? IntentKind.Smash : IntentKind.Attack, target);
+            return new Intent(IntentKind.Attack, target);
         }
 
         public static void TakeTurn(Battle battle, Unit enemy, List<BattleEvent> events)
@@ -280,35 +283,48 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>
-        /// Slam first if two or more of the player's units are within 2 tiles, then smash anyone adjacent,
-        /// throw one boulder per turn from range, otherwise walk closer.
+        /// The Giant's one action from where it stands: smash or slam, whichever deals more in total (slam only
+        /// with two or more of your units within 2 tiles; ties go to smash), else a boulder at the target, else
+        /// nothing (it walks closer first).
         /// </summary>
+        private static IntentKind GiantAction(Battle battle, Unit ogre, Unit target)
+        {
+            var adjacent = battle.AdjacentFoes(ogre).Count(u => !u.IsObjective);
+            var near = battle.Living(Team.Player).Count(u => !u.IsObjective && Battle.Distance(ogre, u) <= 2);
+            var smash = adjacent * ogre.Stats.Damage;
+            var slam = ogre.Stats.Slams && near >= 2 ? near * Battle.SlamDamage : 0;
+            if (slam > smash)
+                return IntentKind.Slam;
+            if (adjacent > 0)
+                return IntentKind.Smash;
+            if (target != null && battle.CanThrow(ogre, target) && !RockWallsOff(battle, ogre, target))
+                return IntentKind.Throw;
+            return IntentKind.None;
+        }
+
+        /// <summary>One action a turn (see <see cref="GiantAction"/>); without one it walks closer and tries again.</summary>
         private static void OgreTurn(Battle battle, Unit ogre, List<BattleEvent> events)
         {
-            var thrown = false;
-            if (ogre.Stats.Slams && ogre.Ap >= Battle.AttackCost &&
-                battle.Living(Team.Player).Count(u => Battle.Distance(ogre, u) <= 2) >= 2)
-                events.AddRange(battle.DoSlam(ogre));
-
             while (!battle.IsOver && ogre.IsAlive)
             {
-                if (battle.AdjacentFoes(ogre).Count > 0)
-                {
-                    if (ogre.Ap < Battle.AttackCost)
-                        return;
-                    events.AddRange(battle.DoSmash(ogre));
-                    continue;
-                }
-
                 var target = ChooseTarget(battle, ogre);
                 if (target == null)
                     return;
 
-                if (!thrown && battle.CanThrow(ogre, target) && !RockWallsOff(battle, ogre, target))
+                if (ogre.Ap >= Battle.AttackCost)
                 {
-                    events.AddRange(battle.DoThrow(ogre, target));
-                    thrown = true;
-                    continue;
+                    switch (GiantAction(battle, ogre, target))
+                    {
+                        case IntentKind.Slam:
+                            events.AddRange(battle.DoSlam(ogre));
+                            continue;
+                        case IntentKind.Smash:
+                            events.AddRange(battle.DoSmash(ogre));
+                            continue;
+                        case IntentKind.Throw:
+                            events.AddRange(battle.DoThrow(ogre, target));
+                            continue;
+                    }
                 }
 
                 if (!Approach(battle, ogre, target, Battle.AttackCost, events))

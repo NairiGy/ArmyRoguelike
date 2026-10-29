@@ -50,7 +50,7 @@ namespace ArmyRoguelike.Tests
             b.Place(Player(b, 2), new GridPos(2, 0));
             Assert.IsTrue(b.StartBattle());
             Assert.AreEqual(Phase.PlayerTurn, b.Phase);
-            Assert.AreEqual(3, Player(b, 0).Ap);
+            Assert.AreEqual(1, Player(b, 0).Ap);
         }
 
         [Test]
@@ -70,7 +70,7 @@ namespace ArmyRoguelike.Tests
             Assert.IsNotNull(move);
             Assert.AreEqual(4, move.Path.Count);
             Assert.AreEqual(0, rogue.Moves);
-            Assert.AreEqual(5, rogue.Ap, "moving costs no AP");
+            Assert.AreEqual(1, rogue.Ap, "moving costs no AP");
         }
 
         [Test]
@@ -97,7 +97,7 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Attack_CostsTwoApAndDealsDamage()
+        public void Attack_UsesTheOneApAndDealsDamage()
         {
             var b = Started(new[] { UnitStats.Rogue }, new[] { new GridPos(3, 1) },
                 new[] { (UnitStats.Wolf, new GridPos(3, 2)) });
@@ -106,7 +106,9 @@ namespace ArmyRoguelike.Tests
             var hit = b.PlayerAttack(rogue, wolf)?.OfType<AttackEvent>().Single();
             Assert.AreEqual(4, hit.Damage);
             Assert.AreEqual(2, wolf.Hp);
-            Assert.AreEqual(3, rogue.Ap);
+            Assert.AreEqual(0, rogue.Ap);
+            Assert.IsNull(b.PlayerAttack(rogue, wolf), "one attack a turn");
+            rogue.Ap = 1;
             b.PlayerAttack(rogue, wolf);
             Assert.IsFalse(wolf.IsAlive);
             Assert.AreEqual(Phase.Victory, b.Phase);
@@ -137,13 +139,13 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void UnusedAp_CarriesOverUpToTwo()
+        public void UnusedAp_DoesntCarryOver()
         {
             var b = Started(new[] { UnitStats.Rogue }, new[] { new GridPos(0, 0) },
                 new[] { (UnitStats.Wolf, new GridPos(7, 7)) });
             var rogue = Player(b);
             b.EndPlayerTurn();
-            Assert.AreEqual(5 + 2, rogue.Ap);
+            Assert.AreEqual(1, rogue.Ap);
         }
 
         [Test]
@@ -176,8 +178,8 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(3, b.EffectiveDamage(near));
             Assert.AreEqual(2, b.EffectiveDamage(far));
 
+            leader.Hp = 2 * UnitStats.Rogue.Damage;
             var first = Player(b, 0);
-            b.PlayerAttack(first, leader);
             b.PlayerAttack(first, leader);
             b.EndUnitTurn(first);
             var second = Player(b, 1);
@@ -205,19 +207,19 @@ namespace ArmyRoguelike.Tests
             var events = b.EndPlayerTurn();
             var wolf = Enemy(b);
             Assert.AreEqual(new GridPos(3, 2), wolf.Pos, "a Swift wolf walks 2 tiles");
-            Assert.AreEqual(2, events.OfType<AttackEvent>().Count(), "walking costs no AP, so both bites land");
-            Assert.AreEqual(8, Player(b).Hp);
+            Assert.AreEqual(1, events.OfType<AttackEvent>().Count(), "walking costs no AP, then one bite");
+            Assert.AreEqual(10, Player(b).Hp);
             Assert.AreEqual(Phase.PlayerTurn, b.Phase);
         }
 
         [Test]
-        public void Enemy_AdjacentAttacksTwice()
+        public void Enemy_AdjacentAttacksOnce()
         {
             var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 1) },
                 new[] { (UnitStats.Wolf, new GridPos(3, 2)) });
             var events = b.EndPlayerTurn();
-            Assert.AreEqual(2, events.OfType<AttackEvent>().Count());
-            Assert.AreEqual(8, Player(b).Hp);
+            Assert.AreEqual(1, events.OfType<AttackEvent>().Count());
+            Assert.AreEqual(10, Player(b).Hp);
         }
 
         [Test]

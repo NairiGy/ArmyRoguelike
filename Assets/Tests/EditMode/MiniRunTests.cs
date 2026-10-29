@@ -809,7 +809,7 @@ namespace ArmyRoguelike.Tests
             var close = Started(Army(UnitStats.Warrior), new[] { new GridPos(3, 1) },
                 new[] { (UnitStats.Wolf, new GridPos(3, 3)) });
             Assert.IsNotNull(close.FindAttackSpot(Player(close), Enemy(close)));
-            Player(close).Ap = 1;
+            Player(close).Ap = 0;
             Assert.IsNull(close.FindAttackSpot(Player(close), Enemy(close)), "no AP left for the attack");
         }
 
@@ -894,8 +894,7 @@ namespace ArmyRoguelike.Tests
                 new[] { (UnitStats.Necromancer, new GridPos(4, 2)), (UnitStats.Skeleton, new GridPos(0, 7)) });
             var rogue = Player(b);
             Enemy(b, 1).Hp = 0;
-            Enemy(b, 0).Hp = 6;
-            b.PlayerAttack(rogue, Enemy(b, 0));
+            Enemy(b, 0).Hp = UnitStats.Rogue.Damage;
             b.PlayerAttack(rogue, Enemy(b, 0));
             Assert.AreEqual(Phase.Victory, b.Phase);
         }
@@ -977,13 +976,50 @@ namespace ArmyRoguelike.Tests
                 new[] { (UnitStats.Ogre, new GridPos(3, 5)) });
             var warrior = Player(b, 0);
             var archer = Player(b, 1);
-            warrior.Pos = new GridPos(3, 4);
-            archer.Pos = new GridPos(5, 6);
+            warrior.Pos = new GridPos(3, 3);
+            archer.Pos = new GridPos(6, 5);
             Assert.AreEqual(IntentKind.Slam, EnemyAI.PredictIntent(b, Enemy(b)).Kind);
             var events = b.EndPlayerTurn();
-            Assert.IsTrue(events.OfType<AreaAttackEvent>().Any(a => a.Kind == "slam"));
+            var slam = events.OfType<AreaAttackEvent>().Single(a => a.Kind == "slam");
+            Assert.AreEqual(2, slam.Hits.Count);
+            Assert.AreEqual(warrior.MaxHp - Battle.SlamDamage, warrior.Hp);
             var pushes = events.OfType<PushEvent>().Where(p => p.Pusher == Enemy(b)).ToList();
             Assert.IsTrue(pushes.Any(p => p.Unit == warrior) && pushes.Any(p => p.Unit == archer));
+            Assert.IsFalse(events.OfType<SmashEvent>().Any(), "one action a turn");
+        }
+
+        [Test]
+        public void Giant_SmashesWhenThatDealsMore()
+        {
+            var b = Started(Army(UnitStats.Warrior, UnitStats.Archer), new[] { new GridPos(0, 0), new GridPos(1, 0) },
+                new[] { (UnitStats.Ogre, new GridPos(3, 5)) });
+            Player(b, 0).Pos = new GridPos(3, 4);
+            Player(b, 1).Pos = new GridPos(6, 5);
+            // Smash: 5 to the adjacent warrior. Slam: 3 each to both = 6, so it slams.
+            Assert.AreEqual(IntentKind.Slam, EnemyAI.PredictIntent(b, Enemy(b)).Kind);
+            Player(b, 1).Pos = new GridPos(5, 6);
+            // Both adjacent now: smash 10 beats slam 6.
+            Assert.AreEqual(IntentKind.Smash, EnemyAI.PredictIntent(b, Enemy(b)).Kind);
+            var events = b.EndPlayerTurn();
+            Assert.AreEqual(1, events.OfType<SmashEvent>().Count());
+            Assert.IsFalse(events.OfType<AreaAttackEvent>().Any(a => a.Kind == "slam"));
+        }
+
+        [Test]
+        public void Necromancer_RaisesEveryPileInRangeAtOnce()
+        {
+            var b = Started(Army(UnitStats.Rogue), new[] { new GridPos(0, 1) },
+                new[]
+                {
+                    (UnitStats.Necromancer, new GridPos(4, 7)), (UnitStats.Skeleton, new GridPos(3, 5)),
+                    (UnitStats.Skeleton, new GridPos(5, 6)), (UnitStats.Skeleton, new GridPos(0, 3)),
+                });
+            foreach (var s in b.Units.Where(u => u.Stats == UnitStats.Skeleton))
+                s.Hp = 0;
+            var events = b.EndPlayerTurn();
+            Assert.AreEqual(2, events.OfType<RaiseEvent>().Count(), "the two within 4 tiles, not the far one");
+            Assert.IsFalse(b.Units.Single(u => u.Pos == new GridPos(0, 3)).IsAlive);
+            Assert.IsFalse(events.OfType<AttackEvent>().Any(), "raising was its action");
         }
 
         [Test]

@@ -34,7 +34,7 @@ namespace ArmyRoguelike.Tests
             Assert.IsTrue(b.IsShielded(archer));
             Assert.IsFalse(b.IsShielded(Player(b, 0)), "the warrior doesn't shield itself");
             b.EndPlayerTurn();
-            Assert.AreEqual(archer.MaxHp - 2, archer.Hp, "two wolf bites of 2, each reduced to 1");
+            Assert.AreEqual(archer.MaxHp - 1, archer.Hp, "one wolf bite of 2, reduced to 1");
         }
 
         [Test]
@@ -99,8 +99,8 @@ namespace ArmyRoguelike.Tests
                 new[] { (UnitStats.Wolf, P(3, 2)) });
             var wolf = Enemy(b);
             var events = b.EndPlayerTurn();
-            Assert.AreEqual(2, events.OfType<EffectEvent>().Count(e => e.Kind == EffectKind.Thorns));
-            Assert.AreEqual(wolf.MaxHp - 2 * Battle.ThornsDamage, wolf.Hp);
+            Assert.AreEqual(1, events.OfType<EffectEvent>().Count(e => e.Kind == EffectKind.Thorns), "one bite a turn");
+            Assert.AreEqual(wolf.MaxHp - Battle.ThornsDamage, wolf.Hp);
         }
 
         [Test]
@@ -114,7 +114,7 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(2, reach[P(3, 2)]);
             Assert.IsFalse(reach.ContainsKey(P(3, 3)), "only 2 moves");
             b.PlayerMove(warrior, P(3, 1));
-            Assert.AreEqual(3, warrior.Ap, "moving costs no AP");
+            Assert.AreEqual(1, warrior.Ap, "moving costs no AP");
             Assert.AreEqual(1, warrior.Moves);
         }
 
@@ -124,6 +124,7 @@ namespace ArmyRoguelike.Tests
             var b = Started(new[] { M(UnitStats.Rogue, Equipment.LuckyCharm) }, new[] { P(3, 1) },
                 new[] { (UnitStats.PackLeader, P(3, 2)) });
             var rogue = Player(b);
+            rogue.Hp = UnitStats.PackLeader.Damage;
             var events = b.EndPlayerTurn();
             Assert.IsTrue(rogue.IsAlive);
             Assert.AreEqual(1, rogue.Hp);
@@ -140,11 +141,14 @@ namespace ArmyRoguelike.Tests
             var sapper = Player(b);
             Assert.IsFalse(b.CanPlaceMine(sapper, P(3, 3)), "not adjacent");
             Assert.IsNotNull(b.PlayerPlaceMine(sapper, P(3, 2)));
-            Assert.AreEqual(4 - Battle.MineCost, sapper.Ap);
+            Assert.AreEqual(1 - Battle.MineCost, sapper.Ap);
+            Assert.IsFalse(b.CanPlaceMine(sapper, P(2, 1)), "one action a turn");
+            sapper.Ap = 99;
             Assert.IsFalse(b.CanPlaceMine(sapper, P(3, 2)), "already mined");
             Assert.IsNotNull(b.PlayerPlaceMine(sapper, P(2, 1)));
-            Assert.IsFalse(b.CanPlaceMine(sapper, P(4, 1)), "out of AP");
-            Assert.AreEqual(2, b.Mines.Count);
+            Assert.IsNotNull(b.PlayerPlaceMine(sapper, P(4, 1)));
+            Assert.IsFalse(b.CanPlaceMine(sapper, P(3, 0)), "at most 3 mines");
+            Assert.AreEqual(3, b.Mines.Count);
         }
 
         [Test]
@@ -168,6 +172,7 @@ namespace ArmyRoguelike.Tests
         {
             var b = Started(new[] { M(UnitStats.Sapper) }, new[] { P(3, 1) }, new[] { (UnitStats.Wolf, P(3, 4)) });
             var sapper = Player(b);
+            sapper.Ap = 2;
             b.PlayerPlaceMine(sapper, P(3, 2));
             // A second mine diagonally next to the first, inside its blast.
             b.PlayerPlaceMine(sapper, P(2, 1));
@@ -306,7 +311,7 @@ namespace ArmyRoguelike.Tests
             var move = events.OfType<MoveEvent>().Single();
             Assert.AreEqual(1, move.ZocSteps);
             Assert.AreEqual(0, rogue.Moves);
-            Assert.AreEqual(5, rogue.Ap, "moving costs no AP");
+            Assert.AreEqual(1, rogue.Ap, "moving costs no AP");
         }
 
         [Test]

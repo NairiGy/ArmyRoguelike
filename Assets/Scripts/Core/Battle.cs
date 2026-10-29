@@ -80,13 +80,15 @@ namespace ArmyRoguelike.Core
         /// <summary>Tiles a unit can walk each turn without Swift or Spring Boots.</summary>
         public const int BaseMoves = 1;
 
-        public const int AttackCost = 2;
-        public const int MaxCarriedAp = 2;
+        /// <summary>Every unit has 1 AP: one attack or action per turn. Unused AP doesn't carry over.</summary>
+        public const int AttackCost = 1;
+
+        public const int MaxCarriedAp = 0;
         public const int PlayerZoneRows = 2;
         public const int LeaderAuraRange = 2;
 
         // Mines and bombs.
-        public const int MineCost = 2;
+        public const int MineCost = 1;
         public const int MineDamage = 4;
         public const int BigMineDamage = 5;
         public const int MaxMinesPerUnit = 3;
@@ -99,10 +101,13 @@ namespace ArmyRoguelike.Core
         public const int ThornsDamage = 1;
         public const int PincerBonus = 3;
         public const int PreyBonus = 2;
-        public const int KillRefundAp = 2;
+        public const int KillRefundAp = 1;
         public const int PoisonDamage = 2;
         public const int PoisonTurns = 2;
         public const int CollisionDamage = 2;
+
+        /// <summary>The Giant's slam: damage to each of your units within 2 tiles, before they are shoved.</summary>
+        public const int SlamDamage = 3;
         public const int TauntRange = 2;
 
         /// <summary>Most damage Bloodthirst can add over a whole run.</summary>
@@ -125,18 +130,8 @@ namespace ArmyRoguelike.Core
         public const int SunDamage = 3;
         public const int MoonShield = 4;
 
-        public static int ActionCost(ActionKind action)
-        {
-            switch (action)
-            {
-                case ActionKind.Fireball:
-                case ActionKind.Turret:
-                case ActionKind.Charge:
-                    return 3;
-                default:
-                    return 2;
-            }
-        }
+        /// <summary>Every special action costs the unit's one AP.</summary>
+        public static int ActionCost(ActionKind action) => action == ActionKind.PlaceMine ? MineCost : AttackCost;
 
         public readonly Board Board;
 
@@ -441,7 +436,7 @@ namespace ArmyRoguelike.Core
                 damage += PreyBonus;
             if (attacker.Has(Ability.Shatter) && target.IsSlowed)
                 damage *= 2;
-            if (attacker.Has(Ability.FirstShotDouble) && !attacker.AttackedThisTurn)
+            if (attacker.Has(Ability.FirstShotDouble) && !attacker.HasStruck(target))
                 damage *= 2;
             return damage;
         }
@@ -894,6 +889,7 @@ namespace ArmyRoguelike.Core
             var after = new List<BattleEvent>();
             var hit = Damage(charge.target, DamageAgainst(unit, charge.target), unit, DamageKind.Attack, after);
             unit.AttackedThisTurn = true;
+            unit.MarkStruck(charge.target);
             events.Add(new AttackEvent(unit, hit.Target, hit.Damage, hit.HpAfter));
             events.AddRange(after);
             if (hit.Target.IsAlive)
@@ -1160,6 +1156,9 @@ namespace ArmyRoguelike.Core
             for (var i = 0; i < strikes && !IsOver && attacker.IsAlive && target.IsAlive; i++)
                 struck.AddRange(Strike(attacker, target, events));
             attacker.AttackedThisTurn = true;
+            attacker.MarkStruck(target);
+            foreach (var hitUnit in struck)
+                attacker.MarkStruck(hitUnit);
 
             if (!attacker.IsRanged)
             {
@@ -1291,14 +1290,27 @@ namespace ArmyRoguelike.Core
             return new List<BattleEvent> { new BombThrowEvent(thrower, target.Pos) };
         }
 
+        /// <summary>
+        /// Raises the given bone pile and every other one within the raiser's range that nobody stands on,
+        /// for one action. They wait until the next enemy turn to act.
+        /// </summary>
         internal List<BattleEvent> DoRaise(Unit raiser, Unit remains)
         {
             raiser.Ap -= raiser.Stats.RaiseCost;
-            remains.Hp = remains.MaxHp;
-            remains.Ap = 0;
-            remains.IsDone = true;
-            remains.PoisonTurns = 0;
-            return new List<BattleEvent> { new RaiseEvent(raiser, remains) };
+            var piles = new List<Unit> { remains };
+            piles.AddRange(Remains(raiser.Team).Where(r => r != remains && Distance(raiser, r) <= raiser.Stats.RaiseRange && UnitAt(r.Pos) == null)
+                .OrderBy(r => Distance(raiser, r)).ThenBy(r => r.Id));
+            var events = new List<BattleEvent>();
+            foreach (var pile in piles)
+            {
+                pile.Hp = pile.MaxHp;
+                pile.Ap = 0;
+                pile.IsDone = true;
+                pile.PoisonTurns = 0;
+                events.Add(new RaiseEvent(raiser, pile));
+            }
+
+            return events;
         }
 
         /// <summary>
@@ -1489,13 +1501,20 @@ namespace ArmyRoguelike.Core
             CheckEnd();
         }
 
-        /// <summary>Slam: every other unit within 2 tiles of the slammer is shoved 1 tile away from it.</summary>
+        /// <summary>
+        /// Slam: every enemy of the slammer within 2 tiles takes <see cref="SlamDamage"/>, then every other unit
+        /// within 2 tiles is shoved 1 tile away from it.
+        /// </summary>
         internal List<BattleEvent> DoSlam(Unit slammer)
         {
             slammer.Ap -= AttackCost;
             var events = new List<BattleEvent>();
             var area = Board.AllTiles().Where(p => Distance(p, 1, slammer) <= 2 && !Cells(slammer).Contains(p)).ToList();
-            events.Add(new AreaAttackEvent(slammer, "slam", slammer.Pos, area, new List<Hit>()));
+            var after = new List<BattleEvent>();
+            var hits = _units.Where(u => u.IsPlaced && u.IsAlive && u.Team != slammer.Team && !u.IsObjective && Distance(slammer, u) <= 2).ToList()
+                .Select(u => Damage(u, SlamDamage, slammer, DamageKind.Blast, after)).ToList();
+            events.Add(new AreaAttackEvent(slammer, "slam", slammer.Pos, area, hits));
+            events.AddRange(after);
             var cx = slammer.Pos.X + (slammer.Size - 1) * 0.5;
             var cy = slammer.Pos.Y + (slammer.Size - 1) * 0.5;
             var shoved = _units.Where(u => u != slammer && u.IsPlaced && u.IsAlive && u.Size == 1 && Distance(slammer, u) <= 2)

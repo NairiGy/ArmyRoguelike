@@ -165,7 +165,7 @@ public static class GamepediaWriter
         else
             lines.Add($"<b>Attack</b> ({cost} AP): {e.Damage} damage to a unit next to it.");
         if (e.Slams)
-            lines.Add($"<b>Slam</b> ({cost} AP): shoves every other 1x1 unit within 2 tiles (yours and its own) 1 tile away from it. " +
+            lines.Add($"<b>Slam</b> ({cost} AP): {Battle.SlamDamage} damage to each of your units within 2 tiles, then shoves every other 1x1 unit within 2 tiles (yours and its own) 1 tile away from it. " +
                       $"A unit pushed into a rock, unit or the edge takes {Battle.CollisionDamage} damage.");
         if (e.CanThrow)
             lines.Add($"<b>Boulder</b> ({e.ThrowCost} AP, once a turn): {e.ThrowDamage} damage to a unit 2-{e.ThrowRange} tiles away, ignoring line of sight. " +
@@ -174,7 +174,7 @@ public static class GamepediaWriter
             lines.Add($"<b>Bomb</b> ({e.BombCost} AP, once a turn): lobbed onto the tile of a unit 2-{e.BombRange} tiles away that has no bomb on it yet, ignoring line of sight. " +
                       $"It explodes at the start of the next enemy turn for {e.BombDamage} damage to whoever stands on that tile, its own side included, and sets off a mine or bomb on it.");
         if (e.CanRaise)
-            lines.Add($"<b>Raise</b> ({e.RaiseCost} AP): brings one of its side's bone piles within {e.RaiseRange} tiles back at full HP, if nobody stands on it. " +
+            lines.Add($"<b>Raise</b> ({e.RaiseCost} AP): brings every one of its side's bone piles within {e.RaiseRange} tiles back at full HP at once, unless someone stands on it. " +
                       "The raised unit acts from the next enemy turn.");
         return lines.ToArray();
     }
@@ -204,7 +204,7 @@ public static class GamepediaWriter
         html.Append("<p>How enemies decide what to do. The rules every enemy shares come first; each behaviour below only lists what it does differently.</p>");
 
         html.Append("<h3 id=\"ai-turn\">The enemy turn</h3><ul>");
-        html.Append($"<li>At the start of the enemy phase, burning ground and poison tick, then every enemy gets its AP back: its full pool plus up to {Battle.MaxCarriedAp} unused AP from last turn, and its moves ({Battle.BaseMoves}, or {Battle.BaseMoves + 1} with Swift; none if slowed).</li>");
+        html.Append($"<li>At the start of the enemy phase, burning ground and poison tick, then every enemy gets its {Battle.AttackCost} AP back (unused AP doesn't carry over) and its moves ({Battle.BaseMoves}, or {Battle.BaseMoves + 1} with Swift; none if slowed).</li>");
         html.Append("<li>Next, every bomb on the board explodes, one by one (a blast sets off other bombs and mines inside it).</li>");
         html.Append("<li>Then the enemies act one at a time, in the order they entered the battle. Each finishes its whole turn before the next starts. Units raised or split off during this phase wait until the next enemy turn.</li>");
         html.Append("<li>A turn is a loop: the enemy picks a target, does the first thing on its behaviour's list that it can, and starts over. It stops when it runs out of AP and moves, or nothing on the list helps. The target is picked again before every action, so after a kill it turns to the next one.</li>");
@@ -217,7 +217,7 @@ public static class GamepediaWriter
         html.Append("<p>Every behaviour uses this target. Only the Bomber may bomb a different unit when its target can't be bombed, and the Necromancer raises bone piles before it looks for a target at all.</p>");
 
         html.Append("<h3 id=\"ai-approach\">Walking up</h3><ol>");
-        html.Append($"<li>If it can reach a tile from which it can hit the target and still have {Battle.AttackCost} AP left for the attack, it walks to the cheapest such tile. Ranged units need range and line of sight from that tile.</li>");
+        html.Append($"<li>If it has its AP and can reach a tile from which it can hit the target, it walks to the cheapest such tile. Ranged units need range and line of sight from that tile.</li>");
         html.Append("<li>Otherwise it walks as close to the target as it can: to the reachable tile with the shortest walk to any tile next to the target, the cheapest of those. That walk goes around rocks but through units, so an enemy stuck behind its friends still edges forward.</li>");
         html.Append("<li>If no reachable tile is closer than where it stands, it stays put.</li></ol>");
         html.Append("<p>Ranged enemies that walk up (the Crossbowman) walk to the cheapest tile with a shot. They don't look for cover; the Camp layout just starts them behind rocks.</p>");
@@ -227,7 +227,7 @@ public static class GamepediaWriter
 
         html.Append("<h3 id=\"ai-range\">Getting into range from a distance</h3>");
         html.Append("<p>Used by enemies that fight from afar, once per turn. They only consider tiles at least their comfort distance from every one of your units:</p><ol>");
-        html.Append("<li>The cheapest tile from which it can use its ranged action on the target, with enough AP left to do it.</li>");
+        html.Append("<li>The cheapest tile from which it can use its ranged action on the target, if it still has the AP for it.</li>");
         html.Append("<li>If there is none, the tile closest to the target, if it is closer than where it stands.</li></ol>");
 
         html.Append("<h3 id=\"ai-behaviours\">Behaviours</h3>");
@@ -249,7 +249,7 @@ public static class GamepediaWriter
         html.Append("Hovering a Pack Leader also lights up its aura.</p>");
         html.Append("<table><tr><th>Shows</th><th>When (checked in this order)</th><th>On the board</th></tr>");
         html.Append("<tr><td>Flee</td><td>It carries stolen gold.</td><td>The enemies' back row, where it will escape.</td></tr>");
-        html.Append("<tr><td>Slam</td><td>It can slam and 2 or more of your units are within 2 tiles.</td><td>The area within 2 tiles.</td></tr>");
+        html.Append("<tr><td>Slam</td><td>It can slam, 2 or more of your units are within 2 tiles, and the slam would deal more in total than a smash.</td><td>The area within 2 tiles.</td></tr>");
         html.Append("<tr><td>Raise</td><td>It can raise and one of its bone piles within raise range is free. AP isn't checked.</td><td>The bone pile.</td></tr>");
         html.Append("<tr><td>Bomb</td><td>It bombs and its target is 2 to bomb-range tiles away with no bomb on its tile. Otherwise it shows Attack, though it may still bomb another unit or back off.</td><td>The target's tile, where the bomb lands.</td></tr>");
         html.Append("<tr><td>Smash</td><td>It smashes and the target is next to it, or the target is out of boulder range.</td><td>The ring around it and the target.</td></tr>");
@@ -295,7 +295,7 @@ public static class GamepediaWriter
                 return new[]
                 {
                     "Carrying stolen gold: if it is on the enemies' back row, escape with the gold. Otherwise move to the reachable tile furthest back (the cheapest of those). If it can't get any further back this turn, it stops.",
-                    $"Not carrying gold: attack its {target} if it can, otherwise {approach}, like Walk up and hit. Its first hit that does damage steals the gold, and it spends the rest of its AP running.",
+                    $"Not carrying gold: attack its {target} if it can, otherwise {approach}, like Walk up and hit. Its first hit that does damage steals the gold, and it spends the rest of its moves running.",
                 };
             case EnemyBehaviour.Bomber:
                 return new[]
@@ -308,15 +308,14 @@ public static class GamepediaWriter
             case EnemyBehaviour.Giant:
                 return new[]
                 {
-                    $"Once, at the very start of its turn: slam if 2 or more of your units are within 2 tiles and it has {Battle.AttackCost} AP.",
-                    $"If any of your units are next to it: smash (stops if it has less than {Battle.AttackCost} AP).",
-                    $"Throw a boulder at its {target} if it is 2 to throw-range tiles away (once a turn).",
-                    $"Otherwise {approach} to the target.",
+                    $"With its one action: smash or slam, whichever deals more in total (slam needs 2 or more of your units within 2 tiles; {Battle.SlamDamage} damage to each), ties going to smash.",
+                    "Or, with nobody close enough for either: throw a boulder at its target if it is 2 to throw-range tiles away and the rock wouldn't wall the Giant off from it.",
+                    $"Without an action to take: {approach} to the {target}, then try again.",
                 };
             case EnemyBehaviour.Necromancer:
                 return new[]
                 {
-                    "Raise the nearest bone pile it can, as long as its AP lasts.",
+                    "If any bone pile is in range: raise them all (its action for the turn).",
                     $"If its {target} is closer than {EnemyAI.NecromancerComfortDistance} tiles: {retreat} (once a turn).",
                     "If it can hit the target from where it stands: fire a bolt.",
                     $"Otherwise {range} for a bolt (once a turn), with a comfort distance of {EnemyAI.NecromancerComfortDistance}. It never walks closer than that to shoot.",
@@ -339,7 +338,7 @@ public static class GamepediaWriter
         foreach (var enc in Encounter.Elites)
             EncounterCard(html, enc, enc.EnemySummary());
         html.Append("</div><h3>Bosses</h3><div class=\"grid\">");
-        EncounterCard(html, Encounter.Necromancer, new[] { "Necromancer", "2 raised units from each faction you beat this act (Skeletons fill up to 4)" });
+        EncounterCard(html, Encounter.Necromancer, new[] { "Necromancer", "1 raised unit from each faction you beat this act (Skeletons fill up to 4)" });
         EncounterCard(html, Encounter.Giant, Encounter.Giant.EnemySummary());
         html.Append("</div><h3>Scenarios</h3><div class=\"grid\">");
         var waves = $"{Encounter.RitualWaveSize} more Elementals after enemy turns {string.Join(" and ", Encounter.RitualWaveTurns)}";
@@ -440,7 +439,7 @@ public static class GamepediaWriter
     private static void Rules(StringBuilder html)
     {
         html.Append("<section id=\"rules\"><h2>Battle rules</h2><ul>");
-        html.Append($"<li>Moves are separate from AP: every unit walks {Battle.BaseMoves} tile per turn ({Battle.BaseMoves + 1} with Swift, +1 with Spring Boots), before or after acting, 4 directions, no diagonals. Unused moves don't carry over. AP pays for attacks and actions: a basic attack costs {Battle.AttackCost} AP. Up to {Battle.MaxCarriedAp} unused AP carry over.</li>");
+        html.Append($"<li>Moves are separate from AP: every unit walks {Battle.BaseMoves} tile per turn ({Battle.BaseMoves + 1} with Swift, +1 with Spring Boots), before or after acting, 4 directions, no diagonals. Unused moves don't carry over. AP pays for attacks and actions: every unit has {Battle.AttackCost} AP, so one attack or action per turn, and unused AP doesn't carry over.</li>");
         html.Append("<li>Side phases: all your units act (one at a time), then all enemies.</li>");
         html.Append($"<li><b>Zone of control</b>: stepping out of a tile next to an enemy uses up all your remaining moves, for both sides. You can always back off one tile, but you can't slip past.</li>");
         html.Append("<li>Ranged attacks need line of sight (rocks block); Arcane Bolt ignores it. Bombs, boulders and fireballs are lobbed.</li>");

@@ -93,12 +93,12 @@ namespace ArmyRoguelike.Core
                 case Ability.SteadyAim: return "+1 damage if it hasn't moved this turn";
                 case Ability.SteadyAimPlus: return "+2 damage if it hasn't moved this turn";
                 case Ability.Pierce: return "shots along a straight row or column hit every enemy in the line";
-                case Ability.FirstShotDouble: return "the first attack each turn deals double damage";
+                case Ability.FirstShotDouble: return "double damage the first time it hits each enemy in a battle";
                 case Ability.PreyOnSnared: return $"snared enemies take +{Battle.PreyBonus} damage from everyone";
                 case Ability.Volley: return "shots hit the target and the 4 tiles next to it for 1 less damage, friend or foe";
                 case Ability.Bloodthirst: return $"+1 damage per kill, kept for the run (up to +{Battle.BloodthirstCap})";
                 case Ability.Pincer: return $"+{Battle.PincerBonus} damage if an ally stands on the far side of the target";
-                case Ability.KillRefund: return $"a kill refunds {Battle.KillRefundAp} AP";
+                case Ability.KillRefund: return "a kill gives its action back: it can attack again";
                 case Ability.Poison: return $"hits poison: {Battle.PoisonDamage} damage at the start of the target's next {Battle.PoisonTurns} turns";
                 case Ability.Counter: return "counter-attacks the first melee hit each enemy turn";
                 case Ability.CounterAll: return "counter-attacks every melee hit";

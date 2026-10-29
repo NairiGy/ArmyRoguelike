@@ -80,7 +80,7 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(Player(b, 0), EnemyAI.ChooseTarget(b, Enemy(b)), "taunt beats the nearer archer");
             var lone = Setup(new[] { UnitStats.Bastion }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2) });
             lone.EndPlayerTurn();
-            Assert.AreEqual(UnitStats.Bastion.MaxHp - 2, Player(lone).Hp, "two bites of 2, each reduced to 1");
+            Assert.AreEqual(UnitStats.Bastion.MaxHp - 1, Player(lone).Hp, "one bite of 2, reduced to 1");
         }
 
         [Test]
@@ -117,16 +117,20 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Deadeye_FirstShotDouble()
+        public void Deadeye_FirstShotOnEachTargetDouble()
         {
-            var b = Setup(new[] { UnitStats.Deadeye }, new[] { P(3, 0) }, new[] { E(UnitStats.Ogre, 3, 4) });
+            var b = Setup(new[] { UnitStats.Deadeye }, new[] { P(3, 0) },
+                new[] { E(UnitStats.Ogre, 3, 4), E(UnitStats.Brute, 1, 3) });
             var deadeye = Player(b);
-            var ogre = Enemy(b);
+            var ogre = Enemy(b, 0);
+            var brute = Enemy(b, 1);
             var normal = b.EffectiveDamage(deadeye);
             b.PlayerAttack(deadeye, ogre);
             Assert.AreEqual(UnitStats.Ogre.MaxHp - 2 * normal, ogre.Hp);
+            deadeye.Ap = 1;
             b.PlayerAttack(deadeye, ogre);
-            Assert.AreEqual(UnitStats.Ogre.MaxHp - 3 * normal, ogre.Hp);
+            Assert.AreEqual(UnitStats.Ogre.MaxHp - 3 * normal, ogre.Hp, "only the first hit on a target is doubled");
+            Assert.AreEqual(2 * normal, b.DamageAgainst(deadeye, brute), "a new target gets the opening shot");
         }
 
         [Test]
@@ -206,7 +210,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Swashbuckler_DodgesFirstHit()
         {
-            var b = Setup(new[] { UnitStats.Swashbuckler }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2) });
+            var b = Setup(new[] { UnitStats.Swashbuckler }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Wolf, 2, 1) });
             var swash = Player(b);
             var events = b.EndPlayerTurn();
             Assert.IsTrue(events.OfType<EffectEvent>().Any(e => e.Kind == EffectKind.Dodge));
@@ -299,7 +303,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void WardShield_SoaksDamageFirst()
         {
-            var b = Setup(new[] { UnitStats.WardMage, UnitStats.Rogue }, new[] { P(1, 0), P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2) });
+            var b = Setup(new[] { UnitStats.WardMage, UnitStats.Rogue }, new[] { P(1, 0), P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Wolf, 4, 1) });
             var rogue = Player(b, 1);
             b.PlayerUseAction(Player(b, 0), ActionKind.Ward, P(3, 1));
             b.EndPlayerTurn();

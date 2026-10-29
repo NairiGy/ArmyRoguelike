@@ -325,6 +325,12 @@ An idea test, built 2026-10-29, not playtested. It lives only on its branch (wor
 - **Layouts:** enemies start in rows 4–5, ridges on row 3 (3 gaps, elite 2), the shrine at (2,2) with spawns at least 3 steps from it, totems on rows 4–5. The Necromancer raises **1** of each beaten faction (was 2), topped up with skeletons to 4, so his army fits.
 - **Logs:** battle logs record `boardSize`, each unit's `maxMoves`, `movesAfter` on moves and "done", and `ranged` on hits (a shot from 2+ tiles), for the ranged vs melee damage split.
 
+**Step 2: one AP** (2026-10-29, same branch, not playtested). Every unit, bosses included, has **1 AP**: one move and one attack or action per turn. Every attack and action costs 1, and unused AP doesn't carry over. Units no longer differ by AP pool (the old pools are gone from the data).
+
+- **Momentum** (Shadow): a kill gives the action back, so it can attack again and chain kills.
+- **Opening Shot** (Deadeye): double damage the first time it hits each enemy in a battle (was "first attack each turn").
+- **Bosses get strong single actions** *(placeholders, "for now")*: the Giant's slam also deals 3 damage to each of your units within 2 tiles, and it picks smash or slam by whichever deals more in total (ties go to smash), else a boulder (now 4 damage); the Necromancer raises **every** bone pile within range in one action, and its bolt does 4.
+
 ## Test mode (for testing only)
 
 - Editor and dev builds only: a "Test battle" button on the draft screen opens a setup screen.

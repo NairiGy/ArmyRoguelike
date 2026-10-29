@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace ArmyRoguelike.Core
 {
@@ -34,8 +35,16 @@ namespace ArmyRoguelike.Core
         /// <summary>Moved at least one tile this turn (for Steady Aim).</summary>
         public bool MovedThisTurn { get; internal set; }
 
-        /// <summary>Has attacked this turn (for the Deadeye's opening shot).</summary>
+        /// <summary>Has attacked this turn.</summary>
         public bool AttackedThisTurn { get; internal set; }
+
+        // Ids of the units this one has attacked this battle (for the Deadeye's opening shot).
+        private readonly HashSet<int> _struck = new HashSet<int>();
+
+        /// <summary>Has attacked this target before in this battle.</summary>
+        public bool HasStruck(Unit target) => _struck.Contains(target.Id);
+
+        internal void MarkStruck(Unit target) => _struck.Add(target.Id);
 
         /// <summary>Riposte already used this enemy turn.</summary>
         public bool CounterUsed { get; internal set; }
