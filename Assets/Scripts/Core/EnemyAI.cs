@@ -429,7 +429,7 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>
-        /// Raise bone piles first, back away from anyone close, then fire bolts. With nothing to raise
+        /// Back away from anyone close, then raise bone piles, else fire bolts. With nothing to raise
         /// and nobody in range it walks up to bolt range, but never closer than its comfort distance.
         /// </summary>
         private static void NecromancerTurn(Battle battle, Unit necro, List<BattleEvent> events)
@@ -438,6 +438,15 @@ namespace ArmyRoguelike.Core
             var advanced = false;
             while (!battle.IsOver && necro.IsAlive)
             {
+                // Back off first: once it raises or shoots it can't move any more this turn.
+                var target = ChooseTarget(battle, necro);
+                if (target != null && !retreated && Battle.Distance(necro, target) < NecromancerComfortDistance)
+                {
+                    retreated = true;
+                    if (Retreat(battle, necro, events))
+                        continue;
+                }
+
                 var remains = ChooseRemains(battle, necro);
                 if (remains != null)
                 {
@@ -445,16 +454,8 @@ namespace ArmyRoguelike.Core
                     continue;
                 }
 
-                var target = ChooseTarget(battle, necro);
                 if (target == null)
                     return;
-
-                if (!retreated && Battle.Distance(necro, target) < NecromancerComfortDistance)
-                {
-                    retreated = true;
-                    if (Retreat(battle, necro, events))
-                        continue;
-                }
 
                 if (battle.CanAttack(necro, target))
                 {

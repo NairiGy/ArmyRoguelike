@@ -566,7 +566,15 @@ namespace ArmyRoguelike.Core
             return count;
         }
 
-        public bool CanMove(Unit unit) => !unit.Has(Ability.Immobile) && !unit.RootedThisTurn;
+        /// <summary>Immobile, pinned or slowed units can't move, and nobody moves again after spending AP that turn.</summary>
+        public bool CanMove(Unit unit) => !unit.Has(Ability.Immobile) && !unit.RootedThisTurn && !unit.ActedThisTurn;
+
+        /// <summary>Pays for an attack or action. Once a unit has spent AP it can't move for the rest of the turn.</summary>
+        private static void SpendAp(Unit unit, int cost)
+        {
+            unit.Ap -= cost;
+            unit.ActedThisTurn = true;
+        }
 
         /// <summary>
         /// Cheapest move cost to every reachable anchor tile (Dijkstra, since steps cost different amounts),
@@ -792,7 +800,7 @@ namespace ArmyRoguelike.Core
                 return null;
             ActiveUnit = unit;
             var events = new List<BattleEvent>();
-            unit.Ap -= ActionCost(action);
+            SpendAp(unit, ActionCost(action));
             switch (action)
             {
                 case ActionKind.PlaceMine:
@@ -1224,7 +1232,7 @@ namespace ArmyRoguelike.Core
         internal List<BattleEvent> DoAttack(Unit attacker, Unit target)
         {
             var events = new List<BattleEvent>();
-            attacker.Ap -= AttackCost;
+            SpendAp(attacker, AttackCost);
             var strikes = attacker.Has(Ability.DoubleStrike) ? 2 : 1;
             var struck = new List<Unit>();
             for (var i = 0; i < strikes && !IsOver && attacker.IsAlive && target.IsAlive; i++)
@@ -1326,7 +1334,7 @@ namespace ArmyRoguelike.Core
         internal List<BattleEvent> DoSmash(Unit attacker)
         {
             var damage = EffectiveDamage(attacker);
-            attacker.Ap -= AttackCost;
+            SpendAp(attacker, AttackCost);
             var hits = new List<Hit>();
             var after = new List<BattleEvent>();
             var targets = AdjacentFoes(attacker);
@@ -1346,7 +1354,7 @@ namespace ArmyRoguelike.Core
 
         internal List<BattleEvent> DoThrow(Unit thrower, Unit target)
         {
-            thrower.Ap -= thrower.Stats.ThrowCost;
+            SpendAp(thrower, thrower.Stats.ThrowCost);
             var rock = RockTileFor(thrower, target);
             var after = new List<BattleEvent>();
             var hit = Damage(target, thrower.Stats.ThrowDamage, thrower, DamageKind.Attack, after);
@@ -1368,7 +1376,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Howl: every wolf of its side that hasn't acted yet this turn gets <see cref="HowlMoves"/> extra moves.</summary>
         internal List<BattleEvent> DoHowl(Unit leader)
         {
-            leader.Ap -= AttackCost;
+            SpendAp(leader, AttackCost);
             var wolves = Living(leader.Team).Where(u => u.IsWolf && !u.IsDone && CanMove(u)).ToList();
             foreach (var wolf in wolves)
                 wolf.Moves += HowlMoves;
@@ -1377,7 +1385,7 @@ namespace ArmyRoguelike.Core
 
         internal List<BattleEvent> DoBomb(Unit thrower, Unit target)
         {
-            thrower.Ap -= thrower.Stats.BombCost;
+            SpendAp(thrower, thrower.Stats.BombCost);
             _bombs.Add(new Bomb(target.Pos, thrower, thrower.Stats.BombDamage));
             return new List<BattleEvent> { new BombThrowEvent(thrower, target.Pos) };
         }
@@ -1388,7 +1396,7 @@ namespace ArmyRoguelike.Core
         /// </summary>
         internal List<BattleEvent> DoRaise(Unit raiser, Unit remains)
         {
-            raiser.Ap -= raiser.Stats.RaiseCost;
+            SpendAp(raiser, raiser.Stats.RaiseCost);
             var piles = new List<Unit> { remains };
             piles.AddRange(Remains(raiser.Team).Where(r => r != remains && Distance(raiser, r) <= raiser.Stats.RaiseRange && UnitAt(r.Pos) == null)
                 .OrderBy(r => Distance(raiser, r)).ThenBy(r => r.Id));
@@ -1602,7 +1610,7 @@ namespace ArmyRoguelike.Core
         /// </summary>
         internal List<BattleEvent> DoSlam(Unit slammer)
         {
-            slammer.Ap -= AttackCost;
+            SpendAp(slammer, AttackCost);
             var events = new List<BattleEvent>();
             var area = Board.AllTiles().Where(p => Distance(p, 1, slammer) <= 2 && !Cells(slammer).Contains(p)).ToList();
             var after = new List<BattleEvent>();
@@ -1717,6 +1725,7 @@ namespace ArmyRoguelike.Core
                 u.IsDone = false;
                 u.MovedThisTurn = false;
                 u.AttackedThisTurn = false;
+                u.ActedThisTurn = false;
             }
 
             BiteChain = 0;

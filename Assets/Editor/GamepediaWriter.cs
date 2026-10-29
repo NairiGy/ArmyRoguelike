@@ -203,7 +203,7 @@ public static class GamepediaWriter
         html.Append("<li>Next, every bomb on the board explodes, one by one (a blast sets off other bombs and mines inside it).</li>");
         html.Append("<li>Then the enemies act one at a time, in the order they entered the battle. Each finishes its whole turn before the next starts. Units raised or split off during this phase wait until the next enemy turn.</li>");
         html.Append("<li>A turn is a loop: the enemy picks a target, does the first thing on its behaviour's list that it can, and starts over. It stops when it runs out of AP and moves, or nothing on the list helps. The target is picked again before every action, so after a kill it turns to the next one.</li>");
-        html.Append($"<li>Enemies move by your rules: {Battle.MoveCost} move per tile (moves are separate from AP), no diagonals, stepping out of a tile next to one of your units uses up their remaining moves (zone of control), and snared or slowed units can't move.</li>");
+        html.Append($"<li>Enemies move by your rules: {Battle.MoveCost} move per tile (moves are separate from AP), no diagonals, stepping out of a tile next to one of your units uses up their remaining moves (zone of control), no moving after spending AP, and pinned or slowed units can't move.</li>");
         html.Append("<li>Enemies can't see mines. One that steps on a mine stops there and sets it off.</li></ul>");
 
         html.Append("<h3 id=\"ai-target\">Targeting</h3><ol>");
@@ -320,8 +320,8 @@ public static class GamepediaWriter
             case EnemyBehaviour.Necromancer:
                 return new[]
                 {
-                    "If any bone pile is in range: raise them all (its action for the turn).",
                     $"If its {target} is closer than {EnemyAI.NecromancerComfortDistance} tiles: {retreat} (once a turn).",
+                    "If any bone pile is in range: raise them all (its action for the turn).",
                     "If it can hit the target from where it stands: fire a bolt.",
                     $"Otherwise {range} for a bolt (once a turn), with a comfort distance of {EnemyAI.NecromancerComfortDistance}. It never walks closer than that to shoot.",
                 };
@@ -444,7 +444,7 @@ public static class GamepediaWriter
     private static void Rules(StringBuilder html)
     {
         html.Append("<section id=\"rules\"><h2>Battle rules</h2><ul>");
-        html.Append($"<li>Moves are separate from AP: every unit walks {Battle.BaseMoves} tile per turn ({Battle.BaseMoves + 1} with Swift, +1 with Spring Boots), before or after acting, 4 directions, no diagonals. Unused moves don't carry over. AP pays for attacks and actions: every unit has {Battle.AttackCost} AP, so one attack or action per turn, and unused AP doesn't carry over.</li>");
+        html.Append($"<li>Moves are separate from AP: every unit walks {Battle.BaseMoves} tile per turn ({Battle.BaseMoves + 1} with Swift, +1 with Spring Boots), 4 directions, no diagonals. Move first: once a unit spends AP (an attack or action) it can't move again that turn, for both sides. Unused moves don't carry over. AP pays for attacks and actions: every unit has {Battle.AttackCost} AP, so one attack or action per turn, and unused AP doesn't carry over.</li>");
         html.Append("<li>Side phases: all your units act (one at a time), then all enemies.</li>");
         html.Append($"<li><b>Zone of control</b>: stepping out of a tile next to an enemy uses up all your remaining moves, for both sides. You can always back off one tile, but you can't slip past.</li>");
         html.Append("<li>Ranged attacks need line of sight (rocks block); Arcane Bolt ignores it. Bombs, boulders and fireballs are lobbed.</li>");

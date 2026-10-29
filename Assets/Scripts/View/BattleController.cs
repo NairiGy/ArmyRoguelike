@@ -1326,7 +1326,8 @@ namespace ArmyRoguelike.View
                 var moves = playerTurn ? PreviewMoves() : 0;
                 apLine = cost > 0 ? $"AP {_selected.Ap} / {_selected.MaxAp}   this action: -{cost} -> {_selected.Ap - cost} left"
                     : $"AP {_selected.Ap} / {_selected.MaxAp}";
-                apLine += moves > 0 ? $"   Moves {_selected.Moves} / {_selected.MaxMoves} (-{moves})" : $"   Moves {_selected.Moves} / {_selected.MaxMoves}";
+                apLine += _selected.ActedThisTurn ? "   Moves: none (acted)"
+                    : moves > 0 ? $"   Moves {_selected.Moves} / {_selected.MaxMoves} (-{moves})" : $"   Moves {_selected.Moves} / {_selected.MaxMoves}";
                 var abilities = AbilityLines(_selected);
                 if (abilities.Length > 0)
                     info += "\n" + abilities;
@@ -1577,6 +1578,8 @@ namespace ArmyRoguelike.View
                 lines.Add($"Shield {u.Shield}");
             if (u.MoonShield > 0)
                 lines.Add($"Moon shield {u.MoonShield}");
+            if (u.Team == Team.Player && Battle.Phase == Phase.PlayerTurn && u.ActedThisTurn && !u.IsDone)
+                lines.Add("Has acted: can't move again this turn");
             if (u.IsSnared)
                 lines.Add("Pinned: can't move");
             if (u.IsHidden)

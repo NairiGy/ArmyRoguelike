@@ -74,6 +74,24 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void Move_NotAfterSpendingAp_ForBothSides()
+        {
+            var b = Started(new[] { UnitStats.Rogue }, new[] { new GridPos(3, 1) },
+                new[] { (UnitStats.Brute, new GridPos(3, 2)) });
+            var rogue = Player(b);
+            Assert.IsNotNull(b.PlayerAttack(rogue, Enemy(b)));
+            Assert.AreEqual(2, rogue.Moves, "its moves are still there");
+            Assert.AreEqual(0, b.GetReachable(rogue).Count, "but it can't walk after attacking");
+            Assert.IsFalse(b.CanStillAct(rogue));
+
+            var brute = Enemy(b);
+            b.EndPlayerTurn();
+            Assert.AreEqual(new GridPos(3, 2), brute.Pos, "the brute hit back and stayed");
+            Assert.IsTrue(brute.ActedThisTurn);
+            Assert.IsTrue(b.GetReachable(rogue).Count > 0, "a new turn: moving is allowed again");
+        }
+
+        [Test]
         public void Move_OneTilePerTurnByDefault()
         {
             var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 0) },

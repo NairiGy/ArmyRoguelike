@@ -855,7 +855,9 @@ namespace ArmyRoguelike.Tests
             b.PlayerAttack(rogue, skeleton);
             Assert.IsFalse(skeleton.IsAlive);
             Assert.AreEqual(skeleton, b.RemainsAt(new GridPos(3, 2)));
-            Assert.IsNotNull(b.PlayerMove(rogue, new GridPos(3, 2)));
+            Assert.IsNull(b.PlayerMove(rogue, new GridPos(3, 2)), "it attacked, so it can't move this turn");
+            b.EndPlayerTurn();
+            Assert.IsNotNull(b.PlayerMove(rogue, new GridPos(3, 2)), "the pile doesn't block");
         }
 
         [Test]

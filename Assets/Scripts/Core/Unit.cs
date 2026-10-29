@@ -35,6 +35,9 @@ namespace ArmyRoguelike.Core
         /// <summary>Moved at least one tile this turn (for Steady Aim).</summary>
         public bool MovedThisTurn { get; internal set; }
 
+        /// <summary>Spent AP this turn (attack or action), so it can't move again until its next turn.</summary>
+        public bool ActedThisTurn { get; internal set; }
+
         /// <summary>Has attacked this turn.</summary>
         public bool AttackedThisTurn { get; internal set; }
 

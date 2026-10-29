@@ -331,6 +331,8 @@ An idea test, built 2026-10-29, not playtested. It lives only on its branch (wor
 - **Opening Shot** (Deadeye): double damage the first time it hits each enemy in a battle (was "first attack each turn").
 - **Bosses get strong single actions** *(placeholders, "for now")*: the Giant's slam also deals 3 damage to each of your units within 2 tiles, and it picks smash or slam by whichever deals more in total (ties go to smash), else a boulder (now 4 damage); the Necromancer raises **every** bone pile within range in one action, and its bolt does 4.
 
+**Move first** (2026-10-29, same branch, not playtested): once a unit spends AP (any attack or action) it can't move again that turn, for both sides. Each turn is "position, then commit"; no more hit-and-run. Swift units can still move 2 and then attack, and Blink (an action) is the mage's escape. The Necromancer now backs off before raising or shooting.
+
 **Step 3: unit kits** (2026-10-29, same branch, not playtested). Every unit should feel unique through its **passives** and its **actions**. The basic attack counts as an action too and has its own name (Wolf Bite, Strike, Shot, Bolt, Smash, Long Strike, Stab). Wolves are the first faction designed this way; the rest of the enemies and the player's units follow.
 
 - **Wolf** (6 HP, Swift). Passive **Blood Scent**: goes for the lowest-HP unit it can reach and attack this turn, instead of the nearest. Action **Wolf Bite**: 2 damage, +1 for every wolf bite earlier in the same turn (any wolf, any target, the Pack Leader's included; resets every turn).
