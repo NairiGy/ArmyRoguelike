@@ -381,7 +381,7 @@ namespace ArmyRoguelike.Core
         // ---------- Rogue tree ----------
 
         public static readonly UnitStats Rogue = Player(UnitKind.Rogue, "Rogue", "R", 1, 5, 4, 1, 1,
-            "Fast, deadly, fragile. Grows with every kill.", A(Ability.Swift, Ability.Bloodthirst), Do(ActionKind.Vanish));
+            "Fast, deadly, fragile. Slips out of sight.", A(Ability.Swift), Do(ActionKind.Vanish));
 
         public static readonly UnitStats Assassin = Player(UnitKind.Rogue, "Assassin", "As", 2, 6, 5, 1, 1,
             "Big damage when an ally pins the target from the other side.", A(Ability.Swift, Ability.Bloodthirst, Ability.Pincer), Do(ActionKind.Vanish), from: Rogue);

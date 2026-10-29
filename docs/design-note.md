@@ -338,7 +338,7 @@ An idea test, built 2026-10-29, not playtested. It lives only on its branch (wor
 - **Your base lines** (each action is inherited by every evolution of the line; 1 AP, so it's a choice against attacking):
   - **Warrior line, Shield Bash:** push an adjacent enemy 1 tile; no damage, only the 2 collision damage if it's blocked. The attack (Strike) is for damage.
   - **Archer line, Pinning Shot:** 1 damage in shot range (line of sight), and the target can't move on its next turn. The attack (Shot) is for damage. The Trapper line lost Snare to it (Prey now works on pinned enemies); the Trapper gets a new action later.
-  - **Rogue line, Vanish:** enemies can't target or attack it (area blasts still hit) until it attacks again, for 2 enemy turns at most; the attack that reveals it deals +2.
+  - **Rogue line, Vanish:** the base Rogue's passive is Swift only (Bloodthirst removed 2026-10-29; its evolutions still have it for now). Vanish goes off as soon as you press it: enemies can't target or attack it (area blasts still hit) until it attacks again, for 2 enemy turns at most; the attack that reveals it deals +2.
   - **Mage line, Blink:** teleport to a free tile within 2, past rocks and zone of control.
   - **Sapper line:** unchanged (Strike, Place Mine).
 - **Hover card:** hovering a unit shows a card at the top right: name and HP, AP / moves / range, **Next** (what an enemy will do), then **Passive**, **Actions** and **Now** (statuses, pack state, engaged). Colours are placeholders for the art chat.

@@ -50,18 +50,18 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Bloodthirst_GainsDamageOnKill()
         {
-            var b = Started(new[] { M(UnitStats.Rogue) }, new[] { P(3, 1) },
+            var b = Started(new[] { M(UnitStats.Assassin) }, new[] { P(3, 1) },
                 new[] { (UnitStats.Wolf, P(3, 2)), (UnitStats.Wolf, P(7, 7)) });
             Enemy(b).Hp = 1;
             var events = b.PlayerAttack(Player(b), Enemy(b));
             Assert.IsTrue(events.OfType<EffectEvent>().Any(e => e.Kind == EffectKind.Bloodthirst));
-            Assert.AreEqual(5, Player(b).BaseDamage);
+            Assert.AreEqual(UnitStats.Assassin.Damage + 1, Player(b).BaseDamage);
         }
 
         [Test]
         public void Bloodthirst_StopsAtTheCapForTheRun()
         {
-            var rogue = M(UnitStats.Rogue);
+            var rogue = M(UnitStats.Assassin);
             rogue.BonusDamage = Battle.BloodthirstCap - 1;
             var b = Started(new[] { rogue }, new[] { P(3, 1) },
                 new[] { (UnitStats.Wolf, P(3, 2)), (UnitStats.Wolf, P(4, 1)), (UnitStats.Wolf, P(7, 7)) });
@@ -75,7 +75,7 @@ namespace ArmyRoguelike.Tests
             var events = b.PlayerAttack(unit, Enemy(b, 1));
             Assert.AreEqual(1, unit.GainedDamage, "the cap is reached");
             Assert.IsFalse(events.OfType<EffectEvent>().Any(e => e.Kind == EffectKind.Bloodthirst));
-            Assert.AreEqual(UnitStats.Rogue.Damage + Battle.BloodthirstCap, unit.BaseDamage);
+            Assert.AreEqual(UnitStats.Assassin.Damage + Battle.BloodthirstCap, unit.BaseDamage);
         }
 
         // ---------- Item abilities ----------

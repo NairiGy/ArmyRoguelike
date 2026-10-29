@@ -281,7 +281,10 @@ namespace ArmyRoguelike.View
                 return;
             }
 
-            if (action == ActionKind.Detonate)
+            // Actions whose only target is the unit itself (Detonate, Vanish) go off at once: there is
+            // nothing to pick, and clicking the statue often lands on the tile behind it.
+            var targets = Battle.ActionTargets(_selected, action);
+            if (targets.Count == 1 && targets[0] == _selected.Pos)
             {
                 _action = null;
                 UseAction(action, _selected.Pos);

@@ -766,13 +766,14 @@ namespace ArmyRoguelike.Tests
         public void Bloodthirst_DamageCarriesToNextBattle()
         {
             var run = NewRun(4);
+            run.Army.Single(m => m.Stats == UnitStats.Rogue).Stats = UnitStats.Assassin;
             run.ChooseNode(0);
             var b = run.StartBattle();
             var x = 0;
             foreach (var u in b.Units.Where(u => u.Team == Team.Player))
                 b.Place(u, new GridPos(x++, 0));
             b.StartBattle();
-            var rogue = b.Units.Single(u => u.Stats == UnitStats.Rogue);
+            var rogue = b.Units.Single(u => u.Stats == UnitStats.Assassin);
             // Elementals split when they die, so keep going until nothing is left standing.
             for (var e = b.Living(Team.Enemy).FirstOrDefault(); e != null && !b.IsOver; e = b.Living(Team.Enemy).FirstOrDefault())
             {
@@ -784,7 +785,7 @@ namespace ArmyRoguelike.Tests
 
             var kills = b.Units.Count(u => u.Team == Team.Enemy);
             run.FinishBattle();
-            Assert.AreEqual(System.Math.Min(kills, Battle.BloodthirstCap), run.Army.Single(m => m.Stats == UnitStats.Rogue).BonusDamage);
+            Assert.AreEqual(System.Math.Min(kills, Battle.BloodthirstCap), run.Army.Single(m => m.Stats == UnitStats.Assassin).BonusDamage);
         }
 
         // ---------- Walk up and attack ----------
