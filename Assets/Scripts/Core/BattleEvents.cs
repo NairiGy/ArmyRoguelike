@@ -169,6 +169,12 @@ namespace ArmyRoguelike.Core
         /// <summary>Vampire Fang: <see cref="EffectEvent.Amount"/> HP healed.</summary>
         Heal,
 
+        /// <summary>Vanish: the unit went invisible (Source and Target are the same unit).</summary>
+        Vanish,
+
+        /// <summary>A vanished unit became visible again.</summary>
+        Reveal,
+
         /// <summary>Thorned Mail hurt the melee attacker for <see cref="EffectEvent.Amount"/>.</summary>
         Thorns,
 
@@ -273,11 +279,18 @@ namespace ArmyRoguelike.Core
 
     public enum StatusKind
     {
-        Snare,
+        /// <summary>Pinned (Pinning Shot): can't move on its next turn.</summary>
+        Pin,
         Slow,
         Poison,
         Ward,
         Heal,
+
+        /// <summary>Vanish: the unit went invisible (Source and Target are the same unit).</summary>
+        Vanish,
+
+        /// <summary>A vanished unit became visible again.</summary>
+        Reveal,
     }
 
     /// <summary>A status or support effect was put on a unit by an action or a hit.</summary>

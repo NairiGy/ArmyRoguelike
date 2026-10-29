@@ -134,16 +134,91 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Snare_RootsNextTurn_AndHunterPunishesIt()
+        public void PinningShot_HitsForOne_RootsNextTurn_AndHunterPunishesIt()
         {
             var b = Setup(new[] { UnitStats.Hunter }, new[] { P(3, 0) }, new[] { E(UnitStats.Wolf, 3, 3) });
             var hunter = Player(b);
             var wolf = Enemy(b);
-            b.PlayerUseAction(hunter, ActionKind.Snare, wolf.Pos);
+            b.PlayerUseAction(hunter, ActionKind.PinningShot, wolf.Pos);
+            Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.PinDamage, wolf.Hp);
             Assert.IsTrue(wolf.IsSnared);
             Assert.AreEqual(b.EffectiveDamage(hunter) + Battle.PreyBonus, b.DamageAgainst(hunter, wolf));
             b.EndPlayerTurn();
-            Assert.AreEqual(P(3, 3), wolf.Pos, "rooted: it couldn't move");
+            Assert.AreEqual(P(3, 3), wolf.Pos, "pinned: it couldn't move");
+        }
+
+        [Test]
+        public void PinningShot_NeedsLineOfSight()
+        {
+            var b = Setup(new[] { UnitStats.Archer }, new[] { P(3, 0) }, new[] { E(UnitStats.Wolf, 3, 3) }, P(3, 2));
+            Assert.IsFalse(b.CanUseAction(Player(b), ActionKind.PinningShot, P(3, 3)));
+        }
+
+        // ---------- Base kits ----------
+
+        [Test]
+        public void ShieldBash_PushesWithoutDamage_CollisionHurts()
+        {
+            var b = Setup(new[] { UnitStats.Warrior }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far });
+            var wolf = Enemy(b);
+            b.PlayerUseAction(Player(b), ActionKind.ShieldBash, wolf.Pos);
+            Assert.AreEqual(P(3, 3), wolf.Pos);
+            Assert.AreEqual(UnitStats.Wolf.MaxHp, wolf.Hp, "no damage");
+
+            var walled = Setup(new[] { UnitStats.Warrior }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far }, P(3, 3));
+            var stuck = Enemy(walled);
+            walled.PlayerUseAction(Player(walled), ActionKind.ShieldBash, stuck.Pos);
+            Assert.AreEqual(P(3, 2), stuck.Pos);
+            Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.CollisionDamage, stuck.Hp, "slammed into the rock");
+        }
+
+        [Test]
+        public void Vanish_EnemiesIgnoreIt_UntilItAttacksWithABonus()
+        {
+            var b = Setup(new[] { UnitStats.Rogue, UnitStats.Warrior }, new[] { P(3, 1), P(0, 0) }, new[] { E(UnitStats.Brute, 3, 2) });
+            var rogue = Player(b, 0);
+            var warrior = Player(b, 1);
+            var brute = Enemy(b);
+            b.PlayerUseAction(rogue, ActionKind.Vanish, rogue.Pos);
+            Assert.IsTrue(rogue.IsHidden);
+            Assert.AreEqual(warrior, EnemyAI.ChooseTarget(b, brute), "the hidden rogue next to it is ignored");
+            Assert.IsFalse(b.CanAttack(brute, rogue));
+            b.EndUnitTurn(rogue);
+            brute.SnareTurns = 1; // keeps it next to the rogue
+            b.EndPlayerTurn();
+            Assert.AreEqual(rogue.MaxHp, rogue.Hp);
+            Assert.IsTrue(rogue.IsHidden, "still hidden after one enemy turn");
+
+            var normal = b.EffectiveDamage(rogue);
+            var hit = b.PlayerAttack(rogue, brute).OfType<AttackEvent>().First();
+            Assert.AreEqual(normal + Battle.VanishBonus - 1, hit.Damage, "the reveal bonus (brute is Tough)");
+            Assert.IsFalse(rogue.IsHidden, "attacking reveals it");
+        }
+
+        [Test]
+        public void Vanish_WearsOffAfterTwoEnemyTurns()
+        {
+            var b = Setup(new[] { UnitStats.Rogue }, new[] { P(0, 0) }, new[] { Far });
+            var rogue = Player(b);
+            b.PlayerUseAction(rogue, ActionKind.Vanish, rogue.Pos);
+            b.EndPlayerTurn();
+            Assert.IsTrue(rogue.IsHidden);
+            var events = b.EndPlayerTurn();
+            Assert.IsFalse(rogue.IsHidden);
+            Assert.IsTrue(events.OfType<StatusEvent>().Any(s => s.Kind == StatusKind.Reveal));
+        }
+
+        [Test]
+        public void Blink_TeleportsPastRocksAndReach()
+        {
+            var b = Setup(new[] { UnitStats.Apprentice }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far }, P(2, 1));
+            var mage = Player(b);
+            Assert.IsTrue(b.CanUseAction(mage, ActionKind.Blink, P(1, 1)), "over the rock");
+            Assert.IsFalse(b.CanUseAction(mage, ActionKind.Blink, P(3, 4)), "3 steps is too far");
+            Assert.IsFalse(b.CanUseAction(mage, ActionKind.Blink, P(3, 2)), "occupied");
+            b.PlayerUseAction(mage, ActionKind.Blink, P(1, 1));
+            Assert.AreEqual(P(1, 1), mage.Pos);
+            Assert.AreEqual(1, mage.Moves, "its move is still there");
         }
 
         [Test]

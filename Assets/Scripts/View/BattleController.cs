@@ -905,7 +905,7 @@ namespace ArmyRoguelike.View
                     var source = _board.ViewOf(status.Source);
                     var target = _board.ViewOf(status.Target);
                     // Statuses applied by a hit show without an extra lunge; actions lunge at their target.
-                    if (status.Kind == StatusKind.Snare || status.Kind == StatusKind.Ward || status.Kind == StatusKind.Heal)
+                    if (status.Kind == StatusKind.Ward || status.Kind == StatusKind.Heal)
                     {
                         yield return source.Lunge(target.transform.position, null);
                         source.SetGridPosition(status.Source.Pos);
@@ -914,8 +914,17 @@ namespace ArmyRoguelike.View
                     var at = target.TopWorld + Vector3.up * 0.25f;
                     switch (status.Kind)
                     {
-                        case StatusKind.Snare:
-                            DamagePopup.Spawn(at, "Snared", DamagePopup.AbilityColor, 44);
+                        case StatusKind.Pin:
+                            DamagePopup.Spawn(at, "Pinned", DamagePopup.AbilityColor, 44);
+                            break;
+                        case StatusKind.Vanish:
+                            // Placeholder look: the statue turns see-through (see the "Art needed" table).
+                            DamagePopup.Spawn(at, "Vanished", DamagePopup.AbilityColor, 44);
+                            target.SetHidden(true);
+                            break;
+                        case StatusKind.Reveal:
+                            DamagePopup.Spawn(at, "Revealed", DamagePopup.AbilityColor, 40);
+                            target.SetHidden(false);
                             break;
                         case StatusKind.Slow:
                             DamagePopup.Spawn(at, "Slowed: no move", DamagePopup.AbilityColor, 40);
@@ -1132,6 +1141,7 @@ namespace ArmyRoguelike.View
                 if (view == null)
                     continue;
                 view.SetDimmed(u.Team == Team.Player && Battle.Phase == Phase.PlayerTurn && u.IsDone);
+                view.SetHidden(u.IsHidden);
                 view.RefreshStatus();
                 switch (Battle.GetPackState(u))
                 {
@@ -1565,7 +1575,9 @@ namespace ArmyRoguelike.View
             if (u.MoonShield > 0)
                 lines.Add($"Moon shield {u.MoonShield}");
             if (u.IsSnared)
-                lines.Add("Snared: can't move");
+                lines.Add("Pinned: can't move");
+            if (u.IsHidden)
+                lines.Add($"Vanished: enemies can't target it ({u.HiddenTurns} enemy turn(s) left, +{Battle.VanishBonus} on its next attack)");
             if (u.IsSlowed)
                 lines.Add("Slowed: can't move");
             if (u.PoisonTurns > 0)
@@ -1636,7 +1648,9 @@ namespace ArmyRoguelike.View
             if (u.Shield > 0)
                 status.Add($"shield {u.Shield}");
             if (u.IsSnared)
-                status.Add("snared (can't move)");
+                status.Add("pinned (can't move)");
+            if (u.IsHidden)
+                status.Add($"vanished ({u.HiddenTurns} enemy turn(s) left)");
             if (u.IsSlowed)
                 status.Add("slowed");
             if (u.PoisonTurns > 0)

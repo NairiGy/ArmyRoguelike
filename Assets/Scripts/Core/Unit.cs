@@ -54,7 +54,13 @@ namespace ArmyRoguelike.Core
 
         // ---------- Statuses ----------
 
-        /// <summary>Snared: can't move on its next turn.</summary>
+        /// <summary>Vanished (rogue): enemy turns left before it shows again. Its next attack reveals it.</summary>
+        public int HiddenTurns { get; internal set; }
+
+        /// <summary>Invisible: enemies can't target or attack it, though area blasts still hit it.</summary>
+        public bool IsHidden => HiddenTurns > 0;
+
+        /// <summary>Pinned: can't move on its next turn.</summary>
         public int SnareTurns { get; internal set; }
 
         /// <summary>Can't move this turn (a snare took effect).</summary>

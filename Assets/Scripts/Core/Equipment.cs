@@ -99,7 +99,7 @@ namespace ArmyRoguelike.Core
                 case Ability.SteadyAimPlus: return "+2 damage if it hasn't moved this turn";
                 case Ability.Pierce: return "shots along a straight row or column hit every enemy in the line";
                 case Ability.FirstShotDouble: return "double damage the first time it hits each enemy in a battle";
-                case Ability.PreyOnSnared: return $"snared enemies take +{Battle.PreyBonus} damage from everyone";
+                case Ability.PreyOnSnared: return $"pinned enemies take +{Battle.PreyBonus} damage from everyone";
                 case Ability.Volley: return "shots hit the target and the 4 tiles next to it for 1 less damage, friend or foe";
                 case Ability.Bloodthirst: return $"+1 damage per kill, kept for the run (up to +{Battle.BloodthirstCap})";
                 case Ability.Pincer: return $"+{Battle.PincerBonus} damage if an ally stands on the far side of the target";
@@ -137,7 +137,10 @@ namespace ArmyRoguelike.Core
             {
                 case ActionKind.PlaceMine: return "Place Mine";
                 case ActionKind.ThrowBomb: return "Throw Bomb";
-                case ActionKind.Snare: return "Snare";
+                case ActionKind.PinningShot: return "Pinning Shot";
+                case ActionKind.ShieldBash: return "Shield Bash";
+                case ActionKind.Vanish: return "Vanish";
+                case ActionKind.Blink: return "Blink";
                 case ActionKind.Fireball: return "Fireball";
                 case ActionKind.IceWall: return "Ice Wall";
                 case ActionKind.Ward: return "Ward";
@@ -158,7 +161,10 @@ namespace ArmyRoguelike.Core
                     return $"put a mine on a free tile next to it (max {Battle.MaxMinesPerUnit}); an enemy stepping on it sets off a {Battle.MineDamage}-damage 3x3 blast, friend or foe";
                 case ActionKind.ThrowBomb:
                     return $"lob a bomb 2-{Battle.PlayerBombRange} tiles away; it explodes for {Battle.PlayerBombDamage} on that tile at the start of the next enemy turn";
-                case ActionKind.Snare: return $"an enemy within {Battle.ActionRange} tiles can't move on its next turn";
+                case ActionKind.PinningShot: return $"{Battle.PinDamage} damage to an enemy in shot range (needs line of sight), and it can't move on its next turn";
+                case ActionKind.ShieldBash: return $"push an enemy next to it 1 tile away; no damage, but {Battle.CollisionDamage} if it slams into a rock, unit or the edge";
+                case ActionKind.Vanish: return $"go invisible: enemies can't target or attack it (area blasts still hit) until it attacks, for {Battle.VanishTurns} enemy turns at most; the attack that reveals it deals +{Battle.VanishBonus}";
+                case ActionKind.Blink: return $"teleport to a free tile within {Battle.BlinkRange}, ignoring rocks and zone of control";
                 case ActionKind.Fireball: return $"{Battle.FireballDamage} damage to everyone on the tile and the 4 next to it, up to {Battle.FireballRange} tiles away";
                 case ActionKind.IceWall: return $"turn a free tile within {Battle.ActionRange} into ice (blocks like a rock) for {Battle.IceRounds} rounds";
                 case ActionKind.Ward: return $"an ally within {Battle.ActionRange} tiles gets a shield that absorbs {Battle.WardShield} damage";

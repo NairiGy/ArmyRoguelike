@@ -133,6 +133,17 @@ namespace ArmyRoguelike.Core
         public const int BarricadeBlastDamage = 3;
         public const int ChargeRange = 3;
 
+        /// <summary>Pinning Shot (archers): damage, and the target can't move on its next turn.</summary>
+        public const int PinDamage = 1;
+
+        /// <summary>Vanish (rogues): enemy turns it stays hidden at most, and the bonus on the attack that reveals it.</summary>
+        public const int VanishTurns = 2;
+
+        public const int VanishBonus = 2;
+
+        /// <summary>Blink (mages): teleport range in steps.</summary>
+        public const int BlinkRange = 2;
+
         // Omens (placeholders).
         public const int SunDamage = 3;
         public const int MoonShield = 4;
@@ -463,6 +474,8 @@ namespace ArmyRoguelike.Core
                 damage += PreyBonus;
             if (attacker.Has(Ability.Shatter) && target.IsSlowed)
                 damage *= 2;
+            if (attacker.IsHidden)
+                damage += VanishBonus;
             if (attacker.Has(Ability.WolfBite))
                 damage += BiteChain;
             if (attacker.Has(Ability.FirstShotDouble) && !attacker.HasStruck(target))
@@ -650,7 +663,7 @@ namespace ArmyRoguelike.Core
 
         public bool CanAttack(Unit attacker, Unit target) =>
             !IsOver && attacker.IsAlive && target != null && target.IsAlive && attacker.Team != target.Team &&
-            attacker.Ap >= AttackCost && CanHitFrom(attacker, attacker.Pos, target);
+            attacker.Ap >= AttackCost && !target.IsHidden && CanHitFrom(attacker, attacker.Pos, target);
 
         /// <summary>
         /// The cheapest tile from which the unit can walk up and attack the target, with its move cost.
@@ -740,8 +753,14 @@ namespace ArmyRoguelike.Core
                 case ActionKind.ThrowBomb:
                     return steps >= 2 && steps <= PlayerBombRange && !Board.IsObstacle(tile) && BombAt(tile) == null &&
                            !IsShroudedFrom(tile, unit.Team);
-                case ActionKind.Snare:
-                    return target != null && target.Team != unit.Team && steps <= ActionRange;
+                case ActionKind.PinningShot:
+                    return target != null && target.Team != unit.Team && !target.IsObjective && CanHitFrom(unit, unit.Pos, target);
+                case ActionKind.ShieldBash:
+                    return target != null && target.Team != unit.Team && !target.IsObjective && unit.Size == 1 && Distance(unit, target) == 1;
+                case ActionKind.Vanish:
+                    return tile == unit.Pos && !unit.IsHidden;
+                case ActionKind.Blink:
+                    return unit.Size == 1 && steps >= 1 && steps <= BlinkRange && CanStand(unit, tile);
                 case ActionKind.Fireball:
                     return steps >= 1 && steps <= FireballRange && !IsShroudedFrom(tile, unit.Team);
                 case ActionKind.IceWall:
@@ -784,11 +803,36 @@ namespace ArmyRoguelike.Core
                     _bombs.Add(new Bomb(tile, unit, PlayerBombDamage));
                     events.Add(new BombThrowEvent(unit, tile));
                     break;
-                case ActionKind.Snare:
+                case ActionKind.PinningShot:
+                {
+                    var after = new List<BattleEvent>();
+                    var hit = Damage(UnitAt(tile), PinDamage, unit, DamageKind.Attack, after);
+                    events.Add(new AttackEvent(unit, hit.Target, hit.Damage, hit.HpAfter));
+                    events.AddRange(after);
+                    if (hit.Target.IsAlive)
+                    {
+                        hit.Target.SnareTurns = 1;
+                        events.Add(new StatusEvent(unit, hit.Target, StatusKind.Pin, 1));
+                    }
+
+                    break;
+                }
+                case ActionKind.ShieldBash:
                 {
                     var target = UnitAt(tile);
-                    target.SnareTurns = 1;
-                    events.Add(new StatusEvent(unit, target, StatusKind.Snare, 1));
+                    Push(target, StraightDirection(unit.Pos, Cells(target).First(c => c.StepsTo(unit.Pos) == 1)).Value, unit, events);
+                    break;
+                }
+                case ActionKind.Vanish:
+                    unit.HiddenTurns = VanishTurns;
+                    events.Add(new StatusEvent(unit, unit, StatusKind.Vanish, VanishTurns));
+                    break;
+                case ActionKind.Blink:
+                {
+                    var from = unit.Pos;
+                    unit.Pos = tile;
+                    unit.MovedThisTurn = true;
+                    events.Add(new MoveEvent(unit, from, new List<GridPos> { tile }));
                     break;
                 }
                 case ActionKind.Fireball:
@@ -970,7 +1014,7 @@ namespace ArmyRoguelike.Core
         {
             if (IsOver || !thrower.IsAlive || !thrower.Stats.CanThrow || thrower.Ap < thrower.Stats.ThrowCost)
                 return false;
-            if (target == null || !target.IsAlive || target.Team == thrower.Team)
+            if (target == null || !target.IsAlive || target.Team == thrower.Team || target.IsHidden)
                 return false;
             var steps = Distance(thrower, target);
             return steps >= 2 && steps <= thrower.Stats.ThrowRange && !IsShroudedFrom(target, thrower.Team);
@@ -980,7 +1024,7 @@ namespace ArmyRoguelike.Core
         {
             if (IsOver || !thrower.IsAlive || !thrower.Stats.CanBomb || thrower.Ap < thrower.Stats.BombCost)
                 return false;
-            if (target == null || !target.IsAlive || target.Team == thrower.Team)
+            if (target == null || !target.IsAlive || target.Team == thrower.Team || target.IsHidden)
                 return false;
             var steps = Distance(thrower, target);
             return steps >= 2 && steps <= thrower.Stats.BombRange && BombAt(target.Pos) == null && !IsShroudedFrom(target, thrower.Team);
@@ -1187,6 +1231,12 @@ namespace ArmyRoguelike.Core
                 struck.AddRange(Strike(attacker, target, events));
             attacker.AttackedThisTurn = true;
             attacker.MarkStruck(target);
+            if (attacker.IsHidden)
+            {
+                attacker.HiddenTurns = 0;
+                events.Add(new StatusEvent(attacker, attacker, StatusKind.Reveal, 0));
+            }
+
             if (attacker.Has(Ability.WolfBite))
                 BiteChain++;
             foreach (var hitUnit in struck)
@@ -1648,6 +1698,11 @@ namespace ArmyRoguelike.Core
                     Board.RemoveObstacle(p);
                     events.Add(new TileEvent("ice", p, false, null));
                 }
+
+                // Vanish wears off after its enemy turns.
+                foreach (var u in Living(team).Where(u => u.IsHidden).ToList())
+                    if (--u.HiddenTurns == 0)
+                        events.Add(new StatusEvent(u, u, StatusKind.Reveal, 0));
             }
 
             foreach (var u in Living(team))

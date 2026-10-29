@@ -76,7 +76,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Double damage the first time it hits each enemy in a battle.</summary>
         FirstShotDouble,
 
-        /// <summary>Snared enemies take +2 damage from everyone.</summary>
+        /// <summary>Pinned enemies take +2 damage from everyone.</summary>
         PreyOnSnared,
 
         /// <summary>Shots hit the target and the 4 tiles next to it for 1 less damage, friend or foe.</summary>
@@ -180,7 +180,7 @@ namespace ArmyRoguelike.Core
     {
         PlaceMine,
         ThrowBomb,
-        Snare,
+        PinningShot,
         Fireball,
         IceWall,
         Ward,
@@ -189,6 +189,9 @@ namespace ArmyRoguelike.Core
         Turret,
         Detonate,
         Charge,
+        ShieldBash,
+        Vanish,
+        Blink,
     }
 
     /// <summary>
@@ -329,107 +332,107 @@ namespace ArmyRoguelike.Core
         // ---------- Warrior tree ----------
 
         public static readonly UnitStats Warrior = Player(UnitKind.Warrior, "Warrior", "W", 1, 12, 3, 1, 1,
-            "Sturdy front line that protects its neighbours.", A(Ability.ShieldWall));
+            "Sturdy front line that protects its neighbours.", A(Ability.ShieldWall), Do(ActionKind.ShieldBash));
 
         public static readonly UnitStats Swordsman = Player(UnitKind.Warrior, "Swordsman", "Sw", 2, 14, 4, 1, 1,
-            "Wide swings that catch groups.", A(Ability.ShieldWall, Ability.Sweep), from: Warrior);
+            "Wide swings that catch groups.", A(Ability.ShieldWall, Ability.Sweep), Do(ActionKind.ShieldBash), from: Warrior);
 
         public static readonly UnitStats Longswordsman = Player(UnitKind.Warrior, "Longswordsman", "Ls", 3, 16, 5, 2, 1,
-            "Hits two tiles deep from a safe distance.", A(Ability.ShieldWall, Ability.LongReach), from: Swordsman);
+            "Hits two tiles deep from a safe distance.", A(Ability.ShieldWall, Ability.LongReach), Do(ActionKind.ShieldBash), from: Swordsman);
 
         public static readonly UnitStats DualBlades = Player(UnitKind.Warrior, "Dual Blades", "Db", 3, 15, 4, 1, 1,
-            "A blender: sweeps and strikes twice.", A(Ability.ShieldWall, Ability.Sweep, Ability.DoubleStrike), from: Swordsman);
+            "A blender: sweeps and strikes twice.", A(Ability.ShieldWall, Ability.Sweep, Ability.DoubleStrike), Do(ActionKind.ShieldBash), from: Swordsman);
 
         public static readonly UnitStats Shielder = Player(UnitKind.Warrior, "Shielder", "Sh", 2, 16, 3, 1, 1,
-            "Takes the hits meant for its friends.", A(Ability.ShieldWall, Ability.Guard), from: Warrior);
+            "Takes the hits meant for its friends.", A(Ability.ShieldWall, Ability.Guard), Do(ActionKind.ShieldBash), from: Warrior);
 
         public static readonly UnitStats Juggernaut = Player(UnitKind.Warrior, "Juggernaut", "Jg", 3, 20, 4, 1, 1,
             "Charges in a straight line and knocks enemies back.", A(Ability.ShieldWall, Ability.Guard),
-            Do(ActionKind.Charge), Shielder);
+            Do(ActionKind.ShieldBash, ActionKind.Charge), Shielder);
 
         public static readonly UnitStats Bastion = Player(UnitKind.Warrior, "Bastion", "Ba", 3, 20, 3, 1, 1,
             "Forces nearby enemies to attack it, and shrugs it off.", A(Ability.ShieldWall, Ability.Guard, Ability.Taunt, Ability.Tough),
-            from: Shielder);
+            Do(ActionKind.ShieldBash), from: Shielder);
 
         // ---------- Archer tree ----------
 
         public static readonly UnitStats Archer = Player(UnitKind.Archer, "Archer", "A", 1, 6, 2, 3, 1,
-            "Fragile ranged damage that likes to stand still.", A(Ability.SteadyAim));
+            "Fragile ranged damage that likes to stand still.", A(Ability.SteadyAim), Do(ActionKind.PinningShot));
 
         public static readonly UnitStats Marksman = Player(UnitKind.Archer, "Marksman", "Mk", 2, 7, 3, 4, 1,
-            "Longer range, bigger reward for holding position.", A(Ability.SteadyAimPlus), from: Archer);
+            "Longer range, bigger reward for holding position.", A(Ability.SteadyAimPlus), Do(ActionKind.PinningShot), from: Archer);
 
         public static readonly UnitStats Sniper = Player(UnitKind.Archer, "Sniper", "Sn", 3, 8, 3, 4, 1,
-            "Lines enemies up and shoots through all of them.", A(Ability.SteadyAimPlus, Ability.Pierce), from: Marksman);
+            "Lines enemies up and shoots through all of them.", A(Ability.SteadyAimPlus, Ability.Pierce), Do(ActionKind.PinningShot), from: Marksman);
 
         public static readonly UnitStats Deadeye = Player(UnitKind.Archer, "Deadeye", "De", 3, 8, 4, 4, 1,
-            "A devastating opening shot on every new target.", A(Ability.SteadyAimPlus, Ability.FirstShotDouble), from: Marksman);
+            "A devastating opening shot on every new target.", A(Ability.SteadyAimPlus, Ability.FirstShotDouble), Do(ActionKind.PinningShot), from: Marksman);
 
         public static readonly UnitStats Trapper = Player(UnitKind.Archer, "Trapper", "Tr", 2, 7, 3, 3, 1,
-            "Roots enemies in place with snares.", A(Ability.SteadyAim), Do(ActionKind.Snare), Archer);
+            "Pins enemies in place; a new action comes later.", A(Ability.SteadyAim), Do(ActionKind.PinningShot), Archer);
 
         public static readonly UnitStats Hunter = Player(UnitKind.Archer, "Hunter", "Hu", 3, 8, 3, 3, 1,
-            "Snared prey takes extra damage from the whole army.", A(Ability.SteadyAim, Ability.PreyOnSnared),
-            Do(ActionKind.Snare), Trapper);
+            "Pinned prey takes extra damage from the whole army.", A(Ability.SteadyAim, Ability.PreyOnSnared),
+            Do(ActionKind.PinningShot), Trapper);
 
         public static readonly UnitStats VolleyMaster = Player(UnitKind.Archer, "Volley Master", "Vm", 3, 8, 3, 3, 1,
-            "Arrows rain on a plus-shaped area. Mind your friends.", A(Ability.SteadyAim, Ability.Volley), Do(ActionKind.Snare), Trapper);
+            "Arrows rain on a plus-shaped area. Mind your friends.", A(Ability.SteadyAim, Ability.Volley), Do(ActionKind.PinningShot), Trapper);
 
         // ---------- Rogue tree ----------
 
         public static readonly UnitStats Rogue = Player(UnitKind.Rogue, "Rogue", "R", 1, 5, 4, 1, 1,
-            "Fast, deadly, fragile. Grows with every kill.", A(Ability.Swift, Ability.Bloodthirst));
+            "Fast, deadly, fragile. Grows with every kill.", A(Ability.Swift, Ability.Bloodthirst), Do(ActionKind.Vanish));
 
         public static readonly UnitStats Assassin = Player(UnitKind.Rogue, "Assassin", "As", 2, 6, 5, 1, 1,
-            "Big damage when an ally pins the target from the other side.", A(Ability.Swift, Ability.Bloodthirst, Ability.Pincer), from: Rogue);
+            "Big damage when an ally pins the target from the other side.", A(Ability.Swift, Ability.Bloodthirst, Ability.Pincer), Do(ActionKind.Vanish), from: Rogue);
 
         public static readonly UnitStats Shadow = Player(UnitKind.Rogue, "Shadow", "Sd", 3, 7, 5, 1, 1,
-            "A kill gives the action back: chain through a whole group.", A(Ability.Swift, Ability.Bloodthirst, Ability.Pincer, Ability.KillRefund), from: Assassin);
+            "A kill gives the action back: chain through a whole group.", A(Ability.Swift, Ability.Bloodthirst, Ability.Pincer, Ability.KillRefund), Do(ActionKind.Vanish), from: Assassin);
 
         public static readonly UnitStats Poisoner = Player(UnitKind.Rogue, "Poisoner", "Po", 3, 7, 5, 1, 1,
-            "Every hit keeps hurting over the next turns.", A(Ability.Swift, Ability.Bloodthirst, Ability.Pincer, Ability.Poison), from: Assassin);
+            "Every hit keeps hurting over the next turns.", A(Ability.Swift, Ability.Bloodthirst, Ability.Pincer, Ability.Poison), Do(ActionKind.Vanish), from: Assassin);
 
         public static readonly UnitStats Duelist = Player(UnitKind.Rogue, "Duelist", "Du", 2, 7, 4, 1, 1,
-            "Strikes back when attacked.", A(Ability.Swift, Ability.Bloodthirst, Ability.Counter), from: Rogue);
+            "Strikes back when attacked.", A(Ability.Swift, Ability.Bloodthirst, Ability.Counter), Do(ActionKind.Vanish), from: Rogue);
 
         public static readonly UnitStats Blademaster = Player(UnitKind.Rogue, "Blademaster", "Bm", 3, 9, 5, 1, 1,
-            "Counters every single melee hit.", A(Ability.Swift, Ability.Bloodthirst, Ability.CounterAll), from: Duelist);
+            "Counters every single melee hit.", A(Ability.Swift, Ability.Bloodthirst, Ability.CounterAll), Do(ActionKind.Vanish), from: Duelist);
 
         public static readonly UnitStats Swashbuckler = Player(UnitKind.Rogue, "Swashbuckler", "Sb", 3, 8, 5, 1, 1,
-            "Dodges the first hit each turn, then counters.", A(Ability.Swift, Ability.Bloodthirst, Ability.Counter, Ability.Dodge), from: Duelist);
+            "Dodges the first hit each turn, then counters.", A(Ability.Swift, Ability.Bloodthirst, Ability.Counter, Ability.Dodge), Do(ActionKind.Vanish), from: Duelist);
 
         // ---------- Mage tree ----------
 
         public static readonly UnitStats Apprentice = Player(UnitKind.Mage, "Mage Apprentice", "Ma", 1, 5, 2, 3, 1,
-            "Weak bolt that flies over obstacles.", A(Ability.ArcaneBolt));
+            "Weak bolt that flies over obstacles.", A(Ability.ArcaneBolt), Do(ActionKind.Blink));
 
         public static readonly UnitStats FireMage = Player(UnitKind.Mage, "Fire Mage", "Fi", 2, 6, 3, 3, 1,
-            "Fireballs hit a plus-shaped area, friend or foe.", A(Ability.ArcaneBolt), Do(ActionKind.Fireball), Apprentice);
+            "Fireballs hit a plus-shaped area, friend or foe.", A(Ability.ArcaneBolt), Do(ActionKind.Fireball, ActionKind.Blink), Apprentice);
 
         public static readonly UnitStats Pyromancer = Player(UnitKind.Mage, "Pyromancer", "Py", 3, 7, 3, 3, 1,
-            "Leaves the ground burning.", A(Ability.ArcaneBolt, Ability.Burning), Do(ActionKind.Fireball), FireMage);
+            "Leaves the ground burning.", A(Ability.ArcaneBolt, Ability.Burning), Do(ActionKind.Fireball, ActionKind.Blink), FireMage);
 
         public static readonly UnitStats BlastMage = Player(UnitKind.Mage, "Blast Mage", "Bl", 3, 7, 3, 3, 1,
             "Fireballs shove everything outward and set off mines and bombs.", A(Ability.ArcaneBolt, Ability.Concussive),
-            Do(ActionKind.Fireball), FireMage);
+            Do(ActionKind.Fireball, ActionKind.Blink), FireMage);
 
         public static readonly UnitStats FrostMage = Player(UnitKind.Mage, "Frost Mage", "Fr", 2, 6, 3, 3, 1,
-            "Bolts slow enemies down.", A(Ability.ArcaneBolt, Ability.Chill), from: Apprentice);
+            "Bolts slow enemies down.", A(Ability.ArcaneBolt, Ability.Chill), Do(ActionKind.Blink), from: Apprentice);
 
         public static readonly UnitStats Cryomancer = Player(UnitKind.Mage, "Cryomancer", "Cr", 3, 7, 3, 3, 1,
-            "Raises ice walls to reshape the board.", A(Ability.ArcaneBolt, Ability.Chill), Do(ActionKind.IceWall), FrostMage);
+            "Raises ice walls to reshape the board.", A(Ability.ArcaneBolt, Ability.Chill), Do(ActionKind.IceWall, ActionKind.Blink), FrostMage);
 
         public static readonly UnitStats Glacier = Player(UnitKind.Mage, "Glacier", "Gl", 3, 7, 4, 3, 1,
-            "Shatters slowed enemies for double damage.", A(Ability.ArcaneBolt, Ability.Chill, Ability.Shatter), from: FrostMage);
+            "Shatters slowed enemies for double damage.", A(Ability.ArcaneBolt, Ability.Chill, Ability.Shatter), Do(ActionKind.Blink), from: FrostMage);
 
         public static readonly UnitStats WardMage = Player(UnitKind.Mage, "Ward Mage", "Wa", 2, 6, 2, 3, 1,
-            "Shields an ally against the next hits.", A(Ability.ArcaneBolt), Do(ActionKind.Ward), Apprentice);
+            "Shields an ally against the next hits.", A(Ability.ArcaneBolt), Do(ActionKind.Ward, ActionKind.Blink), Apprentice);
 
         public static readonly UnitStats Archwarden = Player(UnitKind.Mage, "Archwarden", "Aw", 3, 7, 3, 3, 1,
-            "Wards whole groups at once.", A(Ability.ArcaneBolt, Ability.WideWard), Do(ActionKind.Ward), WardMage);
+            "Wards whole groups at once.", A(Ability.ArcaneBolt, Ability.WideWard), Do(ActionKind.Ward, ActionKind.Blink), WardMage);
 
         public static readonly UnitStats Mender = Player(UnitKind.Mage, "Mender", "Me", 3, 7, 3, 3, 1,
-            "Heals as well as wards.", A(Ability.ArcaneBolt), Do(ActionKind.Ward, ActionKind.Mend), WardMage);
+            "Heals as well as wards.", A(Ability.ArcaneBolt), Do(ActionKind.Ward, ActionKind.Mend, ActionKind.Blink), WardMage);
 
         // ---------- Sapper tree ----------
 

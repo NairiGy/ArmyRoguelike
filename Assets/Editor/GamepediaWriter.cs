@@ -91,9 +91,11 @@ public static class GamepediaWriter
         html.Append("</p>");
         if (!string.IsNullOrEmpty(unit.Role))
             html.Append($"<p class=\"role\">{Esc(unit.Role)}</p>");
-        if (unit.Abilities.Count + unit.Actions.Count > 0)
+        if (unit.Damage > 0 || unit.Abilities.Count + unit.Actions.Count > 0)
         {
             html.Append("<ul>");
+            if (unit.Damage > 0)
+                html.Append($"<li class=\"action\"><b>{Esc(Abilities.AttackName(unit))}</b> ({Battle.AttackCost} AP): {Esc(Abilities.DescribeAttack(unit, unit.Damage))}</li>");
             foreach (var a in unit.Abilities)
             {
                 var isNew = unit.EvolvesFrom == null || !unit.EvolvesFrom.Has(a);
@@ -449,7 +451,8 @@ public static class GamepediaWriter
         html.Append($"<li>Mines: {Battle.MineDamage} damage ({Battle.BigMineDamage} with Big Mines) to everyone in the 3x3, set off when an enemy steps on one. Bombs explode at the start of the next enemy turn and hit only their own tile. Fireballs and Volley hit a plus: the tile and its 4 neighbours. Blasts set each other off.</li>");
         html.Append($"<li>Push: a unit pushed into a rock, unit or the edge takes {Battle.CollisionDamage} damage. An enemy pushed onto a mine sets it off.</li>");
         html.Append($"<li>Poison: {Battle.PoisonDamage} damage at the start of the target's turn, {Battle.PoisonTurns} times. Burning ground: {Battle.BurnDamage} damage at the start of the turn of whoever stands on it.</li>");
-        html.Append("<li>Snared units can't move on their next turn. Slowed (chilled) units can't move on their next turn.</li>");
+        html.Append("<li>Pinned units (Pinning Shot) and slowed units (Chill) can't move on their next turn.</li>");
+        html.Append("<li>Vanished units (rogues) can't be targeted or attacked by enemies, though area blasts still hit them. Attacking reveals them.</li>");
         html.Append("<li>Hover any enemy to see what it plans to do next.</li>");
         html.Append("</ul></section>");
     }

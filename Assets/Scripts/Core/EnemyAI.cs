@@ -93,15 +93,19 @@ namespace ArmyRoguelike.Core
         /// <summary>Break the Ritual: a player unit this close to a totem counts as threatening it.</summary>
         public const int TotemThreatRange = 2;
 
+        /// <summary>Your units enemies can see: everyone except vanished rogues.</summary>
+        private static IEnumerable<Unit> Visible(Battle battle) => battle.Living(Team.Player).Where(u => !u.IsHidden);
+
         /// <summary>
-        /// The player unit this enemy wants to attack: a taunter in range first; in a ritual fight a defender
-        /// next to it, else the objective; in Break the Ritual the nearest unit threatening a totem;
-        /// otherwise nearest in steps, then lowest HP, then lowest id.
+        /// The player unit this enemy wants to attack, among those it can see: a taunter in range first; in a
+        /// ritual fight a defender next to it, else the objective; in Break the Ritual the nearest unit
+        /// threatening a totem; for Blood Scent the weakest it can reach; otherwise nearest in steps, then
+        /// lowest HP, then lowest id.
         /// </summary>
         public static Unit ChooseTarget(Battle battle, Unit enemy)
         {
             // A taunting unit within range overrides everything.
-            var taunter = battle.Living(Team.Player)
+            var taunter = Visible(battle)
                 .Where(u => u.Has(Ability.Taunt) && Battle.Distance(enemy, u) <= Battle.TauntRange)
                 .OrderBy(u => Battle.Distance(enemy, u))
                 .ThenBy(u => u.Id)
@@ -113,7 +117,7 @@ namespace ArmyRoguelike.Core
             var objective = battle.Objective;
             if (objective != null && objective.IsAlive)
             {
-                var blocker = battle.Living(Team.Player)
+                var blocker = Visible(battle)
                     .Where(u => u != objective && Battle.Distance(enemy, u) == 1)
                     .OrderBy(u => u.Hp)
                     .ThenBy(u => u.Id)
@@ -125,7 +129,7 @@ namespace ArmyRoguelike.Core
             var totems = battle.Totems.Where(t => t.IsAlive).ToList();
             if (totems.Count > 0)
             {
-                var threat = battle.Living(Team.Player)
+                var threat = Visible(battle)
                     .Where(u => totems.Any(t => Battle.Distance(t, u) <= TotemThreatRange))
                     .OrderBy(u => Battle.Distance(enemy, u))
                     .ThenBy(u => u.Hp)
@@ -138,7 +142,7 @@ namespace ArmyRoguelike.Core
             // Blood Scent: the lowest-HP unit it can reach and attack this turn.
             if (enemy.Has(Ability.BloodScent))
             {
-                var prey = battle.Living(Team.Player)
+                var prey = Visible(battle)
                     .Where(u => !u.IsObjective && CanReachToAttack(battle, enemy, u))
                     .OrderBy(u => u.Hp)
                     .ThenBy(u => Battle.Distance(enemy, u))
@@ -148,7 +152,7 @@ namespace ArmyRoguelike.Core
                     return prey;
             }
 
-            return battle.Living(Team.Player)
+            return Visible(battle)
                 .OrderBy(u => Battle.Distance(enemy, u))
                 .ThenBy(u => u.Hp)
                 .ThenBy(u => u.Id)
