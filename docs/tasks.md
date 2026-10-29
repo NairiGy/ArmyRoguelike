@@ -24,6 +24,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 | Moon Shrine | Reinforcements arriving at the edge | The rise animation and a text popup | Needed |
 | Scenarios | Blessing pick and item pick screens | Plain IMGUI panels (part of the UI pass) | Needed |
 | Zone of control | Enemy reach tiles, orange "costs extra AP" move tiles, dotted link to the enemies holding the selected unit | Flat colours (`EnemyReachColor`, `CostlyMoveColor`) and a red dotted line (`EngagedLinkColor`) in `BattleController` | Needed |
+| Small board experiment (branch `experiment/small-board`) | Moves left on a statue (moves are now separate from AP); the tower-roof painting fitted under a 6x6 board | Moves only as text in the HUD ("Moves 1 / 1"); the scenery fits itself to the board size but hasn't been looked at on 6x6 | Needed only if the experiment is kept |
 
 ### Other visual work
 
@@ -48,6 +49,8 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [x] Zone of control made visible while a unit is selected (2026-10-27, branch `feature/zoc-visibility`): enemy reach tiles in faint red, move tiles that cost extra AP in orange, a dotted link to each enemy holding the selected unit, and "Engaged by ..." in the HUD and enemy hover. Not playtested; art row added above.
 - [x] Full Act 1 playtest (2026-10-27, logs in `../ArmyRoguelike-sound/Playtests`): won in under 7 minutes with only 4 fights; one faction fight, Rogue at +10 Bloodthirst, Giant dead in 2 turns, Break the Ritual easy, Moon Shrine held at 4 HP. Led to the 12-step act below.
 - [x] Act 1 is 12 steps with elites (harder rematches that pay an item pick); battles bring unbeaten factions, then rematches; Bloodthirst capped at +3; run log now gets each battle's log file even when Continue is clicked early (2026-10-28, branch `feature/act1-12-steps`). Not playtested.
+- [x] Small-board idea test (2026-10-29, branch `experiment/small-board`, worktree `.claude/worktrees/small-board`): 6x6 board, 1 move per turn separate from AP, Swift keyword, scaled ranges, 1x1 bombs, plus-shaped fireballs, new layouts. See "Experiment: small board, one move" in the design note. Gamepedia on the branch is text only.
+- [ ] Playtest the small-board experiment (open the worktree folder as its own project in Unity Hub), then decide: keep and merge, tune, or drop the branch. Watch for: fights too fast now that walking costs no AP, ranged units too strong, bombers too weak with 1x1 bombs, crowding in elites and the Necromancer fight.
 - [ ] Next: playtest the 12-step Act 1 as a full run and summarise from the logs. Then decide on new node types and events, and the balance pass.
 - [ ] Later: split fights into difficulty pools (and add more fights); each map step draws from a pool.
 - [ ] Moon Shrine balance: 3 test battles with a tier-1 Warrior/Archer/Rogue were all lost (army wiped twice, shrine broken once); no blessing earned in play yet. Leave for the general balance pass (user's call).

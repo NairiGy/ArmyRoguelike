@@ -483,8 +483,9 @@ namespace ArmyRoguelike.Tests
             var fought = new[] { Encounter.Wolves, Encounter.Goblins };
             var b = Encounter.Necromancer.CreateBattle(ArmyMember.StartingArmy(), new System.Random(3), fought);
             var minions = b.Units.Where(u => u.Team == Team.Enemy && !u.Stats.CanRaise).ToList();
-            Assert.AreEqual(2, minions.Count(u => u.Stats == UnitStats.Raised(UnitStats.Wolf)));
-            Assert.AreEqual(2, minions.Count(u => u.Stats == UnitStats.Raised(UnitStats.GoblinBomber)));
+            Assert.AreEqual(1, minions.Count(u => u.Stats == UnitStats.Raised(UnitStats.Wolf)), "one of each faction on the small board");
+            Assert.AreEqual(1, minions.Count(u => u.Stats == UnitStats.Raised(UnitStats.GoblinBomber)));
+            Assert.AreEqual(2, minions.Count(u => u.Stats == UnitStats.Skeleton), "topped up with skeletons to 4");
             Assert.IsTrue(minions.All(u => u.Stats.LeavesRemains), "they can all be raised again");
 
             var none = Encounter.Necromancer.CreateBattle(ArmyMember.StartingArmy(), new System.Random(3));
@@ -499,7 +500,7 @@ namespace ArmyRoguelike.Tests
                 for (var seed = 0; seed < 30; seed++)
                 {
                     var b = enc.CreateBattle(ArmyMember.StartingArmy(), new System.Random(seed), Encounter.Regular);
-                    for (var x = 0; x < 8; x++)
+                    for (var x = 0; x < Encounter.Size; x++)
                     for (var y = 0; y < Battle.PlayerZoneRows; y++)
                         Assert.IsFalse(b.Board.IsObstacle(new GridPos(x, y)), $"{enc.Name}: player rows clear");
                     Assert.IsTrue(b.Units.Any(u => u.Team == Team.Enemy), enc.Name);
@@ -508,7 +509,7 @@ namespace ArmyRoguelike.Tests
 
             // The ridge always has exactly three gaps.
             var ridge = Encounter.Goblins.CreateBattle(ArmyMember.StartingArmy(), new System.Random(5));
-            Assert.AreEqual(5, Enumerable.Range(0, 8).Count(x => ridge.Board.IsObstacle(new GridPos(x, 4))));
+            Assert.AreEqual(Encounter.Size - 3, Enumerable.Range(0, Encounter.Size).Count(x => ridge.Board.IsObstacle(new GridPos(x, 3))));
         }
 
         [Test]
@@ -786,25 +787,30 @@ namespace ArmyRoguelike.Tests
         // ---------- Walk up and attack ----------
 
         [Test]
-        public void AttackSpot_CheapestTileThatLeavesAttackAp()
+        public void AttackSpot_CheapestTileInReach()
         {
             var b = Started(Army(UnitStats.Rogue), new[] { new GridPos(3, 1) },
-                new[] { (UnitStats.Wolf, new GridPos(3, 5)) });
+                new[] { (UnitStats.Wolf, new GridPos(3, 4)) });
             var rogue = Player(b);
             var wolf = Enemy(b);
             var spot = b.FindAttackSpot(rogue, wolf);
             Assert.IsTrue(spot.HasValue);
-            Assert.AreEqual(new GridPos(3, 4), spot.Value.tile);
-            Assert.AreEqual(3, spot.Value.cost);
+            Assert.AreEqual(new GridPos(3, 3), spot.Value.tile);
+            Assert.AreEqual(2, spot.Value.cost, "two moves, and walking costs no AP");
         }
 
         [Test]
-        public void AttackSpot_NullWhenAttackCantBeAfforded()
+        public void AttackSpot_NullWhenTooFarOrShortOfAp()
         {
             var b = Started(Army(UnitStats.Warrior), new[] { new GridPos(3, 1) },
-                new[] { (UnitStats.Wolf, new GridPos(3, 5)) });
-            // Warrior has 3 AP: 3 tiles to reach (3,4) would leave nothing for the attack.
-            Assert.IsNull(b.FindAttackSpot(Player(b), Enemy(b)));
+                new[] { (UnitStats.Wolf, new GridPos(3, 4)) });
+            Assert.IsNull(b.FindAttackSpot(Player(b), Enemy(b)), "one move can't reach (3,3)");
+
+            var close = Started(Army(UnitStats.Warrior), new[] { new GridPos(3, 1) },
+                new[] { (UnitStats.Wolf, new GridPos(3, 3)) });
+            Assert.IsNotNull(close.FindAttackSpot(Player(close), Enemy(close)));
+            Player(close).Ap = 1;
+            Assert.IsNull(close.FindAttackSpot(Player(close), Enemy(close)), "no AP left for the attack");
         }
 
         [Test]
@@ -818,7 +824,7 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void CanStillAct_FalseWhenDoneOrOutOfAp()
+        public void CanStillAct_FalseWhenDoneOrOutOfApAndMoves()
         {
             var b = Started(Army(UnitStats.Warrior, UnitStats.Rogue), new[] { new GridPos(0, 0), new GridPos(5, 0) },
                 new[] { (UnitStats.Wolf, new GridPos(7, 7)) });
@@ -828,6 +834,8 @@ namespace ArmyRoguelike.Tests
             b.EndUnitTurn(warrior);
             Assert.IsFalse(b.CanStillAct(warrior));
             rogue.Ap = 0;
+            Assert.IsTrue(b.CanStillAct(rogue), "it can still walk");
+            rogue.Moves = 0;
             Assert.IsFalse(b.CanStillAct(rogue));
         }
 
@@ -896,7 +904,7 @@ namespace ArmyRoguelike.Tests
         public void Necromancer_BacksAwayFromCloseUnits()
         {
             var b = Started(Army(UnitStats.Warrior), new[] { new GridPos(4, 1) },
-                new[] { (UnitStats.Necromancer, new GridPos(4, 3)) });
+                new[] { (UnitStats.Necromancer, new GridPos(4, 2)) });
             var necro = Enemy(b);
             var before = Battle.Distance(necro, Player(b));
             b.EndPlayerTurn();
@@ -1002,7 +1010,7 @@ namespace ArmyRoguelike.Tests
             var b = Started(Army(UnitStats.Warrior), new[] { new GridPos(0, 0) },
                 new[] { (UnitStats.Ogre, new GridPos(5, 5)) });
             var ogre = Enemy(b);
-            ogre.Ap = ogre.MaxAp;
+            ogre.Moves = ogre.MaxMoves;
             var reach = b.GetReachable(ogre);
             Assert.IsFalse(reach.ContainsKey(new GridPos(7, 5)), "the footprint would leave the board");
             Assert.IsTrue(reach.ContainsKey(new GridPos(5, 4)));

@@ -75,7 +75,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Bastion_TauntsAndIsTough()
         {
-            var b = Setup(new[] { UnitStats.Bastion, UnitStats.Archer }, new[] { P(4, 2), P(5, 3) },
+            var b = Setup(new[] { UnitStats.Bastion, UnitStats.Archer }, new[] { P(4, 3), P(5, 3) },
                 new[] { E(UnitStats.Wolf, 5, 4) });
             Assert.AreEqual(Player(b, 0), EnemyAI.ChooseTarget(b, Enemy(b)), "taunt beats the nearer archer");
             var lone = Setup(new[] { UnitStats.Bastion }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2) });
@@ -143,12 +143,13 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void VolleyMaster_Hits3x3_FriendlyFireIncluded()
+        public void VolleyMaster_HitsPlus_FriendlyFireIncluded()
         {
-            var b = Setup(new[] { UnitStats.VolleyMaster, UnitStats.Warrior }, new[] { P(3, 0), P(4, 4) },
-                new[] { E(UnitStats.Wolf, 3, 4), E(UnitStats.Wolf, 2, 5), Far });
+            var b = Setup(new[] { UnitStats.VolleyMaster, UnitStats.Warrior }, new[] { P(3, 1), P(4, 4) },
+                new[] { E(UnitStats.Wolf, 3, 4), E(UnitStats.Wolf, 2, 4), E(UnitStats.Wolf, 2, 5), Far });
             b.PlayerAttack(Player(b, 0), Enemy(b, 0));
             Assert.Less(Enemy(b, 1).Hp, UnitStats.Wolf.MaxHp);
+            Assert.AreEqual(UnitStats.Wolf.MaxHp, Enemy(b, 2).Hp, "diagonal tiles are outside the plus");
             Assert.Less(Player(b, 1).Hp, Player(b, 1).MaxHp, "the warrior was in the area");
         }
 
@@ -241,10 +242,10 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void BlastMage_PushesOutward_AndSetsOffMines()
         {
-            var b = Setup(new[] { UnitStats.BlastMage, UnitStats.Sapper }, new[] { P(4, 0), P(6, 1) },
+            var b = Setup(new[] { UnitStats.BlastMage, UnitStats.Sapper }, new[] { P(4, 1), P(6, 2) },
                 new[] { E(UnitStats.Ogre, 0, 6), E(UnitStats.Wolf, 4, 3) });
             var sapper = Player(b, 1);
-            b.PlayerPlaceMine(sapper, P(6, 2));
+            b.PlayerPlaceMine(sapper, P(6, 3));
             b.EndUnitTurn(sapper);
             var wolf = Enemy(b, 1);
             wolf.Hp = 20;
@@ -266,6 +267,7 @@ namespace ArmyRoguelike.Tests
             b.EndUnitTurn(glacier);
             b.EndPlayerTurn();
             Assert.IsTrue(ogre.SlowedThisTurn);
+            Assert.AreEqual(P(3, 2), ogre.Pos, "chilled: it couldn't move");
         }
 
         [Test]

@@ -85,7 +85,7 @@ public static class GamepediaWriter
         html.Append("<div class=\"body\">");
         var tier = unit.Tier > 0 ? $"<span class=\"badge\">Tier {unit.Tier}</span>" : "";
         html.Append($"<h4>{Esc(unit.Name)} {tier}</h4>");
-        html.Append($"<p class=\"stats\">HP {unit.MaxHp} · DMG {unit.Damage} · RNG {unit.Range} · AP {unit.MaxAp}");
+        html.Append($"<p class=\"stats\">HP {unit.MaxHp} · DMG {unit.Damage} · RNG {unit.Range} · AP {unit.MaxAp} · MV {unit.Moves}");
         if (unit.Size > 1)
             html.Append($" · {unit.Size}x{unit.Size}");
         html.Append("</p>");
@@ -136,7 +136,7 @@ public static class GamepediaWriter
             ? $"<img src=\"{image}\" alt=\"{Esc(unit.Name)}\">"
             : $"<div class=\"noimg\">{Esc(unit.Label)}</div>");
         html.Append($"<div class=\"body\"><h4>{Esc(unit.Name)}</h4>");
-        html.Append($"<p class=\"stats\">HP {unit.MaxHp} · DMG {unit.Damage} · RNG {unit.Range} · AP {unit.MaxAp}");
+        html.Append($"<p class=\"stats\">HP {unit.MaxHp} · DMG {unit.Damage} · RNG {unit.Range} · AP {unit.MaxAp} · MV {unit.Moves}");
         if (unit.Size > 1)
             html.Append($" · {unit.Size}x{unit.Size}");
         html.Append("</p>");
@@ -172,7 +172,7 @@ public static class GamepediaWriter
                       "The boulder stays as a rock on the free tile next to the target that is closest to the thrower, burying any mine or bomb there.");
         if (e.CanBomb)
             lines.Add($"<b>Bomb</b> ({e.BombCost} AP, once a turn): lobbed onto the tile of a unit 2-{e.BombRange} tiles away that has no bomb on it yet, ignoring line of sight. " +
-                      $"It explodes at the start of the next enemy turn for {e.BombDamage} damage to everyone in the 3x3, its own side included, and sets off mines and bombs in the blast.");
+                      $"It explodes at the start of the next enemy turn for {e.BombDamage} damage to whoever stands on that tile, its own side included, and sets off a mine or bomb on it.");
         if (e.CanRaise)
             lines.Add($"<b>Raise</b> ({e.RaiseCost} AP): brings one of its side's bone piles within {e.RaiseRange} tiles back at full HP, if nobody stands on it. " +
                       "The raised unit acts from the next enemy turn.");
@@ -204,11 +204,11 @@ public static class GamepediaWriter
         html.Append("<p>How enemies decide what to do. The rules every enemy shares come first; each behaviour below only lists what it does differently.</p>");
 
         html.Append("<h3 id=\"ai-turn\">The enemy turn</h3><ul>");
-        html.Append($"<li>At the start of the enemy phase, burning ground and poison tick, then every enemy gets its AP back: its full pool plus up to {Battle.MaxCarriedAp} unused AP from last turn (minus any slow).</li>");
+        html.Append($"<li>At the start of the enemy phase, burning ground and poison tick, then every enemy gets its AP back: its full pool plus up to {Battle.MaxCarriedAp} unused AP from last turn, and its moves ({Battle.BaseMoves}, or {Battle.BaseMoves + 1} with Swift; none if slowed).</li>");
         html.Append("<li>Next, every bomb on the board explodes, one by one (a blast sets off other bombs and mines inside it).</li>");
         html.Append("<li>Then the enemies act one at a time, in the order they entered the battle. Each finishes its whole turn before the next starts. Units raised or split off during this phase wait until the next enemy turn.</li>");
-        html.Append("<li>A turn is a loop: the enemy picks a target, does the first thing on its behaviour's list that it can, and starts over. It stops when it runs out of AP or nothing on the list helps. The target is picked again before every action, so after a kill it turns to the next one.</li>");
-        html.Append($"<li>Enemies move by your rules: {Battle.MoveCost} AP per tile, no diagonals, +{Battle.ZocCost} AP per step out of a tile next to one of your units (zone of control), and snared units can't move.</li>");
+        html.Append("<li>A turn is a loop: the enemy picks a target, does the first thing on its behaviour's list that it can, and starts over. It stops when it runs out of AP and moves, or nothing on the list helps. The target is picked again before every action, so after a kill it turns to the next one.</li>");
+        html.Append($"<li>Enemies move by your rules: {Battle.MoveCost} move per tile (moves are separate from AP), no diagonals, stepping out of a tile next to one of your units uses up their remaining moves (zone of control), and snared or slowed units can't move.</li>");
         html.Append("<li>Enemies can't see mines. One that steps on a mine stops there and sets it off.</li></ul>");
 
         html.Append("<h3 id=\"ai-target\">Targeting</h3><ol>");
@@ -251,7 +251,7 @@ public static class GamepediaWriter
         html.Append("<tr><td>Flee</td><td>It carries stolen gold.</td><td>The enemies' back row, where it will escape.</td></tr>");
         html.Append("<tr><td>Slam</td><td>It can slam and 2 or more of your units are within 2 tiles.</td><td>The area within 2 tiles.</td></tr>");
         html.Append("<tr><td>Raise</td><td>It can raise and one of its bone piles within raise range is free. AP isn't checked.</td><td>The bone pile.</td></tr>");
-        html.Append("<tr><td>Bomb</td><td>It bombs and its target is 2 to bomb-range tiles away with no bomb on its tile. Otherwise it shows Attack, though it may still bomb another unit or back off.</td><td>The target and the 3x3 blast.</td></tr>");
+        html.Append("<tr><td>Bomb</td><td>It bombs and its target is 2 to bomb-range tiles away with no bomb on its tile. Otherwise it shows Attack, though it may still bomb another unit or back off.</td><td>The target's tile, where the bomb lands.</td></tr>");
         html.Append("<tr><td>Smash</td><td>It smashes and the target is next to it, or the target is out of boulder range.</td><td>The ring around it and the target.</td></tr>");
         html.Append("<tr><td>Throw</td><td>It throws boulders and the target is 2 to throw-range tiles away.</td><td>The target and the tile where the rock will land.</td></tr>");
         html.Append("<tr><td>Attack</td><td>Anything else, whether or not it can reach the target this turn.</td><td>The target, with an arrow.</td></tr>");
@@ -328,7 +328,7 @@ public static class GamepediaWriter
 
     private static void Encounters(StringBuilder html)
     {
-        html.Append("<section id=\"encounters\"><h2>Encounters</h2><p>Battles are on an 8x8 board; you place your army in the back two rows. ");
+        html.Append($"<section id=\"encounters\"><h2>Encounters</h2><p>Battles are on a {Encounter.Size}x{Encounter.Size} board; you place your army in the back two rows. ");
         html.Append("Kill every enemy to win. Battles bring factions you haven't beaten yet, then normal-strength rematches; Act 1 ends with one of the bosses. ");
         html.Append("Every encounter has a layout template: fixed rules, with the exact rocks and start tiles varied each time.</p>");
         html.Append("<h3>Factions</h3><div class=\"grid\">");
@@ -440,14 +440,14 @@ public static class GamepediaWriter
     private static void Rules(StringBuilder html)
     {
         html.Append("<section id=\"rules\"><h2>Battle rules</h2><ul>");
-        html.Append($"<li>Moving costs {Battle.MoveCost} AP per tile (4 directions, no diagonals). A basic attack costs {Battle.AttackCost} AP. Up to {Battle.MaxCarriedAp} unused AP carry over.</li>");
+        html.Append($"<li>Moves are separate from AP: every unit walks {Battle.BaseMoves} tile per turn ({Battle.BaseMoves + 1} with Swift, +1 with Spring Boots), before or after acting, 4 directions, no diagonals. Unused moves don't carry over. AP pays for attacks and actions: a basic attack costs {Battle.AttackCost} AP. Up to {Battle.MaxCarriedAp} unused AP carry over.</li>");
         html.Append("<li>Side phases: all your units act (one at a time), then all enemies.</li>");
-        html.Append($"<li><b>Zone of control</b>: each step out of a tile next to an enemy costs +{Battle.ZocCost} AP, for both sides. Hit-and-run is possible but expensive.</li>");
+        html.Append($"<li><b>Zone of control</b>: stepping out of a tile next to an enemy uses up all your remaining moves, for both sides. You can always back off one tile, but you can't slip past.</li>");
         html.Append("<li>Ranged attacks need line of sight (rocks block); Arcane Bolt ignores it. Bombs, boulders and fireballs are lobbed.</li>");
-        html.Append($"<li>Mines: {Battle.MineDamage} damage ({Battle.BigMineDamage} with Big Mines) to everyone in the 3x3, set off when an enemy steps on one. Bombs explode at the start of the next enemy turn. Blasts set each other off.</li>");
+        html.Append($"<li>Mines: {Battle.MineDamage} damage ({Battle.BigMineDamage} with Big Mines) to everyone in the 3x3, set off when an enemy steps on one. Bombs explode at the start of the next enemy turn and hit only their own tile. Fireballs and Volley hit a plus: the tile and its 4 neighbours. Blasts set each other off.</li>");
         html.Append($"<li>Push: a unit pushed into a rock, unit or the edge takes {Battle.CollisionDamage} damage. An enemy pushed onto a mine sets it off.</li>");
         html.Append($"<li>Poison: {Battle.PoisonDamage} damage at the start of the target's turn, {Battle.PoisonTurns} times. Burning ground: {Battle.BurnDamage} damage at the start of the turn of whoever stands on it.</li>");
-        html.Append("<li>Snared units can't move on their next turn. Slowed units start their next turn with less AP.</li>");
+        html.Append("<li>Snared units can't move on their next turn. Slowed (chilled) units can't move on their next turn.</li>");
         html.Append("<li>Hover any enemy to see what it plans to do next.</li>");
         html.Append("</ul></section>");
     }

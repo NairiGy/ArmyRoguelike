@@ -28,7 +28,7 @@ namespace ArmyRoguelike.Tests
             var b = Battle.CreatePrototype();
             var warrior = Player(b);
             Assert.IsTrue(b.CanPlace(warrior, new GridPos(0, 0)));
-            Assert.IsTrue(b.CanPlace(warrior, new GridPos(7, 1)));
+            Assert.IsTrue(b.CanPlace(warrior, new GridPos(5, 1)));
             Assert.IsFalse(b.CanPlace(warrior, new GridPos(0, 2)));
         }
 
@@ -54,11 +54,13 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Move_CostsOneApPerTileAroundObstacles()
+        public void Move_CostsOneMovePerTileAroundObstacles()
         {
             var b = Started(new[] { UnitStats.Rogue }, new[] { new GridPos(0, 0) },
                 new[] { (UnitStats.Wolf, new GridPos(7, 7)) }, new GridPos(0, 1));
             var rogue = Player(b);
+            Assert.AreEqual(2, rogue.Moves, "Swift");
+            rogue.Moves = 4;
             var reach = b.GetReachable(rogue);
             // (0,2) is straight ahead but (0,1) is a rock: right, up, up, left = 4.
             Assert.AreEqual(4, reach[new GridPos(0, 2)]);
@@ -67,7 +69,22 @@ namespace ArmyRoguelike.Tests
             var move = b.PlayerMove(rogue, new GridPos(0, 2))?.OfType<MoveEvent>().Single();
             Assert.IsNotNull(move);
             Assert.AreEqual(4, move.Path.Count);
-            Assert.AreEqual(1, rogue.Ap);
+            Assert.AreEqual(0, rogue.Moves);
+            Assert.AreEqual(5, rogue.Ap, "moving costs no AP");
+        }
+
+        [Test]
+        public void Move_OneTilePerTurnByDefault()
+        {
+            var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 0) },
+                new[] { (UnitStats.Wolf, new GridPos(7, 7)) });
+            var warrior = Player(b);
+            Assert.AreEqual(1, warrior.Moves);
+            CollectionAssert.AreEquivalent(new[] { new GridPos(2, 0), new GridPos(4, 0), new GridPos(3, 1) }, b.GetReachable(warrior).Keys);
+            b.PlayerMove(warrior, new GridPos(3, 1));
+            Assert.AreEqual(0, b.GetReachable(warrior).Count);
+            b.EndPlayerTurn();
+            Assert.AreEqual(1, warrior.Moves, "moves refill and don't carry over");
         }
 
         [Test]
@@ -75,6 +92,7 @@ namespace ArmyRoguelike.Tests
         {
             var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 0) },
                 new[] { (UnitStats.Wolf, new GridPos(7, 7)) });
+            Player(b).Moves = 2;
             Assert.AreEqual(2, b.GetReachable(Player(b))[new GridPos(4, 1)]);
         }
 
@@ -98,14 +116,14 @@ namespace ArmyRoguelike.Tests
         public void Archer_RangeCountsStepsAndNeedsLineOfSight()
         {
             var b = Started(new[] { UnitStats.Archer }, new[] { new GridPos(3, 1) },
-                new[] { (UnitStats.Wolf, new GridPos(3, 5)), (UnitStats.Wolf, new GridPos(5, 4)) },
+                new[] { (UnitStats.Wolf, new GridPos(3, 4)), (UnitStats.Wolf, new GridPos(4, 4)) },
                 new GridPos(0, 0));
             var archer = Player(b);
-            Assert.IsTrue(b.CanAttack(archer, Enemy(b, 0)), "4 steps straight ahead");
-            Assert.IsFalse(b.CanAttack(archer, Enemy(b, 1)), "5 steps away");
+            Assert.IsTrue(b.CanAttack(archer, Enemy(b, 0)), "3 steps straight ahead");
+            Assert.IsFalse(b.CanAttack(archer, Enemy(b, 1)), "4 steps away");
 
             var blocked = Started(new[] { UnitStats.Archer }, new[] { new GridPos(3, 1) },
-                new[] { (UnitStats.Wolf, new GridPos(3, 5)) }, new GridPos(3, 3));
+                new[] { (UnitStats.Wolf, new GridPos(3, 4)) }, new GridPos(3, 3));
             Assert.IsFalse(blocked.CanAttack(Player(blocked), Enemy(blocked)), "rock in the way");
         }
 
@@ -186,10 +204,9 @@ namespace ArmyRoguelike.Tests
                 new[] { (UnitStats.Wolf, new GridPos(3, 4)) });
             var events = b.EndPlayerTurn();
             var wolf = Enemy(b);
-            Assert.AreEqual(new GridPos(3, 2), wolf.Pos);
-            var attack = events.OfType<AttackEvent>().Single();
-            Assert.AreEqual(2, attack.Damage);
-            Assert.AreEqual(10, Player(b).Hp);
+            Assert.AreEqual(new GridPos(3, 2), wolf.Pos, "a Swift wolf walks 2 tiles");
+            Assert.AreEqual(2, events.OfType<AttackEvent>().Count(), "walking costs no AP, so both bites land");
+            Assert.AreEqual(8, Player(b).Hp);
             Assert.AreEqual(Phase.PlayerTurn, b.Phase);
         }
 

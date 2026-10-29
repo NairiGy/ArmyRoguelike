@@ -18,6 +18,9 @@ namespace ArmyRoguelike.Core
         public int Hp { get; internal set; }
         public int Ap { get; internal set; }
 
+        /// <summary>Tiles the unit can still walk this turn. Moving doesn't cost AP.</summary>
+        public int Moves { get; internal set; }
+
         /// <summary>The tile the unit stands on. For a 2x2 unit, the corner with the lowest X and Y.</summary>
         public GridPos Pos { get; internal set; }
 
@@ -30,9 +33,6 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Moved at least one tile this turn (for Steady Aim).</summary>
         public bool MovedThisTurn { get; internal set; }
-
-        /// <summary>The free first step of Spring Boots has been used this turn.</summary>
-        public bool FreeStepUsed { get; internal set; }
 
         /// <summary>Has attacked this turn (for the Deadeye's opening shot).</summary>
         public bool AttackedThisTurn { get; internal set; }
@@ -51,10 +51,10 @@ namespace ArmyRoguelike.Core
         /// <summary>Can't move this turn (a snare took effect).</summary>
         public bool RootedThisTurn { get; internal set; }
 
-        /// <summary>AP taken away at the start of its next turn (Chill).</summary>
+        /// <summary>Chilled: can't move on its next turn.</summary>
         public int SlowNext { get; internal set; }
 
-        /// <summary>Started this turn with less AP because of Chill.</summary>
+        /// <summary>Can't move this turn because of Chill.</summary>
         public bool SlowedThisTurn { get; internal set; }
 
         /// <summary>Poison ticks left; each deals poison damage at the start of the unit's turn.</summary>
@@ -97,6 +97,9 @@ namespace ArmyRoguelike.Core
         public int Range => Math.Max(1, Stats.Range);
         public int MaxAp => Math.Max(1, Stats.MaxAp);
 
+        /// <summary>Tiles per turn: the type's moves (1, or 2 with Swift), plus 1 for Spring Boots.</summary>
+        public int MaxMoves => Stats.Moves + (Stats.Moves > 0 && Has(Ability.SpringBoots) ? 1 : 0);
+
         public int Size => Stats.Size;
 
         public bool IsRanged => Stats.IsRanged;
@@ -122,6 +125,6 @@ namespace ArmyRoguelike.Core
         public bool Has(Ability ability) =>
             ability != Ability.None && (Stats.Has(ability) || Equipment?.Ability == ability);
 
-        public override string ToString() => $"{Stats.Name}#{Id} {Pos} hp {Hp} ap {Ap}";
+        public override string ToString() => $"{Stats.Name}#{Id} {Pos} hp {Hp} ap {Ap} mv {Moves}";
     }
 }

@@ -74,6 +74,7 @@ namespace ArmyRoguelike.Core
                 case Ability.SpringBoots: return "Spring Step";
                 case Ability.LuckyCharm: return "Last Stand";
                 case Ability.Immobile: return "Immobile";
+                case Ability.Swift: return "Swift";
                 default: return "";
             }
         }
@@ -87,14 +88,14 @@ namespace ArmyRoguelike.Core
                 case Ability.LongReach: return "melee reach 2 in a straight line, hitting both tiles";
                 case Ability.DoubleStrike: return "every attack strikes twice";
                 case Ability.Guard: return "takes the hit when an adjacent ally is attacked";
-                case Ability.Taunt: return "enemies within 3 tiles must attack it";
+                case Ability.Taunt: return $"enemies within {Battle.TauntRange} tiles must attack it";
                 case Ability.Tough: return "takes 1 less damage from everything";
                 case Ability.SteadyAim: return "+1 damage if it hasn't moved this turn";
                 case Ability.SteadyAimPlus: return "+2 damage if it hasn't moved this turn";
                 case Ability.Pierce: return "shots along a straight row or column hit every enemy in the line";
                 case Ability.FirstShotDouble: return "the first attack each turn deals double damage";
                 case Ability.PreyOnSnared: return $"snared enemies take +{Battle.PreyBonus} damage from everyone";
-                case Ability.Volley: return "shots hit the 3x3 around the target for 1 less damage, friend or foe";
+                case Ability.Volley: return "shots hit the target and the 4 tiles next to it for 1 less damage, friend or foe";
                 case Ability.Bloodthirst: return $"+1 damage per kill, kept for the run (up to +{Battle.BloodthirstCap})";
                 case Ability.Pincer: return $"+{Battle.PincerBonus} damage if an ally stands on the far side of the target";
                 case Ability.KillRefund: return $"a kill refunds {Battle.KillRefundAp} AP";
@@ -105,7 +106,7 @@ namespace ArmyRoguelike.Core
                 case Ability.ArcaneBolt: return "its bolt ignores line of sight";
                 case Ability.Burning: return $"fireballs leave the area burning for {Battle.BurnRounds} rounds ({Battle.BurnDamage} damage at the start of each turn)";
                 case Ability.Concussive: return "fireballs push units outward and set off mines and bombs";
-                case Ability.Chill: return $"its hits slow: the target gets {Battle.ChillAp} less AP on its next turn";
+                case Ability.Chill: return "its hits slow: the target can't move on its next turn";
                 case Ability.Shatter: return "double damage to slowed enemies";
                 case Ability.WideWard: return "Ward also shields every ally next to the target";
                 case Ability.Mines: return "an enemy stepping on one of its mines sets off a blast that hits everyone around";
@@ -113,9 +114,10 @@ namespace ArmyRoguelike.Core
                 case Ability.BlastProof: return "its blasts don't hurt your units";
                 case Ability.VampireFang: return $"heals {Battle.VampireHeal} HP on a kill";
                 case Ability.ThornedMail: return $"melee attackers take {Battle.ThornsDamage} damage";
-                case Ability.SpringBoots: return "the first tile moved each turn is free";
+                case Ability.SpringBoots: return "+1 move each turn";
                 case Ability.LuckyCharm: return "once per battle, survives a killing blow at 1 HP";
                 case Ability.Immobile: return "can't move";
+                case Ability.Swift: return $"{Battle.BaseMoves + 1} moves per turn instead of {Battle.BaseMoves}";
                 default: return "";
             }
         }
@@ -146,9 +148,9 @@ namespace ArmyRoguelike.Core
                 case ActionKind.PlaceMine:
                     return $"put a mine on a free tile next to it (max {Battle.MaxMinesPerUnit}); an enemy stepping on it sets off a {Battle.MineDamage}-damage 3x3 blast, friend or foe";
                 case ActionKind.ThrowBomb:
-                    return $"lob a bomb 2-{Battle.PlayerBombRange} tiles away; it explodes for {Battle.PlayerBombDamage} in a 3x3 at the start of the next enemy turn";
+                    return $"lob a bomb 2-{Battle.PlayerBombRange} tiles away; it explodes for {Battle.PlayerBombDamage} on that tile at the start of the next enemy turn";
                 case ActionKind.Snare: return $"an enemy within {Battle.ActionRange} tiles can't move on its next turn";
-                case ActionKind.Fireball: return $"{Battle.FireballDamage} damage to everyone in a 3x3, up to {Battle.FireballRange} tiles away";
+                case ActionKind.Fireball: return $"{Battle.FireballDamage} damage to everyone on the tile and the 4 next to it, up to {Battle.FireballRange} tiles away";
                 case ActionKind.IceWall: return $"turn a free tile within {Battle.ActionRange} into ice (blocks like a rock) for {Battle.IceRounds} rounds";
                 case ActionKind.Ward: return $"an ally within {Battle.ActionRange} tiles gets a shield that absorbs {Battle.WardShield} damage";
                 case ActionKind.Mend: return $"heal an ally within {Battle.ActionRange} tiles for {Battle.MendHeal}";

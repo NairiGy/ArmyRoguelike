@@ -310,6 +310,21 @@ Decided and built 2026-10-28 (branch `feature/act1-12-steps`), not yet playteste
 - **Bloodthirst capped at +3 for the run.**
 - **Later:** fights get split into difficulty pools (and more fights added); each step then draws from a pool. New node types and events after a playtest of this act.
 
+## Experiment: small board, one move (branch `experiment/small-board`)
+
+An idea test, built 2026-10-29, not playtested. It lives only on its branch (worktree `.claude/worktrees/small-board`); `main` keeps the 8x8 rules. Keep it or drop it after a playtest. Why: positioning should matter more, every step should count, and the board should read at a glance.
+
+- **Board 6x6.** Each side still deploys in its back 2 rows, so only 2 empty rows lie between the armies.
+- **Moves are separate from AP.** Every unit walks **1 tile per turn**, before or after acting; unused moves don't carry over. AP now only pays for attacks and actions. AP pools are unchanged for the first test, so units attack more often (rogues and archers get 2 attacks a turn).
+- **Swift** (new keyword): 2 moves. Rogue line, Wolf, Pack Leader, Goblin, Cutpurse (and their raised versions).
+- **Zone of control:** stepping out of an enemy's reach uses up all remaining moves. A 1-move unit can always back off one tile; a Swift unit can't slip past.
+- **Ranges** scaled to the board: Archer and the Trapper line 4 → 3, Marksman/Sniper/Deadeye 5 → 4, Crossbowman 4 → 3, Turret 3 → 2, Mage bolt stays 3. Fireball and player bomb 4 → 3, Charge 4 → 3, Taunt 3 → 2, goblin bomb 2–4 → 2–3, Giant boulder 2–5 → 2–4, Necromancer raise 5 → 4 and keeps 2 tiles away instead of 3.
+- **Areas:** bombs (goblin and Bombardier) hit only their own tile, so one step dodges them; fireballs and Volley hit a plus (the tile and its 4 neighbours) instead of a 3x3. Mines, barricade blasts and the Night shroud stay 3x3.
+- **Abilities:** Spring Boots give +1 move (were "first tile free"). Chill: the target can't move on its next turn (was −2 AP). Big Mines max 5 → 4.
+- **Enemy AI:** no longer keeps AP back for walking. The Giant won't throw a boulder that would wall it off from its target (on 6x6 its rocks sealed it in).
+- **Layouts:** enemies start in rows 4–5, ridges on row 3 (3 gaps, elite 2), the shrine at (2,2) with spawns at least 3 steps from it, totems on rows 4–5. The Necromancer raises **1** of each beaten faction (was 2), topped up with skeletons to 4, so his army fits.
+- **Logs:** battle logs record `boardSize`, each unit's `maxMoves`, `movesAfter` on moves and "done", and `ranged` on hits (a shot from 2+ tiles), for the ranged vs melee damage split.
+
 ## Test mode (for testing only)
 
 - Editor and dev builds only: a "Test battle" button on the draft screen opens a setup screen.

@@ -246,7 +246,7 @@ namespace ArmyRoguelike.Tests
                 Assert.AreEqual(Encounter.TotemCount, b.Totems.Count, $"seed {seed}");
                 Assert.AreEqual(Encounter.SummonTurn, b.SummonTurn);
                 foreach (var t in b.Totems)
-                    Assert.IsTrue(t.Pos.Y >= 5 && t.Pos.Y <= 6);
+                    Assert.IsTrue(t.Pos.Y >= 4 && t.Pos.Y <= 5);
                 var guards = b.Living(Team.Enemy).Where(u => !u.IsObjective).ToList();
                 Assert.AreEqual(3, guards.Count(g => g.Stats == UnitStats.GoblinBomber));
                 Assert.AreEqual(2, guards.Count(g => g.Stats == UnitStats.Goblin));
@@ -289,7 +289,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void NightBlessing_EnemiesCantShootIntoTheShroud()
         {
-            var b = Plain(new[] { UnitStats.Archer }, new[] { (UnitStats.Crossbowman, new GridPos(3, 4)) });
+            var b = Plain(new[] { UnitStats.Archer }, new[] { (UnitStats.Crossbowman, new GridPos(3, 3)) });
             b.AddOmen(Omen.Night, Team.Player);
             Start(b, new GridPos(3, 0));
             var archer = Player(b);
@@ -304,7 +304,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void NightCurse_YourRangedCantHitTheShroudedEnemy()
         {
-            var b = Plain(new[] { UnitStats.Archer }, new[] { (UnitStats.Wolf, new GridPos(3, 4)) });
+            var b = Plain(new[] { UnitStats.Archer }, new[] { (UnitStats.Wolf, new GridPos(3, 3)) });
             b.AddOmen(Omen.Night, Team.Enemy);
             Start(b, new GridPos(3, 0));
             Assert.IsFalse(b.CanAttack(Player(b), Enemy(b)));

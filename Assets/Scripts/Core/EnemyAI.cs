@@ -65,7 +65,7 @@ namespace ArmyRoguelike.Core
     /// </summary>
     public static class EnemyAI
     {
-        public const int NecromancerComfortDistance = 3;
+        public const int NecromancerComfortDistance = 2;
         public const int BomberComfortDistance = 2;
 
         /// <summary>The turn routine a type runs; <see cref="TakeTurn"/> dispatches on this.</summary>
@@ -183,7 +183,7 @@ namespace ArmyRoguelike.Core
             if (enemy.Stats.CanThrow)
             {
                 var steps = Battle.Distance(enemy, target);
-                if (steps >= 2 && steps <= enemy.Stats.ThrowRange)
+                if (steps >= 2 && steps <= enemy.Stats.ThrowRange && !RockWallsOff(battle, enemy, target))
                     return new Intent(IntentKind.Throw, target, battle.RockTileFor(enemy, target));
             }
 
@@ -214,7 +214,7 @@ namespace ArmyRoguelike.Core
 
         // ---------- Behaviours ----------
 
-        /// <summary>Walk up to the nearest player unit and attack. Each loop spends AP or stops.</summary>
+        /// <summary>Walk up to the nearest player unit and attack. Each loop spends AP or moves, or stops.</summary>
         private static void MeleeTurn(Battle battle, Unit enemy, List<BattleEvent> events)
         {
             while (!battle.IsOver && enemy.IsAlive)
@@ -304,7 +304,7 @@ namespace ArmyRoguelike.Core
                 if (target == null)
                     return;
 
-                if (!thrown && battle.CanThrow(ogre, target))
+                if (!thrown && battle.CanThrow(ogre, target) && !RockWallsOff(battle, ogre, target))
                 {
                     events.AddRange(battle.DoThrow(ogre, target));
                     thrown = true;
@@ -314,6 +314,21 @@ namespace ArmyRoguelike.Core
                 if (!Approach(battle, ogre, target, Battle.AttackCost, events))
                     return;
             }
+        }
+
+        /// <summary>
+        /// True if the boulder thrown at the target would leave the thrower with no walking route to it. On the
+        /// small board a 2x2 Giant can otherwise wall itself in with its own rocks.
+        /// </summary>
+        private static bool RockWallsOff(Battle battle, Unit thrower, Unit target)
+        {
+            var rock = battle.RockTileFor(thrower, target);
+            if (rock == null || !DistanceField(battle, thrower, target).ContainsKey(thrower.Pos))
+                return false;
+            battle.Board.AddObstacle(rock.Value);
+            var cut = !DistanceField(battle, thrower, target).ContainsKey(thrower.Pos);
+            battle.Board.RemoveObstacle(rock.Value);
+            return cut;
         }
 
         /// <summary>
@@ -422,8 +437,8 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>
-        /// Moves to a tile from which <paramref name="canHitFrom"/> holds with <paramref name="keepAp"/> to
-        /// spare, staying at least <paramref name="comfort"/> tiles from every player unit. If no such tile
+        /// Moves to a tile from which <paramref name="canHitFrom"/> holds (if it has <paramref name="keepAp"/> to use there),
+        /// staying at least <paramref name="comfort"/> tiles from every player unit. If no such tile
         /// is reachable this turn, gets as close to the target as that distance allows. False if no move helps.
         /// </summary>
         private static bool AdvanceToRange(Battle battle, Unit unit, Unit target, int comfort, int keepAp,
@@ -437,7 +452,7 @@ namespace ArmyRoguelike.Core
                 .ToList();
 
             var shootingSpot = reachable
-                .Where(kv => unit.Ap - kv.Value >= keepAp && canHitFrom(kv.Key))
+                .Where(kv => unit.Ap >= keepAp && canHitFrom(kv.Key))
                 .OrderBy(kv => kv.Value)
                 .Select(kv => (GridPos?)kv.Key)
                 .FirstOrDefault();
@@ -462,8 +477,8 @@ namespace ArmyRoguelike.Core
         // ---------- Movement helpers ----------
 
         /// <summary>
-        /// Moves towards a tile from which the target can be hit, keeping enough AP for the attack if
-        /// possible. Returns false if no useful move exists.
+        /// Moves towards a tile from which the target can be hit, if it has the AP to attack from there;
+        /// otherwise as close as it can. Returns false if no useful move exists.
         /// </summary>
         private static bool Approach(Battle battle, Unit enemy, Unit target, int keepAp, List<BattleEvent> events)
         {
@@ -483,9 +498,9 @@ namespace ArmyRoguelike.Core
             if (reachable.Count == 0)
                 return null;
 
-            // Best case: the cheapest tile that still leaves enough AP to attack from it.
+            // Best case: the cheapest tile it can attack from, when it has the AP to.
             var attackSpots = reachable
-                .Where(kv => enemy.Ap - kv.Value >= keepAp && battle.CanHitFrom(enemy, kv.Key, target))
+                .Where(kv => enemy.Ap >= keepAp && battle.CanHitFrom(enemy, kv.Key, target))
                 .OrderBy(kv => kv.Value)
                 .ToList();
             if (attackSpots.Count > 0)

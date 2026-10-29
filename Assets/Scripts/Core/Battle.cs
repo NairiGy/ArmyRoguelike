@@ -74,7 +74,12 @@ namespace ArmyRoguelike.Core
     /// </summary>
     public sealed class Battle
     {
+        /// <summary>Move points per tile walked. Moves are separate from AP.</summary>
         public const int MoveCost = 1;
+
+        /// <summary>Tiles a unit can walk each turn without Swift or Spring Boots.</summary>
+        public const int BaseMoves = 1;
+
         public const int AttackCost = 2;
         public const int MaxCarriedAp = 2;
         public const int PlayerZoneRows = 2;
@@ -85,8 +90,8 @@ namespace ArmyRoguelike.Core
         public const int MineDamage = 4;
         public const int BigMineDamage = 5;
         public const int MaxMinesPerUnit = 3;
-        public const int BigMaxMines = 5;
-        public const int PlayerBombRange = 4;
+        public const int BigMaxMines = 4;
+        public const int PlayerBombRange = 3;
         public const int PlayerBombDamage = 4;
 
         // Ability numbers (placeholders).
@@ -97,19 +102,15 @@ namespace ArmyRoguelike.Core
         public const int KillRefundAp = 2;
         public const int PoisonDamage = 2;
         public const int PoisonTurns = 2;
-        public const int ChillAp = 2;
         public const int CollisionDamage = 2;
-        public const int TauntRange = 3;
+        public const int TauntRange = 2;
 
         /// <summary>Most damage Bloodthirst can add over a whole run.</summary>
         public const int BloodthirstCap = 3;
 
-        /// <summary>Zone of control: extra AP for each step out of a tile next to an enemy.</summary>
-        public const int ZocCost = 2;
-
         // Actions (placeholders).
         public const int ActionRange = 3;
-        public const int FireballRange = 4;
+        public const int FireballRange = 3;
         public const int FireballDamage = 3;
         public const int BurnRounds = 2;
         public const int BurnDamage = 1;
@@ -118,7 +119,7 @@ namespace ArmyRoguelike.Core
         public const int MendHeal = 3;
         public const int MaxBarricades = 3;
         public const int BarricadeBlastDamage = 3;
-        public const int ChargeRange = 4;
+        public const int ChargeRange = 3;
 
         // Omens (placeholders).
         public const int SunDamage = 3;
@@ -323,6 +324,20 @@ namespace ArmyRoguelike.Core
             return area;
         }
 
+        /// <summary>A tile and its 4 orthogonal neighbours, clipped to the board: fireballs and volleys.</summary>
+        public List<GridPos> PlusArea(GridPos center)
+        {
+            var area = new List<GridPos> { center };
+            area.AddRange(center.Neighbours().Where(Board.InBounds));
+            return area;
+        }
+
+        /// <summary>A bomb hits only the tile it landed on.</summary>
+        public List<GridPos> BombArea(GridPos center) => new List<GridPos> { center };
+
+        /// <summary>The tiles an explosion of this cause hits: bombs their own tile, mines and barricades the 3x3.</summary>
+        private List<GridPos> ExplosionArea(string cause, GridPos center) => cause == "bomb" ? BombArea(center) : BlastArea(center);
+
         /// <summary>The orthogonal direction from one tile to another in the same row or column, else null.</summary>
         private static GridPos? StraightDirection(GridPos from, GridPos to)
         {
@@ -453,12 +468,12 @@ namespace ArmyRoguelike.Core
         /// </summary>
         public bool InEnemyReach(Unit unit, GridPos anchor) => EngagedBy(unit, anchor).Any();
 
-        /// <summary>The enemies whose reach holds the unit standing here: leaving their reach costs <see cref="ZocCost"/> extra.</summary>
+        /// <summary>The enemies whose reach holds the unit standing here: stepping out of their reach uses up its remaining moves.</summary>
         public IEnumerable<Unit> EngagedBy(Unit unit, GridPos anchor) =>
             _units.Where(u => u.IsPlaced && u.IsAlive && u.Team != unit.Team && !u.IsObjective && Distance(anchor, unit.Size, u) == 1);
 
         /// <summary>
-        /// Tiles inside the reach of the unit's enemies (next to them), where stepping out again costs extra.
+        /// Tiles inside the reach of the unit's enemies (next to them), where stepping out again ends its movement.
         /// Rocks and occupied tiles are left out.
         /// </summary>
         public HashSet<GridPos> EnemyReachTiles(Unit unit)
@@ -472,38 +487,34 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>
-        /// Reachable tiles whose cheapest path leaves an enemy's reach at least once (so it costs zone-of-control AP).
+        /// Reachable tiles whose path steps out of an enemy's reach while moves would be left over, so getting
+        /// there ends the unit's movement early (zone of control).
         /// </summary>
         public HashSet<GridPos> CostlyMoveTiles(Unit unit) =>
-            new HashSet<GridPos>(GetReachable(unit).Keys.Where(t => FindPath(unit, t) is List<GridPos> path && ZocSteps(unit, path) > 0));
+            new HashSet<GridPos>(GetReachable(unit).Keys.Where(t => FindPath(unit, t) is List<GridPos> path && PathCost(unit, path) > path.Count));
 
         /// <summary>
-        /// AP for one step. Zone of control: stepping out of a tile next to an enemy costs
-        /// <see cref="ZocCost"/> extra. Spring Boots make the first step of the turn's base cost free.
+        /// Moves for one step, given the moves already spent this turn. Zone of control: stepping out of a
+        /// tile next to an enemy uses up all the unit's remaining moves.
         /// </summary>
-        public int StepCost(Unit unit, GridPos from, bool firstStep)
-        {
-            var cost = firstStep && unit.Has(Ability.SpringBoots) && !unit.FreeStepUsed ? 0 : MoveCost;
-            if (InEnemyReach(unit, from))
-                cost += ZocCost;
-            return cost;
-        }
+        public int StepCost(Unit unit, GridPos from, int spent) =>
+            InEnemyReach(unit, from) ? Math.Max(MoveCost, unit.Moves - spent) : MoveCost;
 
-        /// <summary>Total AP for walking a path from the unit's tile (path excludes the start).</summary>
+        /// <summary>Total moves for walking a path from the unit's tile (path excludes the start).</summary>
         public int PathCost(Unit unit, IReadOnlyList<GridPos> path)
         {
             var cost = 0;
             var from = unit.Pos;
-            for (var i = 0; i < path.Count; i++)
+            foreach (var p in path)
             {
-                cost += StepCost(unit, from, i == 0);
-                from = path[i];
+                cost += StepCost(unit, from, cost);
+                from = p;
             }
 
             return cost;
         }
 
-        /// <summary>How many steps of a path leave an enemy's reach (each costs <see cref="ZocCost"/> extra).</summary>
+        /// <summary>How many steps of a path leave an enemy's reach.</summary>
         public int ZocSteps(Unit unit, IReadOnlyList<GridPos> path)
         {
             var count = 0;
@@ -521,7 +532,7 @@ namespace ArmyRoguelike.Core
         public bool CanMove(Unit unit) => !unit.Has(Ability.Immobile) && !unit.RootedThisTurn;
 
         /// <summary>
-        /// Cheapest AP cost to every reachable anchor tile (Dijkstra, since steps cost different amounts),
+        /// Cheapest move cost to every reachable anchor tile (Dijkstra, since steps cost different amounts),
         /// with the parent of each tile for rebuilding the path. Stops at <paramref name="budget"/>.
         /// </summary>
         private (Dictionary<GridPos, int> cost, Dictionary<GridPos, GridPos> parent) CheapestRoutes(Unit unit, int budget)
@@ -545,7 +556,7 @@ namespace ArmyRoguelike.Core
                 {
                     if (closed.Contains(n) || !CanStand(unit, n))
                         continue;
-                    var c = cost[p] + StepCost(unit, p, p == unit.Pos);
+                    var c = cost[p] + StepCost(unit, p, cost[p]);
                     if (c > budget || (cost.TryGetValue(n, out var old) && old <= c))
                         continue;
                     cost[n] = c;
@@ -557,20 +568,20 @@ namespace ArmyRoguelike.Core
             return (cost, parent);
         }
 
-        /// <summary>Every anchor tile the unit can walk to with its current AP, with the AP cost. Excludes its own tile.</summary>
+        /// <summary>Every anchor tile the unit can walk to with its remaining moves, with the move cost. Excludes its own tile.</summary>
         public Dictionary<GridPos, int> GetReachable(Unit unit)
         {
             if (!CanMove(unit))
                 return new Dictionary<GridPos, int>();
-            var routes = CheapestRoutes(unit, unit.Ap).cost;
+            var routes = CheapestRoutes(unit, unit.Moves).cost;
             routes.Remove(unit.Pos);
             return routes;
         }
 
-        /// <summary>Cheapest walkable path to an anchor tile, without the start tile. Null if unreachable.</summary>
+        /// <summary>Cheapest path to an anchor tile within the unit's remaining moves, without the start tile. Null if unreachable.</summary>
         public List<GridPos> FindPath(Unit unit, GridPos target)
         {
-            var (cost, parent) = CheapestRoutes(unit, int.MaxValue);
+            var (cost, parent) = CheapestRoutes(unit, unit.Moves);
             if (!cost.ContainsKey(target) || target == unit.Pos)
                 return null;
             var path = new List<GridPos>();
@@ -618,9 +629,9 @@ namespace ArmyRoguelike.Core
             attacker.Ap >= AttackCost && CanHitFrom(attacker, attacker.Pos, target);
 
         /// <summary>
-        /// The cheapest tile from which the unit can walk up and still afford to attack the target,
-        /// with its move cost. Ties go to the tile next to the fewest other enemies. Null if out of reach
-        /// this turn. Returns the unit's own tile at cost 0 if it can already attack.
+        /// The cheapest tile from which the unit can walk up and attack the target, with its move cost.
+        /// Ties go to the tile next to the fewest other enemies. Null if out of reach this turn or short of
+        /// AP. Returns the unit's own tile at cost 0 if it can already attack.
         /// </summary>
         public (GridPos tile, int cost)? FindAttackSpot(Unit unit, Unit target)
         {
@@ -628,9 +639,11 @@ namespace ArmyRoguelike.Core
                 return null;
             if (CanAttack(unit, target))
                 return (unit.Pos, 0);
+            if (unit.Ap < AttackCost)
+                return null;
 
             return GetReachable(unit)
-                .Where(kv => unit.Ap - kv.Value >= AttackCost && CanHitFrom(unit, kv.Key, target))
+                .Where(kv => CanHitFrom(unit, kv.Key, target))
                 .OrderBy(kv => kv.Value)
                 .ThenBy(kv => _units.Count(u => u.IsPlaced && u.IsAlive && u.Team != unit.Team && Distance(kv.Key, unit.Size, u) == 1))
                 .ThenBy(kv => kv.Key.Y)
@@ -822,7 +835,7 @@ namespace ArmyRoguelike.Core
 
         private void Fireball(Unit caster, GridPos center, List<BattleEvent> events)
         {
-            var area = BlastArea(center);
+            var area = PlusArea(center);
             var after = new List<BattleEvent>();
             var hits = _units.Where(u => u.IsPlaced && u.IsAlive && Cells(u).Any(area.Contains)).ToList()
                 .Select(u => Damage(u, FireballDamage, caster, DamageKind.Blast, after)).ToList();
@@ -1110,7 +1123,7 @@ namespace ArmyRoguelike.Core
             if (!CanMove(unit))
                 return null;
             var path = FindPath(unit, target);
-            if (path == null || path.Count == 0 || PathCost(unit, path) > unit.Ap)
+            if (path == null || path.Count == 0 || PathCost(unit, path) > unit.Moves)
                 return null;
 
             Mine triggered = null;
@@ -1129,9 +1142,7 @@ namespace ArmyRoguelike.Core
             var from = unit.Pos;
             var cost = PathCost(unit, path);
             var zoc = ZocSteps(unit, path);
-            unit.Ap -= cost;
-            if (unit.Has(Ability.SpringBoots))
-                unit.FreeStepUsed = true;
+            unit.Moves -= cost;
             unit.MovedThisTurn = true;
             unit.Pos = path[path.Count - 1];
             var events = new List<BattleEvent> { new MoveEvent(unit, from, path, cost, zoc) };
@@ -1172,7 +1183,7 @@ namespace ArmyRoguelike.Core
             if (attacker.Has(Ability.Volley))
             {
                 var damage = Math.Max(1, DamageAgainst(attacker, target) - 1);
-                var area = BlastArea(target.Pos);
+                var area = PlusArea(target.Pos);
                 foreach (var u in _units.Where(u => u.IsPlaced && u.IsAlive && Cells(u).Any(area.Contains)).ToList())
                     hits.Add(Damage(u, damage, attacker, DamageKind.Attack, after));
                 events.Add(new AreaAttackEvent(attacker, "volley", target.Pos, area, hits));
@@ -1291,9 +1302,9 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>
-        /// Blows up a mine, bomb or barricade at <paramref name="center"/>: every living unit in the 3x3
-        /// takes the damage, friend or foe (unless the owner is Blast Proof). Mines and bombs inside the
-        /// area go off too, one after another.
+        /// Blows up a mine, bomb or barricade at <paramref name="center"/>: every living unit in the area
+        /// (the 3x3, or just the tile for a bomb) takes the damage, friend or foe (unless the owner is Blast
+        /// Proof). Mines and bombs inside the area go off too, one after another.
         /// </summary>
         internal void Explode(GridPos center, int damage, string cause, Unit owner, List<BattleEvent> events)
         {
@@ -1305,7 +1316,7 @@ namespace ArmyRoguelike.Core
             while (queue.Count > 0)
             {
                 var blast = queue.Dequeue();
-                var area = BlastArea(blast.center);
+                var area = ExplosionArea(blast.cause, blast.center);
                 var safeTeam = blast.owner != null && blast.owner.Has(Ability.BlastProof) ? blast.owner.Team : (Team?)null;
                 var victims = _units.Where(u => u.IsPlaced && u.IsAlive && u.Team != safeTeam && Cells(u).Any(area.Contains)).ToList();
                 var hits = new List<Hit>();
@@ -1437,8 +1448,8 @@ namespace ArmyRoguelike.Core
 
                 if (source.Has(Ability.Chill))
                 {
-                    target.SlowNext = ChillAp;
-                    after.Add(new StatusEvent(source, target, StatusKind.Slow, ChillAp));
+                    target.SlowNext = 1;
+                    after.Add(new StatusEvent(source, target, StatusKind.Slow, 1));
                 }
             }
 
@@ -1529,8 +1540,8 @@ namespace ArmyRoguelike.Core
 
         /// <summary>
         /// Start of a side's turn: poison and burning ground hurt that side's units, timed tiles count
-        /// down (once per round, at the player's turn), then AP is refilled minus any Chill, and snares
-        /// take effect.
+        /// down (once per round, at the player's turn), then AP and moves are refilled (no moves when
+        /// chilled), and snares take effect.
         /// </summary>
         private void BeginTurn(Team team, List<BattleEvent> events)
         {
@@ -1577,15 +1588,15 @@ namespace ArmyRoguelike.Core
 
             foreach (var u in Living(team))
             {
-                u.Ap = Math.Max(0, u.MaxAp + Math.Min(u.Ap, MaxCarriedAp) - u.SlowNext);
+                u.Ap = u.MaxAp + Math.Min(u.Ap, MaxCarriedAp);
                 u.SlowedThisTurn = u.SlowNext > 0;
                 u.SlowNext = 0;
+                u.Moves = u.SlowedThisTurn ? 0 : u.MaxMoves;
                 u.RootedThisTurn = u.SnareTurns > 0;
                 if (u.RootedThisTurn)
                     u.SnareTurns--;
                 u.IsDone = false;
                 u.MovedThisTurn = false;
-                u.FreeStepUsed = false;
                 u.AttackedThisTurn = false;
             }
 
@@ -1702,7 +1713,7 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>Enemies in a ritual fight start and arrive at least this many steps from the objective.</summary>
-        public const int RitualSpawnDistance = 4;
+        public const int RitualSpawnDistance = 3;
 
         /// <summary>
         /// Playtest shortcut: every enemy dies and the battle is won, with the whole army surviving.

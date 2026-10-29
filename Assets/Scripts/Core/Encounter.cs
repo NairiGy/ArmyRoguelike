@@ -12,7 +12,7 @@ namespace ArmyRoguelike.Core
     /// </summary>
     public sealed class Encounter
     {
-        public const int Size = 8;
+        public const int Size = 6;
 
         public readonly string Name;
 
@@ -189,10 +189,10 @@ namespace ArmyRoguelike.Core
             {
                 var plan = new Plan();
                 for (var i = 0; i < 1 + rng.Next(2); i++)
-                    MirroredPair(plan, rng.Next(0, 4), 3 + rng.Next(2));
-                var leader = P(2 + rng.Next(4), 7);
+                    MirroredPair(plan, rng.Next(0, 3), 2 + rng.Next(2));
+                var leader = P(1 + rng.Next(4), 5);
                 plan.Enemies.Add((UnitStats.PackLeader, leader));
-                var near = FreeTiles(plan, rng, 5, 7).Where(t => t.StepsTo(leader) <= 2).Take(3);
+                var near = FreeTiles(plan, rng, 4, 5).Where(t => t.StepsTo(leader) <= 2).Take(3);
                 foreach (var t in near)
                     plan.Enemies.Add((UnitStats.Wolf, t));
                 return plan;
@@ -206,9 +206,9 @@ namespace ArmyRoguelike.Core
                 var gaps = Enumerable.Range(0, Size).OrderBy(_ => rng.Next()).Take(3).ToList();
                 for (var x = 0; x < Size; x++)
                     if (!gaps.Contains(x))
-                        plan.Rocks.Add(P(x, 4));
-                PlaceRandom(plan, rng, UnitStats.GoblinBomber, 3, 7, 7);
-                PlaceRandom(plan, rng, UnitStats.Goblin, 2, 5, 5);
+                        plan.Rocks.Add(P(x, 3));
+                PlaceRandom(plan, rng, UnitStats.GoblinBomber, 3, 5, 5);
+                PlaceRandom(plan, rng, UnitStats.Goblin, 2, 4, 4);
                 return plan;
             });
 
@@ -217,7 +217,7 @@ namespace ArmyRoguelike.Core
             (rng, _) =>
             {
                 var plan = new Plan();
-                var cover = Enumerable.Range(0, Size).OrderBy(_ => rng.Next()).Take(3).Select(x => P(x, 4 + rng.Next(2))).ToList();
+                var cover = Enumerable.Range(0, Size).OrderBy(_ => rng.Next()).Take(3).Select(x => P(x, 3 + rng.Next(2))).ToList();
                 plan.Rocks.AddRange(cover);
                 foreach (var rock in cover.Take(2))
                 {
@@ -226,12 +226,12 @@ namespace ArmyRoguelike.Core
                         plan.Enemies.Add((UnitStats.Crossbowman, behind));
                 }
 
-                var flanks = FreeTiles(plan, rng, 5, 6).Where(t => t.X <= 1 || t.X >= Size - 2).ToList();
+                var flanks = FreeTiles(plan, rng, 4, 5).Where(t => t.X <= 1 || t.X >= Size - 2).ToList();
                 var left = flanks.FirstOrDefault(t => t.X <= 1);
                 var right = flanks.FirstOrDefault(t => t.X >= Size - 2);
                 plan.Enemies.Add((UnitStats.Cutpurse, left));
                 plan.Enemies.Add((UnitStats.Cutpurse, right));
-                var centre = FreeTiles(plan, rng, 5, 7).Where(t => t.X >= 2 && t.X <= 5).Take(1);
+                var centre = FreeTiles(plan, rng, 4, 5).Where(t => t.X >= 1 && t.X <= 4).Take(1);
                 foreach (var t in centre)
                     plan.Enemies.Add((UnitStats.Brute, t));
                 return plan;
@@ -242,9 +242,9 @@ namespace ArmyRoguelike.Core
             (rng, _) =>
             {
                 var plan = new Plan();
-                MirroredPair(plan, rng.Next(0, 4), 2 + rng.Next(2));
-                MirroredPair(plan, rng.Next(0, 4), 4 + rng.Next(2));
-                var spots = FreeTiles(plan, rng, 5, 7);
+                MirroredPair(plan, rng.Next(0, 3), 2);
+                MirroredPair(plan, rng.Next(0, 3), 3 + rng.Next(2));
+                var spots = FreeTiles(plan, rng, 4, 5);
                 var picked = new List<GridPos>();
                 foreach (var t in spots)
                 {
@@ -268,7 +268,7 @@ namespace ArmyRoguelike.Core
         public const int RitualWaveSize = 2;
         public const int RitualDeployRange = 2;
 
-        public static readonly GridPos ShrineTile = new GridPos(3, 3);
+        public static readonly GridPos ShrineTile = new GridPos(2, 2);
 
         public static readonly Encounter MoonShrine = new Encounter("Moon Shrine", "Moon Shrine",
             "Defend the shrine in the middle for 5 enemy turns. Elementals come from every edge, and more arrive on turns 2 and 4.",
@@ -282,14 +282,14 @@ namespace ArmyRoguelike.Core
                         .Where(p => p != ShrineTile && p.StepsTo(ShrineTile) <= RitualDeployRange).ToList(),
                     RitualTurns = RitualTurns,
                 };
-                MirroredPair(plan, rng.Next(0, 3), 5 + rng.Next(2));
+                MirroredPair(plan, rng.Next(0, 3), 4 + rng.Next(2));
                 bool Edge(GridPos p) => p.X == 0 || p.Y == 0 || p.X == Size - 1 || p.Y == Size - 1;
                 var picked = new List<GridPos>();
                 foreach (var t in FreeTiles(plan, rng, 0, Size - 1).Where(t => Edge(t) && t.StepsTo(ShrineTile) >= Battle.RitualSpawnDistance))
                 {
                     if (picked.Count == 3)
                         break;
-                    if (picked.All(p => p.StepsTo(t) >= 4))
+                    if (picked.All(p => p.StepsTo(t) >= 3))
                         picked.Add(t);
                 }
 
@@ -314,17 +314,15 @@ namespace ArmyRoguelike.Core
             (rng, _) =>
             {
                 var plan = new Plan { SummonTurn = SummonTurn };
-                MirroredPair(plan, rng.Next(0, 3), 3);
-                foreach (var t in FreeTiles(plan, rng, 5, 6))
-                {
-                    if (plan.Totems.Count == TotemCount)
-                        break;
-                    if (plan.Totems.All(p => p.StepsTo(t) >= 3))
+                MirroredPair(plan, rng.Next(0, 3), 2);
+                // Spread out where the rows allow it; any that don't fit 3 apart go 2 apart.
+                foreach (var spacing in new[] { 3, 2 })
+                foreach (var t in FreeTiles(plan, rng, 4, 5))
+                    if (plan.Totems.Count < TotemCount && plan.Totems.All(p => p.StepsTo(t) >= spacing))
                         plan.Totems.Add(t);
-                }
 
-                PlaceRandom(plan, rng, UnitStats.GoblinBomber, 3, 7, 7);
-                PlaceRandom(plan, rng, UnitStats.Goblin, 2, 4, 5);
+                PlaceRandom(plan, rng, UnitStats.GoblinBomber, 3, 5, 5);
+                PlaceRandom(plan, rng, UnitStats.Goblin, 2, 3, 4);
                 return plan;
             });
 
@@ -335,15 +333,15 @@ namespace ArmyRoguelike.Core
             (rng, fought) =>
             {
                 var plan = new Plan();
-                var stones = 4 + rng.Next(3);
-                foreach (var t in FreeTiles(plan, rng, 3, 6).Take(stones))
+                var stones = 3 + rng.Next(2);
+                foreach (var t in FreeTiles(plan, rng, 2, 3).Take(stones))
                     plan.Rocks.Add(t);
-                plan.Enemies.Add((UnitStats.Necromancer, FreeTiles(plan, rng, 7, 7).First(t => t.X >= 2 && t.X <= 5)));
+                plan.Enemies.Add((UnitStats.Necromancer, FreeTiles(plan, rng, 5, 5).First(t => t.X >= 1 && t.X <= 4)));
                 var minions = fought.Where(f => f.RaisedRepresentative != null)
-                    .SelectMany(f => Enumerable.Repeat(UnitStats.Raised(f.RaisedRepresentative), 2)).ToList();
+                    .SelectMany(f => Enumerable.Repeat(UnitStats.Raised(f.RaisedRepresentative), 1)).ToList();
                 while (minions.Count < 4)
                     minions.Add(UnitStats.Skeleton);
-                var tiles = FreeTiles(plan, rng, 5, 7);
+                var tiles = FreeTiles(plan, rng, 4, 5);
                 for (var i = 0; i < minions.Count && i < tiles.Count; i++)
                     plan.Enemies.Add((minions[i], tiles[i]));
                 return plan;
@@ -355,7 +353,7 @@ namespace ArmyRoguelike.Core
             {
                 var plan = new Plan();
                 MirroredPair(plan, rng.Next(0, 3), 2 + rng.Next(2));
-                plan.Enemies.Add((UnitStats.Ogre, P(1 + rng.Next(5), 5)));
+                plan.Enemies.Add((UnitStats.Ogre, P(1 + rng.Next(3), 4)));
                 return plan;
             });
 
@@ -369,12 +367,12 @@ namespace ArmyRoguelike.Core
             (rng, _) =>
             {
                 var plan = new Plan();
-                MirroredPair(plan, rng.Next(0, 4), 3 + rng.Next(2));
-                var leaders = new[] { P(1 + rng.Next(2), 7), P(5 + rng.Next(2), 7) };
+                MirroredPair(plan, rng.Next(0, 3), 2 + rng.Next(2));
+                var leaders = new[] { P(rng.Next(2), 5), P(4 + rng.Next(2), 5) };
                 foreach (var leader in leaders)
                 {
                     plan.Enemies.Add((UnitStats.PackLeader, leader));
-                    foreach (var t in FreeTiles(plan, rng, 5, 7).Where(t => t.StepsTo(leader) <= 2).Take(2))
+                    foreach (var t in FreeTiles(plan, rng, 4, 5).Where(t => t.StepsTo(leader) <= 2).Take(2))
                         plan.Enemies.Add((UnitStats.Wolf, t));
                 }
 
@@ -389,9 +387,9 @@ namespace ArmyRoguelike.Core
                 var gaps = Enumerable.Range(0, Size).OrderBy(_ => rng.Next()).Take(2).ToList();
                 for (var x = 0; x < Size; x++)
                     if (!gaps.Contains(x))
-                        plan.Rocks.Add(P(x, 4));
-                PlaceRandom(plan, rng, UnitStats.GoblinBomber, 4, 7, 7);
-                PlaceRandom(plan, rng, UnitStats.Goblin, 3, 5, 5);
+                        plan.Rocks.Add(P(x, 3));
+                PlaceRandom(plan, rng, UnitStats.GoblinBomber, 4, 5, 5);
+                PlaceRandom(plan, rng, UnitStats.Goblin, 3, 4, 4);
                 return plan;
             });
 
@@ -403,7 +401,7 @@ namespace ArmyRoguelike.Core
                 var columns = Enumerable.Range(0, Size).OrderBy(_ => rng.Next()).Take(3).ToList();
                 foreach (var x in columns)
                 {
-                    var rock = P(x, 4 + rng.Next(2));
+                    var rock = P(x, 3 + rng.Next(2));
                     plan.Rocks.Add(rock);
                     plan.Enemies.Add((UnitStats.Crossbowman, P(rock.X, rock.Y + 1)));
                 }
@@ -411,10 +409,10 @@ namespace ArmyRoguelike.Core
                 // Cutpurses on the flanks; a crossbowman may already stand there, so fall back to the back rows.
                 foreach (var onFlank in new Func<GridPos, bool>[] { t => t.X <= 1, t => t.X >= Size - 2 })
                 {
-                    var free = FreeTiles(plan, rng, 5, 7);
+                    var free = FreeTiles(plan, rng, 4, 5);
                     plan.Enemies.Add((UnitStats.Cutpurse, free.Where(onFlank).DefaultIfEmpty(free[0]).First()));
                 }
-                foreach (var t in FreeTiles(plan, rng, 5, 7).Where(t => t.X >= 2 && t.X <= 5).Take(2))
+                foreach (var t in FreeTiles(plan, rng, 4, 5).Where(t => t.X >= 1 && t.X <= 4).Take(2))
                     plan.Enemies.Add((UnitStats.Brute, t));
                 return plan;
             });
@@ -424,12 +422,12 @@ namespace ArmyRoguelike.Core
             (rng, _) =>
             {
                 var plan = new Plan();
-                MirroredPair(plan, rng.Next(0, 4), 2 + rng.Next(2));
-                MirroredPair(plan, rng.Next(0, 4), 4 + rng.Next(2));
+                MirroredPair(plan, rng.Next(0, 3), 2);
+                MirroredPair(plan, rng.Next(0, 3), 3 + rng.Next(2));
                 // Spread out where the crystals allow it; any fourth that doesn't fit 3 apart goes 2 apart.
                 var picked = new List<GridPos>();
                 foreach (var spacing in new[] { 3, 2 })
-                foreach (var t in FreeTiles(plan, rng, 5, 7))
+                foreach (var t in FreeTiles(plan, rng, 4, 5))
                     if (picked.Count < 4 && picked.All(p => p.StepsTo(t) >= spacing))
                         picked.Add(t);
 

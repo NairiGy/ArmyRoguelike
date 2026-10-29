@@ -65,7 +65,7 @@ namespace ArmyRoguelike.View
         private static readonly Color BombZoneColor = new Color(1f, 0.45f, 0.1f, 0.4f);
         private static readonly Color MineSpotColor = new Color(1f, 0.9f, 0.3f, 0.5f);
         // Zone of control, while one of your units is selected: tiles next to enemies (their reach), move tiles
-        // that cost extra AP to get to, and a dotted link to each enemy holding the selected unit.
+        // that end the unit's movement early, and a dotted link to each enemy holding the selected unit.
         private static readonly Color EnemyReachColor = new Color(0.9f, 0.25f, 0.2f, 0.18f);
         private static readonly Color CostlyMoveColor = new Color(1f, 0.6f, 0.2f, 0.45f);
         private static readonly Color EngagedLinkColor = new Color(0.95f, 0.3f, 0.25f, 0.9f);
@@ -201,11 +201,21 @@ namespace ArmyRoguelike.View
             {
                 if (Battle.CanAttack(_selected, _hoveredUnit))
                     return Battle.AttackCost;
-                var spot = Battle.FindAttackSpot(_selected, _hoveredUnit);
-                return spot.HasValue ? spot.Value.cost + Battle.AttackCost : 0;
+                return Battle.FindAttackSpot(_selected, _hoveredUnit).HasValue ? Battle.AttackCost : 0;
             }
 
-            return Battle.GetReachable(_selected).TryGetValue(tile, out var move) ? move : 0;
+            // Moving costs moves, not AP.
+            return 0;
+        }
+
+        /// <summary>Moves the selected unit would spend walking to the hovered tile (0 if it can't).</summary>
+        private int PreviewMoves()
+        {
+            if (_selected == null || !_hovered.HasValue || !Battle.CanAct(_selected) || _action.HasValue)
+                return 0;
+            if (_hoveredUnit != null && _hoveredUnit.Team == Team.Enemy)
+                return Battle.FindAttackSpot(_selected, _hoveredUnit) is var spot && spot.HasValue ? spot.Value.cost : 0;
+            return Battle.GetReachable(_selected).TryGetValue(_hovered.Value, out var move) ? move : 0;
         }
 
         // ---------- Placement ----------
@@ -415,8 +425,8 @@ namespace ArmyRoguelike.View
             _board.ClearHighlights();
             yield return PlayEvents(events);
 
-            // A unit with no AP left has nothing more to do.
-            if (_selected != null && (!_selected.IsAlive || _selected.Ap == 0))
+            // A unit that can't move, attack or use an action has nothing more to do.
+            if (_selected != null && (!_selected.IsAlive || !Battle.CanStillAct(_selected)))
                 FinishSelectedUnit();
             RefreshUnitStates();
             _board.SyncHazards();
@@ -534,9 +544,9 @@ namespace ArmyRoguelike.View
                     _board.SetHighlight(p, MineSpotColor);
                 if (_hovered.HasValue && Battle.CanUseAction(_selected, action, _hovered.Value))
                 {
-                    // Area actions preview the 3x3 they will hit.
+                    // Area actions preview the tiles they will hit.
                     if (action == ActionKind.Fireball || action == ActionKind.ThrowBomb)
-                        foreach (var p in Battle.BlastArea(_hovered.Value))
+                        foreach (var p in action == ActionKind.Fireball ? Battle.PlusArea(_hovered.Value) : Battle.BombArea(_hovered.Value))
                             _board.SetHighlight(p, BombZoneColor);
                     _board.SetHighlight(_hovered.Value, HoverColor);
                 }
@@ -544,7 +554,7 @@ namespace ArmyRoguelike.View
                 return;
             }
 
-            // Zone of control: enemy reach underneath, then move tiles, orange where getting there costs extra AP.
+            // Zone of control: enemy reach underneath, then move tiles, orange where getting there ends movement early.
             foreach (var p in Battle.EnemyReachTiles(_selected))
                 if (p != _selected.Pos)
                     _board.SetHighlight(p, EnemyReachColor);
@@ -608,7 +618,7 @@ namespace ArmyRoguelike.View
         private void DrawBombZones()
         {
             foreach (var bomb in Battle.Bombs)
-            foreach (var p in Battle.BlastArea(bomb.Tile))
+            foreach (var p in Battle.BombArea(bomb.Tile))
                 _board.SetHighlight(p, BombZoneColor);
         }
 
@@ -651,7 +661,7 @@ namespace ArmyRoguelike.View
                     _intent.Show(from, to);
                     break;
                 case IntentKind.Bomb:
-                    foreach (var p in Battle.BlastArea(intent.Target.Pos))
+                    foreach (var p in Battle.BombArea(intent.Target.Pos))
                         _board.SetHighlight(p, BombZoneColor);
                     _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
                     _intent.Show(from, to);
@@ -869,7 +879,7 @@ namespace ArmyRoguelike.View
                             DamagePopup.Spawn(at, "Snared", DamagePopup.AbilityColor, 44);
                             break;
                         case StatusKind.Slow:
-                            DamagePopup.Spawn(at, $"Slowed -{status.Amount} AP", DamagePopup.AbilityColor, 40);
+                            DamagePopup.Spawn(at, "Slowed: no move", DamagePopup.AbilityColor, 40);
                             break;
                         case StatusKind.Poison:
                             DamagePopup.Spawn(at, "Poisoned", DamagePopup.AbilityColor, 44);
@@ -1260,8 +1270,10 @@ namespace ArmyRoguelike.View
             {
                 info += "\n" + UnitLine(_selected);
                 var cost = playerTurn ? PreviewCost() : 0;
+                var moves = playerTurn ? PreviewMoves() : 0;
                 apLine = cost > 0 ? $"AP {_selected.Ap} / {_selected.MaxAp}   this action: -{cost} -> {_selected.Ap - cost} left"
                     : $"AP {_selected.Ap} / {_selected.MaxAp}";
+                apLine += moves > 0 ? $"   Moves {_selected.Moves} / {_selected.MaxMoves} (-{moves})" : $"   Moves {_selected.Moves} / {_selected.MaxMoves}";
                 var abilities = AbilityLines(_selected);
                 if (abilities.Length > 0)
                     info += "\n" + abilities;
@@ -1418,7 +1430,7 @@ namespace ArmyRoguelike.View
                 if (_hoveredUnit.Stats.AreaMelee)
                     text += $"\nSmash hits everyone next to it. Throws boulders up to {_hoveredUnit.Stats.ThrowRange} tiles; they stay as rocks";
                 if (_hoveredUnit.Stats.CanBomb)
-                    text += $"\nLobs a bomb ({_hoveredUnit.Stats.BombDamage} damage, 3x3) that explodes next enemy turn";
+                    text += $"\nLobs a bomb ({_hoveredUnit.Stats.BombDamage} damage, on one tile) that explodes next enemy turn";
                 if (_hoveredUnit.Team == Team.Enemy)
                     text += "\n" + IntentText(EnemyAI.PredictIntent(Battle, _hoveredUnit));
                 var engaged = EngagedLine(_hoveredUnit);
@@ -1426,7 +1438,7 @@ namespace ArmyRoguelike.View
                     text += "\n" + engaged;
                 if (_selected != null && _hoveredUnit.Team == Team.Enemy && !Battle.CanAttack(_selected, _hoveredUnit) &&
                     Battle.FindAttackSpot(_selected, _hoveredUnit) is var spot && spot.HasValue)
-                    text += $"\nClick: walk {spot.Value.cost} AP + attack {Battle.AttackCost} AP";
+                    text += $"\nClick: walk {spot.Value.cost} tile(s) + attack {Battle.AttackCost} AP";
                 return text;
             }
 
@@ -1440,15 +1452,15 @@ namespace ArmyRoguelike.View
                         ? "Shrouded: enemies can't hit units here from range."
                         : "Shrouded: your units can't hit enemies here from range.";
                 if (Battle.BombAt(p) is Bomb bomb)
-                    return $"Bomb: explodes at the start of the enemy turn for {bomb.Damage} damage to everyone in the orange 3x3.";
+                    return $"Bomb: explodes at the start of the enemy turn for {bomb.Damage} damage to whoever stands on this tile.";
                 if (Battle.MineAt(p) != null)
                     return $"Your mine: an enemy stepping here sets it off ({Battle.MineDamage} damage to everyone around, your units too).";
                 if (Battle.RemainsAt(p) is Unit bones)
                     return $"Bone pile ({bones.Stats.Name}). The Necromancer can raise it.\nStand on it to stop that.";
                 if (_selected != null && !_action.HasValue && Battle.GetReachable(_selected).TryGetValue(p, out var cost))
                     return Battle.InEnemyReach(_selected, _selected.Pos)
-                        ? $"Move here: {cost} AP (includes +{Battle.ZocCost} for leaving an enemy's reach)"
-                        : $"Move here: {cost} AP";
+                        ? $"Move here: {cost} move(s) (leaving an enemy's reach uses up all your moves)"
+                        : $"Move here: {cost} move(s)";
             }
 
             return null;
@@ -1462,8 +1474,8 @@ namespace ArmyRoguelike.View
             var holders = Battle.EngagedBy(u, u.Pos).Select(h => h.Stats.Name).ToList();
             if (holders.Count == 0)
                 return "";
-            var who = u.Team == Team.Player ? "it" : "it (on its turn)";
-            return $"Engaged by {string.Join(", ", holders)}: each step out of their reach costs {who} +{Battle.ZocCost} AP";
+            var who = u.Team == Team.Player ? "its" : "its (on its turn)";
+            return $"Engaged by {string.Join(", ", holders)}: stepping out of their reach uses up {who} remaining moves";
         }
 
         private static string IntentText(Intent intent)
@@ -1493,7 +1505,7 @@ namespace ArmyRoguelike.View
         private string UnitLine(Unit u)
         {
             var item = u.Equipment != null ? $"  [{u.Equipment.Name}]" : "";
-            return $"{u.Stats.Name}  HP {u.Hp}/{u.MaxHp}  DMG {Battle.EffectiveDamage(u)}  RNG {u.Range}{item}";
+            return $"{u.Stats.Name}  HP {u.Hp}/{u.MaxHp}  DMG {Battle.EffectiveDamage(u)}  RNG {u.Range}  MV {u.MaxMoves}{item}";
         }
 
         private static string AbilityLines(Unit u)
