@@ -25,6 +25,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 | Scenarios | Blessing pick and item pick screens | Plain IMGUI panels (part of the UI pass) | Needed |
 | Zone of control | Enemy reach tiles, orange "costs extra AP" move tiles, dotted link to the enemies holding the selected unit | Flat colours (`EnemyReachColor`, `CostlyMoveColor`) and a red dotted line (`EngagedLinkColor`) in `BattleController` | Needed |
 | Unit card (branch `experiment/small-board`) | The hover card's look: panel, header, section colours | IMGUI box with rich-text colours (`DrawUnitCard` in `BattleController`) | Needed only if the experiment is kept |
+| Goblins (branch `experiment/small-board`) | Fling (a goblin or explosive flying through the air), Powder Keg explosion | Thrower lunges, the thrown goblin pops to its landing tile with a "Flung!" popup; an explosive flies as a small square; the keg uses the normal blast | Needed only if the experiment is kept |
 | Howl (branch `experiment/small-board`) | The Pack Leader's howl, and the "+1 move" on each wolf | "Howl!" and "+1 move" popups and a small shake (`HowlEvent` in `BattleController`) | Needed only if the experiment is kept |
 | Base-line actions (branch `experiment/small-board`) | Vanish (hidden rogue), Blink (teleport), Shield Bash, Pinning Shot | Vanished statue at 40% opacity (`UnitView.SetHidden`); Blink slides like a 1-tile move; Shield Bash is just the push; Pinning Shot is a normal shot plus a "Pinned" popup | Needed only if the experiment is kept |
 | Small board experiment (branch `experiment/small-board`) | Moves left on a statue (moves are now separate from AP); the tower-roof painting fitted under a 6x6 board | Moves only as text in the HUD ("Moves 1 / 1"); the scenery fits itself to the board size but hasn't been looked at on 6x6 | Needed only if the experiment is kept |
@@ -57,7 +58,8 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [x] Unit kits, wolves first (2026-10-29, same branch): attacks are named actions; Wolf (Blood Scent, Wolf Bite chain) and Pack Leader (Pack Bond HP, Howl); a hover card with Next / Passive / Actions / Now.
 - [x] Base-line actions (2026-10-29, same branch): Shield Bash (warriors), Pinning Shot (archers), Vanish (rogues), Blink (mages); evolutions inherit them.
 - [ ] Trapper line: design a new action to replace Snare (Pinning Shot took its job).
-- [ ] Unit kits for the other enemy factions (goblins, bandits, elementals, bosses) and for the player's units: a passive and actions for each, designed one faction or line at a time with the user.
+- [x] Goblin kits (2026-10-29, same branch): Slippery + Fling for the Goblin, Powder Keg for the Bomber.
+- [ ] Unit kits for the other enemy factions (bandits, elementals, skeleton, bosses) and for the player's units: a passive and actions for each, designed one faction or line at a time with the user.
 - [ ] Playtest the small-board experiment (open the worktree folder as its own project in Unity Hub), then decide: keep and merge, tune, or drop the branch. Watch for: fights now slower (one attack a turn each) and whether HP needs cutting, ranged units too strong, bombers too weak with 1x1 bombs, the bosses' new single actions, crowding in elites and the Necromancer fight.
 - [ ] Next: playtest the 12-step Act 1 as a full run and summarise from the logs. Then decide on new node types and events, and the balance pass.
 - [ ] Later: split fights into difficulty pools (and add more fights); each map step draws from a pool.

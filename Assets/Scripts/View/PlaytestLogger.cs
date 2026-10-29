@@ -214,6 +214,19 @@ namespace ArmyRoguelike.View
                         target = string.Join(", ", split.Children.Select(Name)), amount = split.Children.Count,
                     });
                     break;
+                case FlingEvent fling:
+                {
+                    var entry = fling.Hit.HasValue
+                        ? HitEntry(turn, fling.Thrower, "fling", fling.Hit.Value)
+                        : new ActionEntry { turn = turn, team = fling.Thrower.Team.ToString(), unit = Name(fling.Thrower), type = "fling", target = Name(fling.Target) };
+                    entry.note = fling.Thrown != null ? Name(fling.Thrown) : "explosive";
+                    entry.fromX = fling.From.X;
+                    entry.fromY = fling.From.Y;
+                    entry.toX = fling.To.X;
+                    entry.toY = fling.To.Y;
+                    _log.actions.Add(entry);
+                    break;
+                }
                 case HowlEvent howl:
                     _log.actions.Add(new ActionEntry
                     {

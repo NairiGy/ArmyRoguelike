@@ -235,6 +235,64 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void Slippery_GoblinsIgnoreZoneOfControl()
+        {
+            var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 1) }, new[] { (UnitStats.Goblin, new GridPos(3, 2)) });
+            var goblin = Enemy(b);
+            goblin.Moves = goblin.MaxMoves;
+            Assert.AreEqual(2, b.GetReachable(goblin)[new GridPos(3, 4)], "two steps away, though it started engaged");
+            Assert.AreEqual(0, b.EngagedBy(goblin, goblin.Pos).Count());
+        }
+
+        [Test]
+        public void Fling_ThrowsAGoblinThatLandsAndStillBites()
+        {
+            var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 0) },
+                new[] { (UnitStats.Goblin, new GridPos(3, 4)), (UnitStats.Goblin, new GridPos(4, 4)) });
+            var thrower = Enemy(b, 0);
+            var thrown = Enemy(b, 1);
+            var warrior = Player(b);
+            var intent = EnemyAI.PredictIntent(b, thrower);
+            Assert.AreEqual(IntentKind.Fling, intent.Kind, "too far to walk up and strike");
+            Assert.AreEqual(thrown, intent.Thrown);
+
+            var events = b.EndPlayerTurn();
+            var fling = events.OfType<FlingEvent>().Single();
+            Assert.AreEqual(thrown, fling.Thrown);
+            Assert.AreEqual(new GridPos(3, 1), thrown.Pos, "landed next to the warrior, on the side facing the thrower");
+            Assert.AreEqual(UnitStats.Goblin.MaxHp, thrown.Hp, "no landing damage");
+            Assert.AreEqual(warrior.MaxHp - Battle.FlingDamage - UnitStats.Goblin.Damage, warrior.Hp, "the landing, then its strike");
+        }
+
+        [Test]
+        public void Fling_ThrowsYourMineBackAtYou()
+        {
+            var b = Started(new[] { UnitStats.Sapper }, new[] { new GridPos(3, 0) }, new[] { (UnitStats.Goblin, new GridPos(4, 1)) });
+            var sapper = Player(b);
+            Assert.IsNotNull(b.PlayerPlaceMine(sapper, new GridPos(3, 1)));
+            var events = b.EndPlayerTurn();
+            var blast = events.OfType<ExplosionEvent>().First();
+            Assert.AreEqual("mine", blast.Cause);
+            Assert.AreEqual(sapper.Pos, blast.Center, "it went off on the sapper");
+            Assert.AreEqual(0, b.Mines.Count);
+            Assert.AreEqual(sapper.MaxHp - Battle.MineDamage, sapper.Hp);
+        }
+
+        [Test]
+        public void PowderKeg_BomberExplodesWhenItDies()
+        {
+            var b = Started(new[] { UnitStats.Rogue }, new[] { new GridPos(3, 1) },
+                new[] { (UnitStats.GoblinBomber, new GridPos(3, 2)), (UnitStats.Wolf, new GridPos(2, 2)) });
+            var rogue = Player(b);
+            var wolf = Enemy(b, 1);
+            Enemy(b, 0).Hp = 1;
+            var events = b.PlayerAttack(rogue, Enemy(b, 0));
+            Assert.IsTrue(events.OfType<ExplosionEvent>().Any(e => e.Cause == "powder keg"));
+            Assert.AreEqual(rogue.MaxHp - Battle.PowderKegDamage, rogue.Hp, "the killer is caught in it");
+            Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.PowderKegDamage, wolf.Hp, "so is its own side");
+        }
+
+        [Test]
         public void Howl_GivesWolvesAnExtraMoveWhenItHelps()
         {
             var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 0) },

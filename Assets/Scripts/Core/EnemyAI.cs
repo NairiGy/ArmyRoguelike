@@ -20,6 +20,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>A Pack Leader howling: every wolf that hasn't acted gets +1 move.</summary>
         Howl,
+
+        /// <summary>A goblin flinging another goblin, a bomb or a mine at one of your units.</summary>
+        Fling,
     }
 
     /// <summary>What an enemy plans to do next, for the hover display.</summary>
@@ -30,14 +33,18 @@ namespace ArmyRoguelike.Core
         /// <summary>The player unit it wants to hit, or the bone pile it wants to raise.</summary>
         public readonly Unit Target;
 
-        /// <summary>For a throw: where the boulder will come to rest. For a bomb: where it will land.</summary>
+        /// <summary>For a throw: where the boulder will come to rest. For a bomb: where it will land. For a fling: where the goblin lands or the explosive goes off.</summary>
         public readonly GridPos? Tile;
 
-        public Intent(IntentKind kind, Unit target, GridPos? tile = null)
+        /// <summary>For a fling: the goblin it will throw, or null for a bomb or mine.</summary>
+        public readonly Unit Thrown;
+
+        public Intent(IntentKind kind, Unit target, GridPos? tile = null, Unit thrown = null)
         {
             Kind = kind;
             Target = target;
             Tile = tile;
+            Thrown = thrown;
         }
     }
 
@@ -55,6 +62,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Slam, area smash and boulder throws.</summary>
         Giant,
+
+        /// <summary>Walks up and strikes; when it can't reach anyone, flings what is next to it.</summary>
+        Goblin,
 
         /// <summary>Howls when that lets wolves reach their prey, otherwise like Advance.</summary>
         PackLeader,
@@ -83,6 +93,8 @@ namespace ArmyRoguelike.Core
                 return EnemyBehaviour.Thief;
             if (stats.CanBomb)
                 return EnemyBehaviour.Bomber;
+            if (stats.Has(Ability.Fling))
+                return EnemyBehaviour.Goblin;
             if (stats.Has(Ability.Howl))
                 return EnemyBehaviour.PackLeader;
             if (stats.AreaMelee)
@@ -243,6 +255,13 @@ namespace ArmyRoguelike.Core
             if (ShouldHowl(battle, enemy))
                 return new Intent(IntentKind.Howl, enemy);
 
+            if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Goblin)
+            {
+                var fling = AsIfItsTurn(battle, enemy, 0, () => ChooseFling(battle, enemy, target));
+                if (fling.HasValue && (fling.Value.goblin == null || !CanReachToAttack(battle, enemy, target)))
+                    return new Intent(IntentKind.Fling, fling.Value.target, fling.Value.to, fling.Value.goblin);
+            }
+
             if (enemy.Stats.CanBomb)
             {
                 var steps = Battle.Distance(enemy, target);
@@ -285,6 +304,9 @@ namespace ArmyRoguelike.Core
                 case EnemyBehaviour.Giant:
                     OgreTurn(battle, enemy, events);
                     break;
+                case EnemyBehaviour.Goblin:
+                    GoblinTurn(battle, enemy, events);
+                    break;
                 case EnemyBehaviour.PackLeader:
                     if (ShouldHowl(battle, enemy))
                         events.AddRange(battle.DoHowl(enemy));
@@ -316,6 +338,54 @@ namespace ArmyRoguelike.Core
                 if (!Approach(battle, enemy, target, Battle.AttackCost, events))
                     return;
             }
+        }
+
+        /// <summary>
+        /// A bomb or mine lying next to it always gets flung. Otherwise strike its target if it can (walking up
+        /// first if that reaches). If it can't reach anyone to strike this turn, fling a goblin that hasn't acted
+        /// at its target, or at any of your units in range. Otherwise walk up and try again.
+        /// </summary>
+        private static void GoblinTurn(Battle battle, Unit goblin, List<BattleEvent> events)
+        {
+            while (!battle.IsOver && goblin.IsAlive)
+            {
+                var target = ChooseTarget(battle, goblin);
+                if (target == null)
+                    return;
+
+                if (ChooseFling(battle, goblin, target) is var explosive && explosive.HasValue && explosive.Value.goblin == null)
+                {
+                    events.AddRange(battle.DoFling(goblin, explosive.Value.target));
+                    continue;
+                }
+
+                if (battle.CanAttack(goblin, target))
+                {
+                    events.AddRange(battle.DoAttack(goblin, target));
+                    continue;
+                }
+
+                if (goblin.Ap >= Battle.AttackCost && battle.FindAttackSpot(goblin, target) == null &&
+                    ChooseFling(battle, goblin, target) is var fling && fling.HasValue)
+                {
+                    events.AddRange(battle.DoFling(goblin, fling.Value.target));
+                    continue;
+                }
+
+                if (!Approach(battle, goblin, target, Battle.AttackCost, events))
+                    return;
+            }
+        }
+
+        /// <summary>A fling at the target if possible, else at the nearest of your units it can fling at.</summary>
+        private static (Unit target, Unit goblin, GridPos to)? ChooseFling(Battle battle, Unit thrower, Unit target)
+        {
+            if (thrower.Ap < Battle.AttackCost)
+                return null;
+            foreach (var u in new[] { target }.Concat(Visible(battle).OrderBy(u => Battle.Distance(thrower, u)).ThenBy(u => u.Id)))
+                if (battle.FlingOption(thrower, u) is var option && option.HasValue)
+                    return (u, option.Value.goblin, option.Value.to);
+            return null;
         }
 
         /// <summary>

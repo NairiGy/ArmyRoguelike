@@ -80,6 +80,9 @@ namespace ArmyRoguelike.Core
                 case Ability.WolfBite: return "Wolf Bite";
                 case Ability.PackBond: return "Pack Bond";
                 case Ability.Howl: return "Howl";
+                case Ability.Slippery: return "Slippery";
+                case Ability.Fling: return "Fling";
+                case Ability.PowderKeg: return "Powder Keg";
                 default: return "";
             }
         }
@@ -127,6 +130,9 @@ namespace ArmyRoguelike.Core
                 case Ability.WolfBite: return "+1 damage for every wolf bite earlier this turn";
                 case Ability.PackBond: return $"while it lives, every wolf has +{Battle.PackBondHp} max HP; once it dies they have -{Battle.PackBondHp} and lose {2 * Battle.PackBondHp} HP on the spot";
                 case Ability.Howl: return $"every wolf that hasn't acted yet gets +{Battle.HowlMoves} move this turn";
+                case Ability.Slippery: return "ignores zone of control: leaving your units' reach doesn't use up its moves";
+                case Ability.Fling: return $"throws what is next to it at a unit 2-{Battle.FlingRange} tiles away, over obstacles: a bomb or mine goes off there with its own blast; a goblin that hasn't acted lands next to the unit, deals {Battle.FlingDamage}, and can still act";
+                case Ability.PowderKeg: return $"when it dies it explodes: {Battle.PowderKegDamage} damage to everyone around it, its own side included";
                 default: return "";
             }
         }
@@ -180,7 +186,7 @@ namespace ArmyRoguelike.Core
         // ---------- A unit's kit: passives and actions ----------
 
         /// <summary>Abilities that describe one of the unit's actions rather than a passive (listed with the actions).</summary>
-        public static bool IsAction(Ability ability) => ability == Ability.WolfBite || ability == Ability.Howl;
+        public static bool IsAction(Ability ability) => ability == Ability.WolfBite || ability == Ability.Howl || ability == Ability.Fling;
 
         /// <summary>The name of a unit type's basic attack, which is one of its actions.</summary>
         public static string AttackName(UnitStats s)
@@ -227,6 +233,8 @@ namespace ArmyRoguelike.Core
                 list.Add(("Bomb", s.BombCost, $"lands on a unit 2-{s.BombRange} tiles away and explodes on that tile for {s.BombDamage} at the start of the next enemy turn"));
             if (s.CanRaise)
                 list.Add(("Raise", s.RaiseCost, $"brings back every bone pile within {s.RaiseRange} tiles at full HP"));
+            if (s.Has(Ability.Fling))
+                list.Add((Name(Ability.Fling), Battle.AttackCost, Describe(Ability.Fling)));
             if (s.Has(Ability.Howl))
                 list.Add((Name(Ability.Howl), Battle.AttackCost, Describe(Ability.Howl)));
             return list;

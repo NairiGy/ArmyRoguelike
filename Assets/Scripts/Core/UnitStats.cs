@@ -173,6 +173,17 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Its action can be a howl: every wolf that hasn't acted yet gets +1 move this turn.</summary>
         Howl,
+
+        // ---------- Goblins ----------
+
+        /// <summary>Ignores zone of control: leaving an enemy's reach doesn't use up its moves.</summary>
+        Slippery,
+
+        /// <summary>Its action can be a fling: it throws an adjacent goblin, bomb or mine at one of your units 2-3 tiles away.</summary>
+        Fling,
+
+        /// <summary>When it dies it explodes: damage to everyone around it, its own side included.</summary>
+        PowderKeg,
     }
 
     /// <summary>A special action a player unit can spend AP on, besides moving and attacking.</summary>
@@ -586,13 +597,17 @@ namespace ArmyRoguelike.Core
             return r;
         }
 
-        public static readonly UnitStats Goblin = new UnitStats(UnitKind.Goblin, "Goblin", 5, 2, 1, 1) { Abilities = A(Ability.Swift), Role = "Melee runner." };
+        public static readonly UnitStats Goblin = new UnitStats(UnitKind.Goblin, "Goblin", 5, 2, 1, 1)
+        {
+            Abilities = A(Ability.Swift, Ability.Slippery, Ability.Fling),
+            Role = "Slips past your line and flings its friends, and your own explosives, at you.",
+        };
 
         /// <summary>Lobs bombs that explode at the start of the next enemy turn. Stabs for 1 up close.</summary>
         public static readonly UnitStats GoblinBomber = new UnitStats(UnitKind.GoblinBomber, "Goblin Bomber", 4, 1, 1, 1)
         {
-            BombCost = 1, BombDamage = 3, BombRange = 3,
-            Role = "Lobs a bomb onto a unit 2-3 tiles away; it explodes on that tile at the start of the next enemy turn. Keeps its distance.",
+            BombCost = 1, BombDamage = 3, BombRange = 3, Abilities = A(Ability.PowderKeg),
+            Role = "Lobs a bomb onto a unit 2-3 tiles away; it explodes on that tile at the start of the next enemy turn. Keeps its distance, and blows up when it dies.",
         };
 
         public static readonly IReadOnlyList<UnitStats> Enemies = new[]

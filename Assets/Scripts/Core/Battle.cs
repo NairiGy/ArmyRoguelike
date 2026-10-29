@@ -144,6 +144,14 @@ namespace ArmyRoguelike.Core
         /// <summary>Blink (mages): teleport range in steps.</summary>
         public const int BlinkRange = 2;
 
+        /// <summary>Fling (goblins): range in steps (at least 2), and the damage a landing goblin deals.</summary>
+        public const int FlingRange = 4;
+
+        public const int FlingDamage = 2;
+
+        /// <summary>Powder Keg (goblin bombers): damage to everyone in the 3x3 when it dies.</summary>
+        public const int PowderKegDamage = 2;
+
         // Omens (placeholders).
         public const int SunDamage = 3;
         public const int MoonShield = 4;
@@ -506,7 +514,7 @@ namespace ArmyRoguelike.Core
         public bool InEnemyReach(Unit unit, GridPos anchor) => EngagedBy(unit, anchor).Any();
 
         /// <summary>The enemies whose reach holds the unit standing here: stepping out of their reach uses up its remaining moves.</summary>
-        public IEnumerable<Unit> EngagedBy(Unit unit, GridPos anchor) =>
+        public IEnumerable<Unit> EngagedBy(Unit unit, GridPos anchor) => unit.Has(Ability.Slippery) ? Enumerable.Empty<Unit>() :
             _units.Where(u => u.IsPlaced && u.IsAlive && u.Team != unit.Team && !u.IsObjective && Distance(anchor, unit.Size, u) == 1);
 
         /// <summary>
@@ -1384,6 +1392,67 @@ namespace ArmyRoguelike.Core
             return events;
         }
 
+        /// <summary>
+        /// What a goblin could fling at the target from where it stands, ignoring its AP: a bomb or mine on an empty tile
+        /// next to it first (it explodes on the target's tile), else a goblin next to it that hasn't acted yet this
+        /// turn (it lands on the free tile next to the target nearest the thrower). Null if it can't.
+        /// </summary>
+        public (Unit goblin, GridPos from, GridPos to)? FlingOption(Unit thrower, Unit target)
+        {
+            if (IsOver || !thrower.IsAlive || !thrower.Has(Ability.Fling) || target == null || !target.IsAlive ||
+                target.Team == thrower.Team || target.IsObjective || target.IsHidden || IsShroudedFrom(target, thrower.Team))
+                return null;
+            var steps = Distance(thrower, target);
+            if (steps < 2 || steps > FlingRange)
+                return null;
+
+            foreach (var n in thrower.Pos.Neighbours())
+                if ((MineAt(n) != null || BombAt(n) != null) && UnitAt(n) == null)
+                    return (null, n, target.Pos);
+
+            var goblin = thrower.Pos.Neighbours().Select(UnitAt)
+                .FirstOrDefault(u => u != null && u.Team == thrower.Team && u.Stats.Kind == UnitKind.Goblin && u.Size == 1 &&
+                                     (Phase != Phase.EnemyTurn || !u.IsDone));
+            if (goblin == null)
+                return null;
+            var landing = target.Pos.Neighbours().Where(p => IsFree(p) && !HasHazard(p))
+                .OrderBy(p => p.StepsTo(thrower.Pos)).ThenBy(p => p.Y).ThenBy(p => p.X)
+                .Select(p => (GridPos?)p).FirstOrDefault();
+            return landing.HasValue ? (goblin, goblin.Pos, landing.Value) : ((Unit, GridPos, GridPos)?)null;
+        }
+
+        internal List<BattleEvent> DoFling(Unit thrower, Unit target)
+        {
+            var option = FlingOption(thrower, target);
+            if (option == null || thrower.Ap < AttackCost)
+                return null;
+            SpendAp(thrower, AttackCost);
+            var (goblin, from, to) = option.Value;
+            var events = new List<BattleEvent>();
+            if (goblin == null)
+            {
+                // Picked up off the ground: it goes off on impact with its own blast.
+                var mine = MineAt(from);
+                var bomb = BombAt(from);
+                _mines.RemoveAll(m => m.Tile == from);
+                _bombs.RemoveAll(b => b.Tile == from);
+                events.Add(new FlingEvent(thrower, null, from, to, target, null));
+                if (mine != null)
+                    Explode(to, mine.Damage, "mine", thrower, events);
+                else
+                    Explode(to, bomb.Damage, "bomb", thrower, events);
+                return events;
+            }
+
+            goblin.Pos = to;
+            var after = new List<BattleEvent>();
+            var hit = Damage(target, FlingDamage, thrower, DamageKind.Attack, after);
+            events.Add(new FlingEvent(thrower, goblin, from, to, target, hit));
+            events.AddRange(after);
+            CheckEnd();
+            return events;
+        }
+
         /// <summary>Howl: every wolf of its side that hasn't acted yet this turn gets <see cref="HowlMoves"/> extra moves.</summary>
         internal List<BattleEvent> DoHowl(Unit leader)
         {
@@ -1552,7 +1621,11 @@ namespace ArmyRoguelike.Core
             }
 
             if (!target.IsAlive)
+            {
                 BreakPackBond(target, after);
+                if (target.Has(Ability.PowderKeg))
+                    Explode(target.Pos, PowderKegDamage, "powder keg", target, after);
+            }
 
             if (!target.IsAlive && target.Stats.SplitsInto != null)
                 Split(target, after);

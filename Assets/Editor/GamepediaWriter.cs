@@ -161,6 +161,8 @@ public static class GamepediaWriter
         var lines = new System.Collections.Generic.List<string>();
         var cost = Battle.AttackCost;
         lines.Add($"<b>{Esc(Abilities.AttackName(e))}</b> ({cost} AP): {Esc(Abilities.DescribeAttack(e, e.Damage))}.");
+        if (e.Has(Ability.Fling))
+            lines.Add($"<b>Fling</b> ({cost} AP): {Esc(Abilities.Describe(Ability.Fling))}.");
         if (e.Has(Ability.Howl))
             lines.Add($"<b>Howl</b> ({cost} AP): {Esc(Abilities.Describe(Ability.Howl))}. The leader acts before the other enemies, so the move reaches wolves that haven't acted.");
         if (e.Slams)
@@ -204,7 +206,7 @@ public static class GamepediaWriter
         html.Append("<li>Then the enemies act one at a time, in the order they entered the battle. Each finishes its whole turn before the next starts. Units raised or split off during this phase wait until the next enemy turn.</li>");
         html.Append("<li>A turn is a loop: the enemy picks a target, does the first thing on its behaviour's list that it can, and starts over. It stops when it runs out of AP and moves, or nothing on the list helps. The target is picked again before every action, so after a kill it turns to the next one.</li>");
         html.Append($"<li>Enemies move by your rules: {Battle.MoveCost} move per tile (moves are separate from AP), no diagonals, stepping out of a tile next to one of your units uses up their remaining moves (zone of control), no moving after spending AP, and pinned or slowed units can't move.</li>");
-        html.Append("<li>Enemies can't see mines. One that steps on a mine stops there and sets it off.</li></ul>");
+        html.Append("<li>Enemies can't see mines, except a goblin standing next to one, which can fling it. One that steps on a mine stops there and sets it off.</li></ul>");
 
         html.Append("<h3 id=\"ai-target\">Targeting</h3><ol>");
         html.Append($"<li>A unit with Taunt within {Battle.TauntRange} tiles: the nearest such unit.</li>");
@@ -246,6 +248,7 @@ public static class GamepediaWriter
         html.Append("<table><tr><th>Shows</th><th>When (checked in this order)</th><th>On the board</th></tr>");
         html.Append("<tr><td>Flee</td><td>It carries stolen gold.</td><td>The enemies' back row, where it will escape.</td></tr>");
         html.Append("<tr><td>Howl</td><td>It can howl, and the extra move would let at least one wolf bite this turn that otherwise couldn't (two if the leader could bite itself).</td><td>Every wolf.</td></tr>");
+        html.Append("<tr><td>Fling</td><td>A goblin that can't reach anyone to strike this turn, with a bomb, mine or unacted goblin next to it and one of your units 2-3 tiles away.</td><td>The target, the goblin to be thrown and its landing tile.</td></tr>");
         html.Append("<tr><td>Slam</td><td>It can slam, 2 or more of your units are within 2 tiles, and the slam would deal more in total than a smash.</td><td>The area within 2 tiles.</td></tr>");
         html.Append("<tr><td>Raise</td><td>It can raise and one of its bone piles within raise range is free. AP isn't checked.</td><td>The bone pile.</td></tr>");
         html.Append("<tr><td>Bomb</td><td>It bombs and its target is 2 to bomb-range tiles away with no bomb on its tile. Otherwise it shows Attack, though it may still bomb another unit or back off.</td><td>The target's tile, where the bomb lands.</td></tr>");
@@ -266,6 +269,7 @@ public static class GamepediaWriter
             case EnemyBehaviour.Bomber: return "Bomber";
             case EnemyBehaviour.Giant: return "Giant";
             case EnemyBehaviour.PackLeader: return "Pack Leader";
+            case EnemyBehaviour.Goblin: return "Goblin";
             case EnemyBehaviour.Necromancer: return "Necromancer";
             default: throw new ArgumentOutOfRangeException(nameof(b), b, "Add a name and steps for this behaviour to the gamepedia.");
         }
@@ -294,6 +298,14 @@ public static class GamepediaWriter
                 {
                     "Carrying stolen gold: if it is on the enemies' back row, escape with the gold. Otherwise move to the reachable tile furthest back (the cheapest of those). If it can't get any further back this turn, it stops.",
                     $"Not carrying gold: attack its {target} if it can, otherwise {approach}, like Walk up and hit. Its first hit that does damage steals the gold, and it spends the rest of its moves running.",
+                };
+            case EnemyBehaviour.Goblin:
+                return new[]
+                {
+                    $"If a bomb or mine lies on an empty tile next to it: fling it at its {target}, or at the nearest of your units 2-{Battle.FlingRange} tiles away.",
+                    $"If it can hit its {target} from where it stands: strike.",
+                    $"If it can't reach anyone to strike this turn: fling a goblin next to it that hasn't acted at its target, or at the nearest of your units 2-{Battle.FlingRange} tiles away.",
+                    $"Otherwise {approach} to it (Slippery: your reach doesn't stop it), then try again.",
                 };
             case EnemyBehaviour.PackLeader:
                 return new[]

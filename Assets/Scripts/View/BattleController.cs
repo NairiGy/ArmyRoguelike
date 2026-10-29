@@ -703,6 +703,17 @@ namespace ArmyRoguelike.View
                         if (Battle.Distance(p, 1, enemy) <= 2 && !Battle.Cells(enemy).Contains(p))
                             _board.SetHighlight(p, SmashZoneColor);
                     break;
+                case IntentKind.Fling:
+                    _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
+                    if (intent.Thrown != null)
+                    {
+                        _board.SetHighlight(intent.Thrown.Pos, AuraColor);
+                        if (intent.Tile.HasValue)
+                            _board.SetHighlight(intent.Tile.Value, RockLandingColor);
+                    }
+
+                    line.Show(from, to);
+                    break;
                 case IntentKind.Howl:
                     foreach (var wolf in Battle.Living(enemy.Team).Where(w => w.IsWolf))
                         _board.SetHighlight(wolf.Pos, AuraColor);
@@ -789,6 +800,31 @@ namespace ArmyRoguelike.View
                     }
 
                     yield return boulder.Hit.Killed ? target.Die() : target.Hit();
+                    break;
+                }
+                case FlingEvent fling:
+                {
+                    // Placeholder: a lunge, then the goblin or explosive hops over (see the "Art needed" table).
+                    var thrower = _board.ViewOf(fling.Thrower);
+                    var target = _board.ViewOf(fling.Target);
+                    yield return thrower.Lunge(IsoMath.GridToWorld(fling.From), null);
+                    thrower.SetGridPosition(fling.Thrower.Pos);
+                    if (fling.Thrown == null)
+                    {
+                        _board.RemoveHazard(fling.From);
+                        yield return FlyProjectile(PlaceholderArt.Pixel, 0.3f, IsoMath.GridToWorld(fling.From), target.transform.position);
+                        break;
+                    }
+
+                    var thrown = _board.ViewOf(fling.Thrown);
+                    thrown.SetGridPosition(fling.To);
+                    DamagePopup.Spawn(thrown.TopWorld + Vector3.up * 0.1f, "Flung!", DamagePopup.AbilityColor, 40);
+                    if (fling.Hit.HasValue)
+                    {
+                        ShowHit(fling.Hit.Value);
+                        yield return fling.Hit.Value.Killed ? target.Die() : target.Hit();
+                    }
+
                     break;
                 }
                 case HowlEvent howl:
@@ -1627,6 +1663,10 @@ namespace ArmyRoguelike.View
                     return $"run off the far edge with {intent.Target.CarryingLoot} of your gold. Kill it first!";
                 case IntentKind.Slam:
                     return $"slam: {Battle.SlamDamage} damage to everyone within 2 tiles (red area), then shove them 1 tile away";
+                case IntentKind.Fling:
+                    return intent.Thrown != null
+                        ? $"fling the {intent.Thrown.Stats.Name} at the {name}: {Battle.FlingDamage} damage, it lands on the dark tile and can still act"
+                        : $"fling an explosive from next to it at the {name}: it goes off there";
                 case IntentKind.Howl:
                     return $"howl: every wolf gets +{Battle.HowlMoves} move this turn (wolves lit up)";
                 default:

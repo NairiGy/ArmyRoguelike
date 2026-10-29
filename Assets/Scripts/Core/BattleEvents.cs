@@ -401,6 +401,37 @@ namespace ArmyRoguelike.Core
         public override Unit Actor => Raiser;
     }
 
+    /// <summary>
+    /// A goblin flung something at a unit: another goblin (it lands on <see cref="To"/>, next to the target, and the
+    /// target takes <see cref="Hit"/>) or a bomb or mine picked up from <see cref="From"/> (an explosion follows).
+    /// </summary>
+    public sealed class FlingEvent : BattleEvent
+    {
+        public readonly Unit Thrower;
+
+        /// <summary>The goblin thrown, or null for an explosive.</summary>
+        public readonly Unit Thrown;
+
+        public readonly GridPos From;
+        public readonly GridPos To;
+        public readonly Unit Target;
+
+        /// <summary>The landing goblin's hit on the target; null for an explosive (its blast is a separate event).</summary>
+        public readonly Hit? Hit;
+
+        public FlingEvent(Unit thrower, Unit thrown, GridPos from, GridPos to, Unit target, Hit? hit)
+        {
+            Thrower = thrower;
+            Thrown = thrown;
+            From = from;
+            To = to;
+            Target = target;
+            Hit = hit;
+        }
+
+        public override Unit Actor => Thrower;
+    }
+
     /// <summary>A Pack Leader howled: every wolf that hasn't acted yet gets extra moves this turn.</summary>
     public sealed class HowlEvent : BattleEvent
     {
