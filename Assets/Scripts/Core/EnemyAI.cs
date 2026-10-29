@@ -335,13 +335,19 @@ namespace ArmyRoguelike.Core
                         return;
                     }
 
-                    // Furthest row reachable, cheapest first; give up if it can't get any further this turn.
+                    // Furthest row reachable, cheapest first. Cornered (it can't get any further back this
+                    // turn): it hits whoever it can instead of standing still.
                     var best = battle.GetReachable(thief)
                         .OrderByDescending(kv => kv.Key.Y)
                         .ThenBy(kv => kv.Value)
                         .FirstOrDefault();
                     if (best.Key.Y <= thief.Pos.Y)
+                    {
+                        var cornered = ChooseTarget(battle, thief);
+                        if (cornered != null && battle.CanAttack(thief, cornered))
+                            events.AddRange(battle.DoAttack(thief, cornered));
                         return;
+                    }
                     var move = battle.DoMove(thief, best.Key);
                     if (move == null)
                         return;

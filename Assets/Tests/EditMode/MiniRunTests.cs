@@ -495,7 +495,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Layouts_FollowTheirRules()
         {
-            foreach (var enc in Encounter.Regular.Concat(Encounter.Bosses))
+            foreach (var enc in Encounter.Regular.Concat(Encounter.Elites).Concat(Encounter.Bosses).Concat(new[] { Encounter.MoonShrine, Encounter.BreakRitual }))
             {
                 for (var seed = 0; seed < 30; seed++)
                 {
@@ -504,10 +504,15 @@ namespace ArmyRoguelike.Tests
                     for (var y = 0; y < Battle.PlayerZoneRows; y++)
                         Assert.IsFalse(b.Board.IsObstacle(new GridPos(x, y)), $"{enc.Name}: player rows clear");
                     Assert.IsTrue(b.Units.Any(u => u.Team == Team.Enemy), enc.Name);
+                    // At most 2 rocks unless the layout needs more (the broken ridge, one cover rock per elite crossbowman), none touching.
+                    var rocks = b.Board.AllTiles().Where(b.Board.IsObstacle).ToList();
+                    var max = enc.Layout == "Ridge" || enc == Encounter.EliteBandits ? 3 : 2;
+                    Assert.LessOrEqual(rocks.Count, max, $"{enc.Name}: rocks");
+                    Assert.IsFalse(rocks.Any(r => rocks.Any(o => o != r && System.Math.Abs(o.X - r.X) <= 1 && System.Math.Abs(o.Y - r.Y) <= 1)), $"{enc.Name}: rocks touch");
                 }
             }
 
-            // The ridge always has exactly three gaps.
+            // The broken ridge is always three rocks, one every other column.
             var ridge = Encounter.Goblins.CreateBattle(ArmyMember.StartingArmy(), new System.Random(5));
             Assert.AreEqual(Encounter.Size - 3, Enumerable.Range(0, Encounter.Size).Count(x => ridge.Board.IsObstacle(new GridPos(x, 3))));
         }
@@ -1070,7 +1075,7 @@ namespace ArmyRoguelike.Tests
                 b.StartBattle();
                 for (var turn = 0; turn < 80 && !b.IsOver; turn++)
                     b.EndPlayerTurn();
-                Assert.IsTrue(b.IsOver, $"{encounter.Name} should end against a passive player");
+                Assert.IsTrue(b.IsOver, $"{encounter.Name} should end against a passive player: " + string.Join("; ", b.Units.Where(u => u.IsAlive && u.IsPlaced)) + " rocks " + string.Join(",", b.Board.AllTiles().Where(b.Board.IsObstacle)));
             }
         }
     }
