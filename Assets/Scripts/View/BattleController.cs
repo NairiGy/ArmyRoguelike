@@ -72,7 +72,7 @@ namespace ArmyRoguelike.View
         private static readonly Color ShroudColor = new Color(0.25f, 0.2f, 0.55f, 0.45f);
 
         // Wolf tints: warm while the leader's aura reaches them, pale and cold once the leader is dead.
-        private static readonly Color NearLeaderTint = new Color(1.25f, 0.8f, 0.75f);
+        private static readonly Color BondedTint = new Color(1.25f, 0.8f, 0.75f);
         private static readonly Color LeaderlessTint = new Color(0.8f, 0.9f, 1.15f);
 
         private const float ReferenceHeight = 720f;
@@ -627,8 +627,7 @@ namespace ArmyRoguelike.View
         private readonly List<IntentView> _allIntents = new List<IntentView>();
 
         /// <summary>
-        /// While hovering an enemy: what it plans to do next, and for the pack leader its aura. While Alt is
-        /// held: every enemy's intent at once.
+        /// While hovering an enemy: what it plans to do next. While Alt is held: every enemy's intent at once.
         /// </summary>
         private void DrawEnemyHover()
         {
@@ -646,11 +645,6 @@ namespace ArmyRoguelike.View
             var enemy = _hoveredUnit;
             if (enemy == null || enemy.Team != Team.Enemy)
                 return;
-
-            if (enemy.IsPackLeader)
-                foreach (var p in Battle.Board.AllTiles())
-                    if (p.StepsTo(enemy.Pos) <= Battle.LeaderAuraRange && !Battle.Board.IsObstacle(p))
-                        _board.SetHighlight(p, AuraColor);
 
             DrawIntent(enemy, _intent);
         }
@@ -705,6 +699,10 @@ namespace ArmyRoguelike.View
                     foreach (var p in Battle.Board.AllTiles())
                         if (Battle.Distance(p, 1, enemy) <= 2 && !Battle.Cells(enemy).Contains(p))
                             _board.SetHighlight(p, SmashZoneColor);
+                    break;
+                case IntentKind.Howl:
+                    foreach (var wolf in Battle.Living(enemy.Team).Where(w => w.IsWolf))
+                        _board.SetHighlight(wolf.Pos, AuraColor);
                     break;
                 default:
                     _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
@@ -788,6 +786,17 @@ namespace ArmyRoguelike.View
                     }
 
                     yield return boulder.Hit.Killed ? target.Die() : target.Hit();
+                    break;
+                }
+                case HowlEvent howl:
+                {
+                    // Placeholder: popups only (see the "Art needed" table).
+                    var leader = _board.ViewOf(howl.Leader);
+                    DamagePopup.Spawn(leader.TopWorld + Vector3.up * 0.25f, "Howl!", DamagePopup.AbilityColor, 48);
+                    StartCoroutine(Shake(0.03f, 0.3f));
+                    foreach (var wolf in howl.Wolves)
+                        DamagePopup.Spawn(_board.ViewOf(wolf).TopWorld + Vector3.up * 0.1f, $"+{howl.Moves} move", DamagePopup.AbilityColor, 36);
+                    yield return new WaitForSeconds(0.45f);
                     break;
                 }
                 case RaiseEvent raise:
@@ -1114,7 +1123,7 @@ namespace ArmyRoguelike.View
             _camera.transform.position = home;
         }
 
-        /// <summary>Dims statues that have finished their turn and tints wolves by their pack state.</summary>
+        /// <summary>Dims statues that have finished their turn and tints wolves by their pack state (leader alive or dead).</summary>
         private void RefreshUnitStates()
         {
             foreach (var u in Battle.Units.Where(u => u.IsPlaced && u.IsAlive))
@@ -1126,8 +1135,8 @@ namespace ArmyRoguelike.View
                 view.RefreshStatus();
                 switch (Battle.GetPackState(u))
                 {
-                    case PackState.NearLeader:
-                        view.SetTint(NearLeaderTint);
+                    case PackState.Bonded:
+                        view.SetTint(BondedTint);
                         break;
                     case PackState.Leaderless:
                         view.SetTint(LeaderlessTint);
@@ -1286,7 +1295,8 @@ namespace ArmyRoguelike.View
             DrawDebugButton();
             GUILayout.EndArea();
 
-            TextPanel(HoverText(), true, false, 280f);
+            if (!DrawUnitCard())
+                TextPanel(HoverText(), true, false, 280f);
         }
 
         private void DrawTurnHud()
@@ -1323,7 +1333,8 @@ namespace ArmyRoguelike.View
             GUILayout.EndArea();
 
             // Top-right: whatever is under the mouse.
-            TextPanel(HoverText(), true, false, 280f);
+            if (!DrawUnitCard())
+                TextPanel(HoverText(), true, false, 280f);
 
             // Bottom-left: the current hint, or the description of the hovered action button.
             if (playerTurn && !_confirmEndTurn)
@@ -1437,40 +1448,6 @@ namespace ArmyRoguelike.View
                            ? "Enemies go for it unless one of your units is next to them."
                            : $"Guards go for any of your units within {EnemyAI.TotemThreatRange} tiles of a totem. Their own bombs don't hurt it.");
 
-            if (_hoveredUnit != null && _hoveredUnit != _selected)
-            {
-                var text = "Hover: " + UnitLine(_hoveredUnit);
-                var abilities = AbilityLines(_hoveredUnit);
-                if (abilities.Length > 0)
-                    text += "\n" + abilities;
-                switch (Battle.GetPackState(_hoveredUnit))
-                {
-                    case PackState.NearLeader:
-                        text += "\n+1 damage: near the Pack Leader";
-                        break;
-                    case PackState.Leaderless:
-                        text += "\n-1 damage: the Pack Leader is dead";
-                        break;
-                }
-
-                if (_hoveredUnit.IsPackLeader)
-                    text += $"\nWolves within {Battle.LeaderAuraRange} tiles get +1 damage";
-                if (_hoveredUnit.Stats.CanRaise)
-                    text += $"\nRaises a bone pile within {_hoveredUnit.Stats.RaiseRange} tiles instead of attacking";
-                if (_hoveredUnit.Stats.AreaMelee)
-                    text += $"\nSmash hits everyone next to it. Throws boulders up to {_hoveredUnit.Stats.ThrowRange} tiles; they stay as rocks";
-                if (_hoveredUnit.Stats.CanBomb)
-                    text += $"\nLobs a bomb ({_hoveredUnit.Stats.BombDamage} damage, on one tile) that explodes next enemy turn";
-                if (_hoveredUnit.Team == Team.Enemy)
-                    text += "\n" + IntentText(EnemyAI.PredictIntent(Battle, _hoveredUnit));
-                var engaged = EngagedLine(_hoveredUnit);
-                if (engaged.Length > 0)
-                    text += "\n" + engaged;
-                if (_selected != null && _hoveredUnit.Team == Team.Enemy && !Battle.CanAttack(_selected, _hoveredUnit) &&
-                    Battle.FindAttackSpot(_selected, _hoveredUnit) is var spot && spot.HasValue)
-                    text += $"\nClick: walk {spot.Value.cost} tile(s) + attack {Battle.AttackCost} AP";
-                return text;
-            }
 
             if (_hovered.HasValue)
             {
@@ -1496,6 +1473,111 @@ namespace ArmyRoguelike.View
             return null;
         }
 
+        // ---------- Unit card (hovering a unit) ----------
+
+        private const float CardWidth = 360f;
+        private const string EnemyHeader = "#ff8f7a";
+        private const string PlayerHeader = "#8cc8ff";
+        private const string NextColor = "#ffb347";
+        private const string PassiveColor = "#9be39b";
+        private const string ActionColor = "#ffd966";
+        private const string DimColor = "#b8b8b8";
+
+        /// <summary>
+        /// While hovering a unit (not the selected one, not an objective): a card at the top-right with its
+        /// name and HP, what it does next (enemies), its passives, its actions and its current state.
+        /// False if there is no such unit, so the plain hover text shows instead.
+        /// </summary>
+        private bool DrawUnitCard()
+        {
+            var u = _hoveredUnit;
+            if (u == null || u == _selected || u.IsObjective)
+                return false;
+
+            var rows = new List<(string text, GUIStyle style)>();
+            var header = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 17, fontStyle = FontStyle.Bold };
+            var body = new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true, fontSize = 13 };
+            var section = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 11, fontStyle = FontStyle.Bold };
+
+            var team = u.Team == Team.Enemy ? EnemyHeader : PlayerHeader;
+            var item = u.Equipment != null ? $"   <color={DimColor}><size=12>[{u.Equipment.Name}]</size></color>" : "";
+            rows.Add(($"<color={team}>{u.Stats.Name}</color>   <color=white>HP {u.Hp} / {u.MaxHp}</color>{item}", header));
+            rows.Add(($"<color={DimColor}>{u.MaxAp} AP  ·  {u.MaxMoves} {(u.MaxMoves == 1 ? "move" : "moves")}  ·  range {u.Range}</color>", body));
+
+            if (u.Team == Team.Enemy)
+                rows.Add(($"<color={NextColor}><b>Next:</b> {IntentText(EnemyAI.PredictIntent(Battle, u))}</color>", body));
+
+            var passives = Abilities.PassivesOf(u.Stats);
+            var itemAbility = u.Equipment?.Ability ?? Ability.None;
+            if (itemAbility != Ability.None)
+                passives.Add(($"{Abilities.Name(itemAbility)} ({u.Equipment.Name})", Abilities.Describe(itemAbility)));
+            if (passives.Count > 0)
+            {
+                rows.Add(($"<color={PassiveColor}>PASSIVE</color>", section));
+                foreach (var (name, text) in passives)
+                    rows.Add(($"<b>{name}</b>  <color={DimColor}>{text}</color>", body));
+            }
+
+            rows.Add(($"<color={ActionColor}>ACTIONS</color>", section));
+            foreach (var (name, cost, text) in Abilities.ActionsOf(u.Stats, Battle.EffectiveDamage(u)))
+                rows.Add(($"<b>{name}</b> <color={DimColor}>({cost} AP)  {text}</color>", body));
+
+            var state = StateLines(u);
+            if (state.Count > 0)
+            {
+                rows.Add(($"<color={DimColor}>NOW</color>", section));
+                foreach (var line in state)
+                    rows.Add((line, body));
+            }
+
+            if (_selected != null && u.Team == Team.Enemy && !Battle.CanAttack(_selected, u) &&
+                Battle.FindAttackSpot(_selected, u) is var spot && spot.HasValue)
+                rows.Add(($"<color={NextColor}>Click: walk {spot.Value.cost} tile(s) and attack ({Battle.AttackCost} AP)</color>", body));
+
+            var inner = CardWidth - 16f;
+            var height = rows.Sum(r => r.style.CalcHeight(new GUIContent(r.text), inner)) + 16f;
+            height = Mathf.Min(height, ReferenceHeight - 2 * Margin);
+            GUILayout.BeginArea(Panel(GuiWidth - CardWidth - Margin, Margin, CardWidth, height), GUI.skin.box);
+            foreach (var (text, style) in rows)
+                GUILayout.Label(text, style);
+            GUILayout.EndArea();
+            return true;
+        }
+
+        /// <summary>What is true for the unit right now: statuses, pack state, run bonuses, zone of control.</summary>
+        private List<string> StateLines(Unit u)
+        {
+            var lines = new List<string>();
+            switch (Battle.GetPackState(u))
+            {
+                case PackState.Bonded:
+                    lines.Add($"+{Battle.PackBondHp} max HP: the Pack Leader lives");
+                    break;
+                case PackState.Leaderless:
+                    lines.Add($"-{Battle.PackBondHp} max HP: the Pack Leader is dead");
+                    break;
+            }
+
+            if (u.Member != null && u.Member.BonusDamage + u.GainedDamage > 0)
+                lines.Add($"Bloodthirst so far: +{u.Member.BonusDamage + u.GainedDamage} damage");
+            if (u.Shield > 0)
+                lines.Add($"Shield {u.Shield}");
+            if (u.MoonShield > 0)
+                lines.Add($"Moon shield {u.MoonShield}");
+            if (u.IsSnared)
+                lines.Add("Snared: can't move");
+            if (u.IsSlowed)
+                lines.Add("Slowed: can't move");
+            if (u.PoisonTurns > 0)
+                lines.Add($"Poisoned ({u.PoisonTurns} more)");
+            if (u.CarryingLoot > 0)
+                lines.Add($"Carrying {u.CarryingLoot} of your gold");
+            var engaged = EngagedLine(u);
+            if (engaged.Length > 0)
+                lines.Add(engaged);
+            return lines;
+        }
+
         /// <summary>"Engaged by ..." for a unit standing in enemy reach (zone of control), or empty.</summary>
         private string EngagedLine(Unit u)
         {
@@ -1511,24 +1593,26 @@ namespace ArmyRoguelike.View
         private static string IntentText(Intent intent)
         {
             if (intent.Target == null)
-                return "Wants to: nothing";
+                return "nothing";
             var name = intent.Target.Stats.Name;
             switch (intent.Kind)
             {
                 case IntentKind.Raise:
-                    return $"Wants to: raise the {name} bone pile";
+                    return $"raise the {name} bone pile and every other one in range";
                 case IntentKind.Smash:
-                    return $"Wants to: smash, going for the {name}";
+                    return $"smash everyone next to it, going for the {name}";
                 case IntentKind.Throw:
-                    return $"Wants to: throw a boulder at the {name} (rock lands on the dark tile)";
+                    return $"throw a boulder at the {name} (the rock lands on the dark tile)";
                 case IntentKind.Bomb:
-                    return $"Wants to: bomb the {name}'s tile (goes off next enemy turn)";
+                    return $"bomb the {name}'s tile (goes off next enemy turn)";
                 case IntentKind.Flee:
-                    return $"Wants to: run off the far edge with {intent.Target.CarryingLoot} of your gold. Kill it first!";
+                    return $"run off the far edge with {intent.Target.CarryingLoot} of your gold. Kill it first!";
                 case IntentKind.Slam:
-                    return "Wants to: slam, shoving everyone within 2 tiles (red area) 1 tile away";
+                    return $"slam: {Battle.SlamDamage} damage to everyone within 2 tiles (red area), then shove them 1 tile away";
+                case IntentKind.Howl:
+                    return $"howl: every wolf gets +{Battle.HowlMoves} move this turn (wolves lit up)";
                 default:
-                    return $"Wants to attack: {name}";
+                    return $"attack the {name}";
             }
         }
 

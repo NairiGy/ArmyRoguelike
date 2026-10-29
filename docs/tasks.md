@@ -24,6 +24,8 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 | Moon Shrine | Reinforcements arriving at the edge | The rise animation and a text popup | Needed |
 | Scenarios | Blessing pick and item pick screens | Plain IMGUI panels (part of the UI pass) | Needed |
 | Zone of control | Enemy reach tiles, orange "costs extra AP" move tiles, dotted link to the enemies holding the selected unit | Flat colours (`EnemyReachColor`, `CostlyMoveColor`) and a red dotted line (`EngagedLinkColor`) in `BattleController` | Needed |
+| Unit card (branch `experiment/small-board`) | The hover card's look: panel, header, section colours | IMGUI box with rich-text colours (`DrawUnitCard` in `BattleController`) | Needed only if the experiment is kept |
+| Howl (branch `experiment/small-board`) | The Pack Leader's howl, and the "+1 move" on each wolf | "Howl!" and "+1 move" popups and a small shake (`HowlEvent` in `BattleController`) | Needed only if the experiment is kept |
 | Small board experiment (branch `experiment/small-board`) | Moves left on a statue (moves are now separate from AP); the tower-roof painting fitted under a 6x6 board | Moves only as text in the HUD ("Moves 1 / 1"); the scenery fits itself to the board size but hasn't been looked at on 6x6 | Needed only if the experiment is kept |
 
 ### Other visual work
@@ -51,6 +53,8 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [x] Act 1 is 12 steps with elites (harder rematches that pay an item pick); battles bring unbeaten factions, then rematches; Bloodthirst capped at +3; run log now gets each battle's log file even when Continue is clicked early (2026-10-28, branch `feature/act1-12-steps`). Not playtested.
 - [x] Small-board idea test (2026-10-29, branch `experiment/small-board`, worktree `.claude/worktrees/small-board`): 6x6 board, 1 move per turn separate from AP, Swift keyword, scaled ranges, 1x1 bombs, plus-shaped fireballs, new layouts. See "Experiment: small board, one move" in the design note. Gamepedia on the branch is text only.
 - [x] Small-board step 2, one AP (2026-10-29, same branch): every unit has 1 AP, so one move and one action a turn, no carry-over; Momentum gives the action back on a kill; Opening Shot doubles the first hit on each enemy; the Giant's slam deals damage and it picks the bigger hit; the Necromancer raises every pile in range at once.
+- [x] Unit kits, wolves first (2026-10-29, same branch): attacks are named actions; Wolf (Blood Scent, Wolf Bite chain) and Pack Leader (Pack Bond HP, Howl); a hover card with Next / Passive / Actions / Now.
+- [ ] Unit kits for the other enemy factions (goblins, bandits, elementals, bosses) and for the player's units: a passive and actions for each, designed one faction or line at a time with the user.
 - [ ] Playtest the small-board experiment (open the worktree folder as its own project in Unity Hub), then decide: keep and merge, tune, or drop the branch. Watch for: fights now slower (one attack a turn each) and whether HP needs cutting, ranged units too strong, bombers too weak with 1x1 bombs, the bosses' new single actions, crowding in elites and the Necromancer fight.
 - [ ] Next: playtest the 12-step Act 1 as a full run and summarise from the logs. Then decide on new node types and events, and the balance pass.
 - [ ] Later: split fights into difficulty pools (and add more fights); each map step draws from a pool.

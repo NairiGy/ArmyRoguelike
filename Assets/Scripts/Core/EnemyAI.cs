@@ -17,6 +17,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>The Giant shoving everyone near it.</summary>
         Slam,
+
+        /// <summary>A Pack Leader howling: every wolf that hasn't acted gets +1 move.</summary>
+        Howl,
     }
 
     /// <summary>What an enemy plans to do next, for the hover display.</summary>
@@ -53,6 +56,9 @@ namespace ArmyRoguelike.Core
         /// <summary>Slam, area smash and boulder throws.</summary>
         Giant,
 
+        /// <summary>Howls when that lets wolves reach their prey, otherwise like Advance.</summary>
+        PackLeader,
+
         /// <summary>Raises bone piles, keeps its distance and fires bolts.</summary>
         Necromancer,
     }
@@ -77,6 +83,8 @@ namespace ArmyRoguelike.Core
                 return EnemyBehaviour.Thief;
             if (stats.CanBomb)
                 return EnemyBehaviour.Bomber;
+            if (stats.Has(Ability.Howl))
+                return EnemyBehaviour.PackLeader;
             if (stats.AreaMelee)
                 return EnemyBehaviour.Giant;
             return EnemyBehaviour.Advance;
@@ -127,11 +135,72 @@ namespace ArmyRoguelike.Core
                     return threat;
             }
 
+            // Blood Scent: the lowest-HP unit it can reach and attack this turn.
+            if (enemy.Has(Ability.BloodScent))
+            {
+                var prey = battle.Living(Team.Player)
+                    .Where(u => !u.IsObjective && CanReachToAttack(battle, enemy, u))
+                    .OrderBy(u => u.Hp)
+                    .ThenBy(u => Battle.Distance(enemy, u))
+                    .ThenBy(u => u.Id)
+                    .FirstOrDefault();
+                if (prey != null)
+                    return prey;
+            }
+
             return battle.Living(Team.Player)
                 .OrderBy(u => Battle.Distance(enemy, u))
                 .ThenBy(u => u.Hp)
                 .ThenBy(u => u.Id)
                 .FirstOrDefault();
+        }
+
+        /// <summary>
+        /// Runs a check as if the unit's turn were about to happen: during the enemy turn with what it has
+        /// left, otherwise (hover intent) with its full AP and moves. <paramref name="extraMoves"/> is added on top.
+        /// </summary>
+        private static T AsIfItsTurn<T>(Battle battle, Unit unit, int extraMoves, System.Func<T> check)
+        {
+            var (moves, ap) = (unit.Moves, unit.Ap);
+            if (battle.Phase != Phase.EnemyTurn)
+            {
+                unit.Moves = unit.MaxMoves;
+                unit.Ap = unit.MaxAp;
+            }
+
+            unit.Moves += extraMoves;
+            try
+            {
+                return check();
+            }
+            finally
+            {
+                (unit.Moves, unit.Ap) = (moves, ap);
+            }
+        }
+
+        /// <summary>Whether the unit can attack the target this turn, walking up first if needed.</summary>
+        private static bool CanReachToAttack(Battle battle, Unit unit, Unit target, int extraMoves = 0) =>
+            AsIfItsTurn(battle, unit, extraMoves, () => battle.FindAttackSpot(unit, target).HasValue);
+
+        /// <summary>
+        /// Howl when the extra move lets wolves bite this turn that otherwise couldn't: at least one if the
+        /// leader can't bite anyone itself, at least two if it could.
+        /// </summary>
+        public static bool ShouldHowl(Battle battle, Unit leader)
+        {
+            if (!leader.Has(Ability.Howl) || (battle.Phase == Phase.EnemyTurn && leader.Ap < Battle.AttackCost))
+                return false;
+            var helped = battle.Living(leader.Team)
+                .Where(w => w.IsWolf && (battle.Phase != Phase.EnemyTurn || !w.IsDone) && battle.CanMove(w))
+                .Count(w =>
+                {
+                    var prey = ChooseTarget(battle, w);
+                    return prey != null && !CanReachToAttack(battle, w, prey) && CanReachToAttack(battle, w, prey, Battle.HowlMoves);
+                });
+            var ownTarget = ChooseTarget(battle, leader);
+            var canBite = ownTarget != null && CanReachToAttack(battle, leader, ownTarget);
+            return helped >= (canBite ? 2 : 1);
         }
 
         /// <summary>The bone pile a necromancer would raise right now, if any.</summary>
@@ -166,6 +235,9 @@ namespace ArmyRoguelike.Core
             var target = ChooseTarget(battle, enemy);
             if (target == null)
                 return new Intent(IntentKind.None, null);
+
+            if (ShouldHowl(battle, enemy))
+                return new Intent(IntentKind.Howl, enemy);
 
             if (enemy.Stats.CanBomb)
             {
@@ -208,6 +280,11 @@ namespace ArmyRoguelike.Core
                     break;
                 case EnemyBehaviour.Giant:
                     OgreTurn(battle, enemy, events);
+                    break;
+                case EnemyBehaviour.PackLeader:
+                    if (ShouldHowl(battle, enemy))
+                        events.AddRange(battle.DoHowl(enemy));
+                    MeleeTurn(battle, enemy, events);
                     break;
                 default:
                     MeleeTurn(battle, enemy, events);

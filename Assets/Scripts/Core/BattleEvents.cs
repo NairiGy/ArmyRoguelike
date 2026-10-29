@@ -34,7 +34,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Tiles stepped onto, in order. Does not include the starting tile.</summary>
         public readonly IReadOnlyList<GridPos> Path;
 
-        /// <summary>AP spent, and how many steps left an enemy's reach (zone of control, each +2 AP).</summary>
+        /// <summary>Moves spent, and how many steps left an enemy's reach (zone of control: uses up the remaining moves).</summary>
         public readonly int Cost;
 
         public readonly int ZocSteps;
@@ -386,6 +386,23 @@ namespace ArmyRoguelike.Core
         }
 
         public override Unit Actor => Raiser;
+    }
+
+    /// <summary>A Pack Leader howled: every wolf that hasn't acted yet gets extra moves this turn.</summary>
+    public sealed class HowlEvent : BattleEvent
+    {
+        public readonly Unit Leader;
+        public readonly IReadOnlyList<Unit> Wolves;
+        public readonly int Moves;
+
+        public HowlEvent(Unit leader, IReadOnlyList<Unit> wolves, int moves)
+        {
+            Leader = leader;
+            Wolves = wolves;
+            Moves = moves;
+        }
+
+        public override Unit Actor => Leader;
     }
 
     /// <summary>Enemy reinforcements walked onto the board at the edge. They act from the next enemy turn.</summary>

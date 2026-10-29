@@ -163,7 +163,7 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void PackLeader_BuffsNearbyWolves_AndDeathWeakensThem()
+        public void PackBond_WolvesHaveExtraHp_AndLoseItWhenTheLeaderDies()
         {
             var b = Started(new[] { UnitStats.Rogue, UnitStats.Rogue }, new[] { new GridPos(0, 1), new GridPos(1, 1) },
                 new[]
@@ -173,22 +173,64 @@ namespace ArmyRoguelike.Tests
                     (UnitStats.Wolf, new GridPos(6, 6)),
                 });
             var leader = Enemy(b, 0);
-            var near = Enemy(b, 1);
-            var far = Enemy(b, 2);
-            Assert.AreEqual(3, b.EffectiveDamage(near));
-            Assert.AreEqual(2, b.EffectiveDamage(far));
+            var healthy = Enemy(b, 1);
+            var wounded = Enemy(b, 2);
+            Assert.AreEqual(UnitStats.Wolf.MaxHp + 1, healthy.MaxHp, "anywhere on the board, no range");
+            Assert.AreEqual(UnitStats.Wolf.MaxHp + 1, healthy.Hp);
+            Assert.AreEqual(PackState.Bonded, b.GetPackState(wounded));
+            Assert.AreEqual(UnitStats.Wolf.Damage, b.EffectiveDamage(healthy), "no damage aura any more");
+            wounded.Hp = 2;
 
-            leader.Hp = 2 * UnitStats.Rogue.Damage;
-            var first = Player(b, 0);
-            b.PlayerAttack(first, leader);
-            b.EndUnitTurn(first);
-            var second = Player(b, 1);
-            Assert.IsNotNull(b.PlayerMove(second, new GridPos(1, 2)));
-            Assert.IsNotNull(b.PlayerAttack(second, leader));
+            leader.Hp = UnitStats.Rogue.Damage;
+            var events = b.PlayerAttack(Player(b, 0), leader);
             Assert.IsFalse(leader.IsAlive);
-            Assert.AreEqual(1, b.EffectiveDamage(near));
-            Assert.AreEqual(1, b.EffectiveDamage(far));
-            Assert.AreEqual(PackState.Leaderless, b.GetPackState(far));
+            Assert.AreEqual(2, events.OfType<TickEvent>().Count(t => t.Cause == "leader lost"));
+            Assert.AreEqual(UnitStats.Wolf.MaxHp - 1, healthy.MaxHp);
+            Assert.AreEqual(UnitStats.Wolf.MaxHp - 1, healthy.Hp, "lost 2");
+            Assert.IsFalse(wounded.IsAlive, "a wolf on 2 HP dies with its leader");
+            Assert.AreEqual(PackState.Leaderless, b.GetPackState(healthy));
+        }
+
+        [Test]
+        public void WolfBite_EachBiteThisTurnHitsHarder_ResetsNextTurn()
+        {
+            var b = Started(new[] { UnitStats.Bastion }, new[] { new GridPos(3, 1) },
+                new[] { (UnitStats.Wolf, new GridPos(3, 2)), (UnitStats.Wolf, new GridPos(2, 1)), (UnitStats.Wolf, new GridPos(4, 1)) });
+            Player(b).Hp = 50;
+            var events = b.EndPlayerTurn();
+            var bites = events.OfType<AttackEvent>().Where(a => a.Attacker.Team == Team.Enemy).Select(a => a.Damage).ToList();
+            // 2, 3, 4 before Bastion's Tough (-1) and Shield Wall doesn't cover itself.
+            CollectionAssert.AreEqual(new[] { 1, 2, 3 }, bites);
+            Assert.AreEqual(0, b.BiteChain, "the chain resets at the start of the next turn");
+        }
+
+        [Test]
+        public void BloodScent_GoesForTheWeakestItCanReach()
+        {
+            var b = Started(new[] { UnitStats.Warrior, UnitStats.Archer, UnitStats.Rogue },
+                new[] { new GridPos(3, 1), new GridPos(4, 1), new GridPos(0, 0) },
+                new[] { (UnitStats.Wolf, new GridPos(3, 3)) });
+            var wolf = Enemy(b);
+            Player(b, 1).Hp = 3;
+            Player(b, 2).Hp = 1;
+            Assert.AreEqual(Player(b, 1), EnemyAI.ChooseTarget(b, wolf), "the wounded archer, not the nearer warrior; the rogue is out of reach");
+        }
+
+        [Test]
+        public void Howl_GivesWolvesAnExtraMoveWhenItHelps()
+        {
+            var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 0) },
+                new[] { (UnitStats.Wolf, new GridPos(3, 4)), (UnitStats.PackLeader, new GridPos(0, 5)) });
+            var wolf = Enemy(b, 0);
+            var leader = Enemy(b, 1);
+            // The wolf needs 3 moves to reach (3,1); it has 2, so the howl lets it bite.
+            Assert.AreEqual(IntentKind.Howl, EnemyAI.PredictIntent(b, leader).Kind);
+            var events = b.EndPlayerTurn();
+            var howl = events.OfType<HowlEvent>().Single();
+            CollectionAssert.AreEqual(new[] { wolf }, howl.Wolves.ToList());
+            Assert.IsTrue(events.IndexOf(howl) < events.FindIndex(e => e is AttackEvent), "the leader goes first");
+            Assert.AreEqual(new GridPos(3, 1), wolf.Pos);
+            Assert.Less(Player(b).Hp, Player(b).MaxHp);
         }
 
         [Test]

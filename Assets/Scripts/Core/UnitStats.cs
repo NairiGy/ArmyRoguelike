@@ -159,6 +159,20 @@ namespace ArmyRoguelike.Core
 
         /// <summary>2 moves per turn instead of 1.</summary>
         Swift,
+
+        // ---------- Wolves ----------
+
+        /// <summary>Goes for the lowest-HP unit it can reach and attack this turn, instead of the nearest.</summary>
+        BloodScent,
+
+        /// <summary>Its attack is a Wolf Bite: +1 damage for every wolf bite earlier in the same turn.</summary>
+        WolfBite,
+
+        /// <summary>While it lives, every wolf on its side has +1 max HP; once the last one dies, they have -1 and lose 2 HP.</summary>
+        PackBond,
+
+        /// <summary>Its action can be a howl: every wolf that hasn't acted yet gets +1 move this turn.</summary>
+        Howl,
     }
 
     /// <summary>A special action a player unit can spend AP on, besides moving and attacking.</summary>
@@ -483,13 +497,13 @@ namespace ArmyRoguelike.Core
 
         public static readonly UnitStats Wolf = new UnitStats(UnitKind.Wolf, "Wolf", 6, 2, 1, 1)
         {
-            Abilities = A(Ability.Swift),
-            Role = "Fast biter. +1 damage within 2 tiles of a living Pack Leader, -1 once the leader is dead.",
+            Abilities = A(Ability.Swift, Ability.BloodScent, Ability.WolfBite),
+            Role = "Fast biter that hunts the weakest. Bites hit harder the more wolves bit before it this turn.",
         };
         public static readonly UnitStats PackLeader = new UnitStats(UnitKind.PackLeader, "Pack Leader", 10, 3, 1, 1)
         {
-            Abilities = A(Ability.Swift),
-            Role = "Wolves within 2 tiles get +1 damage. When it dies, every wolf gets -1.",
+            Abilities = A(Ability.Swift, Ability.PackBond, Ability.Howl, Ability.WolfBite),
+            Role = "Keeps the pack strong while it lives, and howls to send it further.",
         };
 
         public static readonly UnitStats Skeleton =

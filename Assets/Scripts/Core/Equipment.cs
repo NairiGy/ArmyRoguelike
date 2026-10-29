@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ArmyRoguelike.Core
 {
@@ -75,6 +76,10 @@ namespace ArmyRoguelike.Core
                 case Ability.LuckyCharm: return "Last Stand";
                 case Ability.Immobile: return "Immobile";
                 case Ability.Swift: return "Swift";
+                case Ability.BloodScent: return "Blood Scent";
+                case Ability.WolfBite: return "Wolf Bite";
+                case Ability.PackBond: return "Pack Bond";
+                case Ability.Howl: return "Howl";
                 default: return "";
             }
         }
@@ -118,6 +123,10 @@ namespace ArmyRoguelike.Core
                 case Ability.LuckyCharm: return "once per battle, survives a killing blow at 1 HP";
                 case Ability.Immobile: return "can't move";
                 case Ability.Swift: return $"{Battle.BaseMoves + 1} moves per turn instead of {Battle.BaseMoves}";
+                case Ability.BloodScent: return "goes for the lowest-HP unit it can reach and attack this turn, instead of the nearest";
+                case Ability.WolfBite: return "+1 damage for every wolf bite earlier this turn";
+                case Ability.PackBond: return $"while it lives, every wolf has +{Battle.PackBondHp} max HP; once it dies they have -{Battle.PackBondHp} and lose {2 * Battle.PackBondHp} HP on the spot";
+                case Ability.Howl: return $"every wolf that hasn't acted yet gets +{Battle.HowlMoves} move this turn";
                 default: return "";
             }
         }
@@ -160,6 +169,76 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Charge: return $"rush 2-{Battle.ChargeRange} tiles in a straight line into an enemy, hit it and push it back 1";
                 default: return "";
             }
+        }
+
+        // ---------- A unit's kit: passives and actions ----------
+
+        /// <summary>Abilities that describe one of the unit's actions rather than a passive (listed with the actions).</summary>
+        public static bool IsAction(Ability ability) => ability == Ability.WolfBite || ability == Ability.Howl;
+
+        /// <summary>The name of a unit type's basic attack, which is one of its actions.</summary>
+        public static string AttackName(UnitStats s)
+        {
+            if (s.Has(Ability.WolfBite))
+                return "Wolf Bite";
+            if (s.AreaMelee)
+                return "Smash";
+            if (s.Has(Ability.LongReach))
+                return "Long Strike";
+            if (s.IsRanged)
+                return s.Has(Ability.ArcaneBolt) || s.CanRaise ? "Bolt" : "Shot";
+            return s.Kind == UnitKind.GoblinBomber ? "Stab" : "Strike";
+        }
+
+        /// <summary>What the basic attack does, for a given damage (the unit's current damage on the HUD).</summary>
+        public static string DescribeAttack(UnitStats s, int damage)
+        {
+            if (s.Has(Ability.WolfBite))
+                return $"{damage} damage to a unit next to it, +1 for every wolf bite earlier this turn";
+            if (s.AreaMelee)
+                return $"{damage} damage to every unit next to it";
+            if (s.Has(Ability.LongReach))
+                return $"{damage} damage up to {s.Range} tiles in a straight line, hitting every tile on the way";
+            if (s.IsRanged)
+                return $"{damage} damage up to {s.Range} tiles away, " + (s.Has(Ability.ArcaneBolt) ? "over obstacles" : "needs line of sight");
+            return $"{damage} damage to a unit next to it";
+        }
+
+        /// <summary>Every action a unit type can spend AP on: its attack first, then special actions.</summary>
+        public static List<(string name, int cost, string text)> ActionsOf(UnitStats s, int damage)
+        {
+            var list = new List<(string, int, string)>();
+            if (s.Damage > 0)
+                list.Add((AttackName(s), Battle.AttackCost, DescribeAttack(s, damage)));
+            foreach (var action in s.Actions)
+                list.Add((Name(action), Battle.ActionCost(action), Describe(action)));
+            if (s.Slams)
+                list.Add(("Slam", Battle.AttackCost,
+                    $"{Battle.SlamDamage} damage to each of your units within 2 tiles, then shoves everyone within 2 tiles 1 tile away"));
+            if (s.CanThrow)
+                list.Add(("Boulder", s.ThrowCost, $"{s.ThrowDamage} damage to a unit 2-{s.ThrowRange} tiles away, over obstacles; the rock stays"));
+            if (s.CanBomb)
+                list.Add(("Bomb", s.BombCost, $"lands on a unit 2-{s.BombRange} tiles away and explodes on that tile for {s.BombDamage} at the start of the next enemy turn"));
+            if (s.CanRaise)
+                list.Add(("Raise", s.RaiseCost, $"brings back every bone pile within {s.RaiseRange} tiles at full HP"));
+            if (s.Has(Ability.Howl))
+                list.Add((Name(Ability.Howl), Battle.AttackCost, Describe(Ability.Howl)));
+            return list;
+        }
+
+        /// <summary>A unit type's passives: its abilities that aren't actions, plus traits from its stats.</summary>
+        public static List<(string name, string text)> PassivesOf(UnitStats s)
+        {
+            var list = s.Abilities.Where(a => !IsAction(a)).Select(a => (Name(a), Describe(a))).ToList();
+            if (s.Size > 1)
+                list.Add(("Huge", $"takes up {s.Size}x{s.Size} tiles"));
+            if (s.SplitsInto != null)
+                list.Add(("Split", $"when it dies it splits into 2 {s.SplitsInto.Name}s ({s.SplitsInto.MaxHp} HP each)"));
+            if (s.StealsGold > 0)
+                list.Add(("Thief", $"its first hit steals {s.StealsGold} gold, then it runs for the far edge; kill it to get the gold back"));
+            if (s.LeavesRemains)
+                list.Add(("Bone Pile", "leaves a bone pile when killed; a Necromancer can raise it unless someone stands on it"));
+            return list;
         }
     }
 }

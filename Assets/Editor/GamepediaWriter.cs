@@ -158,12 +158,9 @@ public static class GamepediaWriter
     {
         var lines = new System.Collections.Generic.List<string>();
         var cost = Battle.AttackCost;
-        if (e.AreaMelee)
-            lines.Add($"<b>Smash</b> ({cost} AP): {e.Damage} damage to every unit next to it.");
-        else if (e.IsRanged)
-            lines.Add($"<b>Ranged attack</b> ({cost} AP): {e.Damage} damage up to {e.Range} tiles away; needs line of sight.");
-        else
-            lines.Add($"<b>Attack</b> ({cost} AP): {e.Damage} damage to a unit next to it.");
+        lines.Add($"<b>{Esc(Abilities.AttackName(e))}</b> ({cost} AP): {Esc(Abilities.DescribeAttack(e, e.Damage))}.");
+        if (e.Has(Ability.Howl))
+            lines.Add($"<b>Howl</b> ({cost} AP): {Esc(Abilities.Describe(Ability.Howl))}. The leader acts before the other enemies, so the move reaches wolves that haven't acted.");
         if (e.Slams)
             lines.Add($"<b>Slam</b> ({cost} AP): {Battle.SlamDamage} damage to each of your units within 2 tiles, then shoves every other 1x1 unit within 2 tiles (yours and its own) 1 tile away from it. " +
                       $"A unit pushed into a rock, unit or the edge takes {Battle.CollisionDamage} damage.");
@@ -183,12 +180,8 @@ public static class GamepediaWriter
     private static string[] EnemyTraits(UnitStats e)
     {
         var lines = new System.Collections.Generic.List<string>();
-        foreach (var a in e.Abilities)
+        foreach (var a in e.Abilities.Where(a => !Abilities.IsAction(a)))
             lines.Add($"<b>{Esc(Abilities.Name(a))}</b>: {Esc(Abilities.Describe(a))}.");
-        if (e.Kind == UnitKind.PackLeader)
-            lines.Add($"<b>Pack aura</b>: wolves within {Battle.LeaderAuraRange} tiles deal +1 damage. When it dies, every wolf deals 1 less (minimum 1).");
-        else if (e.Kind == UnitKind.Wolf && !e.IsUndead)
-            lines.Add($"<b>Pack</b>: +1 damage within {Battle.LeaderAuraRange} tiles of a living Pack Leader, -1 once the leader is dead (minimum 1).");
         if (e.StealsGold > 0)
             lines.Add($"<b>Steal</b>: its first hit that does damage takes {e.StealsGold} of your gold. From then on it runs for the enemies' back row and escapes from there, and the gold is lost. Kill it first and you keep the gold.");
         if (e.SplitsInto != null)
@@ -213,6 +206,7 @@ public static class GamepediaWriter
 
         html.Append("<h3 id=\"ai-target\">Targeting</h3><ol>");
         html.Append($"<li>A unit with Taunt within {Battle.TauntRange} tiles: the nearest such unit.</li>");
+        html.Append("<li>Blood Scent (wolves): the lowest-HP unit it can reach and attack this turn, walking up first if needed.</li>");
         html.Append("<li>Otherwise the nearest of your units, counted in steps and ignoring rocks. Ties go to the one with the lowest HP, then to the one listed first in your army.</li></ol>");
         html.Append("<p>Every behaviour uses this target. Only the Bomber may bomb a different unit when its target can't be bombed, and the Necromancer raises bone piles before it looks for a target at all.</p>");
 
@@ -246,9 +240,10 @@ public static class GamepediaWriter
 
         html.Append("<h3 id=\"ai-intent\">Hover intent</h3>");
         html.Append("<p>Hovering an enemy shows the first thing it would do if its turn started now. It is a forecast, not a promise: your moves change it, and it only shows the first action. ");
-        html.Append("Hovering a Pack Leader also lights up its aura. Hold Alt to see every enemy's intent at once.</p>");
+        html.Append("Hold Alt to see every enemy's intent at once.</p>");
         html.Append("<table><tr><th>Shows</th><th>When (checked in this order)</th><th>On the board</th></tr>");
         html.Append("<tr><td>Flee</td><td>It carries stolen gold.</td><td>The enemies' back row, where it will escape.</td></tr>");
+        html.Append("<tr><td>Howl</td><td>It can howl, and the extra move would let at least one wolf bite this turn that otherwise couldn't (two if the leader could bite itself).</td><td>Every wolf.</td></tr>");
         html.Append("<tr><td>Slam</td><td>It can slam, 2 or more of your units are within 2 tiles, and the slam would deal more in total than a smash.</td><td>The area within 2 tiles.</td></tr>");
         html.Append("<tr><td>Raise</td><td>It can raise and one of its bone piles within raise range is free. AP isn't checked.</td><td>The bone pile.</td></tr>");
         html.Append("<tr><td>Bomb</td><td>It bombs and its target is 2 to bomb-range tiles away with no bomb on its tile. Otherwise it shows Attack, though it may still bomb another unit or back off.</td><td>The target's tile, where the bomb lands.</td></tr>");
@@ -268,6 +263,7 @@ public static class GamepediaWriter
             case EnemyBehaviour.Thief: return "Thief";
             case EnemyBehaviour.Bomber: return "Bomber";
             case EnemyBehaviour.Giant: return "Giant";
+            case EnemyBehaviour.PackLeader: return "Pack Leader";
             case EnemyBehaviour.Necromancer: return "Necromancer";
             default: throw new ArgumentOutOfRangeException(nameof(b), b, "Add a name and steps for this behaviour to the gamepedia.");
         }
@@ -296,6 +292,13 @@ public static class GamepediaWriter
                 {
                     "Carrying stolen gold: if it is on the enemies' back row, escape with the gold. Otherwise move to the reachable tile furthest back (the cheapest of those). If it can't get any further back this turn, it stops.",
                     $"Not carrying gold: attack its {target} if it can, otherwise {approach}, like Walk up and hit. Its first hit that does damage steals the gold, and it spends the rest of its moves running.",
+                };
+            case EnemyBehaviour.PackLeader:
+                return new[]
+                {
+                    "It acts before every other enemy.",
+                    "Howl (its action for the turn) if the extra move lets at least one wolf that hasn't acted reach and bite its target this turn, or at least two if the leader could bite someone itself.",
+                    "Then like Walk up and hit: bite if it still has its AP, otherwise walk up.",
                 };
             case EnemyBehaviour.Bomber:
                 return new[]

@@ -17,7 +17,10 @@ namespace ArmyRoguelike.Core
     public enum PackState
     {
         None,
-        NearLeader,
+        /// <summary>A Pack Leader of its side lives: +1 max HP.</summary>
+        Bonded,
+
+        /// <summary>Every Pack Leader of its side is dead: -1 max HP.</summary>
         Leaderless,
     }
 
@@ -85,7 +88,11 @@ namespace ArmyRoguelike.Core
 
         public const int MaxCarriedAp = 0;
         public const int PlayerZoneRows = 2;
-        public const int LeaderAuraRange = 2;
+        /// <summary>Pack Bond: max HP a wolf gains while a leader lives, and loses once the last one is dead.</summary>
+        public const int PackBondHp = 1;
+
+        /// <summary>Howl: extra moves for every wolf that hasn't acted yet this turn.</summary>
+        public const int HowlMoves = 1;
 
         // Mines and bombs.
         public const int MineCost = 1;
@@ -276,6 +283,7 @@ namespace ArmyRoguelike.Core
                 _units.Add(new Unit(_nextId++, Team.Player, member.Stats, member));
             foreach (var (stats, pos) in enemies)
                 _units.Add(new Unit(_nextId++, Team.Enemy, stats) { Pos = pos, IsPlaced = true });
+            ApplyPackBond();
         }
 
         public Battle(Board board, IEnumerable<UnitStats> playerArmy, IEnumerable<(UnitStats stats, GridPos pos)> enemies)
@@ -389,32 +397,51 @@ namespace ArmyRoguelike.Core
         /// <summary>Where the player may deploy: the back two rows, or the ritual's zone around the objective.</summary>
         public bool IsPlayerZone(GridPos p) => Board.InBounds(p) && (_deployZone != null ? _deployZone.Contains(p) : p.Y < PlayerZoneRows);
 
+        /// <summary>Pack Bond on a wolf: bonded while a leader of its side lives, leaderless once the last one died.</summary>
         public PackState GetPackState(Unit unit)
         {
             if (!unit.IsWolf)
                 return PackState.None;
-            var leader = _units.FirstOrDefault(u => u.Team == unit.Team && u.IsPackLeader);
-            if (leader == null)
+            var leaders = _units.Where(u => u.Team == unit.Team && u.Has(Ability.PackBond)).ToList();
+            if (leaders.Count == 0)
                 return PackState.None;
-            if (!leader.IsAlive)
-                return PackState.Leaderless;
-            return Distance(leader, unit) <= LeaderAuraRange ? PackState.NearLeader : PackState.None;
+            return leaders.Any(l => l.IsAlive) ? PackState.Bonded : PackState.Leaderless;
+        }
+
+        /// <summary>Wolf bites landed so far this turn; each Wolf Bite gets +1 damage per earlier one.</summary>
+        public int BiteChain { get; private set; }
+
+        /// <summary>Pack Bond at the start: every wolf with a living leader on its side gets +1 max HP.</summary>
+        private void ApplyPackBond()
+        {
+            foreach (var wolf in _units.Where(u => GetPackState(u) == PackState.Bonded))
+            {
+                wolf.PackHp = PackBondHp;
+                wolf.Hp = wolf.MaxHp;
+            }
+        }
+
+        /// <summary>
+        /// The last Pack Leader of a side died: its wolves drop to -1 max HP and lose the difference now
+        /// (which can kill them).
+        /// </summary>
+        private void BreakPackBond(Unit leader, List<BattleEvent> after)
+        {
+            if (!leader.Has(Ability.PackBond) || _units.Any(u => u.Team == leader.Team && u.Has(Ability.PackBond) && u.IsAlive))
+                return;
+            foreach (var wolf in Living(leader.Team).Where(u => u.IsWolf).ToList())
+            {
+                var loss = wolf.PackHp + PackBondHp;
+                wolf.PackHp = -PackBondHp;
+                wolf.Hp = Math.Max(0, Math.Min(wolf.Hp - loss, wolf.MaxHp));
+                after.Add(new TickEvent("leader lost", new Hit(wolf, loss, wolf.Hp)));
+            }
         }
 
         /// <summary>The unit's attack damage before target-specific bonuses.</summary>
         public int EffectiveDamage(Unit unit)
         {
             var damage = unit.BaseDamage;
-            switch (GetPackState(unit))
-            {
-                case PackState.NearLeader:
-                    damage += 1;
-                    break;
-                case PackState.Leaderless:
-                    damage -= 1;
-                    break;
-            }
-
             if (!unit.MovedThisTurn)
             {
                 if (unit.Has(Ability.SteadyAimPlus))
@@ -436,6 +463,8 @@ namespace ArmyRoguelike.Core
                 damage += PreyBonus;
             if (attacker.Has(Ability.Shatter) && target.IsSlowed)
                 damage *= 2;
+            if (attacker.Has(Ability.WolfBite))
+                damage += BiteChain;
             if (attacker.Has(Ability.FirstShotDouble) && !attacker.HasStruck(target))
                 damage *= 2;
             return damage;
@@ -1079,7 +1108,8 @@ namespace ArmyRoguelike.Core
                     Explode(bomb.Tile, bomb.Damage, "bomb", bomb.Owner, events);
             }
 
-            foreach (var enemy in Living(Team.Enemy).ToList())
+            // Howlers go first, so the moves they hand out reach wolves that haven't acted yet.
+            foreach (var enemy in Living(Team.Enemy).OrderBy(e => e.Has(Ability.Howl) ? 0 : 1).ToList())
             {
                 if (IsOver)
                     break;
@@ -1157,6 +1187,8 @@ namespace ArmyRoguelike.Core
                 struck.AddRange(Strike(attacker, target, events));
             attacker.AttackedThisTurn = true;
             attacker.MarkStruck(target);
+            if (attacker.Has(Ability.WolfBite))
+                BiteChain++;
             foreach (var hitUnit in struck)
                 attacker.MarkStruck(hitUnit);
 
@@ -1281,6 +1313,16 @@ namespace ArmyRoguelike.Core
             events.AddRange(after);
             CheckEnd();
             return events;
+        }
+
+        /// <summary>Howl: every wolf of its side that hasn't acted yet this turn gets <see cref="HowlMoves"/> extra moves.</summary>
+        internal List<BattleEvent> DoHowl(Unit leader)
+        {
+            leader.Ap -= AttackCost;
+            var wolves = Living(leader.Team).Where(u => u.IsWolf && !u.IsDone && CanMove(u)).ToList();
+            foreach (var wolf in wolves)
+                wolf.Moves += HowlMoves;
+            return new List<BattleEvent> { new HowlEvent(leader, wolves, HowlMoves) };
         }
 
         internal List<BattleEvent> DoBomb(Unit thrower, Unit target)
@@ -1439,6 +1481,9 @@ namespace ArmyRoguelike.Core
                     after.Add(new EffectEvent(EffectKind.Refund, source, KillRefundAp, source.Hp, source));
                 }
             }
+
+            if (!target.IsAlive)
+                BreakPackBond(target, after);
 
             if (!target.IsAlive && target.Stats.SplitsInto != null)
                 Split(target, after);
@@ -1618,6 +1663,8 @@ namespace ArmyRoguelike.Core
                 u.MovedThisTurn = false;
                 u.AttackedThisTurn = false;
             }
+
+            BiteChain = 0;
 
             // Riposte and Dodge work once per enemy turn.
             if (team == Team.Enemy)

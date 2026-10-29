@@ -331,6 +331,12 @@ An idea test, built 2026-10-29, not playtested. It lives only on its branch (wor
 - **Opening Shot** (Deadeye): double damage the first time it hits each enemy in a battle (was "first attack each turn").
 - **Bosses get strong single actions** *(placeholders, "for now")*: the Giant's slam also deals 3 damage to each of your units within 2 tiles, and it picks smash or slam by whichever deals more in total (ties go to smash), else a boulder (now 4 damage); the Necromancer raises **every** bone pile within range in one action, and its bolt does 4.
 
+**Step 3: unit kits** (2026-10-29, same branch, not playtested). Every unit should feel unique through its **passives** and its **actions**. The basic attack counts as an action too and has its own name (Wolf Bite, Strike, Shot, Bolt, Smash, Long Strike, Stab). Wolves are the first faction designed this way; the rest of the enemies and the player's units follow.
+
+- **Wolf** (6 HP, Swift). Passive **Blood Scent**: goes for the lowest-HP unit it can reach and attack this turn, instead of the nearest. Action **Wolf Bite**: 2 damage, +1 for every wolf bite earlier in the same turn (any wolf, any target, the Pack Leader's included; resets every turn).
+- **Pack Leader** (10 HP, Swift, Wolf Bite 3). Passive **Pack Bond**: while it lives every wolf has +1 max HP (7); once it dies they have -1 (5) and lose 2 HP on the spot, which can kill wounded wolves. Replaces the old +1 damage aura. Action **Howl**: every wolf that hasn't acted gets +1 move this turn. It acts before the other enemies and howls when the extra move lets a wolf bite that otherwise couldn't (two wolves if it could bite itself).
+- **Hover card:** hovering a unit shows a card at the top right: name and HP, AP / moves / range, **Next** (what an enemy will do), then **Passive**, **Actions** and **Now** (statuses, pack state, engaged). Colours are placeholders for the art chat.
+
 ## Test mode (for testing only)
 
 - Editor and dev builds only: a "Test battle" button on the draft screen opens a setup screen.

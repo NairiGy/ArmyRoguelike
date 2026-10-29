@@ -214,6 +214,13 @@ namespace ArmyRoguelike.View
                         target = string.Join(", ", split.Children.Select(Name)), amount = split.Children.Count,
                     });
                     break;
+                case HowlEvent howl:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = howl.Leader.Team.ToString(), unit = Name(howl.Leader), type = "howl",
+                        target = string.Join(", ", howl.Wolves.Select(Name)), amount = howl.Wolves.Count,
+                    });
+                    break;
                 case ReinforceEvent reinforce:
                     _log.wavesArrived += reinforce.Units.Count;
                     _log.actions.Add(new ActionEntry

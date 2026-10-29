@@ -214,7 +214,7 @@ namespace ArmyRoguelike.Tests
             var swash = Player(b);
             var events = b.EndPlayerTurn();
             Assert.IsTrue(events.OfType<EffectEvent>().Any(e => e.Kind == EffectKind.Dodge));
-            Assert.AreEqual(swash.MaxHp - 2, swash.Hp, "only the second bite landed");
+            Assert.AreEqual(swash.MaxHp - 3, swash.Hp, "only the second bite landed: 2, +1 from the bite chain");
         }
 
         // ---------- Mage tree ----------
@@ -307,7 +307,7 @@ namespace ArmyRoguelike.Tests
             var rogue = Player(b, 1);
             b.PlayerUseAction(Player(b, 0), ActionKind.Ward, P(3, 1));
             b.EndPlayerTurn();
-            Assert.AreEqual(rogue.MaxHp - (2 * 2 - Battle.WardShield), rogue.Hp);
+            Assert.AreEqual(rogue.MaxHp - (2 + 3 - Battle.WardShield), rogue.Hp, "bites of 2 and 3 (bite chain), minus the shield");
         }
 
         // ---------- Sapper tree ----------
