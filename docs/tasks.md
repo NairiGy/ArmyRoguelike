@@ -24,7 +24,9 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 | Moon Shrine | Reinforcements arriving at the edge | The rise animation and a text popup | Needed |
 | Scenarios | Blessing pick and item pick screens | Plain IMGUI panels (part of the UI pass) | Needed |
 | Zone of control | Enemy reach tiles, orange "costs extra AP" move tiles, dotted link to the enemies holding the selected unit | Flat colours (`EnemyReachColor`, `CostlyMoveColor`) and a red dotted line (`EngagedLinkColor`) in `BattleController` | Needed |
-| Unit card | The hover card's look: panel, header, section colours | IMGUI box with rich-text colours (`DrawUnitCard` in `BattleController`) | Needed |
+| Unit card | The hover card's look: panel, header, section colours | Readability pass 2026-10-30 (gameplay/UI chat): solid dark panel, team-coloured top edge, HP bar, bigger text, name line + description per action (`DrawUnitCard` in `BattleController`, colours in `HudArt`). Still plain IMGUI, not playtested | Needed (final look) |
+| Action cards | The selected unit's action cards at the bottom centre | Solid IMGUI cards with a grey key square, gold edge while aiming (`DrawActionCards` in `BattleController`, `HudArt`). Not playtested | Needed |
+| Intent badges | An icon per intent kind over an enemy's head (attack melee / ranged, area, buff, overwatch, grasp, push or flee) | Code-drawn white icons tinted by kind on a dark plate, with the action's name (`HudArt.IconTexture`, `DrawIntentBadges`). Not playtested | Needed |
 | Bandits | Caltrops on a tile; the tiles a crossbowman is watching (Overwatch) and its shot; Bull Rush | Grey tile tint for caltrops, a faint pink tint for watched tiles, an "Overwatch!" popup; the shot and the rush use the normal attack and push | Needed |
 | Goblins | Fling (a goblin or explosive flying through the air), Powder Keg explosion | Thrower lunges, the thrown goblin pops to its landing tile with a "Flung!" popup; an explosive flies as a small square; the keg uses the normal blast | Needed |
 | Howl | The Pack Leader's howl, and the "+1 move" on each wolf | "Howl!" and "+1 move" popups and a small shake (`HowlEvent` in `BattleController`) | Needed |
@@ -41,7 +43,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [ ] Archer, rogue, sapper and wolf keep their painted pedestals or slab for now (user's call); redraw them the new way later if the mix looks off.
 - [ ] Improve the player statues' colour (moon marble is better than before, not final).
 - [ ] Labels and health bars over the statues: restyle (part of the UI pass).
-- [ ] UI/HUD pass (IMGUI panels are still placeholders).
+- [ ] UI/HUD pass (IMGUI panels are still placeholders). Started 2026-10-30: hover card readability, action cards at the bottom, intent badges with Alt and on hover (see the Art needed rows). Not playtested.
 - [ ] Decide whether effects change colour by team (e.g. a moon shield on an enemy in ember red instead of silver). User's call; everything is silver/gold for both sides for now.
 - [x] Lightning strike effect onto a tile (2026-10-27, `LightningStrike`): sky flickers, a painted bolt flickering between three shapes, the board flashes white-blue, sparks and a scorch. No rule uses it yet; in test battles press L to strike the hovered tile. Not playtested.
 - [ ] Lightning at night (ambient bolts around the tower, planned, later); can reuse the bolt art.

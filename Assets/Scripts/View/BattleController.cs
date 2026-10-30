@@ -155,6 +155,7 @@ namespace ArmyRoguelike.View
 
             _intent.Hide();
             HideAllIntents();
+            _intentBadges.Clear();
             HideEngagedLinks();
             switch (Battle.Phase)
             {
@@ -665,12 +666,16 @@ namespace ArmyRoguelike.View
                 line.Hide();
         }
 
-        /// <summary>One enemy's intent: the tiles it will hit and a dotted line to its target.</summary>
+        // Enemies whose intent badge shows this frame (filled in Update, drawn in OnGUI).
+        private readonly List<(Unit enemy, Intent intent)> _intentBadges = new List<(Unit, Intent)>();
+
+        /// <summary>One enemy's intent: the tiles it will hit, a dotted line to its target and a badge over its head.</summary>
         private void DrawIntent(Unit enemy, IntentView line)
         {
             var intent = EnemyAI.PredictIntent(Battle, enemy);
             if (intent.Target == null)
                 return;
+            _intentBadges.Add((enemy, intent));
 
             var from = _board.ViewOf(enemy).transform.position + Vector3.up * 0.15f;
             var to = IsoMath.GridToWorld(intent.Target.Pos) + Vector3.up * 0.15f;
@@ -1338,6 +1343,9 @@ namespace ArmyRoguelike.View
             if (Event.current.type == EventType.Layout)
                 _panels.Clear();
 
+            // Under the panels, so a card or button is never hidden by a badge.
+            DrawIntentBadges();
+
             switch (Battle.Phase)
             {
                 case Phase.Placement:
@@ -1354,6 +1362,39 @@ namespace ArmyRoguelike.View
 
             if (_markerNote != null && Time.unscaledTime < _markerNoteUntil)
                 GUI.Box(new Rect(Margin, ReferenceHeight - 80, 180, 30), _markerNote);
+        }
+
+        /// <summary>
+        /// Over each enemy whose intent shows (all of them with Alt, or the hovered one): a badge with an icon and
+        /// the name of what it will do next.
+        /// </summary>
+        private void DrawIntentBadges()
+        {
+            if (Event.current.type != EventType.Repaint || _intentBadges.Count == 0)
+                return;
+            var scale = Screen.height / ReferenceHeight;
+            var word = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleLeft };
+            const float iconSize = 20f, pad = 5f, height = 26f;
+            foreach (var (enemy, intent) in _intentBadges)
+            {
+                var view = _board.ViewOf(enemy);
+                if (view == null)
+                    continue;
+                var screen = _camera.WorldToScreenPoint(view.TopWorld + Vector3.up * 0.06f);
+                var anchor = new Vector2(screen.x / scale, (Screen.height - screen.y) / scale);
+                var (icon, text, color) = HudArt.ForIntent(intent, enemy);
+                var w = pad + iconSize + 4f + word.CalcSize(new GUIContent(text)).x + pad;
+                var rect = new Rect(anchor.x - w * 0.5f, anchor.y - height, w, height);
+
+                GUI.DrawTexture(rect, HudArt.Solid(HudArt.PanelColor));
+                GUI.DrawTexture(new Rect(rect.x, rect.yMax - 2f, rect.width, 2f), HudArt.Solid(color));
+                var old = GUI.color;
+                GUI.color = color;
+                GUI.DrawTexture(new Rect(rect.x + pad, rect.y + (height - iconSize) * 0.5f, iconSize, iconSize), HudArt.IconTexture(icon));
+                GUI.color = old;
+                word.normal.textColor = color;
+                GUI.Label(new Rect(rect.x + pad + iconSize + 4f, rect.y, w - iconSize - pad, height), text, word);
+            }
         }
 
         private string Header => _context.Test
@@ -1461,25 +1502,102 @@ namespace ArmyRoguelike.View
             if (!DrawUnitCard())
                 TextPanel(HoverText(), true, false, 280f);
 
-            // Bottom-left: the current hint, or the description of the hovered action button.
+            // Bottom-left: the current hint.
             if (playerTurn && !_confirmEndTurn)
-                TextPanel(string.IsNullOrEmpty(_actionTooltip) ? _hint : _actionTooltip, false, true, 90f);
+                TextPanel(_hint, false, true, 90f);
 
             if (playerTurn)
+            {
+                DrawActionCards();
                 DrawCommands();
+            }
         }
 
-        private string _actionTooltip;
+        private const float ActionCardWidth = 210f;
+        private const float ActionCardGap = 10f;
 
-        /// <summary>Bottom-right: action buttons, Done and End turn. Always fully visible.</summary>
+        /// <summary>
+        /// Bottom centre: one card per special action of the selected unit, with its key, name, cost, cooldown
+        /// and what it does. Clicking a card (or pressing its key) aims it; clicking it again cancels.
+        /// </summary>
+        private void DrawActionCards()
+        {
+            if (_confirmEndTurn || _selected == null || !Battle.CanAct(_selected))
+                return;
+            var actions = _selected.Stats.Actions;
+            if (actions.Count == 0)
+                return;
+
+            // The free space between the hint panel (left) and the commands (right).
+            var left = Margin + PanelWidth + ActionCardGap;
+            var right = GuiWidth - CommandWidth - Margin - ActionCardGap;
+            var width = Mathf.Min(ActionCardWidth, (right - left - (actions.Count - 1) * ActionCardGap) / actions.Count);
+            var total = actions.Count * width + (actions.Count - 1) * ActionCardGap;
+            var x = Mathf.Max(left, (GuiWidth - total) * 0.5f);
+
+            var title = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 16, fontStyle = FontStyle.Bold, wordWrap = true };
+            var cost = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 13 };
+            var text = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 13, wordWrap = true };
+            var inner = width - 2 * 10f;
+
+            // Every card gets the height of the tallest, so the row lines up.
+            var height = 0f;
+            foreach (var action in actions)
+                height = Mathf.Max(height, title.CalcHeight(new GUIContent(Abilities.Name(action)), inner - 28f) +
+                                           cost.CalcHeight(new GUIContent("x"), inner) +
+                                           text.CalcHeight(new GUIContent(Capitalise(Abilities.Describe(action))), inner) + 30f);
+            var y = ReferenceHeight - Margin - height;
+
+            for (var i = 0; i < actions.Count; i++)
+            {
+                var action = actions[i];
+                var rect = Panel(x + i * (width + ActionCardGap), y, width, height);
+                var aiming = _action == action;
+                var cooldown = _selected.CooldownLeft(action);
+                var usable = Battle.ActionTargets(_selected, action).Count > 0;
+                var hover = rect.Contains(Event.current.mousePosition);
+
+                GUI.enabled = usable || aiming;
+                var background = aiming ? HudArt.CardAimColor : hover && usable ? HudArt.CardHoverColor : HudArt.CardColor;
+                if (GUI.Button(rect, GUIContent.none, HudArt.PanelStyle(background, 0)))
+                    ToggleAction(action);
+                GUI.enabled = true;
+
+                var old = GUI.color;
+                if (!usable && !aiming)
+                    GUI.color = new Color(1f, 1f, 1f, 0.5f);
+                // Gold edge on the card being aimed.
+                if (aiming)
+                    GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 3f), HudArt.Solid(new Color(1f, 0.85f, 0.3f)));
+
+                var keyRect = new Rect(rect.x + 10f, rect.y + 10f, 22f, 22f);
+                GUI.DrawTexture(keyRect, HudArt.Solid(new Color(0.3f, 0.3f, 0.34f)));
+                GUI.Label(keyRect, $"<b>{i + 1}</b>", new GUIStyle(cost) { alignment = TextAnchor.MiddleCenter });
+
+                GUILayout.BeginArea(new Rect(rect.x + 10f, rect.y + 10f, inner, rect.height - 20f));
+                GUILayout.BeginHorizontal();
+                GUILayout.Space(28f);
+                GUILayout.Label($"<color=white>{Abilities.Name(action)}</color>", title);
+                GUILayout.EndHorizontal();
+                var status = aiming ? $"<color={ActionColor}>Aiming: click a yellow tile</color>"
+                    : cooldown > 0 ? $"<color={NextColor}>Ready in {cooldown} turn{(cooldown == 1 ? "" : "s")}</color>"
+                    : !usable ? $"<color={DimColor}>No target in reach</color>"
+                    : $"<color={ActionColor}>{Battle.ActionCost(action)} AP  ·  cooldown {Battle.Cooldown(action)}</color>";
+                GUILayout.Label(status, cost);
+                GUILayout.Label($"<color={TextColor}>{Capitalise(Abilities.Describe(action))}</color>", text);
+                GUILayout.EndArea();
+                GUI.color = old;
+            }
+        }
+
+        /// <summary>Bottom-right: Done and End turn. Always fully visible.</summary>
         private void DrawCommands()
         {
-            var actions = _selected != null && Battle.CanAct(_selected) ? _selected.Stats.Actions : new ActionKind[0];
             float h;
             if (_confirmEndTurn)
                 h = 110f;
             else
-                h = (actions.Count + 2 + (DebugToolsEnabled ? 1 : 0)) * (ButtonHeight + 4) + 30f;
+                h = (2 + (DebugToolsEnabled ? 1 : 0)) * (ButtonHeight + 4) + 30f;
 
             GUILayout.BeginArea(Panel(GuiWidth - CommandWidth - Margin, ReferenceHeight - h - Margin, CommandWidth, h), GUI.skin.box);
             if (_confirmEndTurn)
@@ -1501,23 +1619,6 @@ namespace ArmyRoguelike.View
                 GUILayout.EndArea();
                 return;
             }
-
-            for (var i = 0; i < actions.Count; i++)
-            {
-                var action = actions[i];
-                GUI.enabled = Battle.ActionTargets(_selected, action).Count > 0;
-                var label = _action == action
-                    ? $"Cancel {Abilities.Name(action)} ({i + 1})"
-                    : _selected.CooldownLeft(action) > 0
-                        ? $"{Abilities.Name(action)}: ready in {_selected.CooldownLeft(action)} ({i + 1})"
-                        : $"{Abilities.Name(action)}: {Battle.ActionCost(action)} AP, cooldown {Battle.Cooldown(action)} ({i + 1})";
-                if (GUILayout.Button(new GUIContent(label, $"{Abilities.Name(action)}: {Abilities.Describe(action)}"), GUILayout.Height(ButtonHeight)))
-                    ToggleAction(action);
-                GUI.enabled = true;
-            }
-
-            if (Event.current.type == EventType.Repaint)
-                _actionTooltip = GUI.tooltip;
 
             GUI.enabled = _selected != null;
             if (GUILayout.Button(_selected != null ? $"Done with {_selected.Stats.Name}" : "Done (select a unit)", GUILayout.Height(ButtonHeight)))
@@ -1606,13 +1707,16 @@ namespace ArmyRoguelike.View
 
         // ---------- Unit card (hovering a unit) ----------
 
-        private const float CardWidth = 360f;
+        private const float CardWidth = 400f;
+        private const float CardPadding = 14f;
+        private const float HpBarHeight = 8f;
         private const string EnemyHeader = "#ff8f7a";
         private const string PlayerHeader = "#8cc8ff";
         private const string NextColor = "#ffb347";
         private const string PassiveColor = "#9be39b";
         private const string ActionColor = "#ffd966";
         private const string DimColor = "#b8b8b8";
+        private const string TextColor = "#e6e2da";
 
         /// <summary>
         /// While hovering a unit (not the selected one, not an objective): a card at the top-right with its
@@ -1625,18 +1729,25 @@ namespace ArmyRoguelike.View
             if (u == null || u == _selected || u.IsObjective)
                 return false;
 
-            var rows = new List<(string text, GUIStyle style)>();
-            var header = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 17, fontStyle = FontStyle.Bold };
-            var body = new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true, fontSize = 13 };
-            var section = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 11, fontStyle = FontStyle.Bold };
+            // Each row: its text, its style and the gap above it. The HP bar sits under the header.
+            var rows = new List<(string text, GUIStyle style, float gap)>();
+            var header = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 20, fontStyle = FontStyle.Bold };
+            var stats = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 14 };
+            var name = new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true, fontSize = 15 };
+            var body = new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true, fontSize = 14 };
+            var section = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 12, fontStyle = FontStyle.Bold };
 
             var team = u.Team == Team.Enemy ? EnemyHeader : PlayerHeader;
-            var item = u.Equipment != null ? $"   <color={DimColor}><size=12>[{u.Equipment.Name}]</size></color>" : "";
-            rows.Add(($"<color={team}>{u.Stats.Name}</color>   <color=white>HP {u.Hp} / {u.MaxHp}</color>{item}", header));
-            rows.Add(($"<color={DimColor}>{u.MaxAp} AP  ·  {u.MaxMoves} {(u.MaxMoves == 1 ? "move" : "moves")}  ·  range {u.Range}</color>", body));
+            var item = u.Equipment != null ? $"   <color={DimColor}><size=14>[{u.Equipment.Name}]</size></color>" : "";
+            rows.Add(($"<color={team}>{u.Stats.Name}</color>{item}", header, 0f));
+            rows.Add(($"<color=white><b>HP {u.Hp} / {u.MaxHp}</b></color>   <color={DimColor}>{u.MaxAp} AP  ·  {u.MaxMoves} {(u.MaxMoves == 1 ? "move" : "moves")}  ·  range {u.Range}</color>",
+                stats, HpBarHeight + 4f));
 
             if (u.Team == Team.Enemy)
-                rows.Add(($"<color={NextColor}><b>Next:</b> {IntentText(EnemyAI.PredictIntent(Battle, u))}</color>", body));
+            {
+                rows.Add(($"<color={NextColor}>NEXT TURN</color>", section, 10f));
+                rows.Add(($"<color={NextColor}>{Capitalise(IntentText(EnemyAI.PredictIntent(Battle, u)))}</color>", body, 0f));
+            }
 
             var passives = Abilities.PassivesOf(u.Stats);
             var itemAbility = u.Equipment?.Ability ?? Ability.None;
@@ -1644,41 +1755,73 @@ namespace ArmyRoguelike.View
                 passives.Add(($"{Abilities.Name(itemAbility)} ({u.Equipment.Name})", Abilities.Describe(itemAbility)));
             if (passives.Count > 0)
             {
-                rows.Add(($"<color={PassiveColor}>PASSIVE</color>", section));
-                foreach (var (name, text) in passives)
-                    rows.Add(($"<b>{name}</b>  <color={DimColor}>{text}</color>", body));
+                rows.Add(($"<color={PassiveColor}>PASSIVE</color>", section, 10f));
+                foreach (var (passive, text) in passives)
+                {
+                    rows.Add(($"<b><color=white>{passive}</color></b>", name, 2f));
+                    rows.Add(($"<color={TextColor}>{Capitalise(text)}</color>", body, 0f));
+                }
             }
 
-            rows.Add(($"<color={ActionColor}>ACTIONS</color>", section));
-            foreach (var (name, cost, kind, text) in Abilities.ActionsOf(u.Stats, Battle.EffectiveDamage(u)))
+            rows.Add(($"<color={ActionColor}>ACTIONS</color>", section, 10f));
+            foreach (var (action, cost, kind, text) in Abilities.ActionsOf(u.Stats, Battle.EffectiveDamage(u)))
             {
-                var cooldown = kind.HasValue ? $", cooldown {Battle.Cooldown(kind.Value)}" : "";
+                var cooldown = kind.HasValue ? $"  ·  cooldown {Battle.Cooldown(kind.Value)}" : "";
                 var left = kind.HasValue ? u.CooldownLeft(kind.Value) : 0;
-                var ready = left > 0 ? $"  <color={NextColor}>ready in {left} turn{(left == 1 ? "" : "s")}</color>" : "";
-                rows.Add(($"<b>{name}</b> <color={DimColor}>({cost} AP{cooldown})  {text}</color>{ready}", body));
+                var ready = left > 0 ? $"   <color={NextColor}>ready in {left} turn{(left == 1 ? "" : "s")}</color>" : "";
+                rows.Add(($"<b><color=white>{action}</color></b>   <color={ActionColor}><size=13>{cost} AP{cooldown}</size></color>{ready}", name, 2f));
+                rows.Add(($"<color={TextColor}>{Capitalise(text)}</color>", body, 0f));
             }
 
             var state = StateLines(u);
             if (state.Count > 0)
             {
-                rows.Add(($"<color={DimColor}>NOW</color>", section));
+                rows.Add(($"<color={DimColor}>NOW</color>", section, 10f));
                 foreach (var line in state)
-                    rows.Add((line, body));
+                    rows.Add(($"<color={TextColor}>{line}</color>", body, 0f));
             }
 
             if (_selected != null && u.Team == Team.Enemy && !Battle.CanAttack(_selected, u) &&
                 Battle.FindAttackSpot(_selected, u) is var spot && spot.HasValue)
-                rows.Add(($"<color={NextColor}>Click: walk {spot.Value.cost} tile(s) and attack ({Battle.AttackCost} AP)</color>", body));
+                rows.Add(($"<color={NextColor}>Click: walk {spot.Value.cost} tile(s) and attack ({Battle.AttackCost} AP)</color>", body, 10f));
 
-            var inner = CardWidth - 16f;
-            var height = rows.Sum(r => r.style.CalcHeight(new GUIContent(r.text), inner)) + 16f;
+            var inner = CardWidth - 2 * CardPadding;
+            var height = rows.Sum(r => r.style.CalcHeight(new GUIContent(r.text), inner) + r.gap) + 2 * CardPadding;
             height = Mathf.Min(height, ReferenceHeight - 2 * Margin);
-            GUILayout.BeginArea(Panel(GuiWidth - CardWidth - Margin, Margin, CardWidth, height), GUI.skin.box);
-            foreach (var (text, style) in rows)
+            var rect = Panel(GuiWidth - CardWidth - Margin, Margin, CardWidth, height);
+            GUI.Box(rect, GUIContent.none, HudArt.PanelStyle(HudArt.PanelColor, 0));
+            // A strip in the team's colour along the top.
+            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 3f), HudArt.Solid(u.Team == Team.Enemy ? HudArt.HarmColor : new Color(0.55f, 0.78f, 1f)));
+
+            GUILayout.BeginArea(new Rect(rect.x + CardPadding, rect.y + CardPadding, inner, rect.height - 2 * CardPadding));
+            for (var i = 0; i < rows.Count; i++)
+            {
+                var (text, style, gap) = rows[i];
+                if (gap > 0f)
+                    GUILayout.Space(gap);
                 GUILayout.Label(text, style);
+                if (i == 0)
+                    DrawHpBar(GUILayoutUtility.GetLastRect(), u);
+            }
+
             GUILayout.EndArea();
             return true;
         }
+
+        /// <summary>A health bar just under the card's header, in the space left for it.</summary>
+        private static void DrawHpBar(Rect header, Unit u)
+        {
+            if (Event.current.type != EventType.Repaint)
+                return;
+            var bar = new Rect(header.x, header.yMax + 2f, header.width, HpBarHeight);
+            GUI.DrawTexture(bar, HudArt.Solid(new Color(0.2f, 0.2f, 0.22f)));
+            var frac = u.MaxHp > 0 ? Mathf.Clamp01((float)u.Hp / u.MaxHp) : 0f;
+            var fill = u.Team == Team.Player ? new Color(0.35f, 0.8f, 0.4f) : new Color(0.85f, 0.3f, 0.25f);
+            GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * frac, bar.height), HudArt.Solid(fill));
+        }
+
+        private static string Capitalise(string text) =>
+            string.IsNullOrEmpty(text) ? text : char.ToUpperInvariant(text[0]) + text.Substring(1);
 
         /// <summary>What is true for the unit right now: statuses, pack state, run bonuses, zone of control.</summary>
         private List<string> StateLines(Unit u)

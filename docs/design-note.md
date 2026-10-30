@@ -94,7 +94,7 @@ A roguelike army-builder: lead a small squad across a Slay the Spire–style map
 
 ## Enemy AI
 
-- Intent icons: hovering over an enemy shows who it wants to attack. Holding Alt shows every enemy's intent at once (2026-10-29, small-board branch).
+- Intent icons: hovering over an enemy shows who it wants to attack. Holding Alt shows every enemy's intent at once (2026-10-29, small-board branch). Since 2026-10-30 each shown intent also puts a badge over the enemy's head: an icon (sword, arrow, burst, chevrons for buffs, eye, a "no move" ring, push arrows) and the action's name, coloured by kind (orange harm, green buff, purple control, gold flee). Icons are code-drawn placeholders (`HudArt`).
 
 ## Prototype 1: one battle
 
@@ -355,7 +355,8 @@ Built 2026-10-29 as an idea test on `experiment/small-board`, playtested 2026-10
   - **Rogue line, Vanish:** the base Rogue's passive is Swift only (Bloodthirst removed 2026-10-29; its evolutions still have it for now). Vanish goes off as soon as you press it: enemies can't target or attack it (area blasts still hit) until it attacks again, for 2 enemy turns at most; the attack that reveals it deals +2.
   - **Mage line, Blink:** teleport to a free tile within 2, past rocks and zone of control.
   - **Sapper line:** unchanged (Strike, Place Mine).
-- **Hover card:** hovering a unit shows a card at the top right: name and HP, AP / moves / range, **Next** (what an enemy will do), then **Passive**, **Actions** and **Now** (statuses, pack state, engaged). Colours are placeholders for the art chat.
+- **Hover card:** hovering a unit shows a card at the top right: name and HP, AP / moves / range, **Next** (what an enemy will do), then **Passive**, **Actions** and **Now** (statuses, pack state, engaged). Colours are placeholders for the art chat. Readability pass 2026-10-30: solid dark panel with a team-coloured top edge, an HP bar, bigger text, and each passive and action as a name line (cost and cooldown in gold) with its description underneath.
+- **Action cards:** the selected unit's special actions are cards in a row at the bottom centre (key, name, cost and cooldown or "ready in N", description). Click or press the key to aim, again to cancel; the aimed card turns gold, unusable ones are faded. Done and End turn stay at the bottom right (2026-10-30).
 
 ## Test mode (for testing only)
 
