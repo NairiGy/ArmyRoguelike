@@ -28,6 +28,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 | Bandits | Caltrops on a tile; the tiles a crossbowman is watching (Overwatch) and its shot; Bull Rush | Grey tile tint for caltrops, a faint pink tint for watched tiles, an "Overwatch!" popup; the shot and the rush use the normal attack and push | Needed |
 | Goblins | Fling (a goblin or explosive flying through the air), Powder Keg explosion | Thrower lunges, the thrown goblin pops to its landing tile with a "Flung!" popup; an explosive flies as a small square; the keg uses the normal blast | Needed |
 | Howl | The Pack Leader's howl, and the "+1 move" on each wolf | "Howl!" and "+1 move" popups and a small shake (`HowlEvent` in `BattleController`) | Needed |
+| Elementals and skeletons | Upheaval (a rock bursting up under a unit), Reform (two Shards merging into an Elemental), Grasp (bony hands holding a unit) | Upheaval: the elemental lunges, "Upheaval!" popup, the normal push and the rock just appears; Reform: both shards vanish and the elemental rises with a "Reform!" popup; Grasp: a lunge and a "Grasped: no move" popup | Needed |
 | Base-line actions | Vanish (hidden rogue), Blink (teleport), Shield Bash, Pinning Shot | Vanished statue at 40% opacity (`UnitView.SetHidden`); Blink slides like a 1-tile move; Shield Bash is just the push; Pinning Shot is a normal shot plus a "Pinned" popup | Needed |
 | Small board | Moves left on a statue (moves are now separate from AP); the tower-roof painting fitted under a 6x6 board | Moves only as text in the HUD ("Moves 1 / 1"); the scenery fits itself to the board size but hasn't been looked at on 6x6 | Needed |
 
@@ -61,7 +62,8 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [ ] Trapper line: design a new action to replace Snare (Pinning Shot took its job).
 - [x] Goblin kits (2026-10-29, same branch): Slippery + Fling for the Goblin, Powder Keg for the Bomber.
 - [x] Bandit kits and cooldowns (2026-10-30, same branch): Light Fingers + Caltrops, Behind Cover + Overwatch, Guard + Bull Rush; every non-attack action has a cooldown.
-- [ ] Unit kits for the other enemy factions (elementals, skeleton, bosses) and for the player's units: a passive and actions for each, designed one faction or line at a time with the user.
+- [x] Elemental and skeleton kits (2026-10-30, on `main`): Upheaval for the Elemental, Reform for Shards, Grasp for the Skeleton (see the design note). Not playtested.
+- [ ] Unit kits still to design: the bosses (Giant, Necromancer: name their kits, a passive each) and the player's units, one line at a time with the user. Next: the Rogue line (5 HP problem, Bloodthirst leftover on its evolutions).
 - [x] Playtest the small-board version (2026-10-30): felt ok; 3 finished fights (2 wins, 1 loss), 5-6 turns each. Merged into `main` the same day.
 - [ ] Next (new gameplay chat): tune units from the playtest. Weak spots seen: the Rogue dies first in every fight (5 HP on a 1-move board); Pinning Shot and Blink were never used; Fling and the bandit kits are unplayed; cooldowns are placeholders.
 - [ ] Re-export the illustrated gamepedia (Tools → Export Gamepedia): `docs/gamepedia.html` is the text-only version since the small-board work.

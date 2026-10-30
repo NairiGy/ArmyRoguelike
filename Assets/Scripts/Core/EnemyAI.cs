@@ -27,6 +27,12 @@ namespace ArmyRoguelike.Core
         /// <summary>A crossbowman aiming: it shoots the first of your units that walks onto the marked tiles.</summary>
         Overwatch,
 
+        /// <summary>An elemental raising a rock under its target: damage, a push, and the rock stays.</summary>
+        Upheaval,
+
+        /// <summary>A skeleton grabbing its target so it can't move next turn.</summary>
+        Grasp,
+
         /// <summary>A brute about to hit and shove its target 1 tile.</summary>
         BullRush,
     }
@@ -78,6 +84,9 @@ namespace ArmyRoguelike.Core
         /// <summary>Howls when that lets wolves reach their prey, otherwise like Advance.</summary>
         PackLeader,
 
+        /// <summary>Walks up and strikes; when it can't reach anyone, walks closer and raises a rock under one of your units.</summary>
+        Elemental,
+
         /// <summary>Raises bone piles, keeps its distance and fires bolts.</summary>
         Necromancer,
     }
@@ -108,6 +117,8 @@ namespace ArmyRoguelike.Core
                 return EnemyBehaviour.Goblin;
             if (stats.Has(Ability.Howl))
                 return EnemyBehaviour.PackLeader;
+            if (stats.Has(Ability.Upheaval))
+                return EnemyBehaviour.Elemental;
             if (stats.AreaMelee)
                 return EnemyBehaviour.Giant;
             return EnemyBehaviour.Advance;
@@ -273,6 +284,14 @@ namespace ArmyRoguelike.Core
             if (enemy.Has(Ability.BullRush) && battle.Ready(enemy, ActionKind.BullRush) && CanReachToAttack(battle, enemy, target))
                 return new Intent(IntentKind.BullRush, target);
 
+            if (WantsToGrasp(battle, enemy, target) && CanReachToAttack(battle, enemy, target))
+                return new Intent(IntentKind.Grasp, target);
+
+            // Upheaval: it can't reach the target to strike, but can walk to within Upheaval range of it.
+            if (enemy.Has(Ability.Upheaval) && battle.Ready(enemy, ActionKind.Upheaval) && !CanReachToAttack(battle, enemy, target) &&
+                target.Size == 1 && !target.IsObjective && Battle.Distance(enemy, target) <= Battle.UpheavalRange + enemy.MaxMoves)
+                return new Intent(IntentKind.Upheaval, target, target.Pos);
+
             if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Goblin)
             {
                 var fling = AsIfItsTurn(battle, enemy, 0, () => ChooseFling(battle, enemy, target));
@@ -328,6 +347,9 @@ namespace ArmyRoguelike.Core
                 case EnemyBehaviour.Goblin:
                     GoblinTurn(battle, enemy, events);
                     break;
+                case EnemyBehaviour.Elemental:
+                    ElementalTurn(battle, enemy, events);
+                    break;
                 case EnemyBehaviour.PackLeader:
                     if (ShouldHowl(battle, enemy))
                         events.AddRange(battle.DoHowl(enemy));
@@ -356,6 +378,12 @@ namespace ArmyRoguelike.Core
                     continue;
                 }
 
+                if (WantsToGrasp(battle, enemy, target) && battle.CanGrasp(enemy, target))
+                {
+                    events.AddRange(battle.DoGrasp(enemy, target));
+                    continue;
+                }
+
                 if (battle.CanAttack(enemy, target))
                 {
                     events.AddRange(battle.DoAttack(enemy, target));
@@ -363,6 +391,49 @@ namespace ArmyRoguelike.Core
                 }
 
                 if (!Approach(battle, enemy, target, Battle.AttackCost, events))
+                    return;
+            }
+        }
+
+        /// <summary>
+        /// A skeleton grasps rather than strikes a unit that would get away from it: a ranged one (it wants to back off
+        /// and shoot) or a Swift one. Only when Grasp is ready and the target isn't already held.
+        /// </summary>
+        public static bool WantsToGrasp(Battle battle, Unit enemy, Unit target) =>
+            enemy.Has(Ability.Grasp) && battle.Ready(enemy, ActionKind.Grasp) && target != null && !target.IsObjective &&
+            target.SnareTurns == 0 && (target.IsRanged || target.MaxMoves > Battle.BaseMoves);
+
+        /// <summary>
+        /// Strike its target if it can (walking up first if that reaches). If it can't reach anyone to strike this turn,
+        /// walk as close as it can, then raise a rock under its target, or under the nearest of your units in range.
+        /// </summary>
+        private static void ElementalTurn(Battle battle, Unit elemental, List<BattleEvent> events)
+        {
+            while (!battle.IsOver && elemental.IsAlive)
+            {
+                var target = ChooseTarget(battle, elemental);
+                if (target == null)
+                    return;
+
+                if (battle.CanAttack(elemental, target))
+                {
+                    events.AddRange(battle.DoAttack(elemental, target));
+                    continue;
+                }
+
+                if (battle.FindAttackSpot(elemental, target) == null)
+                {
+                    if (elemental.Moves > 0 && Approach(battle, elemental, target, Battle.AttackCost, events))
+                        continue;
+                    var victim = new[] { target }.Concat(Visible(battle).OrderBy(u => Battle.Distance(elemental, u)).ThenBy(u => u.Id))
+                        .FirstOrDefault(u => battle.CanUpheave(elemental, u));
+                    if (victim == null)
+                        return;
+                    events.AddRange(battle.DoUpheaval(elemental, victim));
+                    continue;
+                }
+
+                if (!Approach(battle, elemental, target, Battle.AttackCost, events))
                     return;
             }
         }

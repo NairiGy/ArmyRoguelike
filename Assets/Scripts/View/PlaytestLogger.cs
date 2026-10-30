@@ -207,6 +207,22 @@ namespace ArmyRoguelike.View
                         toX = escape.Unit.Pos.X, toY = escape.Unit.Pos.Y,
                     });
                     break;
+                case UpheavalEvent upheaval:
+                {
+                    var entry = HitEntry(turn, upheaval.Caster, "upheaval", upheaval.Hit);
+                    entry.rockX = upheaval.Tile.X;
+                    entry.rockY = upheaval.Tile.Y;
+                    _log.actions.Add(entry);
+                    break;
+                }
+                case ReformEvent reform:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = reform.Merged.Team.ToString(), unit = Name(reform.Merged), type = "reform",
+                        target = Name(reform.First) + ", " + Name(reform.Second), amount = reform.Merged.Hp,
+                        toX = reform.Merged.Pos.X, toY = reform.Merged.Pos.Y,
+                    });
+                    break;
                 case SplitEvent split:
                     _log.actions.Add(new ActionEntry
                     {

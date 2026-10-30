@@ -230,6 +230,42 @@ namespace ArmyRoguelike.Core
         public override Unit Actor => null;
     }
 
+    /// <summary>Upheaval: a rock burst up under the target and hurt it. Any push and the rock follow as their own events.</summary>
+    public sealed class UpheavalEvent : BattleEvent
+    {
+        public readonly Unit Caster;
+        public readonly Hit Hit;
+
+        /// <summary>The tile the rock burst out of (where the target stood).</summary>
+        public readonly GridPos Tile;
+
+        public UpheavalEvent(Unit caster, Hit hit, GridPos tile)
+        {
+            Caster = caster;
+            Hit = hit;
+            Tile = tile;
+        }
+
+        public override Unit Actor => Caster;
+    }
+
+    /// <summary>Two Shards next to each other merged back into an Elemental (Reform).</summary>
+    public sealed class ReformEvent : BattleEvent
+    {
+        public readonly Unit First;
+        public readonly Unit Second;
+        public readonly Unit Merged;
+
+        public ReformEvent(Unit first, Unit second, Unit merged)
+        {
+            First = first;
+            Second = second;
+            Merged = merged;
+        }
+
+        public override Unit Actor => null;
+    }
+
     /// <summary>A unit was shoved one or more tiles. If it slammed into something it took <see cref="Collision"/> damage.</summary>
     public sealed class PushEvent : BattleEvent
     {
@@ -288,6 +324,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Vanish: the unit went invisible (Source and Target are the same unit).</summary>
         Vanish,
+
+        /// <summary>Grasp (skeletons): held in place, can't move on its next turn.</summary>
+        Grasp,
 
         /// <summary>A vanished unit became visible again.</summary>
         Reveal,

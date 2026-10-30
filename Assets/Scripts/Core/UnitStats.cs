@@ -201,6 +201,17 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Its action can be Bull Rush: a hit that also pushes the target 1 tile.</summary>
         BullRush,
+
+        // ---------- Elementals and skeletons ----------
+
+        /// <summary>Its action can be Upheaval: a rock bursts up under a unit within 2 tiles, hurting it and pushing it off.</summary>
+        Upheaval,
+
+        /// <summary>Two Shards that start the enemy turn next to each other merge back into an Elemental.</summary>
+        Reform,
+
+        /// <summary>Its action can be Grasp: an adjacent unit can't move on its next turn.</summary>
+        Grasp,
     }
 
     /// <summary>A special action a unit can spend AP on besides its basic attack. Every one has a cooldown.</summary>
@@ -231,6 +242,8 @@ namespace ArmyRoguelike.Core
         Overwatch,
         Caltrops,
         BullRush,
+        Upheaval,
+        Grasp,
     }
 
     /// <summary>
@@ -551,7 +564,8 @@ namespace ArmyRoguelike.Core
         public static readonly UnitStats Skeleton =
             new UnitStats(UnitKind.Skeleton, "Skeleton", 4, 2, 1, 1)
             {
-                LeavesRemains = true, Role = "Leaves a bone pile when killed; a Necromancer can raise it. Stand on the pile to stop that.",
+                LeavesRemains = true, Abilities = A(Ability.Grasp),
+                Role = "Grabs your units and holds them in place. Leaves a bone pile when killed; a Necromancer can raise it. Stand on the pile to stop that.",
             };
 
         /// <summary>
@@ -596,12 +610,13 @@ namespace ArmyRoguelike.Core
 
         public static readonly UnitStats Shard = new UnitStats(UnitKind.Shard, "Shard", 5, 2, 1, 1)
         {
-            Role = "Half of an Elemental.",
+            Abilities = A(Ability.Reform), Role = "Half of an Elemental. Two Shards left next to each other merge back into one.",
         };
 
         public static readonly UnitStats Elemental = new UnitStats(UnitKind.Elemental, "Elemental", 10, 3, 1, 1)
         {
-            SplitsInto = Shard, Role = "When it dies it splits into 2 Shards (5 HP each).",
+            SplitsInto = Shard, Abilities = A(Ability.Upheaval),
+            Role = "Raises rocks under your units to break your line. When it dies it splits into 2 Shards (5 HP each).",
         };
 
         // ---------- Raised versions (necromancer boss) ----------

@@ -721,6 +721,10 @@ namespace ArmyRoguelike.View
 
                     line.Show(from, to);
                     break;
+                case IntentKind.Upheaval:
+                    _board.SetHighlight(intent.Target.Pos, RockLandingColor);
+                    line.Show(from, to);
+                    break;
                 case IntentKind.Howl:
                     foreach (var wolf in Battle.Living(enemy.Team).Where(w => w.IsWolf))
                         _board.SetHighlight(wolf.Pos, AuraColor);
@@ -955,7 +959,7 @@ namespace ArmyRoguelike.View
                     var source = _board.ViewOf(status.Source);
                     var target = _board.ViewOf(status.Target);
                     // Statuses applied by a hit show without an extra lunge; actions lunge at their target.
-                    if (status.Kind == StatusKind.Ward || status.Kind == StatusKind.Heal)
+                    if (status.Kind == StatusKind.Ward || status.Kind == StatusKind.Heal || status.Kind == StatusKind.Grasp)
                     {
                         yield return source.Lunge(target.transform.position, null);
                         source.SetGridPosition(status.Source.Pos);
@@ -966,6 +970,9 @@ namespace ArmyRoguelike.View
                     {
                         case StatusKind.Pin:
                             DamagePopup.Spawn(at, "Pinned", DamagePopup.AbilityColor, 44);
+                            break;
+                        case StatusKind.Grasp:
+                            DamagePopup.Spawn(at, "Grasped: no move", DamagePopup.AbilityColor, 40);
                             break;
                         case StatusKind.Vanish:
                             // Placeholder look: the statue turns see-through (see the "Art needed" table).
@@ -1014,6 +1021,9 @@ namespace ArmyRoguelike.View
                         source.SetGridPosition(tile.Source.Pos);
                     }
 
+                    // An upheaval rock buries whatever lay on the tile.
+                    if (tile.Kind == "rock")
+                        _board.RemoveHazard(tile.Tile);
                     _board.SyncTiles();
                     break;
                 }
@@ -1024,6 +1034,28 @@ namespace ArmyRoguelike.View
                         escape.Gold > 0 ? $"Escaped with {escape.Gold} gold" : "Escaped", DamagePopup.DamageColor, 44);
                     yield return view.Slide(escape.Unit.Pos, new GridPos(escape.Unit.Pos.X, escape.Unit.Pos.Y + 1), null);
                     view.gameObject.SetActive(false);
+                    break;
+                }
+                case UpheavalEvent upheaval:
+                {
+                    // Placeholder: the caster lunges and the target is hit; the push and the rock follow as their own events.
+                    var caster = _board.ViewOf(upheaval.Caster);
+                    var target = _board.ViewOf(upheaval.Hit.Target);
+                    yield return caster.Lunge(target.transform.position, null);
+                    caster.SetGridPosition(upheaval.Caster.Pos);
+                    DamagePopup.Spawn(target.TopWorld + Vector3.up * 0.4f, "Upheaval!", DamagePopup.AbilityColor, 44);
+                    ShowHit(upheaval.Hit);
+                    yield return upheaval.Hit.Killed ? target.Die() : target.Hit();
+                    break;
+                }
+                case ReformEvent reform:
+                {
+                    // Placeholder: both shards vanish and the elemental rises on the first one's tile.
+                    _board.ViewOf(reform.First).gameObject.SetActive(false);
+                    _board.ViewOf(reform.Second).gameObject.SetActive(false);
+                    StartCoroutine(_board.AddView(reform.Merged).Raise());
+                    DamagePopup.Spawn(IsoMath.GridToWorld(reform.Merged.Pos) + Vector3.up * 0.6f, "Reform!", DamagePopup.AbilityColor, 48);
+                    yield return new WaitForSeconds(0.5f);
                     break;
                 }
                 case SplitEvent split:
@@ -1640,6 +1672,8 @@ namespace ArmyRoguelike.View
                 lines.Add("Has acted: can't move again this turn");
             if (u.IsSnared)
                 lines.Add("Pinned: can't move");
+            if (u.Reformed)
+                lines.Add("Reformed from two Shards: won't split again");
             if (u.IsHidden)
                 lines.Add($"Vanished: enemies can't target it ({u.HiddenTurns} enemy turn(s) left, +{Battle.VanishBonus} on its next attack)");
             if (u.IsSlowed)
@@ -1693,6 +1727,10 @@ namespace ArmyRoguelike.View
                     return "overwatch: no shot this turn, so it aims; the first of your units to walk into its sight next turn gets shot";
                 case IntentKind.BullRush:
                     return $"bull rush the {name}: hit it and push it 1 tile";
+                case IntentKind.Upheaval:
+                    return $"upheaval: walk closer, then raise a rock under the {name}: {Battle.UpheavalDamage} damage, it is thrown 1 tile and the rock stays on the dark tile";
+                case IntentKind.Grasp:
+                    return $"grasp the {name}: no damage, but it can't move on your next turn";
                 case IntentKind.Howl:
                     return $"howl: every wolf gets +{Battle.HowlMoves} move this turn (wolves lit up)";
                 default:

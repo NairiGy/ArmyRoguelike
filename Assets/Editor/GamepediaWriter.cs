@@ -161,10 +161,14 @@ public static class GamepediaWriter
         var lines = new System.Collections.Generic.List<string>();
         var cost = Battle.AttackCost;
         lines.Add($"<b>{Esc(Abilities.AttackName(e))}</b> ({cost} AP): {Esc(Abilities.DescribeAttack(e, e.Damage))}.");
-        if (e.Has(Ability.Fling))
-        foreach (var (ability, kind) in new[] { (Ability.Caltrops, ActionKind.Caltrops), (Ability.Overwatch, ActionKind.Overwatch), (Ability.BullRush, ActionKind.BullRush) })
+        foreach (var (ability, kind) in new[]
+                 {
+                     (Ability.Caltrops, ActionKind.Caltrops), (Ability.Overwatch, ActionKind.Overwatch), (Ability.BullRush, ActionKind.BullRush),
+                     (Ability.Upheaval, ActionKind.Upheaval), (Ability.Grasp, ActionKind.Grasp),
+                 })
             if (e.Has(ability))
                 lines.Add($"<b>{Esc(Abilities.Name(ability))}</b> ({cost} AP, cooldown {Battle.Cooldown(kind)}): {Esc(Abilities.Describe(ability))}.");
+        if (e.Has(Ability.Fling))
             lines.Add($"<b>Fling</b> ({cost} AP, cooldown {Battle.Cooldown(ActionKind.Fling)}): {Esc(Abilities.Describe(Ability.Fling))}.");
         if (e.Has(Ability.Howl))
             lines.Add($"<b>Howl</b> ({cost} AP, cooldown {Battle.Cooldown(ActionKind.Howl)}): {Esc(Abilities.Describe(Ability.Howl))}. The leader acts before the other enemies, so the move reaches wolves that haven't acted.");
@@ -192,7 +196,7 @@ public static class GamepediaWriter
         if (e.StealsGold > 0)
             lines.Add($"<b>Steal</b>: its first hit that does damage takes {e.StealsGold} of your gold. From then on it runs for the enemies' back row and escapes from there, and the gold is lost. Kill it first and you keep the gold.");
         if (e.SplitsInto != null)
-            lines.Add($"<b>Split</b>: when it dies it becomes 2 {Link(e.SplitsInto.Name)}s, one on its tile and one on a free neighbour (fewer if there is no room). They act from the next enemy turn.");
+            lines.Add($"<b>Split</b>: when it dies it becomes 2 {Link(e.SplitsInto.Name)}s, one on its tile and one on a free neighbour (fewer if there is no room). They act from the next enemy turn. One formed by Reform doesn't split again.");
         if (e.LeavesRemains)
             lines.Add("<b>Bone pile</b>: leaves one when killed, which a Necromancer can raise. A unit standing on the pile stops that.");
         return lines.ToArray();
@@ -252,6 +256,8 @@ public static class GamepediaWriter
         html.Append("<tr><td>Flee</td><td>It carries stolen gold.</td><td>The enemies' back row, where it will escape.</td></tr>");
         html.Append("<tr><td>Howl</td><td>It can howl, and the extra move would let at least one wolf bite this turn that otherwise couldn't (two if the leader could bite itself).</td><td>Every wolf.</td></tr>");
         html.Append("<tr><td>Fling</td><td>A goblin that can't reach anyone to strike this turn, with a bomb, mine or unacted goblin next to it and one of your units 2-3 tiles away.</td><td>The target, the goblin to be thrown and its landing tile.</td></tr>");
+        html.Append("<tr><td>Grasp</td><td>It grasps, Grasp is ready, it can reach its target to attack this turn, and the target is ranged or Swift and not already held.</td><td>The target, with an arrow.</td></tr>");
+        html.Append($"<tr><td>Upheaval</td><td>It has Upheaval ready, can't reach its target to strike this turn, and the target is within {Battle.UpheavalRange} tiles plus its moves. It may still pick a nearer unit once it has walked.</td><td>The target's tile, where the rock will stay.</td></tr>");
         html.Append("<tr><td>Slam</td><td>It can slam, 2 or more of your units are within 2 tiles, and the slam would deal more in total than a smash.</td><td>The area within 2 tiles.</td></tr>");
         html.Append("<tr><td>Raise</td><td>It can raise and one of its bone piles within raise range is free. AP isn't checked.</td><td>The bone pile.</td></tr>");
         html.Append("<tr><td>Bomb</td><td>It bombs and its target is 2 to bomb-range tiles away with no bomb on its tile. Otherwise it shows Attack, though it may still bomb another unit or back off.</td><td>The target's tile, where the bomb lands.</td></tr>");
@@ -273,6 +279,7 @@ public static class GamepediaWriter
             case EnemyBehaviour.Giant: return "Giant";
             case EnemyBehaviour.PackLeader: return "Pack Leader";
             case EnemyBehaviour.Goblin: return "Goblin";
+            case EnemyBehaviour.Elemental: return "Elemental";
             case EnemyBehaviour.Shooter: return "Shooter";
             case EnemyBehaviour.Necromancer: return "Necromancer";
             default: throw new ArgumentOutOfRangeException(nameof(b), b, "Add a name and steps for this behaviour to the gamepedia.");
@@ -294,7 +301,8 @@ public static class GamepediaWriter
             case EnemyBehaviour.Advance:
                 return new[]
                 {
-                    $"If it can hit its {target} from where it stands: attack, or Bull Rush instead when it has it ready (Bandit Brute).",
+                    $"If it can hit its {target} from where it stands: attack, or Bull Rush instead when it has it ready (Bandit Brute), " +
+                    "or Grasp instead when it has it ready and the target is ranged or Swift and not already held (Skeleton).",
                     $"Otherwise {approach} to it.",
                 };
             case EnemyBehaviour.Shooter:
@@ -317,6 +325,14 @@ public static class GamepediaWriter
                     $"If it can hit its {target} from where it stands: strike.",
                     $"If it can't reach anyone to strike this turn: fling a goblin next to it that hasn't acted at its target, or at the nearest of your units 2-{Battle.FlingRange} tiles away.",
                     $"Otherwise {approach} to it (Slippery: your reach doesn't stop it), then try again.",
+                };
+            case EnemyBehaviour.Elemental:
+                return new[]
+                {
+                    $"If it can hit its {target} from where it stands: strike.",
+                    $"If it can reach a tile to strike from this turn: {approach} and strike.",
+                    $"Otherwise walk as close as it can, then use Upheaval on its target, or on the nearest of your units within {Battle.UpheavalRange} tiles.",
+                    "Shards have no behaviour of their own (Walk up and hit); at the start of the enemy phase, any two next to each other Reform first.",
                 };
             case EnemyBehaviour.PackLeader:
                 return new[]
