@@ -160,6 +160,9 @@ namespace ArmyRoguelike.Core
 
         public const int UpheavalDamage = 2;
 
+        /// <summary>Corpse Blast (Necromancer): damage to everyone in the 3x3 around the bone pile, friend or foe.</summary>
+        public const int CorpseBlastDamage = 2;
+
         // Omens (placeholders).
         public const int SunDamage = 3;
         public const int MoonShield = 4;
@@ -826,7 +829,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.PinningShot:
                     return target != null && target.Team != unit.Team && !target.IsObjective && CanHitFrom(unit, unit.Pos, target);
                 case ActionKind.ShieldBash:
-                    return target != null && target.Team != unit.Team && !target.IsObjective && unit.Size == 1 && Distance(unit, target) == 1;
+                    return target != null && target.Team != unit.Team && !target.IsObjective && !target.Has(Ability.Colossus) && unit.Size == 1 && Distance(unit, target) == 1;
                 case ActionKind.Vanish:
                     return tile == unit.Pos && !unit.IsHidden;
                 case ActionKind.Blink:
@@ -879,7 +882,7 @@ namespace ArmyRoguelike.Core
                     var hit = Damage(UnitAt(tile), PinDamage, unit, DamageKind.Attack, after);
                     events.Add(new AttackEvent(unit, hit.Target, hit.Damage, hit.HpAfter));
                     events.AddRange(after);
-                    if (hit.Target.IsAlive)
+                    if (hit.Target.IsAlive && !hit.Target.Has(Ability.Colossus))
                     {
                         hit.Target.SnareTurns = 1;
                         events.Add(new StatusEvent(unit, hit.Target, StatusKind.Pin, 1));
@@ -1045,8 +1048,8 @@ namespace ArmyRoguelike.Core
         /// </summary>
         private void Push(Unit unit, GridPos dir, Unit pusher, List<BattleEvent> events, bool hurtsBlocker = false)
         {
-            // The shrine is rooted to its tile.
-            if (!unit.IsAlive || unit.IsObjective)
+            // The shrine is rooted to its tile, and nothing moves a Colossus.
+            if (!unit.IsAlive || unit.IsObjective || unit.Has(Ability.Colossus))
                 return;
             var from = unit.Pos;
             var to = from + dir;
@@ -1088,8 +1091,31 @@ namespace ArmyRoguelike.Core
 
         public bool CanRaise(Unit raiser, Unit remains) =>
             !IsOver && raiser.IsAlive && raiser.Stats.CanRaise && raiser.Ap >= raiser.Stats.RaiseCost && Ready(raiser, ActionKind.Raise) &&
-            remains != null && remains.IsRemains && remains.Team == raiser.Team &&
+            remains != null && IsRaisableBy(raiser, remains) &&
             Distance(raiser, remains) <= raiser.Stats.RaiseRange && UnitAt(remains.Pos) == null;
+
+        /// <summary>A bone pile the raiser can bring back: one of its own side's, or a fallen unit of yours with Soul Harvest.</summary>
+        private static bool IsRaisableBy(Unit raiser, Unit remains) =>
+            remains.IsRemains && (remains.Team == raiser.Team || (remains.LeftPile && raiser.Has(Ability.SoulHarvest)));
+
+        /// <summary>Every bone pile the raiser could bring back, wherever it lies.</summary>
+        public IEnumerable<Unit> RaisablePiles(Unit raiser) => _units.Where(u => IsRaisableBy(raiser, u));
+
+        /// <summary>Corpse Blast: any bone pile (its side's or yours) within raise range, someone standing on it or not.</summary>
+        public bool CanCorpseBlast(Unit unit, Unit pile) =>
+            !IsOver && unit.IsAlive && unit.Has(Ability.CorpseBlast) && unit.Ap >= AttackCost && Ready(unit, ActionKind.CorpseBlast) &&
+            pile != null && pile.IsRemains && Distance(unit, pile) <= unit.Stats.RaiseRange;
+
+        /// <summary>Corpse Blast: the pile is used up and explodes for <see cref="CorpseBlastDamage"/> in the 3x3 around it, friend or foe.</summary>
+        internal List<BattleEvent> DoCorpseBlast(Unit unit, Unit pile)
+        {
+            UseUp(unit, ActionKind.CorpseBlast);
+            pile.PileGone = true;
+            var events = new List<BattleEvent> { new CorpseBlastEvent(unit, pile) };
+            Explode(pile.Pos, CorpseBlastDamage, "corpse blast", unit, events);
+            CheckEnd();
+            return events;
+        }
 
         public bool CanThrow(Unit thrower, Unit target)
         {
@@ -1659,7 +1685,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Grasp: an adjacent unit it could attack, not already held in place.</summary>
         public bool CanGrasp(Unit unit, Unit target) =>
             unit.Has(Ability.Grasp) && Ready(unit, ActionKind.Grasp) && CanAttack(unit, target) && Distance(unit, target) == 1 &&
-            !target.IsObjective && target.SnareTurns == 0;
+            !target.IsObjective && target.SnareTurns == 0 && !target.Has(Ability.Colossus);
 
         /// <summary>Grasp: no damage, but the target can't move on its next turn (the same hold as a pin).</summary>
         internal List<BattleEvent> DoGrasp(Unit unit, Unit target)
@@ -1719,17 +1745,27 @@ namespace ArmyRoguelike.Core
 
         /// <summary>
         /// Raises the given bone pile and every other one within the raiser's range that nobody stands on,
-        /// for one action. They wait until the next enemy turn to act.
+        /// for one action. They wait until the next enemy turn to act. A fallen unit of yours (Soul Harvest) rises as a new
+        /// unit on the raiser's side (<see cref="UnitStats.Harvested"/>) and its pile is used up.
         /// </summary>
         internal List<BattleEvent> DoRaise(Unit raiser, Unit remains)
         {
             UseUp(raiser, ActionKind.Raise);
             var piles = new List<Unit> { remains };
-            piles.AddRange(Remains(raiser.Team).Where(r => r != remains && Distance(raiser, r) <= raiser.Stats.RaiseRange && UnitAt(r.Pos) == null)
+            piles.AddRange(RaisablePiles(raiser).Where(r => r != remains && Distance(raiser, r) <= raiser.Stats.RaiseRange && UnitAt(r.Pos) == null)
                 .OrderBy(r => Distance(raiser, r)).ThenBy(r => r.Id));
             var events = new List<BattleEvent>();
             foreach (var pile in piles)
             {
+                if (pile.Team != raiser.Team)
+                {
+                    pile.PileGone = true;
+                    var risen = new Unit(_nextId++, raiser.Team, UnitStats.Harvested(pile.Stats)) { Pos = pile.Pos, IsPlaced = true, IsDone = true, Ap = 0 };
+                    _units.Add(risen);
+                    events.Add(new RaiseEvent(raiser, risen, pile));
+                    continue;
+                }
+
                 pile.Hp = pile.MaxHp;
                 pile.Ap = 0;
                 pile.IsDone = true;
@@ -1842,7 +1878,10 @@ namespace ArmyRoguelike.Core
                 after.Add(new EffectEvent(EffectKind.LastStand, target, 0, 1, target));
             }
 
+            var wasInWrath = target.InWrath;
             target.Hp = Math.Max(0, hp);
+            if (!wasInWrath && target.InWrath)
+                after.Add(new StatusEvent(target, target, StatusKind.Wrath, 0));
 
             if (!target.IsAlive && hostile && source.IsAlive)
             {
@@ -1870,6 +1909,10 @@ namespace ArmyRoguelike.Core
             if (!target.IsAlive)
             {
                 BreakPackBond(target, after);
+                // Soul Harvest: one of your units dying while a harvester stands leaves a bone pile it can raise.
+                if (target.Team == Team.Player && !target.IsSummon && !target.IsObjective && !target.Stats.LeavesRemains &&
+                    Living(Team.Enemy).Any(u => u.Has(Ability.SoulHarvest)))
+                    target.LeftPile = true;
                 if (target.Has(Ability.PowderKeg))
                     Explode(target.Pos, PowderKegDamage, "powder keg", target, after);
             }
@@ -1892,7 +1935,7 @@ namespace ArmyRoguelike.Core
                     after.Add(new StatusEvent(source, target, StatusKind.Poison, PoisonTurns));
                 }
 
-                if (source.Has(Ability.Chill))
+                if (source.Has(Ability.Chill) && !target.Has(Ability.Colossus))
                 {
                     target.SlowNext = 1;
                     after.Add(new StatusEvent(source, target, StatusKind.Slow, 1));

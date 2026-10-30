@@ -145,7 +145,10 @@ namespace ArmyRoguelike.Core
         public int PackHp { get; internal set; }
         public int BaseDamage => Math.Max(1, Stats.Damage + (Member?.BonusDamage ?? 0) + GainedDamage);
         public int Range => Math.Max(1, Stats.Range);
-        public int MaxAp => Math.Max(1, Stats.MaxAp);
+        public int MaxAp => Math.Max(1, Stats.MaxAp) + (InWrath ? 1 : 0);
+
+        /// <summary>Wrath (the Giant): at half HP or less it gets one more AP each turn.</summary>
+        public bool InWrath => Has(Ability.Wrath) && IsAlive && Hp * 2 <= MaxHp;
 
         /// <summary>Tiles per turn: the type's moves (1, or 2 with Swift), plus 1 for Spring Boots.</summary>
         public int MaxMoves => Stats.Moves + (Stats.Moves > 0 && Has(Ability.SpringBoots) ? 1 : 0);
@@ -169,7 +172,13 @@ namespace ArmyRoguelike.Core
         public bool IsSlowed => SlowNext > 0 || SlowedThisTurn;
 
         /// <summary>A dead unit that left a bone pile behind.</summary>
-        public bool IsRemains => IsPlaced && !IsAlive && Stats.LeavesRemains;
+        public bool IsRemains => IsPlaced && !IsAlive && (Stats.LeavesRemains || LeftPile) && !PileGone;
+
+        /// <summary>One of your units that died while a Necromancer with Soul Harvest was on the board: it left a bone pile.</summary>
+        public bool LeftPile { get; internal set; }
+
+        /// <summary>Its bone pile is used up (raised as a new unit by Soul Harvest, or blown up by Corpse Blast).</summary>
+        public bool PileGone { get; internal set; }
 
         /// <summary>Has the ability, from its type or from its item.</summary>
         public bool Has(Ability ability) =>

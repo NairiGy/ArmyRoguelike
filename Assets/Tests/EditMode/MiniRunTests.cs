@@ -883,6 +883,75 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void SoulHarvest_YourFallenRiseAsBoneVersionsWithOnlyTheirAttack()
+        {
+            var b = Started(Army(UnitStats.Warrior, UnitStats.Archer), new[] { new GridPos(0, 0), new GridPos(3, 1) },
+                new[] { (UnitStats.Necromancer, new GridPos(3, 4)) });
+            var archer = Player(b, 1);
+            archer.Hp = 1;
+            b.EndPlayerTurn();
+            Assert.IsFalse(archer.IsAlive, "bolted");
+            Assert.IsTrue(archer.IsRemains, "left a bone pile");
+
+            var raise = b.EndPlayerTurn().OfType<RaiseEvent>().Single();
+            Assert.AreEqual(archer, raise.From);
+            var bone = raise.Raised;
+            Assert.AreEqual(Team.Enemy, bone.Team);
+            Assert.AreEqual("Bone Archer", bone.Stats.Name);
+            Assert.AreEqual(UnitStats.Archer.Damage, bone.Stats.Damage);
+            Assert.AreEqual(0, bone.Stats.Abilities.Count, "only its basic attack");
+            Assert.AreEqual(archer.Pos, bone.Pos);
+            Assert.IsFalse(archer.IsRemains, "the pile is used up");
+        }
+
+        [Test]
+        public void CorpseBlast_PunishesStandingOnAPile()
+        {
+            var b = Started(Army(UnitStats.Warrior), new[] { new GridPos(3, 1) },
+                new[] { (UnitStats.Necromancer, new GridPos(3, 5)), (UnitStats.Skeleton, new GridPos(3, 2)) });
+            var necro = Enemy(b, 0);
+            var skeleton = Enemy(b, 1);
+            skeleton.Hp = 0;
+            var warrior = Player(b);
+            b.PlayerMove(warrior, new GridPos(3, 2));
+            Assert.AreEqual(IntentKind.CorpseBlast, EnemyAI.PredictIntent(b, necro).Kind);
+            var events = b.EndPlayerTurn();
+            Assert.IsTrue(events.OfType<CorpseBlastEvent>().Any());
+            Assert.AreEqual(warrior.MaxHp - Battle.CorpseBlastDamage, warrior.Hp);
+            Assert.IsFalse(skeleton.IsRemains, "the pile is used up");
+        }
+
+        [Test]
+        public void Colossus_GiantCantBePinnedOrBashed()
+        {
+            var b = Started(Army(UnitStats.Archer, UnitStats.Warrior), new[] { new GridPos(3, 1), new GridPos(0, 0) },
+                new[] { (UnitStats.Ogre, new GridPos(3, 4)) });
+            var archer = Player(b, 0);
+            var warrior = Player(b, 1);
+            var giant = Enemy(b);
+            Assert.IsNotNull(b.PlayerUseAction(archer, ActionKind.PinningShot, giant.Pos));
+            Assert.AreEqual(giant.MaxHp - Battle.PinDamage, giant.Hp, "the shot still hurts");
+            Assert.IsFalse(giant.IsSnared);
+            warrior.Pos = new GridPos(3, 3);
+            Assert.IsFalse(b.CanUseAction(warrior, ActionKind.ShieldBash, giant.Pos));
+        }
+
+        [Test]
+        public void Wrath_GiantActsTwiceAtHalfHp()
+        {
+            var b = Started(Army(UnitStats.Warrior), new[] { new GridPos(3, 1) }, new[] { (UnitStats.Ogre, new GridPos(3, 4)) });
+            var warrior = Player(b);
+            var giant = Enemy(b);
+            giant.Hp = giant.MaxHp / 2 + 1;
+            warrior.Pos = new GridPos(3, 3);
+            var hit = b.PlayerAttack(warrior, giant);
+            Assert.IsTrue(hit.OfType<StatusEvent>().Any(s => s.Kind == StatusKind.Wrath));
+            Assert.AreEqual(2, giant.MaxAp);
+            var events = b.EndPlayerTurn();
+            Assert.AreEqual(2, events.OfType<SmashEvent>().Count(), "two smashes in one turn");
+        }
+
+        [Test]
         public void StandingOnBonePile_BlocksRaise()
         {
             var b = Started(Army(UnitStats.Warrior), new[] { new GridPos(3, 1) },

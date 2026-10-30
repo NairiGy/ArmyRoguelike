@@ -164,7 +164,7 @@ public static class GamepediaWriter
         foreach (var (ability, kind) in new[]
                  {
                      (Ability.Caltrops, ActionKind.Caltrops), (Ability.Overwatch, ActionKind.Overwatch), (Ability.BullRush, ActionKind.BullRush),
-                     (Ability.Upheaval, ActionKind.Upheaval), (Ability.Grasp, ActionKind.Grasp),
+                     (Ability.Upheaval, ActionKind.Upheaval), (Ability.Grasp, ActionKind.Grasp), (Ability.CorpseBlast, ActionKind.CorpseBlast),
                  })
             if (e.Has(ability))
                 lines.Add($"<b>{Esc(Abilities.Name(ability))}</b> ({cost} AP, cooldown {Battle.Cooldown(kind)}): {Esc(Abilities.Describe(ability))}.");
@@ -259,7 +259,8 @@ public static class GamepediaWriter
         html.Append("<tr><td>Grasp</td><td>It grasps, Grasp is ready, it can reach its target to attack this turn, and the target is ranged or Swift and not already held.</td><td>The target, with an arrow.</td></tr>");
         html.Append($"<tr><td>Upheaval</td><td>It has Upheaval ready, can't reach its target to strike this turn, and the target is within {Battle.UpheavalRange} tiles plus its moves. It may still pick a nearer unit once it has walked.</td><td>The target's tile, where the rock will stay.</td></tr>");
         html.Append("<tr><td>Slam</td><td>It can slam, 2 or more of your units are within 2 tiles, and the slam would deal more in total than a smash.</td><td>The area within 2 tiles.</td></tr>");
-        html.Append("<tr><td>Raise</td><td>It can raise and one of its bone piles within raise range is free. AP isn't checked.</td><td>The bone pile.</td></tr>");
+        html.Append("<tr><td>Corpse Blast</td><td>It has Corpse Blast ready and a bone pile in range whose 3x3 holds more of your units than of its own (at least one).</td><td>The 3x3 around the pile.</td></tr>");
+        html.Append("<tr><td>Raise</td><td>It can raise and a bone pile it can raise (its own side's, or one of your fallen with Soul Harvest) is in raise range and free. AP isn't checked.</td><td>The bone pile.</td></tr>");
         html.Append("<tr><td>Bomb</td><td>It bombs and its target is 2 to bomb-range tiles away with no bomb on its tile. Otherwise it shows Attack, though it may still bomb another unit or back off.</td><td>The target's tile, where the bomb lands.</td></tr>");
         html.Append("<tr><td>Smash</td><td>It smashes and the target is next to it, or the target is out of boulder range.</td><td>The ring around it and the target.</td></tr>");
         html.Append("<tr><td>Throw</td><td>It throws boulders and the target is 2 to throw-range tiles away.</td><td>The target and the tile where the rock will land.</td></tr>");
@@ -352,7 +353,7 @@ public static class GamepediaWriter
             case EnemyBehaviour.Giant:
                 return new[]
                 {
-                    $"With its one action: smash or slam, whichever deals more in total (slam needs 2 or more of your units within 2 tiles; {Battle.SlamDamage} damage to each), ties going to smash.",
+                    $"With its action (two actions a turn at half HP or less, Wrath; it loops until both are spent): smash or slam, whichever deals more in total (slam needs 2 or more of your units within 2 tiles; {Battle.SlamDamage} damage to each), ties going to smash.",
                     "Or, with nobody close enough for either: throw a boulder at its target if it is 2 to throw-range tiles away and the rock wouldn't wall the Giant off from it.",
                     $"Without an action to take: {approach} to the {target}, then try again.",
                 };
@@ -360,7 +361,8 @@ public static class GamepediaWriter
                 return new[]
                 {
                     $"If its {target} is closer than {EnemyAI.NecromancerComfortDistance} tiles: {retreat} (once a turn).",
-                    "If any bone pile is in range: raise them all (its action for the turn).",
+                    "If blowing up a bone pile in range (its side's or one of your fallen) would hit more of your units than of its own, at least one: Corpse Blast, the pile with the most of yours first.",
+                    "Otherwise, if any bone pile it can raise is in range and free: raise them all, your fallen included (Soul Harvest).",
                     "If it can hit the target from where it stands: fire a bolt.",
                     $"Otherwise {range} for a bolt (once a turn), with a comfort distance of {EnemyAI.NecromancerComfortDistance}. It never walks closer than that to shoot.",
                 };

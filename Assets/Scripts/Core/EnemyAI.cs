@@ -30,6 +30,9 @@ namespace ArmyRoguelike.Core
         /// <summary>An elemental raising a rock under its target: damage, a push, and the rock stays.</summary>
         Upheaval,
 
+        /// <summary>A necromancer blowing up a bone pile your units stand on or next to.</summary>
+        CorpseBlast,
+
         /// <summary>A skeleton grabbing its target so it can't move next turn.</summary>
         Grasp,
 
@@ -243,11 +246,36 @@ namespace ArmyRoguelike.Core
 
         /// <summary>The bone pile a necromancer would raise right now, if any.</summary>
         public static Unit ChooseRemains(Battle battle, Unit raiser) =>
-            battle.Remains(raiser.Team)
+            battle.RaisablePiles(raiser)
                 .Where(r => battle.CanRaise(raiser, r))
                 .OrderBy(r => Battle.Distance(raiser, r))
                 .ThenBy(r => r.Id)
                 .FirstOrDefault();
+
+        /// <summary>
+        /// The bone pile a necromancer would blow up right now, if any: one whose 3x3 holds more of your units than of
+        /// its own side (itself included), at least one. Most of yours first, then nearest.
+        /// </summary>
+        public static Unit ChooseCorpseBlast(Battle battle, Unit necro)
+        {
+            int Score(Unit pile)
+            {
+                var area = battle.BlastArea(pile.Pos);
+                var hit = battle.Units.Where(u => u.IsPlaced && u.IsAlive && Battle.Cells(u).Any(area.Contains)).ToList();
+                var yours = hit.Count(u => u.Team != necro.Team && !u.IsObjective);
+                return yours == 0 ? 0 : yours - hit.Count(u => u.Team == necro.Team);
+            }
+
+            return battle.Units
+                .Where(p => battle.CanCorpseBlast(necro, p))
+                .Select(p => (pile: p, score: Score(p)))
+                .Where(s => s.score > 0)
+                .OrderByDescending(s => s.score)
+                .ThenBy(s => Battle.Distance(necro, s.pile))
+                .ThenBy(s => s.pile.Id)
+                .Select(s => s.pile)
+                .FirstOrDefault();
+        }
 
         /// <summary>What this enemy would do first if its turn started now. Used to show intent on hover.</summary>
         public static Intent PredictIntent(Battle battle, Unit enemy)
@@ -258,10 +286,13 @@ namespace ArmyRoguelike.Core
             if (enemy.CarryingLoot > 0)
                 return new Intent(IntentKind.Flee, enemy);
 
+            if (enemy.Has(Ability.CorpseBlast) && AsIfItsTurn(battle, enemy, 0, () => ChooseCorpseBlast(battle, enemy)) is Unit blast)
+                return new Intent(IntentKind.CorpseBlast, blast, blast.Pos);
+
             if (enemy.Stats.CanRaise && battle.Ready(enemy, ActionKind.Raise))
             {
                 // Intent is shown during the player's turn, so assume a full enemy AP pool.
-                var remains = battle.Remains(enemy.Team)
+                var remains = battle.RaisablePiles(enemy)
                     .Where(r => Battle.Distance(enemy, r) <= enemy.Stats.RaiseRange && battle.UnitAt(r.Pos) == null)
                     .OrderBy(r => Battle.Distance(enemy, r))
                     .ThenBy(r => r.Id)
@@ -688,6 +719,13 @@ namespace ArmyRoguelike.Core
                     retreated = true;
                     if (Retreat(battle, necro, events))
                         continue;
+                }
+
+                var blast = ChooseCorpseBlast(battle, necro);
+                if (blast != null)
+                {
+                    events.AddRange(battle.DoCorpseBlast(necro, blast));
+                    continue;
                 }
 
                 var remains = ChooseRemains(battle, necro);

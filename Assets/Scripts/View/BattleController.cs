@@ -725,6 +725,11 @@ namespace ArmyRoguelike.View
                     _board.SetHighlight(intent.Target.Pos, RockLandingColor);
                     line.Show(from, to);
                     break;
+                case IntentKind.CorpseBlast:
+                    foreach (var p in Battle.BlastArea(intent.Target.Pos))
+                        _board.SetHighlight(p, BombZoneColor);
+                    line.Show(from, to);
+                    break;
                 case IntentKind.Howl:
                     foreach (var wolf in Battle.Living(enemy.Team).Where(w => w.IsWolf))
                         _board.SetHighlight(wolf.Pos, AuraColor);
@@ -856,10 +861,34 @@ namespace ArmyRoguelike.View
                 case RaiseEvent raise:
                 {
                     var raiser = _board.ViewOf(raise.Raiser);
+                    if (raise.From != null)
+                    {
+                        // Soul Harvest: your fallen unit's pile gives way to a new enemy statue (placeholder look).
+                        var pile = _board.ViewOf(raise.From);
+                        yield return raiser.Lunge(pile.transform.position, null);
+                        raiser.SetGridPosition(raise.Raiser.Pos);
+                        pile.gameObject.SetActive(false);
+                        var risen = _board.AddView(raise.Raised);
+                        DamagePopup.Spawn(risen.TopWorld + Vector3.up * 0.25f, "Harvested!", DamagePopup.AbilityColor, 44);
+                        yield return risen.Raise();
+                        break;
+                    }
+
                     var raised = _board.ViewOf(raise.Raised);
                     yield return raiser.Lunge(raised.transform.position, null);
                     raiser.SetGridPosition(raise.Raiser.Pos);
                     yield return raised.Raise();
+                    break;
+                }
+                case CorpseBlastEvent blast:
+                {
+                    // Placeholder: a lunge at the pile, which vanishes; the explosion follows as its own event.
+                    var caster = _board.ViewOf(blast.Caster);
+                    var pile = _board.ViewOf(blast.Pile);
+                    yield return caster.Lunge(pile.transform.position, null);
+                    caster.SetGridPosition(blast.Caster.Pos);
+                    DamagePopup.Spawn(pile.transform.position + Vector3.up * 0.6f, "Corpse Blast!", DamagePopup.AbilityColor, 44);
+                    pile.gameObject.SetActive(false);
                     break;
                 }
                 case PlaceMineEvent mine:
@@ -973,6 +1002,9 @@ namespace ArmyRoguelike.View
                             break;
                         case StatusKind.Grasp:
                             DamagePopup.Spawn(at, "Grasped: no move", DamagePopup.AbilityColor, 40);
+                            break;
+                        case StatusKind.Wrath:
+                            DamagePopup.Spawn(at, "Wrath! 2 actions a turn", DamagePopup.DamageColor, 48);
                             break;
                         case StatusKind.Vanish:
                             // Placeholder look: the statue turns see-through (see the "Art needed" table).
@@ -1674,6 +1706,8 @@ namespace ArmyRoguelike.View
                 lines.Add("Pinned: can't move");
             if (u.Reformed)
                 lines.Add("Reformed from two Shards: won't split again");
+            if (u.InWrath)
+                lines.Add("Wrath: 2 actions a turn");
             if (u.IsHidden)
                 lines.Add($"Vanished: enemies can't target it ({u.HiddenTurns} enemy turn(s) left, +{Battle.VanishBonus} on its next attack)");
             if (u.IsSlowed)
@@ -1731,6 +1765,8 @@ namespace ArmyRoguelike.View
                     return $"upheaval: walk closer, then raise a rock under the {name}: {Battle.UpheavalDamage} damage, it is thrown 1 tile and the rock stays on the dark tile";
                 case IntentKind.Grasp:
                     return $"grasp the {name}: no damage, but it can't move on your next turn";
+                case IntentKind.CorpseBlast:
+                    return $"blow up the {name} bone pile: {Battle.CorpseBlastDamage} damage to everyone in the red area, its own side included";
                 case IntentKind.Howl:
                     return $"howl: every wolf gets +{Battle.HowlMoves} move this turn (wolves lit up)";
                 default:

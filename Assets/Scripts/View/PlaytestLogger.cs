@@ -115,6 +115,14 @@ namespace ArmyRoguelike.View
                     {
                         turn = turn, team = raise.Raiser.Team.ToString(), unit = Name(raise.Raiser), type = "raise",
                         target = Name(raise.Raised), toX = raise.Raised.Pos.X, toY = raise.Raised.Pos.Y,
+                        note = raise.From != null ? "harvested " + Name(raise.From) : null,
+                    });
+                    break;
+                case CorpseBlastEvent blast:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = blast.Caster.Team.ToString(), unit = Name(blast.Caster), type = "corpse blast",
+                        target = Name(blast.Pile), toX = blast.Pile.Pos.X, toY = blast.Pile.Pos.Y,
                     });
                     break;
                 case PlaceMineEvent mine:

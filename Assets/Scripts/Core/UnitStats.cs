@@ -212,6 +212,20 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Its action can be Grasp: an adjacent unit can't move on its next turn.</summary>
         Grasp,
+
+        // ---------- Bosses ----------
+
+        /// <summary>Can't be pushed, pinned, slowed or grasped.</summary>
+        Colossus,
+
+        /// <summary>At half HP or less it gets one more AP each turn (two actions).</summary>
+        Wrath,
+
+        /// <summary>While it is on the board, your units that die leave a bone pile it can raise as one of its own.</summary>
+        SoulHarvest,
+
+        /// <summary>Its action can be Corpse Blast: a bone pile in range explodes in a 3x3.</summary>
+        CorpseBlast,
     }
 
     /// <summary>A special action a unit can spend AP on besides its basic attack. Every one has a cooldown.</summary>
@@ -244,6 +258,7 @@ namespace ArmyRoguelike.Core
         BullRush,
         Upheaval,
         Grasp,
+        CorpseBlast,
     }
 
     /// <summary>
@@ -575,17 +590,17 @@ namespace ArmyRoguelike.Core
         public static readonly UnitStats Necromancer =
             new UnitStats(UnitKind.Necromancer, "Necromancer", 14, 4, 3, 1)
             {
-                RaiseCost = 1, RaiseRange = 4,
-                Role = "Boss. Brings raised versions of the factions you beat this act. One action a turn: raises every bone pile within 4 tiles at once, or fires a bolt. " +
-                       "Keeps 2 tiles away, walks up to bolt range and shoots (needs line of sight).",
+                RaiseCost = 1, RaiseRange = 4, Abilities = A(Ability.SoulHarvest, Ability.CorpseBlast),
+                Role = "Boss. Brings raised versions of the factions you beat this act, and raises your fallen against you. One action a turn: blows up a bone pile " +
+                       "your units stand on or next to, raises every bone pile within 4 tiles at once, or fires a bolt. Keeps 2 tiles away, walks up to bolt range and shoots (needs line of sight).",
             };
 
         /// <summary>Act 1 boss (the ogre). Its basic attack is the club smash, which hits everyone adjacent.</summary>
         public static readonly UnitStats Ogre = new UnitStats(UnitKind.Ogre, "Giant", 36, 5, 1, 1)
         {
-            Size = 2, AreaMelee = true, ThrowCost = 1, ThrowDamage = 4, ThrowRange = 4, Slams = true,
-            Role = "Boss, 2x2. One action a turn. Slam: 3 damage to each of your units within 2 tiles, then shoves them 1 tile away. Smash hits every adjacent unit. " +
-                   "Or throws a boulder 2-4 tiles away that stays as a rock.",
+            Size = 2, AreaMelee = true, ThrowCost = 1, ThrowDamage = 4, ThrowRange = 4, Slams = true, Abilities = A(Ability.Colossus, Ability.Wrath),
+            Role = "Boss, 2x2. One action a turn, two at half HP. Slam: 3 damage to each of your units within 2 tiles, then shoves them 1 tile away. Smash hits every adjacent unit. " +
+                   "Or throws a boulder 2-4 tiles away that stays as a rock. Nothing pins, slows or pushes it.",
         };
 
         // ---------- Bandits ----------
@@ -637,6 +652,25 @@ namespace ArmyRoguelike.Core
                 Role = $"Raised {s.Name}. Leaves a bone pile; the Necromancer can raise it again.", IsUndead = true,
             };
             RaisedCache[s] = r;
+            return r;
+        }
+
+        private static readonly Dictionary<UnitStats, UnitStats> HarvestedCache = new Dictionary<UnitStats, UnitStats>();
+
+        /// <summary>
+        /// One of your fallen units raised by Soul Harvest: its HP, damage, range and moves, but none of its passives,
+        /// actions or item; it only uses its basic attack. Leaves a bone pile like any undead.
+        /// </summary>
+        public static UnitStats Harvested(UnitStats s)
+        {
+            if (HarvestedCache.TryGetValue(s, out var r))
+                return r;
+            r = new UnitStats(s.Kind, "Bone " + s.Name, s.MaxHp, s.Damage, s.Has(Ability.LongReach) ? 1 : s.Range, 1)
+            {
+                Abilities = s.Has(Ability.Swift) ? A(Ability.Swift) : A(), Label = s.Label, LeavesRemains = true, IsUndead = true,
+                Role = $"Your fallen {s.Name}, raised by the Necromancer. Only its basic attack; leaves a bone pile it can raise again.",
+            };
+            HarvestedCache[s] = r;
             return r;
         }
 

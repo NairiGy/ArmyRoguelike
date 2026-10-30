@@ -593,7 +593,7 @@ namespace ArmyRoguelike.View
             if (_base != null)
                 _base.enabled = false;
 
-            if (!Unit.Stats.LeavesRemains)
+            if (!Unit.Stats.LeavesRemains && !Unit.LeftPile)
             {
                 gameObject.SetActive(false);
                 yield break;

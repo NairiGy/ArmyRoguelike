@@ -325,6 +325,9 @@ namespace ArmyRoguelike.Core
         /// <summary>Vanish: the unit went invisible (Source and Target are the same unit).</summary>
         Vanish,
 
+        /// <summary>Wrath (the Giant): it dropped to half HP and now gets two actions a turn (Source and Target are the same unit).</summary>
+        Wrath,
+
         /// <summary>Grasp (skeletons): held in place, can't move on its next turn.</summary>
         Grasp,
 
@@ -431,13 +434,32 @@ namespace ArmyRoguelike.Core
         public readonly Unit Raiser;
         public readonly Unit Raised;
 
-        public RaiseEvent(Unit raiser, Unit raised)
+        /// <summary>Soul Harvest: the fallen unit of yours whose pile became <see cref="Raised"/> (a new unit), else null.</summary>
+        public readonly Unit From;
+
+        public RaiseEvent(Unit raiser, Unit raised, Unit from = null)
         {
             Raiser = raiser;
             Raised = raised;
+            From = from;
         }
 
         public override Unit Actor => Raiser;
+    }
+
+    /// <summary>Corpse Blast: a necromancer set off a bone pile. The explosion follows as its own event.</summary>
+    public sealed class CorpseBlastEvent : BattleEvent
+    {
+        public readonly Unit Caster;
+        public readonly Unit Pile;
+
+        public CorpseBlastEvent(Unit caster, Unit pile)
+        {
+            Caster = caster;
+            Pile = pile;
+        }
+
+        public override Unit Actor => Caster;
     }
 
     /// <summary>

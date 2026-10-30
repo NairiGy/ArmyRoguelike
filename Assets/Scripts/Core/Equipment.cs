@@ -91,6 +91,10 @@ namespace ArmyRoguelike.Core
                 case Ability.Upheaval: return "Upheaval";
                 case Ability.Reform: return "Reform";
                 case Ability.Grasp: return "Grasp";
+                case Ability.Colossus: return "Colossus";
+                case Ability.Wrath: return "Wrath";
+                case Ability.SoulHarvest: return "Soul Harvest";
+                case Ability.CorpseBlast: return "Corpse Blast";
                 default: return "";
             }
         }
@@ -149,6 +153,10 @@ namespace ArmyRoguelike.Core
                 case Ability.Upheaval: return $"a rock bursts up under one of your units within {Battle.UpheavalRange} tiles (no line of sight needed): {Battle.UpheavalDamage} damage, and it is thrown 1 tile away from the caster ({Battle.CollisionDamage} more if blocked); the rock stays where it stood";
                 case Ability.Reform: return "two Shards that start the enemy turn next to each other merge into an Elemental with their HP added up; it acts that turn but won't split again";
                 case Ability.Grasp: return "grabs a unit next to it: no damage, but it can't move on its next turn";
+                case Ability.Colossus: return "can't be pushed, pinned, slowed or grasped";
+                case Ability.Wrath: return "at half HP or less it gets 2 actions a turn instead of 1 (each still has its cooldown)";
+                case Ability.SoulHarvest: return "while it is on the board your units that die leave a bone pile; raising one brings it back on its side as a Bone version with only its basic attack";
+                case Ability.CorpseBlast: return $"a bone pile within its raise range explodes for {Battle.CorpseBlastDamage} damage in the 3x3 around it, friend or foe; the pile is used up";
                 default: return "";
             }
         }
@@ -174,6 +182,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.BullRush: return "Bull Rush";
                 case ActionKind.Upheaval: return "Upheaval";
                 case ActionKind.Grasp: return "Grasp";
+                case ActionKind.CorpseBlast: return "Corpse Blast";
                 case ActionKind.Fireball: return "Fireball";
                 case ActionKind.IceWall: return "Ice Wall";
                 case ActionKind.Ward: return "Ward";
@@ -215,7 +224,8 @@ namespace ArmyRoguelike.Core
         /// <summary>Abilities that describe one of the unit's actions rather than a passive (listed with the actions).</summary>
         public static bool IsAction(Ability ability) =>
             ability == Ability.WolfBite || ability == Ability.Howl || ability == Ability.Fling || ability == Ability.Caltrops ||
-            ability == Ability.Overwatch || ability == Ability.BullRush || ability == Ability.Upheaval || ability == Ability.Grasp;
+            ability == Ability.Overwatch || ability == Ability.BullRush || ability == Ability.Upheaval || ability == Ability.Grasp ||
+            ability == Ability.CorpseBlast;
 
         /// <summary>The name of a unit type's basic attack, which is one of its actions.</summary>
         public static string AttackName(UnitStats s)
@@ -269,7 +279,7 @@ namespace ArmyRoguelike.Core
                      {
                          (Ability.Fling, ActionKind.Fling), (Ability.Howl, ActionKind.Howl), (Ability.Caltrops, ActionKind.Caltrops),
                          (Ability.Overwatch, ActionKind.Overwatch), (Ability.BullRush, ActionKind.BullRush),
-                         (Ability.Upheaval, ActionKind.Upheaval), (Ability.Grasp, ActionKind.Grasp),
+                         (Ability.Upheaval, ActionKind.Upheaval), (Ability.Grasp, ActionKind.Grasp), (Ability.CorpseBlast, ActionKind.CorpseBlast),
                      })
                 if (s.Has(ability))
                     list.Add((Name(ability), Battle.AttackCost, kind, Describe(ability)));

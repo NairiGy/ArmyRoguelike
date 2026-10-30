@@ -343,17 +343,17 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void FrostMage_SlowsNextTurn_GlacierShatters()
         {
-            var b = Setup(new[] { UnitStats.Glacier }, new[] { P(3, 0) }, new[] { E(UnitStats.Ogre, 3, 2) });
+            var b = Setup(new[] { UnitStats.Glacier }, new[] { P(3, 0) }, new[] { E(UnitStats.Brute, 3, 2) });
             var glacier = Player(b);
-            var ogre = Enemy(b);
-            var normal = b.DamageAgainst(glacier, ogre);
-            b.PlayerAttack(glacier, ogre);
-            Assert.IsTrue(ogre.IsSlowed);
-            Assert.AreEqual(normal * 2, b.DamageAgainst(glacier, ogre));
+            var brute = Enemy(b);
+            var normal = b.DamageAgainst(glacier, brute);
+            b.PlayerAttack(glacier, brute);
+            Assert.IsTrue(brute.IsSlowed);
+            Assert.AreEqual(normal * 2, b.DamageAgainst(glacier, brute));
             b.EndUnitTurn(glacier);
             b.EndPlayerTurn();
-            Assert.IsTrue(ogre.SlowedThisTurn);
-            Assert.AreEqual(P(3, 2), ogre.Pos, "chilled: it couldn't move");
+            Assert.IsTrue(brute.SlowedThisTurn);
+            Assert.AreEqual(P(3, 2), brute.Pos, "chilled: it couldn't move");
         }
 
         [Test]
