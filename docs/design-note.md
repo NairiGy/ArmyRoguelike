@@ -94,7 +94,7 @@ A roguelike army-builder: lead a small squad across a Slay the Spire–style map
 
 ## Enemy AI
 
-- Intent icons: hovering over an enemy shows who it wants to attack.
+- Intent icons: hovering over an enemy shows who it wants to attack. Holding Alt shows every enemy's intent at once (2026-10-29, small-board branch).
 
 ## Prototype 1: one battle
 
@@ -309,6 +309,48 @@ Decided and built 2026-10-28 (branch `feature/act1-12-steps`), not yet playteste
 - **Elites are high risk, high reward**, always a choice: normal gold plus a pick of 1 of 3 items. First version is more of the same enemies, no new types *(placeholders)*: Wolves 2 leaders + 4 wolves; Goblins 4 bombers + 3 runners behind a ridge with only 2 gaps; Bandits 3 crossbowmen behind cover, 2 cutpurses, 2 brutes; Elementals 4.
 - **Bloodthirst capped at +3 for the run.**
 - **Later:** fights get split into difficulty pools (and more fights added); each step then draws from a pool. New node types and events after a playtest of this act.
+
+## Experiment: small board, one move (branch `experiment/small-board`)
+
+An idea test, built 2026-10-29, not playtested. It lives only on its branch (worktree `.claude/worktrees/small-board`); `main` keeps the 8x8 rules. Keep it or drop it after a playtest. Why: positioning should matter more, every step should count, and the board should read at a glance.
+
+- **Board 6x6.** Each side still deploys in its back 2 rows, so only 2 empty rows lie between the armies.
+- **Moves are separate from AP.** Every unit walks **1 tile per turn**, before or after acting; unused moves don't carry over. AP now only pays for attacks and actions. AP pools are unchanged for the first test, so units attack more often (rogues and archers get 2 attacks a turn).
+- **Swift** (new keyword): 2 moves. Rogue line, Wolf, Pack Leader, Goblin, Cutpurse (and their raised versions).
+- **Zone of control:** stepping out of an enemy's reach uses up all remaining moves. A 1-move unit can always back off one tile; a Swift unit can't slip past.
+- **Ranges** scaled to the board: Archer and the Trapper line 4 → 3, Marksman/Sniper/Deadeye 5 → 4, Crossbowman 4 → 3, Turret 3 → 2, Mage bolt stays 3. Fireball and player bomb 4 → 3, Charge 4 → 3, Taunt 3 → 2, goblin bomb 2–4 → 2–3, Giant boulder 2–5 → 2–4, Necromancer raise 5 → 4 and keeps 2 tiles away instead of 3.
+- **Areas:** bombs (goblin and Bombardier) hit only their own tile, so one step dodges them; fireballs and Volley hit a plus (the tile and its 4 neighbours) instead of a 3x3. Mines, barricade blasts and the Night shroud stay 3x3.
+- **Abilities:** Spring Boots give +1 move (were "first tile free"). Chill: the target can't move on its next turn (was −2 AP). Big Mines max 5 → 4.
+- **Enemy AI:** no longer keeps AP back for walking. The Giant won't throw a boulder that would wall it off from its target (on 6x6 its rocks sealed it in).
+- **Layouts:** enemies start in rows 4–5, the shrine at (2,2) with spawns at least 3 steps from it, totems on rows 4–5. The Necromancer raises **1** of each beaten faction (was 2), topped up with skeletons to 4, so his army fits.
+- **Fewer rocks** (2026-10-29): at most 2 per layout (a mirrored pair, two tombstones, two cover rocks), and no two rocks touch, not even corner to corner. Exceptions where the fight needs more: the goblins' broken ridge (3 rocks on row 3, one every other column, elite too) and the elite Bandit Camp (one cover rock per crossbowman, 3). A cutpurse that is cornered while carrying gold now hits whoever it can instead of standing still (it used to jam the Bandit Camp).
+- **Logs:** battle logs record `boardSize`, each unit's `maxMoves`, `movesAfter` on moves and "done", and `ranged` on hits (a shot from 2+ tiles), for the ranged vs melee damage split.
+
+**Step 2: one AP** (2026-10-29, same branch, not playtested). Every unit, bosses included, has **1 AP**: one move and one attack or action per turn. Every attack and action costs 1, and unused AP doesn't carry over. Units no longer differ by AP pool (the old pools are gone from the data).
+
+- **Momentum** (Shadow): a kill gives the action back, so it can attack again and chain kills.
+- **Opening Shot** (Deadeye): double damage the first time it hits each enemy in a battle (was "first attack each turn").
+- **Bosses get strong single actions** *(placeholders, "for now")*: the Giant's slam also deals 3 damage to each of your units within 2 tiles, and it picks smash or slam by whichever deals more in total (ties go to smash), else a boulder (now 4 damage); the Necromancer raises **every** bone pile within range in one action, and its bolt does 4.
+
+**Move first** (2026-10-29, same branch, not playtested): once a unit spends AP (any attack or action) it can't move again that turn, for both sides. Each turn is "position, then commit"; no more hit-and-run. Swift units can still move 2 and then attack, and Blink (an action) is the mage's escape. The Necromancer now backs off before raising or shooting.
+
+**Step 3: unit kits** (2026-10-29, same branch, not playtested). Every unit should feel unique through its **passives** and its **actions**. The basic attack counts as an action too and has its own name (Wolf Bite, Strike, Shot, Bolt, Smash, Long Strike, Stab). Wolves are the first faction designed this way; the rest of the enemies and the player's units follow.
+
+- **Wolf** (6 HP, Swift). Passive **Blood Scent**: goes for the lowest-HP unit it can reach and attack this turn, instead of the nearest. Action **Wolf Bite**: 2 damage, +1 for every wolf bite earlier in the same turn (any wolf, any target, the Pack Leader's included; resets every turn).
+- **Pack Leader** (10 HP, Swift, Wolf Bite 3). Passive **Pack Bond**: while it lives every wolf has +1 max HP (7); once it dies they have -1 (5) and lose 2 HP on the spot, which can kill wounded wolves. Replaces the old +1 damage aura. Action **Howl**: every wolf that hasn't acted gets +1 move this turn. It acts before the other enemies and howls when the extra move lets a wolf bite that otherwise couldn't (two wolves if it could bite itself).
+- **Goblin** (5 HP, Swift, Strike 2). Passive **Slippery**: ignores zone of control. Action **Fling**: throws what is next to it at one of your units 2-4 tiles away, over obstacles. A bomb or mine on an empty tile next to it goes off there with its own blast (so your mines and dodged bombs come back at you; it always does this when it can). Otherwise a goblin that hasn't acted lands on the free tile next to the target nearest the thrower, deals 2, takes no damage itself, and can still act (it usually strikes right away). It flings a goblin only when it can't reach anyone to strike this turn. Rocks are too heavy to throw.
+- **Goblin Bomber** (4 HP). Passive **Powder Keg**: when it dies it explodes for 2 on everyone in the 3x3 around it, its own side included. Actions: Stab (1) and Bomb (unchanged: one tile, 2-3 away, goes off next enemy turn).
+- **Cutpurse** (5 HP, Swift, Strike 2, steals 5 gold on its first hit). Passive **Light Fingers**: the only unit that may still move after attacking, so it stabs, grabs the gold and runs in the same turn (zone of control still applies). Action **Caltrops**: on its tile or a free tile next to it; a unit of yours stepping on them takes 1 and its movement ends. It drops them behind it after running, or when it can't do anything else.
+- **Crossbowman** (6 HP, Shot 3, range 3). Passive **Behind Cover**: while next to a rock (or ice, or a barricade) it can't be hit by ranged attacks; melee, bombs and blasts still reach it. Action **Overwatch**: with no shot this turn it walks closer (into cover if it can) and aims; during your next turn the first of your units that walks onto a tile it can see in range is shot and stops there. One shot, and it ends at the crossbowman's next turn. Fixes the old "hides behind cover" card text: its AI now picks covered tiles.
+- **Bandit Brute** (12 HP, Strike 3). Passive **Guard** (replaces Tough; same rule as your Shielder): takes the hit when an adjacent ally is attacked. Action **Bull Rush**: hits for its damage and pushes the target 1 tile; if it slams into a unit, both take 2.
+- **Cooldowns** (2026-10-30): basic attacks have none; every other action, yours and the enemies', is ready again N of the unit's own turns after use *(placeholders)*: 3 for Fireball, Ice Wall, Mend, Build Turret, Detonate, Vanish, Raise and Caltrops; 2 for everything else (Shield Bash, Pinning Shot, Blink, Place Mine, Throw Bomb, Ward, Barricade, Charge, Slam, Boulder, Bomb, Howl, Fling, Overwatch, Bull Rush). Why: easier balancing, room for stronger actions, and with 1 AP a real choice each turn. The card and the action buttons show the cooldown and "ready in N".
+- **Your base lines** (each action is inherited by every evolution of the line; 1 AP, so it's a choice against attacking):
+  - **Warrior line, Shield Bash:** push an adjacent enemy 1 tile; no damage, only the 2 collision damage if it's blocked, and a unit it slams into takes the same 2 (other pushes still only hurt the pushed unit). The attack (Strike) is for damage.
+  - **Archer line, Pinning Shot:** 1 damage in shot range (line of sight), and the target can't move on its next turn. The attack (Shot) is for damage. The Trapper line lost Snare to it (Prey now works on pinned enemies); the Trapper gets a new action later.
+  - **Rogue line, Vanish:** the base Rogue's passive is Swift only (Bloodthirst removed 2026-10-29; its evolutions still have it for now). Vanish goes off as soon as you press it: enemies can't target or attack it (area blasts still hit) until it attacks again, for 2 enemy turns at most; the attack that reveals it deals +2.
+  - **Mage line, Blink:** teleport to a free tile within 2, past rocks and zone of control.
+  - **Sapper line:** unchanged (Strike, Place Mine).
+- **Hover card:** hovering a unit shows a card at the top right: name and HP, AP / moves / range, **Next** (what an enemy will do), then **Passive**, **Actions** and **Now** (statuses, pack state, engaged). Colours are placeholders for the art chat.
 
 ## Test mode (for testing only)
 

@@ -392,7 +392,7 @@ namespace ArmyRoguelike.View
         /// <summary>One line describing a unit type: stats, abilities and actions.</summary>
         private static string Describe(UnitStats s)
         {
-            var text = $"{s.Name}  HP {s.MaxHp}  DMG {s.Damage}  RNG {s.Range}  AP {s.MaxAp}\n{s.Role}";
+            var text = $"{s.Name}  HP {s.MaxHp}  DMG {s.Damage}  RNG {s.Range}  AP {s.MaxAp}  MV {s.Moves}\n{s.Role}";
             foreach (var a in s.Abilities)
                 text += $"\n  - {Abilities.Name(a)}: {Abilities.Describe(a)}";
             foreach (var a in s.Actions)

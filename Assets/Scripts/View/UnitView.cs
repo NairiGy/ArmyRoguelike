@@ -364,12 +364,21 @@ namespace ArmyRoguelike.View
                 _base.sharedMaterial = BattleScenery.PerTexture(material, _base.sprite.texture);
         }
 
+        private bool _hidden;
+
+        /// <summary>Vanished (rogue): placeholder see-through statue.</summary>
+        public void SetHidden(bool hidden)
+        {
+            _hidden = hidden;
+            ApplyColor();
+        }
+
         private void ApplyColor()
         {
             var c = _baseColor * _tint;
             if (_dimmed)
                 c *= 0.6f;
-            c.a = 1f;
+            c.a = _hidden ? 0.4f : 1f;
             _body.color = c;
         }
 

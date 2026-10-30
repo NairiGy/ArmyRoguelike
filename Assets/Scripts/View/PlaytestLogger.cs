@@ -31,6 +31,7 @@ namespace ArmyRoguelike.View
             _log.elite = context.Elite;
             _log.test = context.Test;
             _log.layout = context.Layout;
+            _log.boardSize = battle.Board.Width;
             _log.goldAtStart = context.Gold;
             _goldIfWon = context.GoldIfWon;
             _log.omens = battle.Omens.Select(o => Omens.Name(o.omen, o.side == Team.Player)).ToList();
@@ -62,7 +63,7 @@ namespace ArmyRoguelike.View
                 _log.placements.Add(new PlacementEntry
                 {
                     unit = Name(u), x = u.Pos.X, y = u.Pos.Y, equipment = u.Equipment?.Name ?? "", maxHp = u.MaxHp,
-                    damage = u.BaseDamage, range = u.Range, maxAp = u.MaxAp, tier = u.Stats.Tier, line = u.Stats.Root.Name,
+                    damage = u.BaseDamage, range = u.Range, maxAp = u.MaxAp, maxMoves = u.MaxMoves, tier = u.Stats.Tier, line = u.Stats.Root.Name,
                 });
         }
 
@@ -79,7 +80,7 @@ namespace ArmyRoguelike.View
                     {
                         turn = turn, team = move.Unit.Team.ToString(), unit = Name(move.Unit), type = "move",
                         fromX = move.From.X, fromY = move.From.Y, toX = move.To.X, toY = move.To.Y, tiles = move.Path.Count,
-                        apAfter = ApAfter(move.Unit), autoApproach = autoApproach, amount = move.Cost, zocSteps = move.ZocSteps,
+                        apAfter = ApAfter(move.Unit), movesAfter = move.Unit.Moves, autoApproach = autoApproach, amount = move.Cost, zocSteps = move.ZocSteps,
                     });
                     break;
                 case AttackEvent attack:
@@ -213,6 +214,32 @@ namespace ArmyRoguelike.View
                         target = string.Join(", ", split.Children.Select(Name)), amount = split.Children.Count,
                     });
                     break;
+                case FlingEvent fling:
+                {
+                    var entry = fling.Hit.HasValue
+                        ? HitEntry(turn, fling.Thrower, "fling", fling.Hit.Value)
+                        : new ActionEntry { turn = turn, team = fling.Thrower.Team.ToString(), unit = Name(fling.Thrower), type = "fling", target = Name(fling.Target) };
+                    entry.note = fling.Thrown != null ? Name(fling.Thrown) : "explosive";
+                    entry.fromX = fling.From.X;
+                    entry.fromY = fling.From.Y;
+                    entry.toX = fling.To.X;
+                    entry.toY = fling.To.Y;
+                    _log.actions.Add(entry);
+                    break;
+                }
+                case OverwatchEvent watch:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = watch.Watcher.Team.ToString(), unit = Name(watch.Watcher), type = "overwatch", amount = watch.Tiles.Count,
+                    });
+                    break;
+                case HowlEvent howl:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = howl.Leader.Team.ToString(), unit = Name(howl.Leader), type = "howl",
+                        target = string.Join(", ", howl.Wolves.Select(Name)), amount = howl.Wolves.Count,
+                    });
+                    break;
                 case ReinforceEvent reinforce:
                     _log.wavesArrived += reinforce.Units.Count;
                     _log.actions.Add(new ActionEntry
@@ -272,6 +299,7 @@ namespace ArmyRoguelike.View
         {
             turn = turn, team = attacker.Team.ToString(), unit = Name(attacker), type = type, target = Name(hit.Target),
             damage = hit.Damage, targetHpAfter = hit.HpAfter, killed = hit.Killed, apAfter = ApAfter(attacker),
+            ranged = attacker.IsRanged && Battle.Distance(attacker, hit.Target) > 1,
         };
 
         private static int ApAfter(Unit u) => u.Team == Team.Player ? u.Ap : -1;
@@ -280,7 +308,7 @@ namespace ArmyRoguelike.View
         {
             _log.actions.Add(new ActionEntry
             {
-                turn = turn, team = unit.Team.ToString(), unit = Name(unit), type = "done", apAfter = unit.Ap,
+                turn = turn, team = unit.Team.ToString(), unit = Name(unit), type = "done", apAfter = unit.Ap, movesAfter = unit.Moves,
             });
         }
 
@@ -414,6 +442,8 @@ namespace ArmyRoguelike.View
                     case "attack":
                     case "smash":
                     case "boulder":
+                    case "fling":
+                    case "slam":
                     case "explosion":
                     case "thorns":
                     case "sweep":
@@ -503,6 +533,9 @@ namespace ArmyRoguelike.View
             public bool test;
             public string layout;
 
+            /// <summary>Board side length in tiles (6 in the small-board experiment, 8 before).</summary>
+            public int boardSize;
+
             /// <summary>Gold carried off by cutpurses that escaped.</summary>
             public int stolenGold;
             public int goldAtStart;
@@ -549,6 +582,7 @@ namespace ArmyRoguelike.View
             public int damage;
             public int range;
             public int maxAp;
+            public int maxMoves;
             public int tier;
             public string line;
         }
@@ -571,6 +605,12 @@ namespace ArmyRoguelike.View
             public bool killed;
             public int apAfter;
 
+            /// <summary>Move and done: moves the unit has left this turn (moves are separate from AP).</summary>
+            public int movesAfter;
+
+            /// <summary>Attacks and area hits: a ranged shot from 2+ tiles away (for the ranged vs melee damage split).</summary>
+            public bool ranged;
+
             /// <summary>Smash: how many units the one swing hit.</summary>
             public int smashTargets;
 
@@ -587,7 +627,7 @@ namespace ArmyRoguelike.View
             /// <summary>Move or attack done by clicking a distant enemy (walk up and attack).</summary>
             public bool autoApproach;
 
-            /// <summary>Move: steps that left an enemy's reach (zone of control, +2 AP each). "amount" is the AP spent.</summary>
+            /// <summary>Move: steps that left an enemy's reach (zone of control: uses up the remaining moves). "amount" is the moves spent.</summary>
             public int zocSteps;
 
             /// <summary>

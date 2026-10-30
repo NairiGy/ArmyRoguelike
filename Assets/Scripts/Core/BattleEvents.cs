@@ -34,7 +34,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Tiles stepped onto, in order. Does not include the starting tile.</summary>
         public readonly IReadOnlyList<GridPos> Path;
 
-        /// <summary>AP spent, and how many steps left an enemy's reach (zone of control, each +2 AP).</summary>
+        /// <summary>Moves spent, and how many steps left an enemy's reach (zone of control: uses up the remaining moves).</summary>
         public readonly int Cost;
 
         public readonly int ZocSteps;
@@ -169,6 +169,12 @@ namespace ArmyRoguelike.Core
         /// <summary>Vampire Fang: <see cref="EffectEvent.Amount"/> HP healed.</summary>
         Heal,
 
+        /// <summary>Vanish: the unit went invisible (Source and Target are the same unit).</summary>
+        Vanish,
+
+        /// <summary>A vanished unit became visible again.</summary>
+        Reveal,
+
         /// <summary>Thorned Mail hurt the melee attacker for <see cref="EffectEvent.Amount"/>.</summary>
         Thorns,
 
@@ -273,11 +279,18 @@ namespace ArmyRoguelike.Core
 
     public enum StatusKind
     {
-        Snare,
+        /// <summary>Pinned (Pinning Shot): can't move on its next turn.</summary>
+        Pin,
         Slow,
         Poison,
         Ward,
         Heal,
+
+        /// <summary>Vanish: the unit went invisible (Source and Target are the same unit).</summary>
+        Vanish,
+
+        /// <summary>A vanished unit became visible again.</summary>
+        Reveal,
     }
 
     /// <summary>A status or support effect was put on a unit by an action or a hit.</summary>
@@ -386,6 +399,69 @@ namespace ArmyRoguelike.Core
         }
 
         public override Unit Actor => Raiser;
+    }
+
+    /// <summary>
+    /// A goblin flung something at a unit: another goblin (it lands on <see cref="To"/>, next to the target, and the
+    /// target takes <see cref="Hit"/>) or a bomb or mine picked up from <see cref="From"/> (an explosion follows).
+    /// </summary>
+    public sealed class FlingEvent : BattleEvent
+    {
+        public readonly Unit Thrower;
+
+        /// <summary>The goblin thrown, or null for an explosive.</summary>
+        public readonly Unit Thrown;
+
+        public readonly GridPos From;
+        public readonly GridPos To;
+        public readonly Unit Target;
+
+        /// <summary>The landing goblin's hit on the target; null for an explosive (its blast is a separate event).</summary>
+        public readonly Hit? Hit;
+
+        public FlingEvent(Unit thrower, Unit thrown, GridPos from, GridPos to, Unit target, Hit? hit)
+        {
+            Thrower = thrower;
+            Thrown = thrown;
+            From = from;
+            To = to;
+            Target = target;
+            Hit = hit;
+        }
+
+        public override Unit Actor => Thrower;
+    }
+
+    /// <summary>A crossbowman took aim: during your next turn it shoots the first of your units that walks onto one of the tiles.</summary>
+    public sealed class OverwatchEvent : BattleEvent
+    {
+        public readonly Unit Watcher;
+        public readonly IReadOnlyList<GridPos> Tiles;
+
+        public OverwatchEvent(Unit watcher, IReadOnlyList<GridPos> tiles)
+        {
+            Watcher = watcher;
+            Tiles = tiles;
+        }
+
+        public override Unit Actor => Watcher;
+    }
+
+    /// <summary>A Pack Leader howled: every wolf that hasn't acted yet gets extra moves this turn.</summary>
+    public sealed class HowlEvent : BattleEvent
+    {
+        public readonly Unit Leader;
+        public readonly IReadOnlyList<Unit> Wolves;
+        public readonly int Moves;
+
+        public HowlEvent(Unit leader, IReadOnlyList<Unit> wolves, int moves)
+        {
+            Leader = leader;
+            Wolves = wolves;
+            Moves = moves;
+        }
+
+        public override Unit Actor => Leader;
     }
 
     /// <summary>Enemy reinforcements walked onto the board at the edge. They act from the next enemy turn.</summary>

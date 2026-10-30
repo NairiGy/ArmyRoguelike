@@ -34,7 +34,7 @@ namespace ArmyRoguelike.Tests
             Assert.IsTrue(b.IsShielded(archer));
             Assert.IsFalse(b.IsShielded(Player(b, 0)), "the warrior doesn't shield itself");
             b.EndPlayerTurn();
-            Assert.AreEqual(archer.MaxHp - 2, archer.Hp, "two wolf bites of 2, each reduced to 1");
+            Assert.AreEqual(archer.MaxHp - 1, archer.Hp, "one wolf bite of 2, reduced to 1");
         }
 
         [Test]
@@ -50,18 +50,18 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Bloodthirst_GainsDamageOnKill()
         {
-            var b = Started(new[] { M(UnitStats.Rogue) }, new[] { P(3, 1) },
+            var b = Started(new[] { M(UnitStats.Assassin) }, new[] { P(3, 1) },
                 new[] { (UnitStats.Wolf, P(3, 2)), (UnitStats.Wolf, P(7, 7)) });
             Enemy(b).Hp = 1;
             var events = b.PlayerAttack(Player(b), Enemy(b));
             Assert.IsTrue(events.OfType<EffectEvent>().Any(e => e.Kind == EffectKind.Bloodthirst));
-            Assert.AreEqual(5, Player(b).BaseDamage);
+            Assert.AreEqual(UnitStats.Assassin.Damage + 1, Player(b).BaseDamage);
         }
 
         [Test]
         public void Bloodthirst_StopsAtTheCapForTheRun()
         {
-            var rogue = M(UnitStats.Rogue);
+            var rogue = M(UnitStats.Assassin);
             rogue.BonusDamage = Battle.BloodthirstCap - 1;
             var b = Started(new[] { rogue }, new[] { P(3, 1) },
                 new[] { (UnitStats.Wolf, P(3, 2)), (UnitStats.Wolf, P(4, 1)), (UnitStats.Wolf, P(7, 7)) });
@@ -75,7 +75,7 @@ namespace ArmyRoguelike.Tests
             var events = b.PlayerAttack(unit, Enemy(b, 1));
             Assert.AreEqual(1, unit.GainedDamage, "the cap is reached");
             Assert.IsFalse(events.OfType<EffectEvent>().Any(e => e.Kind == EffectKind.Bloodthirst));
-            Assert.AreEqual(UnitStats.Rogue.Damage + Battle.BloodthirstCap, unit.BaseDamage);
+            Assert.AreEqual(UnitStats.Assassin.Damage + Battle.BloodthirstCap, unit.BaseDamage);
         }
 
         // ---------- Item abilities ----------
@@ -99,22 +99,23 @@ namespace ArmyRoguelike.Tests
                 new[] { (UnitStats.Wolf, P(3, 2)) });
             var wolf = Enemy(b);
             var events = b.EndPlayerTurn();
-            Assert.AreEqual(2, events.OfType<EffectEvent>().Count(e => e.Kind == EffectKind.Thorns));
-            Assert.AreEqual(wolf.MaxHp - 2 * Battle.ThornsDamage, wolf.Hp);
+            Assert.AreEqual(1, events.OfType<EffectEvent>().Count(e => e.Kind == EffectKind.Thorns), "one bite a turn");
+            Assert.AreEqual(wolf.MaxHp - Battle.ThornsDamage, wolf.Hp);
         }
 
         [Test]
-        public void SpringBoots_FirstStepFree()
+        public void SpringBoots_GiveAnExtraMove()
         {
             var b = Started(new[] { M(UnitStats.Warrior, Equipment.SpringBoots) }, new[] { P(3, 0) },
                 new[] { (UnitStats.Wolf, P(7, 7)) });
             var warrior = Player(b);
+            Assert.AreEqual(2, warrior.Moves);
             var reach = b.GetReachable(warrior);
-            Assert.AreEqual(0, reach[P(3, 1)]);
-            Assert.AreEqual(3, reach[P(3, 4)], "4 tiles for 3 AP");
+            Assert.AreEqual(2, reach[P(3, 2)]);
+            Assert.IsFalse(reach.ContainsKey(P(3, 3)), "only 2 moves");
             b.PlayerMove(warrior, P(3, 1));
-            Assert.AreEqual(3, warrior.Ap);
-            Assert.AreEqual(1, b.GetReachable(warrior)[P(3, 2)], "only the first step of the turn is free");
+            Assert.AreEqual(1, warrior.Ap, "moving costs no AP");
+            Assert.AreEqual(1, warrior.Moves);
         }
 
         [Test]
@@ -123,6 +124,7 @@ namespace ArmyRoguelike.Tests
             var b = Started(new[] { M(UnitStats.Rogue, Equipment.LuckyCharm) }, new[] { P(3, 1) },
                 new[] { (UnitStats.PackLeader, P(3, 2)) });
             var rogue = Player(b);
+            rogue.Hp = UnitStats.PackLeader.Damage;
             var events = b.EndPlayerTurn();
             Assert.IsTrue(rogue.IsAlive);
             Assert.AreEqual(1, rogue.Hp);
@@ -139,11 +141,18 @@ namespace ArmyRoguelike.Tests
             var sapper = Player(b);
             Assert.IsFalse(b.CanPlaceMine(sapper, P(3, 3)), "not adjacent");
             Assert.IsNotNull(b.PlayerPlaceMine(sapper, P(3, 2)));
-            Assert.AreEqual(4 - Battle.MineCost, sapper.Ap);
+            Assert.AreEqual(1 - Battle.MineCost, sapper.Ap);
+            Assert.IsFalse(b.CanPlaceMine(sapper, P(2, 1)), "one action a turn");
+            sapper.Ap = 99;
+            Assert.IsFalse(b.CanPlaceMine(sapper, P(2, 1)), "on cooldown");
+            sapper.ClearCooldowns();
             Assert.IsFalse(b.CanPlaceMine(sapper, P(3, 2)), "already mined");
             Assert.IsNotNull(b.PlayerPlaceMine(sapper, P(2, 1)));
-            Assert.IsFalse(b.CanPlaceMine(sapper, P(4, 1)), "out of AP");
-            Assert.AreEqual(2, b.Mines.Count);
+            sapper.ClearCooldowns();
+            Assert.IsNotNull(b.PlayerPlaceMine(sapper, P(4, 1)));
+            sapper.ClearCooldowns();
+            Assert.IsFalse(b.CanPlaceMine(sapper, P(3, 0)), "at most 3 mines");
+            Assert.AreEqual(3, b.Mines.Count);
         }
 
         [Test]
@@ -167,7 +176,9 @@ namespace ArmyRoguelike.Tests
         {
             var b = Started(new[] { M(UnitStats.Sapper) }, new[] { P(3, 1) }, new[] { (UnitStats.Wolf, P(3, 4)) });
             var sapper = Player(b);
+            sapper.Ap = 2;
             b.PlayerPlaceMine(sapper, P(3, 2));
+            sapper.ClearCooldowns();
             // A second mine diagonally next to the first, inside its blast.
             b.PlayerPlaceMine(sapper, P(2, 1));
             var events = b.EndPlayerTurn();
@@ -217,25 +228,23 @@ namespace ArmyRoguelike.Tests
             var b = Started(new[] { M(UnitStats.Warrior) }, new[] { P(3, 1) }, new[] { (UnitStats.GoblinBomber, P(3, 4)) });
             var warrior = Player(b);
             b.EndPlayerTurn();
-            b.PlayerMove(warrior, P(5, 0));
+            b.PlayerMove(warrior, P(2, 1));
             var events = b.EndPlayerTurn();
             var blast = events.OfType<ExplosionEvent>().First();
-            Assert.IsFalse(blast.Hits.Any(h => h.Target == warrior));
+            Assert.IsFalse(blast.Hits.Any(h => h.Target == warrior), "one step off the tile is enough");
         }
 
         [Test]
-        public void Bomb_SetsOffMines()
+        public void Bomb_HitsOnlyItsOwnTile()
         {
-            var b = Started(new[] { M(UnitStats.Sapper) }, new[] { P(3, 1) }, new[] { (UnitStats.GoblinBomber, P(3, 4)) });
-            var sapper = Player(b);
+            var b = Started(new[] { M(UnitStats.Warrior), M(UnitStats.Warrior) }, new[] { P(3, 1), P(2, 1) },
+                new[] { (UnitStats.GoblinBomber, P(3, 4)) });
             b.EndPlayerTurn();
             Assert.IsNotNull(b.BombAt(P(3, 1)));
-            b.PlayerPlaceMine(sapper, P(3, 2));
-            b.PlayerMove(sapper, P(6, 0));
             var events = b.EndPlayerTurn();
-            var blasts = events.OfType<ExplosionEvent>().ToList();
-            Assert.IsTrue(blasts.Any(e => e.Cause == "bomb" && e.ChainDepth == 0));
-            Assert.IsTrue(blasts.Any(e => e.Cause == "mine" && e.ChainDepth == 1));
+            var blast = events.OfType<ExplosionEvent>().First(e => e.Cause == "bomb");
+            CollectionAssert.AreEqual(new[] { P(3, 1) }, blast.Area.ToList());
+            CollectionAssert.AreEqual(new[] { Player(b, 0) }, blast.Hits.Select(h => h.Target).ToList());
         }
 
         [Test]
@@ -295,16 +304,28 @@ namespace ArmyRoguelike.Tests
         // ---------- Zone of control ----------
 
         [Test]
-        public void ZoneOfControl_LeavingEnemyReachCostsExtra()
+        public void ZoneOfControl_LeavingEnemyReachUsesUpMoves()
         {
             var b = Started(new[] { M(UnitStats.Rogue) }, new[] { P(3, 1) }, new[] { (UnitStats.Ogre, P(3, 2)) });
             var rogue = Player(b);
+            Assert.AreEqual(2, rogue.Moves, "Swift");
             var reach = b.GetReachable(rogue);
-            Assert.AreEqual(Battle.MoveCost + Battle.ZocCost, reach[P(2, 1)], "first step out of the ogre's reach");
-            var events = b.PlayerMove(rogue, P(2, 0));
+            Assert.AreEqual(2, reach[P(2, 1)], "the step out of the ogre's reach uses up both moves");
+            Assert.IsFalse(reach.ContainsKey(P(2, 0)), "can't keep walking after leaving its reach");
+            var events = b.PlayerMove(rogue, P(2, 1));
             var move = events.OfType<MoveEvent>().Single();
             Assert.AreEqual(1, move.ZocSteps);
-            Assert.AreEqual(5 - move.Cost, rogue.Ap);
+            Assert.AreEqual(0, rogue.Moves);
+            Assert.AreEqual(1, rogue.Ap, "moving costs no AP");
+        }
+
+        [Test]
+        public void ZoneOfControl_OneMoveUnitCanStillBackOff()
+        {
+            var b = Started(new[] { M(UnitStats.Warrior) }, new[] { P(3, 1) }, new[] { (UnitStats.Ogre, P(3, 2)) });
+            var warrior = Player(b);
+            Assert.AreEqual(1, b.GetReachable(warrior)[P(3, 0)]);
+            Assert.AreEqual(0, b.CostlyMoveTiles(warrior).Count, "with one move, leaving costs nothing extra");
         }
 
         [Test]
@@ -319,9 +340,10 @@ namespace ArmyRoguelike.Tests
         {
             var b = Started(new[] { M(UnitStats.Warrior) }, new[] { P(3, 1) }, new[] { (UnitStats.Wolf, P(3, 2)) });
             var wolf = Enemy(b);
-            wolf.Ap = wolf.MaxAp;
+            wolf.Moves = wolf.MaxMoves;
             var reach = b.GetReachable(wolf);
-            Assert.AreEqual(Battle.MoveCost + Battle.ZocCost, reach[P(3, 3)]);
+            Assert.AreEqual(2, reach[P(3, 3)]);
+            Assert.IsFalse(reach.ContainsKey(P(3, 4)));
         }
 
         [Test]

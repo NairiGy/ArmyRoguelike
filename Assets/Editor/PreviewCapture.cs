@@ -90,7 +90,7 @@ public static class PreviewCapture
             var board = BoardView.Create(battle, root.transform);
             board.SyncHazards();
             foreach (var bomb in battle.Bombs)
-            foreach (var p in battle.BlastArea(bomb.Tile))
+            foreach (var p in battle.BombArea(bomb.Tile))
                 board.SetHighlight(p, new Color(1f, 0.45f, 0.1f, 0.4f));
             var cam = Camera.main;
             GameBootstrap.FrameCamera(cam, board);
