@@ -139,7 +139,7 @@ namespace ArmyRoguelike.View
             if (keyboard != null && !_busy && _selected != null && Battle.CanAct(_selected))
             {
                 var keys = new[] { keyboard.digit1Key, keyboard.digit2Key, keyboard.digit3Key, keyboard.digit4Key };
-                var actions = _selected.Stats.Actions;
+                var actions = _selected.Actions.ToList();
                 for (var i = 0; i < actions.Count && i < keys.Length; i++)
                     if (keys[i].wasPressedThisFrame)
                         ToggleAction(actions[i]);
@@ -358,6 +358,19 @@ namespace ArmyRoguelike.View
                 {
                     Record(attack);
                     StartCoroutine(PlayPlayerAction(attack));
+                }
+
+                return;
+            }
+
+            // A barricade in reach: hit it (either side's; it breaks at 0 HP).
+            if (target == null && Battle.CanAttackBarricade(_selected, tile))
+            {
+                var hit = Battle.PlayerAttackBarricade(_selected, tile);
+                if (hit != null)
+                {
+                    Record(hit);
+                    StartCoroutine(PlayPlayerAction(hit));
                 }
 
                 return;
@@ -1045,6 +1058,17 @@ namespace ArmyRoguelike.View
                     yield return tick.Hit.Killed ? view.Die() : view.Hit();
                     break;
                 }
+                case BarricadeHitEvent barricadeHit:
+                {
+                    var attacker = _board.ViewOf(barricadeHit.Attacker);
+                    var at = IsoMath.GridToWorld(barricadeHit.Tile);
+                    yield return attacker.Lunge(at, null);
+                    attacker.SetGridPosition(barricadeHit.Attacker.Pos);
+                    DamagePopup.Spawn(at + Vector3.up * 0.4f,
+                        barricadeHit.HpAfter > 0 ? $"-{barricadeHit.Damage}  ({barricadeHit.HpAfter} left)" : $"-{barricadeHit.Damage}  broken",
+                        DamagePopup.DamageColor, 44);
+                    break;
+                }
                 case TileEvent tile:
                 {
                     if (tile.Added && tile.Source != null && tile.Kind != "burn")
@@ -1147,9 +1171,6 @@ namespace ArmyRoguelike.View
                     view.RefreshHp(effect.HpAfter);
                     yield return effect.HpAfter <= 0 ? view.Die() : view.Hit();
                     yield break;
-                case EffectKind.Bloodthirst:
-                    DamagePopup.Spawn(at, "+1 DMG", DamagePopup.AbilityColor, 48);
-                    break;
                 case EffectKind.LastStand:
                     DamagePopup.Spawn(at, "Last Stand!", DamagePopup.AbilityColor, 48);
                     view.RefreshHp(effect.HpAfter);
@@ -1426,7 +1447,8 @@ namespace ArmyRoguelike.View
             foreach (var u in army)
             {
                 var item = u.Equipment != null ? $" [{u.Equipment.Name}]" : "";
-                var label = $"{u.Stats.Name}{item}{(u.IsPlaced ? "  (placed)" : "")}{(u == _toPlace ? "  <" : "")}";
+                var level = u.Member != null && u.Member.Level > 0 ? $" (level {u.Member.Level})" : "";
+                var label = $"{u.Stats.Name}{level}{item}{(u.IsPlaced ? "  (placed)" : "")}{(u == _toPlace ? "  <" : "")}";
                 if (GUILayout.Button(label, GUILayout.Height(ButtonHeight)))
                     _toPlace = u;
             }
@@ -1507,7 +1529,7 @@ namespace ArmyRoguelike.View
         {
             if (_confirmEndTurn || _selected == null || !Battle.CanAct(_selected))
                 return;
-            var actions = _selected.Stats.Actions;
+            var actions = _selected.Actions.ToList();
             if (actions.Count == 0)
                 return;
 
@@ -1677,6 +1699,9 @@ namespace ArmyRoguelike.View
                     return "Overwatch: a crossbowman is aiming here. The first of your units to walk onto a marked tile is shot and stops.";
                 if (Battle.MineAt(p) != null)
                     return $"Your mine: an enemy stepping here sets it off ({Battle.MineDamage} damage to everyone around, your units too).";
+                if (Battle.IsBarricade(p))
+                    return $"Barricade: {Battle.BarricadeHpAt(p)}/{Battle.BarricadeHp} HP. Blocks paths and shots; either side can attack it, and it breaks at 0." +
+                           (_selected != null && Battle.CanAttackBarricade(_selected, p) ? $"\nClick: attack it for {Battle.EffectiveDamage(_selected)} ({Battle.AttackCost} AP)." : "");
                 if (Battle.RemainsAt(p) is Unit bones)
                     return $"Bone pile ({bones.Stats.Name}). The Necromancer can raise it.\nStand on it to stop that.";
                 if (_selected != null && !_action.HasValue && Battle.GetReachable(_selected).TryGetValue(p, out var cost))
@@ -1701,6 +1726,9 @@ namespace ArmyRoguelike.View
         private const string DimColor = "#b8b8b8";
         private const string TextColor = "#e6e2da";
 
+        /// <summary>The HP a planned attack would take off (hover preview).</summary>
+        private const string LossColor = "#ff8a6a";
+
         /// <summary>
         /// While hovering a unit (not the selected one, not an objective): a card at the top-right with its
         /// name and HP, what it does next (enemies), its passives, its actions and its current state.
@@ -1722,8 +1750,21 @@ namespace ArmyRoguelike.View
 
             var team = u.Team == Team.Enemy ? EnemyHeader : PlayerHeader;
             var item = u.Equipment != null ? $"   <color={DimColor}><size=14>[{u.Equipment.Name}]</size></color>" : "";
-            rows.Add(($"<color={team}>{u.Stats.Name}</color>{item}", header, 0f));
-            rows.Add(($"<color=white><b>HP {u.Hp} / {u.MaxHp}</b></color>   <color={DimColor}>{u.MaxAp} AP  ·  {u.MaxMoves} {(u.MaxMoves == 1 ? "move" : "moves")}  ·  range {u.Range}</color>",
+            var level = u.Member != null ? $"   <color={DimColor}><size=14>level {u.Member.Level}</size></color>" : "";
+            rows.Add(($"<color={team}>{u.Stats.Name}</color>{level}{item}", header, 0f));
+
+            // What the selected unit's attack would take off, shown on the HP bar and as "-3" by the HP.
+            var loss = 0;
+            var preview = "";
+            if (_selected != null && _selected.Team == Team.Player && u.Team == Team.Enemy && Battle.CanAttack(_selected, u))
+            {
+                loss = Battle.PredictHpLoss(_selected, u, out var guard);
+                preview = guard != null ? $"   <color={LossColor}>the {guard.Stats.Name} guards it</color>"
+                    : loss >= u.Hp ? $"   <color={LossColor}><b>-{loss}  kills</b></color>"
+                    : $"   <color={LossColor}><b>-{loss}</b></color>";
+            }
+
+            rows.Add(($"<color=white><b>HP {u.Hp} / {u.MaxHp}</b></color>{preview}   <color={DimColor}>{u.MaxAp} AP  ·  {u.MaxMoves} {(u.MaxMoves == 1 ? "move" : "moves")}  ·  range {u.Range}</color>",
                 stats, HpBarHeight + 4f));
 
             if (u.Team == Team.Enemy)
@@ -1733,6 +1774,8 @@ namespace ArmyRoguelike.View
             }
 
             var passives = Abilities.PassivesOf(u.Stats);
+            foreach (var technique in TechniquesOf(u).Where(t => !t.Action.HasValue))
+                passives.Add((technique.Name, technique.Description));
             var itemAbility = u.Equipment?.Ability ?? Ability.None;
             if (itemAbility != Ability.None)
                 passives.Add(($"{Abilities.Name(itemAbility)} ({u.Equipment.Name})", Abilities.Describe(itemAbility)));
@@ -1747,7 +1790,10 @@ namespace ArmyRoguelike.View
             }
 
             rows.Add(($"<color={ActionColor}>ACTIONS</color>", section, 10f));
-            foreach (var (action, cost, kind, text) in Abilities.ActionsOf(u.Stats, Battle.EffectiveDamage(u)))
+            var actions = Abilities.ActionsOf(u.Stats, Battle.EffectiveDamage(u));
+            foreach (var technique in TechniquesOf(u).Where(t => t.Action.HasValue))
+                actions.Add((technique.Name, Battle.ActionCost(technique.Action.Value), technique.Action, technique.Description));
+            foreach (var (action, cost, kind, text) in actions)
             {
                 var cooldown = kind.HasValue ? $"  ·  cooldown {Battle.Cooldown(kind.Value)}" : "";
                 var left = kind.HasValue ? u.CooldownLeft(kind.Value) : 0;
@@ -1768,10 +1814,26 @@ namespace ArmyRoguelike.View
                 Battle.FindAttackSpot(_selected, u) is var spot && spot.HasValue)
                 rows.Add(($"<color={NextColor}>Click: walk {spot.Value.cost} tile(s) and attack ({Battle.AttackCost} AP)</color>", body, 10f));
 
-            var inner = CardWidth - 2 * CardPadding;
-            var height = rows.Sum(r => r.style.CalcHeight(new GUIContent(r.text), inner) + r.gap) + 2 * CardPadding;
-            height = Mathf.Min(height, ReferenceHeight - 2 * Margin);
-            var rect = Panel(GuiWidth - CardWidth - Margin, Margin, CardWidth, height);
+            // Fit the whole card on screen: shrink the text a little at a time, then widen the card if still too tall.
+            var width = CardWidth;
+            float Height() => rows.Sum(r => r.style.CalcHeight(new GUIContent(r.text), width - 2 * CardPadding) + r.gap) + 2 * CardPadding;
+            var maxHeight = ReferenceHeight - 2 * Margin;
+            var styles = new[] { header, stats, name, body, section };
+            var sizes = styles.Select(s => s.fontSize).ToArray();
+            for (var step = 1; step <= 4 && Height() > maxHeight; step++)
+                for (var i = 0; i < styles.Length; i++)
+                    styles[i].fontSize = Mathf.RoundToInt(sizes[i] * (1f - 0.08f * step));
+            if (Height() > maxHeight)
+                width = CardWidth * 1.4f;
+            var inner = width - 2 * CardPadding;
+            var height = Mathf.Min(Height(), maxHeight);
+
+            // Top right, unless the pointer is under it: then top left, so it never hides the tile you're aiming at.
+            var x = GuiWidth - width - Margin;
+            var mouse = Event.current.mousePosition;
+            if (mouse.x >= x - Margin && mouse.y <= height + 2 * Margin)
+                x = Margin;
+            var rect = Panel(x, Margin, width, height);
             GUI.Box(rect, GUIContent.none, HudArt.PanelStyle(HudArt.PanelColor, 0));
             // A strip in the team's colour along the top.
             GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 3f), HudArt.Solid(u.Team == Team.Enemy ? HudArt.HarmColor : new Color(0.55f, 0.78f, 1f)));
@@ -1784,23 +1846,36 @@ namespace ArmyRoguelike.View
                     GUILayout.Space(gap);
                 GUILayout.Label(text, style);
                 if (i == 0)
-                    DrawHpBar(GUILayoutUtility.GetLastRect(), u);
+                    DrawHpBar(GUILayoutUtility.GetLastRect(), u, loss);
             }
 
             GUILayout.EndArea();
             return true;
         }
 
-        /// <summary>A health bar just under the card's header, in the space left for it.</summary>
-        private static void DrawHpBar(Rect header, Unit u)
+        /// <summary>The techniques a unit has learned (none for enemies and summons).</summary>
+        private static IEnumerable<Technique> TechniquesOf(Unit u) => u.Member?.Techniques ?? (IEnumerable<Technique>)new Technique[0];
+
+        /// <summary>
+        /// A health bar just under the card's header, in the space left for it. The HP a planned attack would take
+        /// off (<paramref name="loss"/>) shows as a pale, pulsing chunk at the end of the fill.
+        /// </summary>
+        private static void DrawHpBar(Rect header, Unit u, int loss)
         {
             if (Event.current.type != EventType.Repaint)
                 return;
             var bar = new Rect(header.x, header.yMax + 2f, header.width, HpBarHeight);
             GUI.DrawTexture(bar, HudArt.Solid(new Color(0.2f, 0.2f, 0.22f)));
             var frac = u.MaxHp > 0 ? Mathf.Clamp01((float)u.Hp / u.MaxHp) : 0f;
+            var left = u.MaxHp > 0 ? Mathf.Clamp01((float)(u.Hp - loss) / u.MaxHp) : 0f;
             var fill = u.Team == Team.Player ? new Color(0.35f, 0.8f, 0.4f) : new Color(0.85f, 0.3f, 0.25f);
-            GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * frac, bar.height), HudArt.Solid(fill));
+            GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * left, bar.height), HudArt.Solid(fill));
+            if (loss > 0)
+            {
+                var pulse = 0.55f + 0.35f * Mathf.Sin(Time.unscaledTime * 6f);
+                GUI.DrawTexture(new Rect(bar.x + bar.width * left, bar.y, bar.width * (frac - left), bar.height),
+                    HudArt.Solid(new Color(1f, 0.85f, 0.75f, pulse)));
+            }
         }
 
         private static string Capitalise(string text) =>
@@ -1820,8 +1895,6 @@ namespace ArmyRoguelike.View
                     break;
             }
 
-            if (u.Member != null && u.Member.BonusDamage + u.GainedDamage > 0)
-                lines.Add($"Bloodthirst so far: +{u.Member.BonusDamage + u.GainedDamage} damage");
             if (u.Shield > 0)
                 lines.Add($"Shield {u.Shield}");
             if (u.MoonShield > 0)
@@ -1901,7 +1974,8 @@ namespace ArmyRoguelike.View
         private string UnitLine(Unit u)
         {
             var item = u.Equipment != null ? $"  [{u.Equipment.Name}]" : "";
-            return $"{u.Stats.Name}  HP {u.Hp}/{u.MaxHp}  DMG {Battle.EffectiveDamage(u)}  RNG {u.Range}  MV {u.MaxMoves}{item}";
+            var level = u.Member != null ? $"  level {u.Member.Level}" : "";
+            return $"{u.Stats.Name}{level}  HP {u.Hp}/{u.MaxHp}  DMG {Battle.EffectiveDamage(u)}  RNG {u.Range}  MV {u.MaxMoves}{item}";
         }
 
         private static string AbilityLines(Unit u)
@@ -1909,11 +1983,11 @@ namespace ArmyRoguelike.View
             var lines = new List<string>();
             foreach (var ability in u.Stats.Abilities)
                 lines.Add($"{Abilities.Name(ability)}: {Abilities.Describe(ability)}");
+            foreach (var technique in TechniquesOf(u))
+                lines.Add($"{technique.Name}: {technique.Description}");
             var itemAbility = u.Equipment?.Ability ?? Ability.None;
             if (itemAbility != Ability.None)
                 lines.Add($"{Abilities.Name(itemAbility)} ({u.Equipment.Name}): {Abilities.Describe(itemAbility)}");
-            if (u.Member != null && u.Member.BonusDamage + u.GainedDamage > 0)
-                lines.Add($"Bloodthirst so far: +{u.Member.BonusDamage + u.GainedDamage} damage");
             var status = new List<string>();
             if (u.Shield > 0)
                 status.Add($"shield {u.Shield}");

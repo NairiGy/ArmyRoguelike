@@ -1,7 +1,7 @@
 # Grid Tactics Roguelike — Design Note
 
 Working title: "Army Roguelike" (placeholder; a better name will come later). Separate project from Nardatro. Unity project: `Desktop/Unity projects/ArmyRoguelike`. This file (`docs/design-note.md`) is the canonical copy.
-Status: Prototype 5 (Act 1) built, not yet playtested: 7-step Act 1 where each of four factions (wolves, goblins, bandits, elementals) appears at most once, rule-based layouts, a rotating boss (Necromancer raising your beaten factions, or the Giant), one evolution per unit per Trainer visit with paid extras, zone of control. Prototype 4: draft 3 of 5 base units, 9-step map with free Trainers at steps 4 and 7 (every unit +1 tier per visit), 5 evolution trees (38 unit types, 3 tiers), only rule-bending items. Full unit/ability/item reference: `docs/gamepedia.html` (generated from game data; re-export via Tools → Export Gamepedia). Earlier, Prototype 3: branching 6-step map (battles, shops, ? events, ogre boss), built-in unit abilities, ability items, the sapper recruit with mines, and a goblin bomber battle. Prototype 2 (fixed mini-run) was playtested once: won, about 5.5 minutes. Fixes from it: walk-up attacks, End turn confirmation, necromancer no longer idle. Prototype 1 (one battle): no bugs, felt OK, won 2/2, "not super easy". Numbers marked *(placeholder)* are only examples.
+Status (2026-10-30): techniques replace evolutions and Trainers, playtested once (see "Techniques instead of evolutions"); the sections before it are history where they mention evolutions, tiers, Trainers, item picks or Bloodthirst. Earlier: Prototype 5 (Act 1) built: 7-step Act 1 where each of four factions (wolves, goblins, bandits, elementals) appears at most once, rule-based layouts, a rotating boss (Necromancer raising your beaten factions, or the Giant), one evolution per unit per Trainer visit with paid extras, zone of control. Prototype 4: draft 3 of 5 base units, 9-step map with free Trainers at steps 4 and 7 (every unit +1 tier per visit), 5 evolution trees (38 unit types, 3 tiers), only rule-bending items. Full unit/ability/item reference: `docs/gamepedia.html` (generated from game data; re-export via Tools → Export Gamepedia). Earlier, Prototype 3: branching 6-step map (battles, shops, ? events, ogre boss), built-in unit abilities, ability items, the sapper recruit with mines, and a goblin bomber battle. Prototype 2 (fixed mini-run) was playtested once: won, about 5.5 minutes. Fixes from it: walk-up attacks, End turn confirmation, necromancer no longer idle. Prototype 1 (one battle): no bugs, felt OK, won 2/2, "not super easy". Numbers marked *(placeholder)* are only examples.
 
 ## Pitch
 
@@ -296,19 +296,19 @@ Decided and built 2026-10-28 (branch `feature/act1-12-steps`), not yet playteste
 | 2 | Shop / ? |
 | 3 | Battle / ? |
 | 4 | Scenario / Battle |
-| 5 | Trainer / Shop |
+| 5 | Trainer / Shop (now Shop / ?) |
 | 6 | Elite / Battle |
 | 7 | Shop / ? |
 | 8 | Scenario (the other one) / Battle |
-| 9 | Trainer / ? |
+| 9 | Trainer / ? (now ? / Battle) |
 | 10 | Elite / Battle |
 | 11 | Shop / ? |
 | 12 | Boss |
 
-- **At least 5 fights before the boss** (steps 1, 4, 6, 8, 10 are two fights), up to 7. The two Trainers stay (enough for tier 3).
+- **At least 5 fights before the boss** (steps 1, 4, 6, 8, 10 are two fights), up to 7. The two Trainers stay (enough for tier 3). (Trainers went with techniques, 2026-10-30.) (Trainers went with techniques, 2026-10-30.)
 - **Battle:** a faction you haven't beaten yet; once you've met all four, a normal-strength rematch. **Elite:** a harder rematch of a faction you've beaten. Both get their faction when the run reaches their step (the map shows "Battle" / "Elite" until then); the two fights of a step never share a faction.
-- **Elites are high risk, high reward**, always a choice: normal gold plus a pick of 1 of 3 items. First version is more of the same enemies, no new types *(placeholders)*: Wolves 2 leaders + 4 wolves; Goblins 4 bombers + 3 runners behind a ridge with only 2 gaps; Bandits 3 crossbowmen behind cover, 2 cutpurses, 2 brutes; Elementals 4.
-- **Bloodthirst capped at +3 for the run.**
+- **Elites are high risk, high reward**, always a choice: normal gold plus a pick of 1 of 3 items (now a technique pick holding a rare one). First version is more of the same enemies, no new types *(placeholders)*: Wolves 2 leaders + 4 wolves; Goblins 4 bombers + 3 runners behind a ridge with only 2 gaps; Bandits 3 crossbowmen behind cover, 2 cutpurses, 2 brutes; Elementals 4.
+- **Bloodthirst capped at +3 for the run.** (Removed with the evolutions, 2026-10-30.)
 - **Later:** fights get split into difficulty pools (and more fights added); each step then draws from a pool. New node types and events after a playtest of this act.
 
 ## Small board, one move (merged into `main` 2026-10-30)
@@ -353,15 +353,15 @@ Built 2026-10-29 as an idea test on `experiment/small-board`, playtested 2026-10
 - **Your base lines** (each action is inherited by every evolution of the line; 1 AP, so it's a choice against attacking):
   - **Warrior line, Shield Bash:** push an adjacent enemy 1 tile; no damage, only the 2 collision damage if it's blocked, and a unit it slams into takes the same 2 (other pushes still only hurt the pushed unit). The attack (Strike) is for damage.
   - **Archer line, Pinning Shot:** 1 damage in shot range (line of sight), and the target can't move on its next turn. The attack (Shot) is for damage. The Trapper line lost Snare to it (Prey now works on pinned enemies); the Trapper gets a new action later.
-  - **Rogue line, Vanish:** the base Rogue's passive is Swift only (Bloodthirst removed 2026-10-29; its evolutions still have it for now). Vanish goes off as soon as you press it: enemies can't target or attack it (area blasts still hit) until it attacks again, for 2 enemy turns at most; the attack that reveals it deals +2.
+  - **Rogue line, Vanish:** the base Rogue's passive is Swift only (Bloodthirst removed 2026-10-29, and from the game with the evolutions on 2026-10-30). Vanish goes off as soon as you press it: enemies can't target or attack it (area blasts still hit) until it attacks again, for 2 enemy turns at most; the attack that reveals it deals +2.
   - **Mage line, Blink:** teleport to a free tile within 2, past rocks and zone of control.
   - **Sapper line:** unchanged (Strike, Place Mine).
 - **Hover card:** hovering a unit shows a card at the top right: name and HP, AP / moves / range, **Next** (what an enemy will do), then **Passive**, **Actions** and **Now** (statuses, pack state, engaged). Colours are placeholders for the art chat. Readability pass 2026-10-30: solid dark panel with a team-coloured top edge, an HP bar, bigger text, and each passive and action as a name line (cost and cooldown in gold) with its description underneath.
 - **Action cards:** the selected unit's special actions are cards in a row at the bottom centre (key, name, cost and cooldown or "ready in N", description). Click or press the key to aim, again to cancel; the aimed card turns gold, unusable ones are faded. Done and End turn stay at the bottom right (2026-10-30).
 
-## Techniques instead of evolutions (decided 2026-10-30, not built)
+## Techniques instead of evolutions (built 2026-10-30)
 
-Decided with the user 2026-10-30, not built yet. Why: evolution added little to the run (every unit evolved at every Trainer, the only real choice was the tier-2 branch), 33 evolution kits were still to design, and the run should feel more like deckbuilding: a pick after every fight and builds that grow one card at a time. Replaces evolutions and Trainers once built (items stay); the sections above describe what is in the game until then. Being built on branch `feature/techniques`.
+Decided with the user and built 2026-10-30 (branch `feature/techniques`, merged into `main` with it); playtested once, fixes below. Why: evolution added little to the run (every unit evolved at every Trainer, the only real choice was the tier-2 branch), 33 evolution kits were still to design, and the run should feel more like deckbuilding: a pick after every fight and builds that grow one card at a time. Replaces evolutions and Trainers (items stay).
 
 - **No evolutions.** The 5 base units stay (Warrior, Archer, Rogue, Mage Apprentice, Sapper) with their base kits, which work as a starter deck; the 33 evolved types go. Statues are unaffected (evolved units already shared their line's statue).
 - **Techniques:** passives or actions (actions use the normal 1 AP and cooldown rules). Today's tier-2 and tier-3 additions become techniques, so almost the whole pool is already built:
@@ -385,7 +385,7 @@ Ideas from the same discussion, parked for after techniques (suggested order): b
 ## Test mode (for testing only)
 
 - Editor and dev builds only: a "Test battle" button on the draft screen opens a setup screen.
-- Pick any 1–4 unit types (any tier, repeats allowed), any encounter (factions, bosses, Moon Shrine, Break the Ritual; for the Necromancer, which factions count as beaten) and optionally any blessing or curse. No items for now.
+- Pick any 1–4 base units (repeats allowed) and tick each one's techniques (its level follows), any encounter (factions, bosses, Moon Shrine, Break the Ritual; for the Necromancer, which factions count as beaten) and optionally any blessing or curse. No items for now.
 - The battle uses the normal rules; afterwards it returns to the setup screen. No run, gold or map, and no run log; battle logs are marked `test: true`.
 
 ## Later / maybe

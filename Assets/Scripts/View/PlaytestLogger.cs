@@ -63,7 +63,8 @@ namespace ArmyRoguelike.View
                 _log.placements.Add(new PlacementEntry
                 {
                     unit = Name(u), x = u.Pos.X, y = u.Pos.Y, equipment = u.Equipment?.Name ?? "", maxHp = u.MaxHp,
-                    damage = u.BaseDamage, range = u.Range, maxAp = u.MaxAp, maxMoves = u.MaxMoves, tier = u.Stats.Tier, line = u.Stats.Root.Name,
+                    damage = u.BaseDamage, range = u.Range, maxAp = u.MaxAp, maxMoves = u.MaxMoves, line = u.Stats.Name,
+                    level = u.Member?.Level ?? 0, techniques = u.Member?.Techniques.Select(t => t.Name).ToList() ?? new List<string>(),
                 });
         }
 
@@ -201,6 +202,14 @@ namespace ArmyRoguelike.View
                         damage = tick.Hit.Damage, targetHpAfter = tick.Hit.HpAfter, killed = tick.Hit.Killed,
                     });
                     break;
+                case BarricadeHitEvent barricade:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = barricade.Attacker.Team.ToString(), unit = Name(barricade.Attacker), type = "barricade hit",
+                        damage = barricade.Damage, targetHpAfter = barricade.HpAfter, killed = barricade.HpAfter == 0,
+                        toX = barricade.Tile.X, toY = barricade.Tile.Y,
+                    });
+                    break;
                 case TileEvent tile:
                     _log.actions.Add(new ActionEntry
                     {
@@ -297,7 +306,6 @@ namespace ArmyRoguelike.View
             {
                 case EffectKind.Heal: return "heal";
                 case EffectKind.Thorns: return "thorns";
-                case EffectKind.Bloodthirst: return "bloodthirst";
                 case EffectKind.LastStand: return "last stand";
                 case EffectKind.Dodge: return "dodge";
                 case EffectKind.Absorb: return "shield absorb";
@@ -404,12 +412,21 @@ namespace ArmyRoguelike.View
             return SavedFile;
         }
 
+        /// <summary>
+        /// Each technique action the unit knows and how often it used it this battle (0 = never). Passive techniques
+        /// are listed under the placements; their effects show in the actions (sweep, pierce, counters and so on).
+        /// </summary>
+        private static List<TechniqueUse> TechniqueUses(Unit u) =>
+            (u.Member?.Techniques ?? (IEnumerable<Technique>)new Technique[0]).Where(t => t.Action.HasValue)
+                .Select(t => new TechniqueUse { technique = t.Name, uses = u.TimesUsed(t.Action.Value) }).ToList();
+
         private List<UnitSummary> Summarise()
         {
             var summaries = _battle.Units.Where(u => u.IsPlaced).ToDictionary(Name, u => new UnitSummary
             {
                 unit = Name(u), team = u.Team.ToString(), equipment = u.Equipment?.Name ?? "", survived = u.IsAlive,
-                hpLeft = u.Hp, maxHp = u.MaxHp,
+                hpLeft = u.Hp, maxHp = u.MaxHp, level = u.Member?.Level ?? 0,
+                techniqueUses = TechniqueUses(u),
             });
             foreach (var a in _log.actions)
             {
@@ -594,7 +611,9 @@ namespace ArmyRoguelike.View
             public int range;
             public int maxAp;
             public int maxMoves;
-            public int tier;
+            /// <summary>Level (techniques learned) and the techniques it knows.</summary>
+            public int level;
+            public List<string> techniques = new List<string>();
             public string line;
         }
 
@@ -691,11 +710,22 @@ namespace ArmyRoguelike.View
         }
 
         [Serializable]
+        private sealed class TechniqueUse
+        {
+            public string technique;
+            public int uses;
+        }
+
+        [Serializable]
         private sealed class UnitSummary
         {
             public string unit;
             public string team;
             public string equipment;
+
+            /// <summary>Player units: level, and how often each technique action was used.</summary>
+            public int level;
+            public List<TechniqueUse> techniqueUses = new List<TechniqueUse>();
             public bool survived;
             public int hpLeft;
             public int maxHp;

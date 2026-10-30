@@ -540,7 +540,7 @@ namespace ArmyRoguelike.View
         {
             var home = transform.position;
             var toward = (target - home).normalized;
-            var ranged = Unit.Stats.IsRanged;
+            var ranged = Unit.IsRanged;
 
             for (var t = 0f; t < 1f; t += Time.deltaTime / 0.09f)
             {

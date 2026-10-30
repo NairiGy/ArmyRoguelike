@@ -390,6 +390,23 @@ namespace ArmyRoguelike.Core
                     MeleeTurn(battle, enemy, events);
                     break;
             }
+
+            BreakBarricade(battle, enemy, events);
+        }
+
+        /// <summary>
+        /// An enemy that spent no AP this turn (nobody to hit) attacks a barricade in its reach instead, the
+        /// weakest first, so walls don't hold it off forever.
+        /// </summary>
+        private static void BreakBarricade(Battle battle, Unit enemy, List<BattleEvent> events)
+        {
+            if (battle.IsOver || !enemy.IsAlive || enemy.ActedThisTurn)
+                return;
+            var tile = battle.Barricades.Where(t => battle.CanAttackBarricade(enemy, t))
+                .OrderBy(t => battle.BarricadeHpAt(t)).ThenBy(t => t.X).ThenBy(t => t.Y)
+                .Cast<GridPos?>().FirstOrDefault();
+            if (tile.HasValue)
+                events.AddRange(battle.DoAttackBarricade(enemy, tile.Value));
         }
 
         // ---------- Behaviours ----------

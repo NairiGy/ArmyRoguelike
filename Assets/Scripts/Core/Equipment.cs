@@ -26,10 +26,10 @@ namespace ArmyRoguelike.Core
 
         public override string ToString() => Name;
 
-        public static readonly Equipment VampireFang = new Equipment("Vampire Fang", 9, Ability.VampireFang);
-        public static readonly Equipment ThornedMail = new Equipment("Thorned Mail", 8, Ability.ThornedMail);
-        public static readonly Equipment SpringBoots = new Equipment("Spring Boots", 7, Ability.SpringBoots);
-        public static readonly Equipment LuckyCharm = new Equipment("Lucky Charm", 10, Ability.LuckyCharm);
+        public static readonly Equipment VampireFang = new Equipment("Vampire Fang", 14, Ability.VampireFang);
+        public static readonly Equipment ThornedMail = new Equipment("Thorned Mail", 12, Ability.ThornedMail);
+        public static readonly Equipment SpringBoots = new Equipment("Spring Boots", 11, Ability.SpringBoots);
+        public static readonly Equipment LuckyCharm = new Equipment("Lucky Charm", 15, Ability.LuckyCharm);
 
         public static readonly IReadOnlyList<Equipment> Catalog = new[] { VampireFang, ThornedMail, SpringBoots, LuckyCharm };
     }
@@ -54,7 +54,6 @@ namespace ArmyRoguelike.Core
                 case Ability.FirstShotDouble: return "Opening Shot";
                 case Ability.PreyOnSnared: return "Prey";
                 case Ability.Volley: return "Volley";
-                case Ability.Bloodthirst: return "Bloodthirst";
                 case Ability.Pincer: return "Pincer";
                 case Ability.KillRefund: return "Momentum";
                 case Ability.Poison: return "Poison";
@@ -115,7 +114,6 @@ namespace ArmyRoguelike.Core
                 case Ability.FirstShotDouble: return "double damage the first time it hits each enemy in a battle";
                 case Ability.PreyOnSnared: return $"pinned enemies take +{Battle.PreyBonus} damage from everyone";
                 case Ability.Volley: return "shots hit the target and the 4 tiles next to it for 1 less damage, friend or foe";
-                case Ability.Bloodthirst: return $"+1 damage per kill, kept for the run (up to +{Battle.BloodthirstCap})";
                 case Ability.Pincer: return $"+{Battle.PincerBonus} damage if an ally stands on the far side of the target";
                 case Ability.KillRefund: return "a kill gives its action back: it can attack again";
                 case Ability.Poison: return $"hits poison: {Battle.PoisonDamage} damage at the start of the target's next {Battle.PoisonTurns} turns";
@@ -209,7 +207,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.IceWall: return $"turn a free tile within {Battle.ActionRange} into ice (blocks like a rock) for {Battle.IceRounds} rounds";
                 case ActionKind.Ward: return $"an ally within {Battle.ActionRange} tiles gets a shield that absorbs {Battle.WardShield} damage";
                 case ActionKind.Mend: return $"heal an ally within {Battle.ActionRange} tiles for {Battle.MendHeal}";
-                case ActionKind.Barricade: return $"build a barricade (a rock) on a free tile next to it (max {Battle.MaxBarricades})";
+                case ActionKind.Barricade: return $"build a barricade on a free tile next to it (max {Battle.MaxBarricades}): blocks paths and shots, {Battle.BarricadeHp} HP, either side can break it";
                 case ActionKind.Turret: return "build a turret next to it (one at a time); it acts on your turn but can't move";
                 case ActionKind.Detonate: return $"blow up all its barricades: {Battle.BarricadeBlastDamage} damage in a 3x3 around each";
                 case ActionKind.Charge: return $"rush 2-{Battle.ChargeRange} tiles in a straight line into an enemy, hit it and push it back 1";

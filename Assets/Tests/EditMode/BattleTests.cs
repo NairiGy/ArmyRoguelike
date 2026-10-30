@@ -212,12 +212,13 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void WolfBite_EachBiteThisTurnHitsHarder_ResetsNextTurn()
         {
-            var b = Started(new[] { UnitStats.Bastion }, new[] { new GridPos(3, 1) },
+            var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 1) },
                 new[] { (UnitStats.Wolf, new GridPos(3, 2)), (UnitStats.Wolf, new GridPos(2, 1)), (UnitStats.Wolf, new GridPos(4, 1)) });
+            Player(b).Member.Learn(Technique.Tough);
             Player(b).Hp = 50;
             var events = b.EndPlayerTurn();
             var bites = events.OfType<AttackEvent>().Where(a => a.Attacker.Team == Team.Enemy).Select(a => a.Damage).ToList();
-            // 2, 3, 4 before Bastion's Tough (-1) and Shield Wall doesn't cover itself.
+            // 2, 3, 4 before Tough (-1); Shield Wall doesn't cover the warrior itself.
             CollectionAssert.AreEqual(new[] { 1, 2, 3 }, bites);
             Assert.AreEqual(0, b.BiteChain, "the chain resets at the start of the next turn");
         }

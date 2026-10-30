@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ArmyRoguelike.Core
 {
@@ -52,6 +53,14 @@ namespace ArmyRoguelike.Core
             if (turns > 0)
                 _cooldowns[action] = turns;
         }
+
+        // How often each special action was used this battle (for the playtest log).
+        private readonly Dictionary<ActionKind, int> _uses = new Dictionary<ActionKind, int>();
+
+        /// <summary>Times the unit used this special action in this battle.</summary>
+        public int TimesUsed(ActionKind action) => _uses.TryGetValue(action, out var n) ? n : 0;
+
+        internal void CountUse(ActionKind action) => _uses[action] = TimesUsed(action) + 1;
 
         /// <summary>Every action ready again (tests).</summary>
         internal void ClearCooldowns() => _cooldowns.Clear();
@@ -110,9 +119,6 @@ namespace ArmyRoguelike.Core
         /// <summary>The Lucky Charm has already saved this unit in this battle.</summary>
         public bool LastStandUsed { get; internal set; }
 
-        /// <summary>Damage gained in this battle (Bloodthirst). Added to the army member when the battle ends.</summary>
-        public int GainedDamage { get; internal set; }
-
         /// <summary>Gold a cutpurse is carrying after a hit. It flees with it; killing it gets it back.</summary>
         public int CarryingLoot { get; internal set; }
 
@@ -133,12 +139,14 @@ namespace ArmyRoguelike.Core
         public Equipment Equipment => Member?.Equipment;
 
         // Stats after run-long bonuses.
-        public int MaxHp => Math.Max(1, Stats.MaxHp + (Member?.BonusMaxHp ?? 0) + PackHp);
+        public int MaxHp => Math.Max(1, Stats.MaxHp + (Member?.BonusMaxHp ?? 0) + (Member?.LevelHp ?? 0) + PackHp);
 
         /// <summary>Max HP from a Pack Leader's Pack Bond: +1 while one lives, -1 once the last one dies.</summary>
         public int PackHp { get; internal set; }
-        public int BaseDamage => Math.Max(1, Stats.Damage + (Member?.BonusDamage ?? 0) + GainedDamage);
-        public int Range => Math.Max(1, Stats.Range);
+        public int BaseDamage => Math.Max(1, Stats.Damage + (Member?.BonusDamage ?? 0) + (Member?.LevelDamage ?? 0));
+
+        /// <summary>Attack range in steps. Long Reach makes it 2 (still melee).</summary>
+        public int Range => Math.Max(Has(Ability.LongReach) ? 2 : 1, Stats.Range);
         public int MaxAp => Math.Max(1, Stats.MaxAp) + (InWrath ? 1 : 0);
 
         /// <summary>Wrath (the Giant): at half HP or less it gets one more AP each turn.</summary>
@@ -149,7 +157,8 @@ namespace ArmyRoguelike.Core
 
         public int Size => Stats.Size;
 
-        public bool IsRanged => Stats.IsRanged;
+        /// <summary>A ranged attack needs line of sight and can't be countered. Long Reach is still melee.</summary>
+        public bool IsRanged => Range > 1 && !Has(Ability.LongReach);
 
         public bool IsAlive => Hp > 0;
 
@@ -174,9 +183,15 @@ namespace ArmyRoguelike.Core
         /// <summary>Its bone pile is used up (raised as a new unit by Soul Harvest, or blown up by Corpse Blast).</summary>
         public bool PileGone { get; internal set; }
 
-        /// <summary>Has the ability, from its type or from its item.</summary>
+        /// <summary>Has the ability, from its type, its item or a technique.</summary>
         public bool Has(Ability ability) =>
-            ability != Ability.None && (Stats.Has(ability) || Equipment?.Ability == ability);
+            ability != Ability.None && (Stats.Has(ability) || Equipment?.Ability == ability || (Member?.HasTechniqueAbility(ability) ?? false));
+
+        /// <summary>Its special actions: its type's, then those from techniques.</summary>
+        public IEnumerable<ActionKind> Actions =>
+            Member == null ? Stats.Actions : Stats.Actions.Concat(Member.TechniqueActions).Distinct();
+
+        public bool HasAction(ActionKind action) => Actions.Contains(action);
 
         public override string ToString() => $"{Stats.Name}#{Id} {Pos} hp {Hp} ap {Ap} mv {Moves}";
     }

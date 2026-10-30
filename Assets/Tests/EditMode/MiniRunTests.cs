@@ -85,6 +85,7 @@ namespace ArmyRoguelike.Tests
                 run.ChooseNode(0);
                 WinCurrentBattle(run, 3);
                 run.FinishBattle();
+                run.SkipReward();
                 run.ChooseNode(shop);
                 return run;
             }
@@ -105,6 +106,7 @@ namespace ArmyRoguelike.Tests
                 run.ChooseNode(0);
                 WinCurrentBattle(run, 3);
                 run.FinishBattle();
+                run.SkipReward();
                 run.ChooseNode(ev);
                 if (run.CurrentEvent == kind)
                     return run;
@@ -124,17 +126,11 @@ namespace ArmyRoguelike.Tests
                     run.FinishBattle();
                     if (run.State == RunState.Blessing)
                         run.ChooseBlessing(run.BlessingChoices[0]);
-                    if (run.State == RunState.ItemReward)
-                        run.SkipRewardItem();
+                    if (run.State == RunState.Reward)
+                        run.SkipReward();
                     break;
                 case RunState.Shop:
                     run.LeaveShop();
-                    break;
-                case RunState.Trainer:
-                    foreach (var m in run.Army)
-                        if (m.Stats.Evolutions.Count > 0)
-                            run.Evolve(m, m.Stats.Evolutions[0]);
-                    run.LeaveTrainer();
                     break;
                 case RunState.Event:
                     switch (run.CurrentEvent)
@@ -143,7 +139,7 @@ namespace ArmyRoguelike.Tests
                             run.AcceptRecruit();
                             break;
                         case EventKind.AbandonedCart:
-                            run.TakeCartItem(null);
+                            run.TakeCart(null);
                             break;
                         case EventKind.Gambler:
                             run.Gamble(false);
@@ -169,8 +165,8 @@ namespace ArmyRoguelike.Tests
             {
                 var run = NewRun(seed);
                 Assert.AreEqual(12, run.Map.Count);
-                foreach (var step in Run.TrainerSteps)
-                    Assert.IsTrue(run.Map[step].Any(n => n.Kind == NodeKind.Trainer), $"trainer at step {step + 1}");
+                Assert.IsTrue(run.Map[4].Any(n => n.Kind == NodeKind.Shop) && run.Map[4].Any(n => n.Kind == NodeKind.Event), "step 5: shop or ?");
+                Assert.IsTrue(run.Map[8].Any(n => n.Kind == NodeKind.Event) && run.Map[8].Any(n => n.Kind == NodeKind.Battle), "step 9: ? or battle");
                 foreach (var step in Run.FightSteps)
                     Assert.IsTrue(run.Map[step].All(IsFight), $"step {step + 1} is two fights");
                 Assert.IsTrue(run.Map[0].All(n => n.Kind == NodeKind.Battle), "the run opens with a fight");
@@ -245,7 +241,8 @@ namespace ArmyRoguelike.Tests
             var earned = run.FinishBattle();
             Assert.AreEqual(gold + earned, run.Gold);
             Assert.Greater(earned, 0);
-            Assert.AreEqual(RunState.ItemReward, run.State);
+            Assert.AreEqual(RunState.Reward, run.State);
+            Assert.IsTrue(run.RewardOffers.Any(t => t.Rarity == TechniqueRarity.Rare), "an elite's pick holds a rare technique");
             Assert.IsFalse(run.Fought.Contains(run.CurrentEncounter), "the elite itself isn't a faction for the Necromancer");
         }
 
@@ -309,7 +306,7 @@ namespace ArmyRoguelike.Tests
         private static int ScenarioIndex(Run run, Encounter scenario) => run.CurrentChoices.ToList().FindIndex(n => n.Encounter == scenario);
 
         [Test]
-        public void BreakRitual_Won_PickAnItemForAUnit()
+        public void BreakRitual_Won_PickATechniqueForAUnit()
         {
             var run = RunAtScenarioStep(4, Encounter.BreakRitual);
             var step = run.StepIndex;
@@ -317,16 +314,52 @@ namespace ArmyRoguelike.Tests
             WinCurrentBattle(run, 3);
             Assert.IsTrue(run.CurrentBattle.TotemsBroken);
             Assert.Greater(run.FinishBattle(), 0);
-            Assert.AreEqual(RunState.ItemReward, run.State);
-            Assert.AreEqual(Run.RewardItemCount, run.RewardItems.Distinct().Count());
+            Assert.AreEqual(RunState.Reward, run.State);
+            Assert.AreEqual(Run.RewardCount, run.RewardOffers.Distinct().Count());
 
-            var item = run.RewardItems[0];
-            var member = run.Army[1];
-            Assert.IsTrue(run.TakeRewardItem(item, member));
-            Assert.AreEqual(item, member.Equipment);
+            var technique = run.RewardOffers[0];
+            var member = run.Army.First(technique.CanLearn);
+            var level = member.Level;
+            Assert.IsTrue(run.TakeReward(technique, member));
+            Assert.IsTrue(member.Knows(technique));
+            Assert.AreEqual(level + 1, member.Level);
             Assert.AreEqual(RunState.Map, run.State);
             Assert.AreEqual(step + 1, run.StepIndex);
-            Assert.AreEqual(0, run.RewardItems.Count);
+            Assert.AreEqual(0, run.RewardOffers.Count);
+        }
+
+        [Test]
+        public void Reward_OffersOnlyLearnable_AndOnlyToUnitsThatCanLearn()
+        {
+            for (var seed = 0; seed < 30; seed++)
+            {
+                var run = NewRun(seed);
+                run.ChooseNode(0);
+                WinCurrentBattle(run, 3);
+                run.FinishBattle();
+                Assert.AreEqual(RunState.Reward, run.State);
+                Assert.AreEqual(Run.RewardCount, run.RewardOffers.Distinct().Count());
+                Assert.IsTrue(run.RewardOffers.All(t => run.Army.Any(t.CanLearn)), $"seed {seed}");
+                var technique = run.RewardOffers.First(t => !t.IsShared);
+                var outsider = run.Army.FirstOrDefault(m => !technique.CanLearn(m));
+                if (outsider != null)
+                    Assert.IsFalse(run.TakeReward(technique, outsider), "another line's technique");
+            }
+        }
+
+        [Test]
+        public void Reward_SkipPaysGold_AndMovesOn()
+        {
+            var run = NewRun(1);
+            run.ChooseNode(0);
+            WinCurrentBattle(run, 3);
+            run.FinishBattle();
+            var gold = run.Gold;
+            run.SkipReward();
+            Assert.AreEqual(gold + Run.SkipGold, run.Gold);
+            Assert.AreEqual(RunState.Map, run.State);
+            Assert.AreEqual(1, run.StepIndex);
+            Assert.IsTrue(run.Army.All(m => m.Level == 0));
         }
 
         [Test]
@@ -449,35 +482,6 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Trainer_FirstEvolutionFree_ThenPaid()
-        {
-            for (var seed = 0; seed < 300; seed++)
-            {
-                var run = NewRun(seed);
-                while (run.State == RunState.Map && run.StepIndex < Run.TrainerSteps[0])
-                {
-                    run.ChooseNode(0);
-                    PlayThroughNode(run);
-                }
-
-                if (run.State != RunState.Map || run.Gold < Run.SecondEvolutionPrice)
-                    continue;
-                run.ChooseNode(run.CurrentChoices.ToList().FindIndex(n => n.Kind == NodeKind.Trainer));
-                var gold = run.Gold;
-                Assert.AreEqual(0, run.NextEvolutionPrice);
-                Assert.IsTrue(run.Evolve(run.Army[0], run.Army[0].Stats.Evolutions[0]));
-                Assert.AreEqual(gold, run.Gold, "first is free");
-                Assert.AreEqual(Run.SecondEvolutionPrice, run.NextEvolutionPrice);
-                Assert.IsTrue(run.Evolve(run.Army[1], run.Army[1].Stats.Evolutions[0]));
-                Assert.AreEqual(gold - Run.SecondEvolutionPrice, run.Gold);
-                Assert.AreEqual(Run.LaterEvolutionPrice, run.NextEvolutionPrice);
-                return;
-            }
-
-            Assert.Fail("never reached a trainer with enough gold");
-        }
-
-        [Test]
         public void Necromancer_RaisesTheFactionsYouBeat()
         {
             var fought = new[] { Encounter.Wolves, Encounter.Goblins };
@@ -518,15 +522,15 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Run_GoldScalesWithSurvivors_ThenBackToMap()
+        public void Run_GoldScalesWithSurvivors_ThenTechniquePick()
         {
             var run = NewRun(1);
             run.ChooseNode(0);
             WinCurrentBattle(run, 2);
             Assert.AreEqual(Run.GoldFor(2), run.FinishBattle());
             Assert.AreEqual(20, run.Gold);
-            Assert.AreEqual(RunState.Map, run.State);
-            Assert.AreEqual(1, run.StepIndex);
+            Assert.AreEqual(RunState.Reward, run.State);
+            Assert.AreEqual(0, run.StepIndex);
         }
 
         [Test]
@@ -552,21 +556,54 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Shop_BuyReplacesSlot_AndSpendsGold()
+        public void Shop_BuyTeachesTheTechnique_AndSpendsGold()
         {
             var run = RunInShop();
+            Assert.IsTrue(run.Offers.All(t => run.Army.Any(t.CanLearn)), "only learnable techniques");
+            var offer = run.Offers.OrderBy(o => o.Price).First();
+            var buyer = run.Army.First(offer.CanLearn);
+            var gold = run.Gold;
+            Assume.That(gold >= offer.Price);
+            Assert.IsTrue(run.Buy(offer, buyer));
+            Assert.IsTrue(buyer.Knows(offer));
+            Assert.AreEqual(1, buyer.Level);
+            Assert.AreEqual(gold - offer.Price, run.Gold);
+            Assert.IsFalse(run.Offers.Contains(offer), "bought techniques leave the shop");
+        }
+
+        [Test]
+        public void Shop_ItemReplacesSlot_AndSpendsGold()
+        {
+            var run = RunInShop();
+            Assert.AreEqual(Run.ShopItemCount, run.ItemOffers.Distinct().Count());
             var warrior = run.Army[0];
-            var affordable = run.Offers.Where(o => o.CanEquip(warrior.Stats)).OrderBy(o => o.Price).ToList();
-            Assume.That(affordable.Count >= 2);
-            Assert.IsTrue(run.Buy(affordable[0], warrior));
-            Assert.AreEqual(affordable[0], warrior.Equipment);
-            Assert.IsFalse(run.Offers.Contains(affordable[0]), "bought items leave the shop");
-            var goldBefore = run.Gold;
-            if (run.Buy(affordable[1], warrior))
+            var items = run.ItemOffers.OrderBy(o => o.Price).ToList();
+            Assert.IsTrue(run.BuyItem(items[0], warrior));
+            Assert.AreEqual(items[0], warrior.Equipment);
+            Assert.AreEqual(0, warrior.Level, "items don't level a unit");
+            Assert.IsFalse(run.ItemOffers.Contains(items[0]), "bought items leave the shop");
+            var gold = run.Gold;
+            if (run.BuyItem(items[1], warrior))
             {
-                Assert.AreEqual(affordable[1], warrior.Equipment, "one slot: the new item replaces the old");
-                Assert.AreEqual(goldBefore - affordable[1].Price, run.Gold);
+                Assert.AreEqual(items[1], warrior.Equipment, "one slot: the new item replaces the old");
+                Assert.AreEqual(gold - items[1].Price, run.Gold);
             }
+        }
+
+        [Test]
+        public void Shop_ForgetCostsGold_KeepsTheLevel()
+        {
+            var run = RunInShop();
+            var mage = run.Army[0];
+            mage.Stats = UnitStats.Apprentice;
+            mage.Learn(Technique.Ward);
+            mage.Learn(Technique.Mend);
+            var gold = run.Gold;
+            Assert.IsTrue(run.Forget(mage, Technique.Ward));
+            Assert.AreEqual(gold - Run.ForgetPrice, run.Gold);
+            Assert.IsFalse(mage.Knows(Technique.Mend), "Mend needs Ward");
+            Assert.AreEqual(2, mage.Level);
+            Assert.IsFalse(run.Forget(mage, Technique.Ward), "not known any more");
         }
 
         [Test]
@@ -622,6 +659,7 @@ namespace ArmyRoguelike.Tests
             run.ChooseNode(0);
             WinCurrentBattle(run, 1);
             run.FinishBattle();
+            run.SkipReward();
             // Second fight of the run, wherever it comes up.
             while (run.State == RunState.Map)
             {
@@ -659,7 +697,7 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(recruit, run.Army[3].Stats);
         }
 
-        // ---------- Draft and trainer ----------
+        // ---------- Draft ----------
 
         [Test]
         public void Draft_ThreeDifferentBaseUnits()
@@ -667,70 +705,11 @@ namespace ArmyRoguelike.Tests
             var run = new Run(1);
             Assert.AreEqual(RunState.Draft, run.State);
             Assert.IsFalse(run.Draft(UnitStats.Warrior, UnitStats.Warrior, UnitStats.Rogue), "no duplicates");
-            Assert.IsFalse(run.Draft(UnitStats.Warrior, UnitStats.Swordsman, UnitStats.Rogue), "base units only");
+            Assert.IsFalse(run.Draft(UnitStats.Warrior, UnitStats.Wolf, UnitStats.Rogue), "player units only");
             Assert.IsFalse(run.Draft(UnitStats.Warrior, UnitStats.Rogue), "exactly three");
             Assert.IsTrue(run.Draft(UnitStats.Apprentice, UnitStats.Sapper, UnitStats.Rogue));
             Assert.AreEqual(RunState.Map, run.State);
             Assert.AreEqual(3, run.Army.Count);
-        }
-
-        [Test]
-        public void Trainer_EveryUnitUpOneTierPerVisit_KeepsBonuses()
-        {
-            for (var seed = 0; seed < 300; seed++)
-            {
-                var run = NewRun(seed);
-                // Walk to the first trainer, taking it.
-                while (run.State == RunState.Map && run.StepIndex < Run.TrainerSteps[0])
-                {
-                    run.ChooseNode(0);
-                    PlayThroughNode(run);
-                }
-
-                if (run.State != RunState.Map)
-                    continue;
-                var trainer = run.CurrentChoices.ToList().FindIndex(n => n.Kind == NodeKind.Trainer);
-                run.ChooseNode(trainer);
-                Assert.AreEqual(RunState.Trainer, run.State);
-
-                var warrior = run.Army.First(m => m.Stats.Root == UnitStats.Warrior);
-                warrior.BonusMaxHp = 2;
-                Assert.IsFalse(run.CanEvolve(warrior, UnitStats.Juggernaut), "one tier at a time");
-                Assert.IsTrue(run.Evolve(warrior, UnitStats.Shielder));
-                Assert.AreEqual(UnitStats.Shielder, warrior.Stats);
-                Assert.IsFalse(run.Evolve(warrior, UnitStats.Juggernaut), "once per visit");
-                Assert.AreEqual(2, warrior.BonusMaxHp);
-                Assert.IsTrue(run.Army.Where(m => m != warrior).All(m => run.CanEvolve(m, m.Stats.Evolutions[0])));
-                run.LeaveTrainer();
-                Assert.AreEqual(RunState.Map, run.State);
-                return;
-            }
-
-            Assert.Fail("never reached a trainer");
-        }
-
-        [Test]
-        public void Trees_ThreeTiers_TwoBranchesEach_StrongerAsTheyGo()
-        {
-            Assert.AreEqual(5, UnitStats.BaseUnits.Count);
-            // 7 per tree, except the mage apprentice, which has three tier-2 branches: 4 x 7 + 10.
-            Assert.AreEqual(38, UnitStats.AllPlayerTypes.Count());
-            foreach (var type in UnitStats.AllPlayerTypes)
-            {
-                var branches = type == UnitStats.Apprentice ? 3 : type.Tier < 3 ? 2 : 0;
-                Assert.AreEqual(branches, type.Evolutions.Count, type.Name);
-                foreach (var next in type.Evolutions)
-                {
-                    Assert.AreEqual(type.Tier + 1, next.Tier);
-                    Assert.GreaterOrEqual(next.MaxHp, type.MaxHp, $"{next.Name} HP");
-                    Assert.GreaterOrEqual(next.Damage, type.Damage, $"{next.Name} damage");
-                    // The Trapper lost Snare to the archer's Pinning Shot; its new action is still to be designed.
-                    if (next == UnitStats.Trapper)
-                        continue;
-                    Assert.IsTrue(next.Abilities.Count + next.Actions.Count > type.Abilities.Count + type.Actions.Count ||
-                                  next.Abilities.Except(type.Abilities).Any(), $"{next.Name} adds something");
-                }
-            }
         }
 
         [Test]
@@ -743,12 +722,24 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Event_Cart_EquipsItem()
+        public void Event_Cart_TeachesATechniqueOrGivesAnItem()
         {
             var run = RunAtEvent(EventKind.AbandonedCart);
-            var member = run.Army.First(m => run.CartItem.CanEquip(m.Stats));
-            Assert.IsTrue(run.TakeCartItem(member));
-            Assert.AreEqual(run.CartItem, member.Equipment);
+            Assert.IsTrue(run.CartTechnique == null ^ run.CartItem == null, "a technique or an item, never both");
+            if (run.CartTechnique != null)
+            {
+                var technique = run.CartTechnique;
+                var member = run.Army.First(technique.CanLearn);
+                Assert.IsTrue(run.TakeCart(member));
+                Assert.IsTrue(member.Knows(technique));
+                Assert.AreEqual(1, member.Level);
+            }
+            else
+            {
+                var item = run.CartItem;
+                Assert.IsTrue(run.TakeCart(run.Army[0]));
+                Assert.AreEqual(item, run.Army[0].Equipment);
+            }
         }
 
         [Test]
@@ -765,32 +756,6 @@ namespace ArmyRoguelike.Tests
             WinCurrentBattle(run, 3);
             run.FinishBattle();
             Assert.AreEqual(before + Run.GoldFor(3) + Run.AmbushBonusGold, run.Gold);
-        }
-
-        [Test]
-        public void Bloodthirst_DamageCarriesToNextBattle()
-        {
-            var run = NewRun(4);
-            run.Army.Single(m => m.Stats == UnitStats.Rogue).Stats = UnitStats.Assassin;
-            run.ChooseNode(0);
-            var b = run.StartBattle();
-            var x = 0;
-            foreach (var u in b.Units.Where(u => u.Team == Team.Player))
-                b.Place(u, new GridPos(x++, 0));
-            b.StartBattle();
-            var rogue = b.Units.Single(u => u.Stats == UnitStats.Assassin);
-            // Elementals split when they die, so keep going until nothing is left standing.
-            for (var e = b.Living(Team.Enemy).FirstOrDefault(); e != null && !b.IsOver; e = b.Living(Team.Enemy).FirstOrDefault())
-            {
-                e.Hp = 1;
-                rogue.Ap = 99;
-                rogue.Pos = new GridPos(e.Pos.X, e.Pos.Y - 1);
-                b.PlayerAttack(rogue, e);
-            }
-
-            var kills = b.Units.Count(u => u.Team == Team.Enemy);
-            run.FinishBattle();
-            Assert.AreEqual(System.Math.Min(kills, Battle.BloodthirstCap), run.Army.Single(m => m.Stats == UnitStats.Assassin).BonusDamage);
         }
 
         // ---------- Walk up and attack ----------

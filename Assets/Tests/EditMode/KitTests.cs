@@ -4,8 +4,8 @@ using NUnit.Framework;
 
 namespace ArmyRoguelike.Tests
 {
-    /// <summary>The rules of the evolved unit types.</summary>
-    public class EvolutionTests
+    /// <summary>The rules of the base kits and of the techniques units learn.</summary>
+    public class KitTests
     {
         private static Unit Player(Battle b, int index = 0) => b.Units.Where(u => u.Team == Team.Player).ElementAt(index);
 
@@ -14,9 +14,9 @@ namespace ArmyRoguelike.Tests
         private static GridPos P(int x, int y) => new GridPos(x, y);
 
         /// <summary>A started battle where players stand where told (anywhere, not only the back rows).</summary>
-        private static Battle Setup(UnitStats[] army, GridPos[] at, (UnitStats, GridPos)[] enemies, params GridPos[] rocks)
+        private static Battle Setup(ArmyMember[] army, GridPos[] at, (UnitStats, GridPos)[] enemies, params GridPos[] rocks)
         {
-            var b = new Battle(new Board(8, 8, rocks), army.Select(s => new ArmyMember(s)), enemies);
+            var b = new Battle(new Board(8, 8, rocks), army, enemies);
             for (var i = 0; i < army.Length; i++)
                 Assert.IsTrue(b.Place(Player(b, i), P(i, 0)));
             Assert.IsTrue(b.StartBattle());
@@ -25,25 +25,28 @@ namespace ArmyRoguelike.Tests
             return b;
         }
 
+        /// <summary>A unit of the army that knows these techniques.</summary>
+        private static ArmyMember M(UnitStats stats, params Technique[] techniques) => new ArmyMember(stats, null, techniques);
+
         private static (UnitStats, GridPos) E(UnitStats s, int x, int y) => (s, P(x, y));
 
         private static (UnitStats, GridPos) Far => (UnitStats.Wolf, P(7, 7));
 
-        // ---------- Warrior tree ----------
+        // ---------- Warrior techniques ----------
 
         [Test]
-        public void Swordsman_SweepHitsBothSides()
+        public void Sweep_HitsBothSides()
         {
-            var b = Setup(new[] { UnitStats.Swordsman }, new[] { P(3, 2) },
+            var b = Setup(new[] { M(UnitStats.Warrior, Technique.Sweep) }, new[] { P(3, 2) },
                 new[] { E(UnitStats.Wolf, 2, 3), E(UnitStats.Wolf, 3, 3), E(UnitStats.Wolf, 4, 3), Far });
             b.PlayerAttack(Player(b), Enemy(b, 1));
-            Assert.IsTrue(Enumerable.Range(0, 3).All(i => Enemy(b, i).Hp == UnitStats.Wolf.MaxHp - 4));
+            Assert.IsTrue(Enumerable.Range(0, 3).All(i => Enemy(b, i).Hp == UnitStats.Wolf.MaxHp - Player(b).BaseDamage));
         }
 
         [Test]
-        public void Longswordsman_HitsTwoTilesInALine()
+        public void LongReach_HitsTwoTilesInALine()
         {
-            var b = Setup(new[] { UnitStats.Longswordsman }, new[] { P(3, 2) },
+            var b = Setup(new[] { M(UnitStats.Warrior, Technique.LongReach) }, new[] { P(3, 2) },
                 new[] { E(UnitStats.Wolf, 3, 3), E(UnitStats.Wolf, 3, 4), Far });
             Assert.IsTrue(b.CanAttack(Player(b), Enemy(b, 1)), "reach 2");
             b.PlayerAttack(Player(b), Enemy(b, 1));
@@ -52,17 +55,17 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void DualBlades_StrikesTwice()
+        public void DoubleStrike_StrikesTwice()
         {
-            var b = Setup(new[] { UnitStats.DualBlades }, new[] { P(3, 2) }, new[] { E(UnitStats.Ogre, 3, 3) });
+            var b = Setup(new[] { M(UnitStats.Warrior, Technique.Sweep, Technique.DoubleStrike) }, new[] { P(3, 2) }, new[] { E(UnitStats.Ogre, 3, 3) });
             b.PlayerAttack(Player(b), Enemy(b));
-            Assert.AreEqual(UnitStats.Ogre.MaxHp - 2 * UnitStats.DualBlades.Damage, Enemy(b).Hp);
+            Assert.AreEqual(UnitStats.Ogre.MaxHp - 2 * Player(b).BaseDamage, Enemy(b).Hp);
         }
 
         [Test]
-        public void Shielder_GuardsAdjacentAlly()
+        public void Guard_ProtectsAdjacentAlly()
         {
-            var b = Setup(new[] { UnitStats.Shielder, UnitStats.Archer }, new[] { P(3, 1), P(4, 1) },
+            var b = Setup(new[] { M(UnitStats.Warrior, Technique.Guard), M(UnitStats.Archer) }, new[] { P(3, 1), P(4, 1) },
                 new[] { E(UnitStats.Wolf, 4, 2) });
             var shielder = Player(b, 0);
             var archer = Player(b, 1);
@@ -73,20 +76,20 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Bastion_TauntsAndIsTough()
+        public void Taunt_AndTough()
         {
-            var b = Setup(new[] { UnitStats.Bastion, UnitStats.Archer }, new[] { P(4, 3), P(5, 3) },
+            var b = Setup(new[] { M(UnitStats.Warrior, Technique.Guard, Technique.Taunt, Technique.Tough), M(UnitStats.Archer) }, new[] { P(4, 3), P(5, 3) },
                 new[] { E(UnitStats.Wolf, 5, 4) });
             Assert.AreEqual(Player(b, 0), EnemyAI.ChooseTarget(b, Enemy(b)), "taunt beats the nearer archer");
-            var lone = Setup(new[] { UnitStats.Bastion }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2) });
+            var lone = Setup(new[] { M(UnitStats.Warrior, Technique.Guard, Technique.Taunt, Technique.Tough) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2) });
             lone.EndPlayerTurn();
-            Assert.AreEqual(UnitStats.Bastion.MaxHp - 1, Player(lone).Hp, "one bite of 2, reduced to 1");
+            Assert.AreEqual(Player(lone).MaxHp - 1, Player(lone).Hp, "one bite of 2, reduced to 1");
         }
 
         [Test]
-        public void Juggernaut_ChargesAndPushes()
+        public void Charge_MovesAndPushes()
         {
-            var b = Setup(new[] { UnitStats.Juggernaut }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 4) });
+            var b = Setup(new[] { M(UnitStats.Warrior, Technique.Guard, Technique.Charge) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 4) });
             var jug = Player(b);
             var wolf = Enemy(b);
             Assert.IsTrue(b.CanUseAction(jug, ActionKind.Charge, wolf.Pos));
@@ -98,28 +101,28 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Push_IntoRock_DealsCollisionDamage()
         {
-            var b = Setup(new[] { UnitStats.Juggernaut }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 4) }, P(3, 5));
+            var b = Setup(new[] { M(UnitStats.Warrior, Technique.Guard, Technique.Charge) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 4) }, P(3, 5));
             var wolf = Enemy(b);
             b.PlayerUseAction(Player(b), ActionKind.Charge, wolf.Pos);
             Assert.AreEqual(P(3, 4), wolf.Pos);
-            Assert.AreEqual(UnitStats.Wolf.MaxHp - UnitStats.Juggernaut.Damage - Battle.CollisionDamage, wolf.Hp);
+            Assert.AreEqual(UnitStats.Wolf.MaxHp - Player(b).BaseDamage - Battle.CollisionDamage, wolf.Hp);
         }
 
-        // ---------- Archer tree ----------
+        // ---------- Archer techniques ----------
 
         [Test]
-        public void Sniper_PiercesTheLine()
+        public void Pierce_HitsTheLine()
         {
-            var b = Setup(new[] { UnitStats.Sniper }, new[] { P(3, 0) },
-                new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Wolf, 3, 4), Far });
+            var b = Setup(new[] { M(UnitStats.Archer, Technique.SteadyAimPlus, Technique.Pierce) }, new[] { P(3, 0) },
+                new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Wolf, 3, 3), Far });
             b.PlayerAttack(Player(b), Enemy(b, 0));
             Assert.Less(Enemy(b, 1).Hp, UnitStats.Wolf.MaxHp, "the wolf behind is hit too");
         }
 
         [Test]
-        public void Deadeye_FirstShotOnEachTargetDouble()
+        public void OpeningShot_FirstShotOnEachTargetDouble()
         {
-            var b = Setup(new[] { UnitStats.Deadeye }, new[] { P(3, 0) },
+            var b = Setup(new[] { M(UnitStats.Archer, Technique.SteadyAimPlus, Technique.OpeningShot) }, new[] { P(3, 1) },
                 new[] { E(UnitStats.Ogre, 3, 4), E(UnitStats.Brute, 1, 3) });
             var deadeye = Player(b);
             var ogre = Enemy(b, 0);
@@ -134,9 +137,9 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void PinningShot_HitsForOne_RootsNextTurn_AndHunterPunishesIt()
+        public void PinningShot_HitsForOne_RootsNextTurn_AndPreyPunishesIt()
         {
-            var b = Setup(new[] { UnitStats.Hunter }, new[] { P(3, 0) }, new[] { E(UnitStats.Wolf, 3, 3) });
+            var b = Setup(new[] { M(UnitStats.Archer, Technique.Prey) }, new[] { P(3, 0) }, new[] { E(UnitStats.Wolf, 3, 3) });
             var hunter = Player(b);
             var wolf = Enemy(b);
             b.PlayerUseAction(hunter, ActionKind.PinningShot, wolf.Pos);
@@ -150,7 +153,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void PinningShot_NeedsLineOfSight()
         {
-            var b = Setup(new[] { UnitStats.Archer }, new[] { P(3, 0) }, new[] { E(UnitStats.Wolf, 3, 3) }, P(3, 2));
+            var b = Setup(new[] { M(UnitStats.Archer) }, new[] { P(3, 0) }, new[] { E(UnitStats.Wolf, 3, 3) }, P(3, 2));
             Assert.IsFalse(b.CanUseAction(Player(b), ActionKind.PinningShot, P(3, 3)));
         }
 
@@ -159,19 +162,19 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void ShieldBash_PushesWithoutDamage_CollisionHurts()
         {
-            var b = Setup(new[] { UnitStats.Warrior }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far });
+            var b = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far });
             var wolf = Enemy(b);
             b.PlayerUseAction(Player(b), ActionKind.ShieldBash, wolf.Pos);
             Assert.AreEqual(P(3, 3), wolf.Pos);
             Assert.AreEqual(UnitStats.Wolf.MaxHp, wolf.Hp, "no damage");
 
-            var walled = Setup(new[] { UnitStats.Warrior }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far }, P(3, 3));
+            var walled = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far }, P(3, 3));
             var stuck = Enemy(walled);
             walled.PlayerUseAction(Player(walled), ActionKind.ShieldBash, stuck.Pos);
             Assert.AreEqual(P(3, 2), stuck.Pos);
             Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.CollisionDamage, stuck.Hp, "slammed into the rock");
 
-            var crowd = Setup(new[] { UnitStats.Warrior }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Brute, 3, 3), Far });
+            var crowd = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Brute, 3, 3), Far });
             var front = Enemy(crowd, 0);
             var behind = Enemy(crowd, 1);
             crowd.PlayerUseAction(Player(crowd), ActionKind.ShieldBash, front.Pos);
@@ -182,7 +185,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Vanish_EnemiesIgnoreIt_UntilItAttacksWithABonus()
         {
-            var b = Setup(new[] { UnitStats.Rogue, UnitStats.Warrior }, new[] { P(3, 1), P(0, 0) }, new[] { E(UnitStats.Brute, 3, 2) });
+            var b = Setup(new[] { M(UnitStats.Rogue), M(UnitStats.Warrior) }, new[] { P(3, 1), P(0, 0) }, new[] { E(UnitStats.Brute, 3, 2) });
             var rogue = Player(b, 0);
             var warrior = Player(b, 1);
             var brute = Enemy(b);
@@ -205,7 +208,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Vanish_WearsOffAfterTwoEnemyTurns()
         {
-            var b = Setup(new[] { UnitStats.Rogue }, new[] { P(0, 0) }, new[] { Far });
+            var b = Setup(new[] { M(UnitStats.Rogue) }, new[] { P(0, 0) }, new[] { Far });
             var rogue = Player(b);
             b.PlayerUseAction(rogue, ActionKind.Vanish, rogue.Pos);
             b.EndPlayerTurn();
@@ -218,7 +221,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Blink_TeleportsPastRocksAndReach()
         {
-            var b = Setup(new[] { UnitStats.Apprentice }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far }, P(2, 1));
+            var b = Setup(new[] { M(UnitStats.Apprentice) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far }, P(2, 1));
             var mage = Player(b);
             Assert.IsTrue(b.CanUseAction(mage, ActionKind.Blink, P(1, 1)), "over the rock");
             Assert.IsFalse(b.CanUseAction(mage, ActionKind.Blink, P(3, 4)), "3 steps is too far");
@@ -229,9 +232,9 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void VolleyMaster_HitsPlus_FriendlyFireIncluded()
+        public void Volley_HitsPlus_FriendlyFireIncluded()
         {
-            var b = Setup(new[] { UnitStats.VolleyMaster, UnitStats.Warrior }, new[] { P(3, 1), P(4, 4) },
+            var b = Setup(new[] { M(UnitStats.Archer, Technique.Volley), M(UnitStats.Warrior) }, new[] { P(3, 1), P(4, 4) },
                 new[] { E(UnitStats.Wolf, 3, 4), E(UnitStats.Wolf, 2, 4), E(UnitStats.Wolf, 2, 5), Far });
             b.PlayerAttack(Player(b, 0), Enemy(b, 0));
             Assert.Less(Enemy(b, 1).Hp, UnitStats.Wolf.MaxHp);
@@ -239,20 +242,20 @@ namespace ArmyRoguelike.Tests
             Assert.Less(Player(b, 1).Hp, Player(b, 1).MaxHp, "the warrior was in the area");
         }
 
-        // ---------- Rogue tree ----------
+        // ---------- Rogue techniques ----------
 
         [Test]
-        public void Assassin_PincerBonus()
+        public void Pincer_Bonus()
         {
-            var b = Setup(new[] { UnitStats.Assassin, UnitStats.Warrior }, new[] { P(3, 2), P(3, 4) },
+            var b = Setup(new[] { M(UnitStats.Rogue, Technique.Pincer), M(UnitStats.Warrior) }, new[] { P(3, 2), P(3, 4) },
                 new[] { E(UnitStats.Wolf, 3, 3) });
             Assert.AreEqual(b.EffectiveDamage(Player(b)) + Battle.PincerBonus, b.DamageAgainst(Player(b), Enemy(b)));
         }
 
         [Test]
-        public void Shadow_KillRefundsAp()
+        public void Momentum_KillRefundsAp()
         {
-            var b = Setup(new[] { UnitStats.Shadow }, new[] { P(3, 2) }, new[] { E(UnitStats.Wolf, 3, 3), Far });
+            var b = Setup(new[] { M(UnitStats.Rogue, Technique.Pincer, Technique.Momentum) }, new[] { P(3, 2) }, new[] { E(UnitStats.Wolf, 3, 3), Far });
             var shadow = Player(b);
             Enemy(b).Hp = 1;
             var before = shadow.Ap;
@@ -261,9 +264,9 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Poisoner_PoisonTicksOnEnemyTurns()
+        public void Poison_TicksOnEnemyTurns()
         {
-            var b = Setup(new[] { UnitStats.Poisoner }, new[] { P(0, 0) }, new[] { E(UnitStats.Ogre, 5, 5) });
+            var b = Setup(new[] { M(UnitStats.Rogue, Technique.Pincer, Technique.Poison) }, new[] { P(0, 0) }, new[] { E(UnitStats.Ogre, 5, 5) });
             var ogre = Enemy(b);
             var poisoner = Player(b);
             poisoner.Pos = P(5, 4);
@@ -276,13 +279,13 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Duelist_CountersOncePerTurn_BlademasterEveryTime()
+        public void Riposte_CountersOncePerTurn_RipostePlusEveryTime()
         {
-            var b = Setup(new[] { UnitStats.Duelist }, new[] { P(3, 1) }, new[] { E(UnitStats.Ogre, 3, 2) });
+            var b = Setup(new[] { M(UnitStats.Rogue, Technique.Riposte) }, new[] { P(3, 1) }, new[] { E(UnitStats.Ogre, 3, 2) });
             var events = b.EndPlayerTurn();
             Assert.AreEqual(1, events.OfType<AttackEvent>().Count(a => a.Attacker.Team == Team.Player));
 
-            var b2 = Setup(new[] { UnitStats.Blademaster }, new[] { P(3, 1) }, new[] { E(UnitStats.Ogre, 3, 2) });
+            var b2 = Setup(new[] { M(UnitStats.Rogue, Technique.Riposte, Technique.RipostePlus) }, new[] { P(3, 1) }, new[] { E(UnitStats.Ogre, 3, 2) });
             Player(b2).Hp = 50; // survive both smashes so every one gets countered
             var events2 = b2.EndPlayerTurn();
             var smashes = events2.OfType<SmashEvent>().Count();
@@ -290,28 +293,28 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Swashbuckler_DodgesFirstHit()
+        public void Dodge_DodgesFirstHit()
         {
-            var b = Setup(new[] { UnitStats.Swashbuckler }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Wolf, 2, 1) });
+            var b = Setup(new[] { M(UnitStats.Rogue, Technique.Riposte, Technique.Dodge) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Wolf, 2, 1) });
             var swash = Player(b);
             var events = b.EndPlayerTurn();
             Assert.IsTrue(events.OfType<EffectEvent>().Any(e => e.Kind == EffectKind.Dodge));
             Assert.AreEqual(swash.MaxHp - 3, swash.Hp, "only the second bite landed: 2, +1 from the bite chain");
         }
 
-        // ---------- Mage tree ----------
+        // ---------- Mage techniques ----------
 
         [Test]
         public void Apprentice_BoltIgnoresLineOfSight()
         {
-            var b = Setup(new[] { UnitStats.Apprentice }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 4) }, P(3, 2), P(3, 3));
+            var b = Setup(new[] { M(UnitStats.Apprentice) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 4) }, P(3, 2), P(3, 3));
             Assert.IsTrue(b.CanAttack(Player(b), Enemy(b)));
         }
 
         [Test]
-        public void Fireball_Hits3x3_FriendlyFire_AndPyroBurns()
+        public void Fireball_FriendlyFire_AndBurningGround()
         {
-            var b = Setup(new[] { UnitStats.Pyromancer, UnitStats.Warrior }, new[] { P(3, 0), P(4, 3) },
+            var b = Setup(new[] { M(UnitStats.Apprentice, Technique.Fireball, Technique.Burning), M(UnitStats.Warrior) }, new[] { P(3, 0), P(4, 3) },
                 new[] { E(UnitStats.Wolf, 3, 3), Far });
             var pyro = Player(b, 0);
             b.PlayerUseAction(pyro, ActionKind.Fireball, P(3, 3));
@@ -326,9 +329,9 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void BlastMage_PushesOutward_AndSetsOffMines()
+        public void Concussive_PushesOutward_AndSetsOffMines()
         {
-            var b = Setup(new[] { UnitStats.BlastMage, UnitStats.Sapper }, new[] { P(4, 1), P(6, 2) },
+            var b = Setup(new[] { M(UnitStats.Apprentice, Technique.Fireball, Technique.Concussive), M(UnitStats.Sapper) }, new[] { P(4, 1), P(6, 2) },
                 new[] { E(UnitStats.Ogre, 0, 6), E(UnitStats.Wolf, 4, 3) });
             var sapper = Player(b, 1);
             b.PlayerPlaceMine(sapper, P(6, 3));
@@ -341,9 +344,9 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void FrostMage_SlowsNextTurn_GlacierShatters()
+        public void Chill_SlowsNextTurn_ShatterDoubles()
         {
-            var b = Setup(new[] { UnitStats.Glacier }, new[] { P(3, 0) }, new[] { E(UnitStats.Brute, 3, 2) });
+            var b = Setup(new[] { M(UnitStats.Apprentice, Technique.Chill, Technique.Shatter) }, new[] { P(3, 0) }, new[] { E(UnitStats.Brute, 3, 2) });
             var glacier = Player(b);
             var brute = Enemy(b);
             var normal = b.DamageAgainst(glacier, brute);
@@ -357,9 +360,9 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Cryomancer_IceWallBlocksThenMelts()
+        public void IceWall_BlocksThenMelts()
         {
-            var b = Setup(new[] { UnitStats.Cryomancer }, new[] { P(3, 0) }, new[] { Far });
+            var b = Setup(new[] { M(UnitStats.Apprentice, Technique.IceWall) }, new[] { P(3, 0) }, new[] { Far });
             b.PlayerUseAction(Player(b), ActionKind.IceWall, P(3, 2));
             Assert.IsTrue(b.Board.IsObstacle(P(3, 2)));
             for (var i = 0; i < Battle.IceRounds; i++)
@@ -368,15 +371,15 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Ward_Absorbs_ArchwardenWardsNeighbours_MenderHeals()
+        public void Ward_Absorbs_WideWardCoversNeighbours_MendHeals()
         {
-            var b = Setup(new[] { UnitStats.Archwarden, UnitStats.Warrior, UnitStats.Rogue }, new[] { P(3, 0), P(3, 2), P(4, 2) },
+            var b = Setup(new[] { M(UnitStats.Apprentice, Technique.Ward, Technique.WideWard), M(UnitStats.Warrior), M(UnitStats.Rogue) }, new[] { P(3, 0), P(3, 2), P(4, 2) },
                 new[] { Far });
             b.PlayerUseAction(Player(b, 0), ActionKind.Ward, P(3, 2));
             Assert.AreEqual(Battle.WardShield, Player(b, 1).Shield);
             Assert.AreEqual(Battle.WardShield, Player(b, 2).Shield, "wide ward");
 
-            var m = Setup(new[] { UnitStats.Mender, UnitStats.Warrior }, new[] { P(3, 0), P(3, 2) }, new[] { Far });
+            var m = Setup(new[] { M(UnitStats.Apprentice, Technique.Ward, Technique.Mend), M(UnitStats.Warrior) }, new[] { P(3, 0), P(3, 2) }, new[] { Far });
             Player(m, 1).Hp = 5;
             m.PlayerUseAction(Player(m, 0), ActionKind.Mend, P(3, 2));
             Assert.AreEqual(5 + Battle.MendHeal, Player(m, 1).Hp);
@@ -385,27 +388,27 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void WardShield_SoaksDamageFirst()
         {
-            var b = Setup(new[] { UnitStats.WardMage, UnitStats.Rogue }, new[] { P(1, 0), P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Wolf, 4, 1) });
+            var b = Setup(new[] { M(UnitStats.Apprentice, Technique.Ward), M(UnitStats.Rogue) }, new[] { P(1, 0), P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Wolf, 4, 1) });
             var rogue = Player(b, 1);
             b.PlayerUseAction(Player(b, 0), ActionKind.Ward, P(3, 1));
             b.EndPlayerTurn();
             Assert.AreEqual(rogue.MaxHp - (2 + 3 - Battle.WardShield), rogue.Hp, "bites of 2 and 3 (bite chain), minus the shield");
         }
 
-        // ---------- Sapper tree ----------
+        // ---------- Sapper techniques ----------
 
         [Test]
-        public void Demolitionist_BiggerMines()
+        public void BigMines_BiggerMines()
         {
-            var b = Setup(new[] { UnitStats.Demolitionist }, new[] { P(3, 1) }, new[] { Far });
+            var b = Setup(new[] { M(UnitStats.Sapper, Technique.BigMines) }, new[] { P(3, 1) }, new[] { Far });
             b.PlayerPlaceMine(Player(b), P(3, 2));
             Assert.AreEqual(Battle.BigMineDamage, b.MineAt(P(3, 2)).Damage);
         }
 
         [Test]
-        public void Safecracker_BlastsSpareYourSide()
+        public void BlastProof_BlastsSpareYourSide()
         {
-            var b = Setup(new[] { UnitStats.Safecracker }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 4) });
+            var b = Setup(new[] { M(UnitStats.Sapper, Technique.BigMines, Technique.BlastProof) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 4) });
             var safe = Player(b);
             b.PlayerPlaceMine(safe, P(3, 2));
             var events = b.EndPlayerTurn();
@@ -414,9 +417,9 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Bombardier_ThrowsDelayedBomb()
+        public void ThrowBomb_DelayedBomb()
         {
-            var b = Setup(new[] { UnitStats.Bombardier }, new[] { P(3, 0) }, new[] { E(UnitStats.Ogre, 3, 4) });
+            var b = Setup(new[] { M(UnitStats.Sapper, Technique.ThrowBomb) }, new[] { P(3, 0) }, new[] { E(UnitStats.Ogre, 3, 4) });
             b.PlayerUseAction(Player(b), ActionKind.ThrowBomb, P(3, 3));
             Assert.IsNotNull(b.BombAt(P(3, 3)));
             var events = b.EndPlayerTurn();
@@ -424,9 +427,9 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Engineer_Barricades_CaptainDetonates()
+        public void Barricade_AndDetonate()
         {
-            var b = Setup(new[] { UnitStats.SapperCaptain }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 3), Far });
+            var b = Setup(new[] { M(UnitStats.Sapper, Technique.Barricade, Technique.Detonate) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 3), Far });
             var captain = Player(b);
             b.PlayerUseAction(captain, ActionKind.Barricade, P(3, 2));
             Assert.IsTrue(b.Board.IsObstacle(P(3, 2)));
@@ -438,9 +441,66 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void TurretBuilder_TurretShoots_AndDoesNotCountForDefeat()
+        public void Barricade_HasHp_AndBreaks()
         {
-            var b = Setup(new[] { UnitStats.TurretBuilder }, new[] { P(3, 1) }, new[] { E(UnitStats.Ogre, 3, 5) });
+            var b = Setup(new[] { M(UnitStats.Sapper, Technique.Barricade), M(UnitStats.Warrior) }, new[] { P(3, 1), P(4, 2) }, new[] { Far });
+            var sapper = Player(b, 0);
+            var warrior = Player(b, 1);
+            b.PlayerUseAction(sapper, ActionKind.Barricade, P(3, 2));
+            Assert.AreEqual(Battle.BarricadeHp, b.BarricadeHpAt(P(3, 2)));
+            b.EndUnitTurn(sapper);
+            Assert.IsTrue(b.CanAttackBarricade(warrior, P(3, 2)), "your own side can break it too");
+            var events = b.PlayerAttackBarricade(warrior, P(3, 2));
+            Assert.AreEqual(Battle.BarricadeHp - warrior.BaseDamage, b.BarricadeHpAt(P(3, 2)));
+            Assert.IsTrue(events.OfType<BarricadeHitEvent>().Any());
+            Assert.IsTrue(b.Board.IsObstacle(P(3, 2)), "still standing");
+
+            warrior.Ap = 1;
+            events = b.PlayerAttackBarricade(warrior, P(3, 2));
+            Assert.IsFalse(b.IsBarricade(P(3, 2)));
+            Assert.IsFalse(b.Board.IsObstacle(P(3, 2)), "broken: the tile is free");
+            Assert.IsTrue(events.OfType<TileEvent>().Any(t => t.Kind == "barricade" && !t.Added));
+        }
+
+        [Test]
+        public void Barricade_EnemyWithNobodyToHitBreaksIt()
+        {
+            var b = Setup(new[] { M(UnitStats.Sapper, Technique.Barricade) }, new[] { P(0, 0) }, new[] { E(UnitStats.Brute, 3, 4) });
+            var sapper = Player(b);
+            sapper.Pos = P(3, 2);
+            b.PlayerUseAction(sapper, ActionKind.Barricade, P(3, 3));
+            // Fence the brute in so the barricade is the only thing it can reach.
+            sapper.Pos = P(0, 0);
+            b.EndUnitTurn(sapper);
+            Enemy(b).SnareTurns = 1;
+            var events = b.EndPlayerTurn();
+            Assert.IsTrue(events.OfType<BarricadeHitEvent>().Any(e => e.Attacker == Enemy(b)));
+            Assert.Less(b.BarricadeHpAt(P(3, 3)), Battle.BarricadeHp);
+        }
+
+        // ---------- Attack preview ----------
+
+        [Test]
+        public void PredictHpLoss_MatchesTheHit_WithToughAndGuard()
+        {
+            var b = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(3, 2) }, new[] { E(UnitStats.Brute, 3, 3), E(UnitStats.Wolf, 7, 7) });
+            var warrior = Player(b);
+            var brute = Enemy(b, 0);
+            var predicted = b.PredictHpLoss(warrior, brute, out var guard);
+            Assert.IsNull(guard);
+            var hpBefore = brute.Hp;
+            b.PlayerAttack(warrior, brute);
+            Assert.AreEqual(hpBefore - brute.Hp, predicted, "the preview matches the real hit");
+
+            var guarded = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(3, 2) }, new[] { E(UnitStats.Wolf, 3, 3), E(UnitStats.Brute, 4, 3) });
+            Assert.AreEqual(0, guarded.PredictHpLoss(Player(guarded), Enemy(guarded, 0), out var brute2));
+            Assert.AreEqual(Enemy(guarded, 1), brute2, "the brute guards the wolf");
+        }
+
+        [Test]
+        public void Turret_Shoots_AndDoesNotCountForDefeat()
+        {
+            var b = Setup(new[] { M(UnitStats.Sapper, Technique.Barricade, Technique.Turret) }, new[] { P(3, 1) }, new[] { E(UnitStats.Ogre, 3, 5) });
             var builder = Player(b);
             b.PlayerUseAction(builder, ActionKind.Turret, P(4, 1));
             var turret = b.Units.Single(u => u.IsSummon);

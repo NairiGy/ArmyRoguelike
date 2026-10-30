@@ -17,7 +17,7 @@ Things that need Unity itself (with the Editor closed, or driven live through th
 ```bash
 unity test . --mode EditMode                     # the official test run
 unity run . -- -executeMethod GamepediaExporter.ExportFromCommandLine   # gamepedia with statue images
-unity run . -- -executeMethod PreviewCapture.CaptureFromCommandLine -previewOut out.png -previewPlaceArmy -previewEncounter 2 -previewUnits "Warrior,Juggernaut"
+unity run . -- -executeMethod PreviewCapture.CaptureFromCommandLine -previewOut out.png -previewPlaceArmy -previewEncounter 2 -previewUnits "Warrior,Archer"
 ```
 
 `make_sfx.sh` cuts the sound clips (`Assets/Audio/Resources/Sfx`) out of the raw Freesound downloads with ffmpeg; the sources and cut points are in the script, the credits in `Assets/Audio/CREDITS.md`:
