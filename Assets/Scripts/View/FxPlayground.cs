@@ -272,7 +272,7 @@ namespace ArmyRoguelike.View
                     yield return view.MoveAlong(new[] { tile });
                     break;
                 case "unit_attack":
-                    var ranged = view.Unit.Stats.IsRanged;
+                    var ranged = view.Unit.IsRanged;
                     var target = IsoMath.GridToWorld(new GridPos(tile.X + 1, tile.Y));
                     // Ranged attacks have no blow of their own; play it as the shot lands so it can still be judged.
                     yield return view.Lunge(target, () => { if (ranged) Sfx.Play("unit_attack", target); });

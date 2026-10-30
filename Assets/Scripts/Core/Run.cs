@@ -18,10 +18,55 @@ namespace ArmyRoguelike.Core
         /// <summary>Max HP gained during the run, e.g. from a shrine.</summary>
         public int BonusMaxHp { get; internal set; }
 
-        public ArmyMember(UnitStats stats, Equipment equipment = null)
+        private readonly List<Technique> _techniques = new List<Technique>();
+
+        /// <summary>The techniques it knows, in the order learned.</summary>
+        public IReadOnlyList<Technique> Techniques => _techniques;
+
+        /// <summary>One per technique ever learned; forgetting one keeps the level.</summary>
+        public int Level { get; private set; }
+
+        public bool Knows(Technique technique) => _techniques.Contains(technique);
+
+        /// <summary>Learns a technique and goes up a level. False if it can't learn it (line, requirement, known).</summary>
+        public bool Learn(Technique technique)
+        {
+            if (!technique.CanLearn(this))
+                return false;
+            _techniques.Add(technique);
+            Level++;
+            return true;
+        }
+
+        /// <summary>Forgets a technique; the level stays. Techniques that needed it are forgotten too.</summary>
+        public bool Forget(Technique technique)
+        {
+            if (!_techniques.Remove(technique))
+                return false;
+            foreach (var dependent in _techniques.Where(t => t.Requires == technique).ToList())
+                _techniques.Remove(dependent);
+            return true;
+        }
+
+        /// <summary>Max HP from levels.</summary>
+        public int LevelHp => Growth.Hp(Stats.Root, Level);
+
+        /// <summary>Damage from levels.</summary>
+        public int LevelDamage => Growth.Damage(Stats.Root, Level);
+
+        /// <summary>Extra mines on the board from levels.</summary>
+        public int LevelMines => Growth.Mines(Stats.Root, Level);
+
+        public bool HasTechniqueAbility(Ability ability) => _techniques.Any(t => t.Ability == ability);
+
+        public IEnumerable<ActionKind> TechniqueActions => _techniques.Where(t => t.Action.HasValue).Select(t => t.Action.Value);
+
+        public ArmyMember(UnitStats stats, Equipment equipment = null, params Technique[] techniques)
         {
             Stats = stats;
             Equipment = equipment;
+            foreach (var t in techniques)
+                Learn(t);
         }
 
         /// <summary>A default army (warrior, archer, rogue) for tests and tools.</summary>

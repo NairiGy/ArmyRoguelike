@@ -769,7 +769,7 @@ namespace ArmyRoguelike.Core
                 return false;
             if (unit.Ap >= AttackCost && Living(Team.Enemy).Any(e => CanAttack(unit, e)))
                 return true;
-            if (unit.Stats.Actions.Any(a => ActionTargets(unit, a).Any()))
+            if (unit.Actions.Any(a => ActionTargets(unit, a).Any()))
                 return true;
             return GetReachable(unit).Count > 0;
         }
@@ -780,7 +780,7 @@ namespace ArmyRoguelike.Core
 
         public static int MineDamageFor(Unit owner) => owner != null && owner.Has(Ability.BigMines) ? BigMineDamage : MineDamage;
 
-        public static int MaxMinesFor(Unit owner) => owner.Has(Ability.BigMines) ? BigMaxMines : MaxMinesPerUnit;
+        public static int MaxMinesFor(Unit owner) => (owner.Has(Ability.BigMines) ? BigMaxMines : MaxMinesPerUnit) + (owner.Member?.LevelMines ?? 0);
 
         public bool CanPlaceMine(Unit unit, GridPos tile) => CanUseAction(unit, ActionKind.PlaceMine, tile);
 
@@ -815,7 +815,7 @@ namespace ArmyRoguelike.Core
 
         public bool CanUseAction(Unit unit, ActionKind action, GridPos tile)
         {
-            if (IsOver || !unit.IsAlive || !unit.Stats.HasAction(action) || unit.Ap < ActionCost(action) || !Ready(unit, action) || !Board.InBounds(tile))
+            if (IsOver || !unit.IsAlive || !unit.HasAction(action) || unit.Ap < ActionCost(action) || !Ready(unit, action) || !Board.InBounds(tile))
                 return false;
             var target = UnitAt(tile);
             var steps = Distance(tile, 1, unit);

@@ -139,7 +139,7 @@ namespace ArmyRoguelike.View
             if (keyboard != null && !_busy && _selected != null && Battle.CanAct(_selected))
             {
                 var keys = new[] { keyboard.digit1Key, keyboard.digit2Key, keyboard.digit3Key, keyboard.digit4Key };
-                var actions = _selected.Stats.Actions;
+                var actions = _selected.Actions.ToList();
                 for (var i = 0; i < actions.Count && i < keys.Length; i++)
                     if (keys[i].wasPressedThisFrame)
                         ToggleAction(actions[i]);
@@ -1507,7 +1507,7 @@ namespace ArmyRoguelike.View
         {
             if (_confirmEndTurn || _selected == null || !Battle.CanAct(_selected))
                 return;
-            var actions = _selected.Stats.Actions;
+            var actions = _selected.Actions.ToList();
             if (actions.Count == 0)
                 return;
 
