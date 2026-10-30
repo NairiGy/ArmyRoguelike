@@ -375,7 +375,7 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Upheaval_HurtsPushesAwayAndLeavesARock()
+        public void Upheaval_HurtsAndPushesAway_NoRock()
         {
             var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 1) }, new[] { (UnitStats.Elemental, new GridPos(3, 4)) });
             var warrior = Player(b);
@@ -386,41 +386,17 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(new GridPos(3, 3), elemental.Pos, "walked closer first");
             Assert.AreEqual(new GridPos(3, 0), warrior.Pos, "thrown away from the elemental");
             Assert.AreEqual(warrior.MaxHp - Battle.UpheavalDamage, warrior.Hp);
-            Assert.IsTrue(b.Board.IsObstacle(new GridPos(3, 1)), "the rock stays");
+            Assert.IsFalse(b.Board.IsObstacle(new GridPos(3, 1)), "no rock is left behind");
         }
 
         [Test]
-        public void Upheaval_AgainstTheEdge_HurtsMoreAndLeavesNoRock()
+        public void Upheaval_AgainstTheEdge_HurtsMore()
         {
             var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 0) }, new[] { (UnitStats.Elemental, new GridPos(3, 3)) });
             var warrior = Player(b);
             b.EndPlayerTurn();
             Assert.AreEqual(new GridPos(3, 0), warrior.Pos);
             Assert.AreEqual(warrior.MaxHp - Battle.UpheavalDamage - Battle.CollisionDamage, warrior.Hp);
-            Assert.IsFalse(b.Board.IsObstacle(new GridPos(3, 0)), "the warrior still stands there");
-        }
-
-        [Test]
-        public void Reform_TwoShardsNextToEachOtherMergeAndDontSplitAgain()
-        {
-            var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(0, 0) },
-                new[] { (UnitStats.Shard, new GridPos(3, 6)), (UnitStats.Shard, new GridPos(4, 6)), (UnitStats.Shard, new GridPos(7, 3)) });
-            Enemy(b, 0).Hp = 2;
-            Enemy(b, 1).Hp = 4;
-            var events = b.EndPlayerTurn();
-            var reform = events.OfType<ReformEvent>().Single();
-            var merged = reform.Merged;
-            Assert.AreEqual(UnitStats.Elemental, merged.Stats);
-            Assert.AreEqual(6, merged.Hp, "their HP added up");
-            Assert.IsTrue(merged.Reformed);
-            Assert.AreEqual(2, b.Living(Team.Enemy).Count(), "the merged elemental and the lone shard");
-            Assert.IsTrue(merged.MovedThisTurn, "it acts in the phase it forms");
-
-            var warrior = Player(b);
-            merged.Hp = 1;
-            warrior.Pos = merged.Pos.Neighbours().First(b.IsFree);
-            var hit = b.PlayerAttack(warrior, merged);
-            Assert.IsFalse(hit.OfType<SplitEvent>().Any(), "a reformed elemental doesn't split");
         }
 
         [Test]

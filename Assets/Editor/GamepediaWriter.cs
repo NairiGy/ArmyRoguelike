@@ -196,7 +196,7 @@ public static class GamepediaWriter
         if (e.StealsGold > 0)
             lines.Add($"<b>Steal</b>: its first hit that does damage takes {e.StealsGold} of your gold. From then on it runs for the enemies' back row and escapes from there, and the gold is lost. Kill it first and you keep the gold.");
         if (e.SplitsInto != null)
-            lines.Add($"<b>Split</b>: when it dies it becomes 2 {Link(e.SplitsInto.Name)}s, one on its tile and one on a free neighbour (fewer if there is no room). They act from the next enemy turn. One formed by Reform doesn't split again.");
+            lines.Add($"<b>Split</b>: when it dies it becomes 2 {Link(e.SplitsInto.Name)}s, one on its tile and one on a free neighbour (fewer if there is no room). They act from the next enemy turn.");
         if (e.LeavesRemains)
             lines.Add("<b>Bone pile</b>: leaves one when killed, which a Necromancer can raise. A unit standing on the pile stops that.");
         return lines.ToArray();
@@ -257,7 +257,7 @@ public static class GamepediaWriter
         html.Append("<tr><td>Howl</td><td>It can howl, and the extra move would let at least one wolf bite this turn that otherwise couldn't (two if the leader could bite itself).</td><td>Every wolf.</td></tr>");
         html.Append("<tr><td>Fling</td><td>A goblin that can't reach anyone to strike this turn, with a bomb, mine or unacted goblin next to it and one of your units 2-3 tiles away.</td><td>The target, the goblin to be thrown and its landing tile.</td></tr>");
         html.Append("<tr><td>Grasp</td><td>It grasps, Grasp is ready, it can reach its target to attack this turn, and the target is ranged or Swift and not already held.</td><td>The target, with an arrow.</td></tr>");
-        html.Append($"<tr><td>Upheaval</td><td>It has Upheaval ready, can't reach its target to strike this turn, and the target is within {Battle.UpheavalRange} tiles plus its moves. It may still pick a nearer unit once it has walked.</td><td>The target's tile, where the rock will stay.</td></tr>");
+        html.Append($"<tr><td>Upheaval</td><td>It has Upheaval ready, can't reach its target to strike this turn, and the target is within {Battle.UpheavalRange} tiles plus its moves. It may still pick a nearer unit once it has walked.</td><td>The target, with an arrow.</td></tr>");
         html.Append("<tr><td>Slam</td><td>It can slam, 2 or more of your units are within 2 tiles, and the slam would deal more in total than a smash.</td><td>The area within 2 tiles.</td></tr>");
         html.Append("<tr><td>Corpse Blast</td><td>It has Corpse Blast ready and a bone pile in range whose 3x3 holds more of your units than of its own (at least one).</td><td>The 3x3 around the pile.</td></tr>");
         html.Append("<tr><td>Raise</td><td>It can raise and a bone pile it can raise (its own side's, or one of your fallen with Soul Harvest) is in raise range and free. AP isn't checked.</td><td>The bone pile.</td></tr>");
@@ -333,7 +333,6 @@ public static class GamepediaWriter
                     $"If it can hit its {target} from where it stands: strike.",
                     $"If it can reach a tile to strike from this turn: {approach} and strike.",
                     $"Otherwise walk as close as it can, then use Upheaval on its target, or on the nearest of your units within {Battle.UpheavalRange} tiles.",
-                    "Shards have no behaviour of their own (Walk up and hit); at the start of the enemy phase, any two next to each other Reform first.",
                 };
             case EnemyBehaviour.PackLeader:
                 return new[]
@@ -490,7 +489,7 @@ public static class GamepediaWriter
         html.Append("<li>Side phases: all your units act (one at a time), then all enemies.</li>");
         html.Append($"<li><b>Zone of control</b>: stepping out of a tile next to an enemy uses up all your remaining moves, for both sides. You can always back off one tile, but you can't slip past.</li>");
         html.Append("<li>Ranged attacks need line of sight (rocks block); Arcane Bolt ignores it. Bombs, boulders and fireballs are lobbed.</li>");
-        html.Append($"<li>Mines: {Battle.MineDamage} damage ({Battle.BigMineDamage} with Big Mines) to everyone in the 3x3, set off when an enemy steps on one. Bombs explode at the start of the next enemy turn and hit only their own tile. Fireballs and Volley hit a plus: the tile and its 4 neighbours. Blasts set each other off.</li>");
+        html.Append($"<li>Mines: {Battle.MineDamage} damage ({Battle.BigMineDamage} with Big Mines) to whoever stands on its tile, set off when an enemy steps on one (or a blast, fling or fireball sets it off). Bombs explode at the start of the next enemy turn and hit only their own tile. Fireballs and Volley hit a plus: the tile and its 4 neighbours. Blasts set each other off.</li>");
         html.Append($"<li>Push: a unit pushed into a rock, unit or the edge takes {Battle.CollisionDamage} damage. An enemy pushed onto a mine sets it off.</li>");
         html.Append($"<li>Poison: {Battle.PoisonDamage} damage at the start of the target's turn, {Battle.PoisonTurns} times. Burning ground: {Battle.BurnDamage} damage at the start of the turn of whoever stands on it.</li>");
         html.Append("<li>Pinned units (Pinning Shot) and slowed units (Chill) can't move on their next turn.</li>");

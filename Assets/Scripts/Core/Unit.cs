@@ -119,12 +119,6 @@ namespace ArmyRoguelike.Core
         /// <summary>Left the board (a cutpurse that got away). No longer in the battle.</summary>
         public bool Escaped { get; internal set; }
 
-        /// <summary>An Elemental formed from two Shards: it doesn't split again.</summary>
-        public bool Reformed { get; internal set; }
-
-        /// <summary>A Shard that merged into an Elemental. No longer on the board.</summary>
-        public bool Merged { get; internal set; }
-
         public Unit(int id, Team team, UnitStats stats, ArmyMember member = null, Unit summoner = null)
         {
             Id = id;

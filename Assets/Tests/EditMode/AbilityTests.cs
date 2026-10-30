@@ -156,7 +156,7 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Mine_EnemyStepsOn_StopsAndExplodes_HittingEveryoneAround()
+        public void Mine_EnemyStepsOn_StopsAndExplodes_OnlyItsTile()
         {
             var b = Started(new[] { M(UnitStats.Sapper) }, new[] { P(3, 1) }, new[] { (UnitStats.Wolf, P(3, 4)) });
             var sapper = Player(b);
@@ -165,26 +165,31 @@ namespace ArmyRoguelike.Tests
             var events = b.EndPlayerTurn();
             var blast = events.OfType<ExplosionEvent>().First();
             Assert.AreEqual("mine", blast.Cause);
+            CollectionAssert.AreEqual(new[] { P(3, 2) }, blast.Area.ToList(), "1x1");
             Assert.AreEqual(P(3, 2), wolf.Pos, "the wolf stops on the mine");
             Assert.AreEqual(wolf.MaxHp - Battle.MineDamage, wolf.Hp);
-            Assert.AreEqual(sapper.MaxHp - Battle.MineDamage - 2, sapper.Hp, "friendly fire, then the wolf bites once");
+            Assert.AreEqual(sapper.MaxHp - 2, sapper.Hp, "no friendly fire next to it; the wolf bites once");
             Assert.AreEqual(0, b.Mines.Count);
         }
 
         [Test]
-        public void Mine_ChainReaction()
+        public void Mine_OnlyABiggerBlastSetsItOff()
         {
             var b = Started(new[] { M(UnitStats.Sapper) }, new[] { P(3, 1) }, new[] { (UnitStats.Wolf, P(3, 4)) });
             var sapper = Player(b);
             sapper.Ap = 2;
             b.PlayerPlaceMine(sapper, P(3, 2));
             sapper.ClearCooldowns();
-            // A second mine diagonally next to the first, inside its blast.
+            // A second mine diagonally next to the first: out of a 1x1 mine blast.
             b.PlayerPlaceMine(sapper, P(2, 1));
-            var events = b.EndPlayerTurn();
+            Assert.AreEqual(1, b.EndPlayerTurn().OfType<ExplosionEvent>().Count());
+            Assert.AreEqual(1, b.Mines.Count, "the other mine is still there");
+
+            // A 3x3 blast (a barricade) over it does set it off.
+            var events = new System.Collections.Generic.List<BattleEvent>();
+            b.Explode(P(2, 2), 1, "barricade", sapper, events);
             var blasts = events.OfType<ExplosionEvent>().ToList();
             Assert.AreEqual(2, blasts.Count);
-            Assert.AreEqual(0, blasts[0].ChainDepth);
             Assert.AreEqual(1, blasts[1].ChainDepth);
         }
 
@@ -196,11 +201,12 @@ namespace ArmyRoguelike.Tests
             var sapper = Player(b);
             b.PlayerPlaceMine(sapper, P(3, 2));
             Enemy(b).Hp = 1;
+            sapper.Hp = sapper.MaxHp - 3;
             var events = b.EndPlayerTurn();
             Assert.IsFalse(Enemy(b).IsAlive);
-            // Caught in its own blast (6 - 4), then healed by the Vampire Fang for the kill.
+            // Healed by the Vampire Fang for the mine's kill.
             Assert.IsTrue(events.OfType<EffectEvent>().Any(e => e.Kind == EffectKind.Heal && e.Unit == sapper));
-            Assert.AreEqual(sapper.MaxHp - Battle.MineDamage + Battle.VampireHeal, sapper.Hp);
+            Assert.AreEqual(System.Math.Min(sapper.MaxHp, sapper.MaxHp - 3 + Battle.VampireHeal), sapper.Hp);
         }
 
         // ---------- Goblin bombs ----------

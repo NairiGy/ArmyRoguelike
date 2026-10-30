@@ -207,9 +207,9 @@ namespace ArmyRoguelike.Tests
             Start(b, new GridPos(3, 0));
             var bomber = Enemy(b, 0);
             var totem = b.Totems[0];
-            b.Explode(new GridPos(3, 4), 3, "bomb", bomber, new System.Collections.Generic.List<BattleEvent>());
+            b.Explode(new GridPos(3, 5), 3, "bomb", bomber, new System.Collections.Generic.List<BattleEvent>());
             Assert.AreEqual(UnitStats.Totem.MaxHp, totem.Hp);
-            b.Explode(new GridPos(3, 4), 3, "mine", Player(b), new System.Collections.Generic.List<BattleEvent>());
+            b.Explode(new GridPos(3, 5), 3, "mine", Player(b), new System.Collections.Generic.List<BattleEvent>());
             Assert.AreEqual(UnitStats.Totem.MaxHp - 3, totem.Hp);
         }
 

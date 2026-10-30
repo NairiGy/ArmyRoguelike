@@ -726,10 +726,6 @@ namespace ArmyRoguelike.View
 
                     line.Show(from, to);
                     break;
-                case IntentKind.Upheaval:
-                    _board.SetHighlight(intent.Target.Pos, RockLandingColor);
-                    line.Show(from, to);
-                    break;
                 case IntentKind.CorpseBlast:
                     foreach (var p in Battle.BlastArea(intent.Target.Pos))
                         _board.SetHighlight(p, BombZoneColor);
@@ -1058,9 +1054,6 @@ namespace ArmyRoguelike.View
                         source.SetGridPosition(tile.Source.Pos);
                     }
 
-                    // An upheaval rock buries whatever lay on the tile.
-                    if (tile.Kind == "rock")
-                        _board.RemoveHazard(tile.Tile);
                     _board.SyncTiles();
                     break;
                 }
@@ -1075,7 +1068,7 @@ namespace ArmyRoguelike.View
                 }
                 case UpheavalEvent upheaval:
                 {
-                    // Placeholder: the caster lunges and the target is hit; the push and the rock follow as their own events.
+                    // Placeholder: the caster lunges and the target is hit; the push follows as its own event.
                     var caster = _board.ViewOf(upheaval.Caster);
                     var target = _board.ViewOf(upheaval.Hit.Target);
                     yield return caster.Lunge(target.transform.position, null);
@@ -1083,16 +1076,6 @@ namespace ArmyRoguelike.View
                     DamagePopup.Spawn(target.TopWorld + Vector3.up * 0.4f, "Upheaval!", DamagePopup.AbilityColor, 44);
                     ShowHit(upheaval.Hit);
                     yield return upheaval.Hit.Killed ? target.Die() : target.Hit();
-                    break;
-                }
-                case ReformEvent reform:
-                {
-                    // Placeholder: both shards vanish and the elemental rises on the first one's tile.
-                    _board.ViewOf(reform.First).gameObject.SetActive(false);
-                    _board.ViewOf(reform.Second).gameObject.SetActive(false);
-                    StartCoroutine(_board.AddView(reform.Merged).Raise());
-                    DamagePopup.Spawn(IsoMath.GridToWorld(reform.Merged.Pos) + Vector3.up * 0.6f, "Reform!", DamagePopup.AbilityColor, 48);
-                    yield return new WaitForSeconds(0.5f);
                     break;
                 }
                 case SplitEvent split:
@@ -1847,8 +1830,6 @@ namespace ArmyRoguelike.View
                 lines.Add("Has acted: can't move again this turn");
             if (u.IsSnared)
                 lines.Add("Pinned: can't move");
-            if (u.Reformed)
-                lines.Add("Reformed from two Shards: won't split again");
             if (u.InWrath)
                 lines.Add("Wrath: 2 actions a turn");
             if (u.IsHidden)
@@ -1905,7 +1886,7 @@ namespace ArmyRoguelike.View
                 case IntentKind.BullRush:
                     return $"bull rush the {name}: hit it and push it 1 tile";
                 case IntentKind.Upheaval:
-                    return $"upheaval: walk closer, then raise a rock under the {name}: {Battle.UpheavalDamage} damage, it is thrown 1 tile and the rock stays on the dark tile";
+                    return $"upheaval: walk closer, then burst the ground under the {name}: {Battle.UpheavalDamage} damage and it is thrown 1 tile away";
                 case IntentKind.Grasp:
                     return $"grasp the {name}: no damage, but it can't move on your next turn";
                 case IntentKind.CorpseBlast:

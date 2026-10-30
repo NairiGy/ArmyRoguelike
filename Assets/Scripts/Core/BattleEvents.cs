@@ -114,7 +114,6 @@ namespace ArmyRoguelike.Core
         public PlaceMineEvent(Unit sapper, GridPos tile)
         {
             Sapper = sapper;
-            Tile = tile;
         }
 
         public override Unit Actor => Sapper;
@@ -135,7 +134,7 @@ namespace ArmyRoguelike.Core
         public override Unit Actor => Thrower;
     }
 
-    /// <summary>A mine or bomb blew up, hitting every unit in the 3x3 area around it, friend or foe.</summary>
+    /// <summary>Something blew up, hitting every unit in its area (one tile for a mine or bomb, else the 3x3), friend or foe.</summary>
     public sealed class ExplosionEvent : BattleEvent
     {
         /// <summary>"mine" or "bomb".</summary>
@@ -230,40 +229,19 @@ namespace ArmyRoguelike.Core
         public override Unit Actor => null;
     }
 
-    /// <summary>Upheaval: a rock burst up under the target and hurt it. Any push and the rock follow as their own events.</summary>
+    /// <summary>Upheaval: the ground burst up under the target and hurt it. Any push follows as its own event.</summary>
     public sealed class UpheavalEvent : BattleEvent
     {
         public readonly Unit Caster;
         public readonly Hit Hit;
 
-        /// <summary>The tile the rock burst out of (where the target stood).</summary>
-        public readonly GridPos Tile;
-
-        public UpheavalEvent(Unit caster, Hit hit, GridPos tile)
+        public UpheavalEvent(Unit caster, Hit hit)
         {
             Caster = caster;
             Hit = hit;
-            Tile = tile;
         }
 
         public override Unit Actor => Caster;
-    }
-
-    /// <summary>Two Shards next to each other merged back into an Elemental (Reform).</summary>
-    public sealed class ReformEvent : BattleEvent
-    {
-        public readonly Unit First;
-        public readonly Unit Second;
-        public readonly Unit Merged;
-
-        public ReformEvent(Unit first, Unit second, Unit merged)
-        {
-            First = first;
-            Second = second;
-            Merged = merged;
-        }
-
-        public override Unit Actor => null;
     }
 
     /// <summary>A unit was shoved one or more tiles. If it slammed into something it took <see cref="Collision"/> damage.</summary>

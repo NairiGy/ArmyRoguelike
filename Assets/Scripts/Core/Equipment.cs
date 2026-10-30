@@ -89,7 +89,6 @@ namespace ArmyRoguelike.Core
                 case Ability.Overwatch: return "Overwatch";
                 case Ability.BullRush: return "Bull Rush";
                 case Ability.Upheaval: return "Upheaval";
-                case Ability.Reform: return "Reform";
                 case Ability.Grasp: return "Grasp";
                 case Ability.Colossus: return "Colossus";
                 case Ability.Wrath: return "Wrath";
@@ -129,7 +128,7 @@ namespace ArmyRoguelike.Core
                 case Ability.Chill: return "its hits slow: the target can't move on its next turn";
                 case Ability.Shatter: return "double damage to slowed enemies";
                 case Ability.WideWard: return "Ward also shields every ally next to the target";
-                case Ability.Mines: return "an enemy stepping on one of its mines sets off a blast that hits everyone around";
+                case Ability.Mines: return "an enemy stepping on one of its mines sets it off: it hurts whoever stands on that tile";
                 case Ability.BigMines: return $"its mines deal {Battle.BigMineDamage} damage and it can have {Battle.BigMaxMines} out";
                 case Ability.BlastProof: return "its blasts don't hurt your units";
                 case Ability.VampireFang: return $"heals {Battle.VampireHeal} HP on a kill";
@@ -150,8 +149,7 @@ namespace ArmyRoguelike.Core
                 case Ability.BehindCover: return "while next to a rock it can't be hit by ranged attacks; melee, bombs and blasts still reach it";
                 case Ability.Overwatch: return "instead of shooting, it aims: during your next turn the first of your units that walks onto a tile it can see in range is shot and stops there";
                 case Ability.BullRush: return $"hit a unit next to it and push it 1 tile; if it slams into a unit, both take {Battle.CollisionDamage}";
-                case Ability.Upheaval: return $"a rock bursts up under one of your units within {Battle.UpheavalRange} tiles (no line of sight needed): {Battle.UpheavalDamage} damage, and it is thrown 1 tile away from the caster ({Battle.CollisionDamage} more if blocked); the rock stays where it stood";
-                case Ability.Reform: return "two Shards that start the enemy turn next to each other merge into an Elemental with their HP added up; it acts that turn but won't split again";
+                case Ability.Upheaval: return $"the ground bursts up under one of your units within {Battle.UpheavalRange} tiles (no line of sight needed): {Battle.UpheavalDamage} damage, and it is thrown 1 tile away from the caster ({Battle.CollisionDamage} more if blocked)";
                 case Ability.Grasp: return "grabs a unit next to it: no damage, but it can't move on its next turn";
                 case Ability.Colossus: return "can't be pushed, pinned, slowed or grasped";
                 case Ability.Wrath: return "at half HP or less it gets 2 actions a turn instead of 1 (each still has its cooldown)";
@@ -200,7 +198,7 @@ namespace ArmyRoguelike.Core
             switch (action)
             {
                 case ActionKind.PlaceMine:
-                    return $"put a mine on a free tile next to it (max {Battle.MaxMinesPerUnit}); an enemy stepping on it sets off a {Battle.MineDamage}-damage 3x3 blast, friend or foe";
+                    return $"put a mine on a free tile next to it (max {Battle.MaxMinesPerUnit}); an enemy stepping on it sets it off for {Battle.MineDamage} damage to whoever stands on that tile";
                 case ActionKind.ThrowBomb:
                     return $"lob a bomb 2-{Battle.PlayerBombRange} tiles away; it explodes for {Battle.PlayerBombDamage} on that tile at the start of the next enemy turn";
                 case ActionKind.PinningShot: return $"{Battle.PinDamage} damage to an enemy in shot range (needs line of sight), and it can't move on its next turn";

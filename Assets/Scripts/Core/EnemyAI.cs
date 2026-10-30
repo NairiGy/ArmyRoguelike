@@ -27,7 +27,7 @@ namespace ArmyRoguelike.Core
         /// <summary>A crossbowman aiming: it shoots the first of your units that walks onto the marked tiles.</summary>
         Overwatch,
 
-        /// <summary>An elemental raising a rock under its target: damage, a push, and the rock stays.</summary>
+        /// <summary>An elemental bursting the ground up under its target: damage and a push.</summary>
         Upheaval,
 
         /// <summary>A necromancer blowing up a bone pile your units stand on or next to.</summary>
@@ -321,7 +321,7 @@ namespace ArmyRoguelike.Core
             // Upheaval: it can't reach the target to strike, but can walk to within Upheaval range of it.
             if (enemy.Has(Ability.Upheaval) && battle.Ready(enemy, ActionKind.Upheaval) && !CanReachToAttack(battle, enemy, target) &&
                 target.Size == 1 && !target.IsObjective && Battle.Distance(enemy, target) <= Battle.UpheavalRange + enemy.MaxMoves)
-                return new Intent(IntentKind.Upheaval, target, target.Pos);
+                return new Intent(IntentKind.Upheaval, target);
 
             if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Goblin)
             {

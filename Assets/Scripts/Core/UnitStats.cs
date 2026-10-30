@@ -204,11 +204,8 @@ namespace ArmyRoguelike.Core
 
         // ---------- Elementals and skeletons ----------
 
-        /// <summary>Its action can be Upheaval: a rock bursts up under a unit within 2 tiles, hurting it and pushing it off.</summary>
+        /// <summary>Its action can be Upheaval: the ground bursts up under a unit within 2 tiles, hurting it and pushing it off.</summary>
         Upheaval,
-
-        /// <summary>Two Shards that start the enemy turn next to each other merge back into an Elemental.</summary>
-        Reform,
 
         /// <summary>Its action can be Grasp: an adjacent unit can't move on its next turn.</summary>
         Grasp,
@@ -625,13 +622,13 @@ namespace ArmyRoguelike.Core
 
         public static readonly UnitStats Shard = new UnitStats(UnitKind.Shard, "Shard", 5, 2, 1, 1)
         {
-            Abilities = A(Ability.Reform), Role = "Half of an Elemental. Two Shards left next to each other merge back into one.",
+            Role = "Half of an Elemental.",
         };
 
         public static readonly UnitStats Elemental = new UnitStats(UnitKind.Elemental, "Elemental", 10, 3, 1, 1)
         {
             SplitsInto = Shard, Abilities = A(Ability.Upheaval),
-            Role = "Raises rocks under your units to break your line. When it dies it splits into 2 Shards (5 HP each).",
+            Role = "Throws your units out of line with the ground beneath them. When it dies it splits into 2 Shards (5 HP each).",
         };
 
         // ---------- Raised versions (necromancer boss) ----------

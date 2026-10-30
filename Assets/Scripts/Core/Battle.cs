@@ -155,7 +155,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Caltrops (cutpurses): damage to a unit of yours stepping on them; its movement ends there.</summary>
         public const int CaltropsDamage = 1;
 
-        /// <summary>Upheaval (elementals): range in steps (ignores line of sight), and damage to the unit thrown off the rock.</summary>
+        /// <summary>Upheaval (elementals): range in steps (ignores line of sight), and damage to the unit it throws.</summary>
         public const int UpheavalRange = 2;
 
         public const int UpheavalDamage = 2;
@@ -412,8 +412,8 @@ namespace ArmyRoguelike.Core
         /// <summary>A bomb hits only the tile it landed on.</summary>
         public List<GridPos> BombArea(GridPos center) => new List<GridPos> { center };
 
-        /// <summary>The tiles an explosion of this cause hits: bombs their own tile, mines and barricades the 3x3.</summary>
-        private List<GridPos> ExplosionArea(string cause, GridPos center) => cause == "bomb" ? BombArea(center) : BlastArea(center);
+        /// <summary>The tiles an explosion of this cause hits: bombs and mines their own tile, everything else the 3x3.</summary>
+        private List<GridPos> ExplosionArea(string cause, GridPos center) => cause == "bomb" || cause == "mine" ? BombArea(center) : BlastArea(center);
 
         /// <summary>The orthogonal direction from one tile to another in the same row or column, else null.</summary>
         private static GridPos? StraightDirection(GridPos from, GridPos to)
@@ -1259,9 +1259,6 @@ namespace ArmyRoguelike.Core
                     Explode(bomb.Tile, bomb.Damage, "bomb", bomb.Owner, events);
             }
 
-            if (!IsOver)
-                Reform(events);
-
             // Howlers go first, so the moves they hand out reach wolves that haven't acted yet.
             foreach (var enemy in Living(Team.Enemy).OrderBy(e => e.Has(Ability.Howl) ? 0 : 1).ToList())
             {
@@ -1653,30 +1650,19 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>
-        /// Upheaval: a rock bursts up under the target. It takes <see cref="UpheavalDamage"/> and is pushed 1 tile away from
-        /// the caster (collision damage if blocked); the rock stays on its old tile if that tile is empty afterwards (no unit or bone pile),
-        /// burying any mine, bomb, caltrops or fire there.
+        /// Upheaval: the ground bursts up under the target. It takes <see cref="UpheavalDamage"/> and is pushed 1 tile away
+        /// from the caster (collision damage if blocked). No rock is left behind (rocks were too much, 2026-10-30).
         /// </summary>
         internal List<BattleEvent> DoUpheaval(Unit unit, Unit target)
         {
             UseUp(unit, ActionKind.Upheaval);
-            var tile = target.Pos;
             var dir = UpheavalDirection(unit, target);
             var after = new List<BattleEvent>();
             var hit = Damage(target, UpheavalDamage, unit, DamageKind.Blast, after);
-            var events = new List<BattleEvent> { new UpheavalEvent(unit, hit, tile) };
+            var events = new List<BattleEvent> { new UpheavalEvent(unit, hit) };
             events.AddRange(after);
             if (target.IsAlive)
                 Push(target, dir, unit, events);
-            if (IsFree(tile) && RemainsAt(tile) == null)
-            {
-                Board.AddObstacle(tile);
-                _mines.RemoveAll(m => m.Tile == tile);
-                _bombs.RemoveAll(b => b.Tile == tile);
-                _burning.Remove(tile);
-                _caltrops.Remove(tile);
-                events.Add(new TileEvent("rock", tile, true, null));
-            }
 
             CheckEnd();
             return events;
@@ -1693,37 +1679,6 @@ namespace ArmyRoguelike.Core
             UseUp(unit, ActionKind.Grasp);
             target.SnareTurns = 1;
             return new List<BattleEvent> { new StatusEvent(unit, target, StatusKind.Grasp, 1) };
-        }
-
-        /// <summary>
-        /// Reform, at the start of the enemy phase: every two Shards standing next to each other merge into the type
-        /// that splits into them, on the first one's tile, with their HP added up (to its max). It acts this phase,
-        /// and doesn't split again.
-        /// </summary>
-        private void Reform(List<BattleEvent> events)
-        {
-            var shards = Living(Team.Enemy).Where(u => u.Has(Ability.Reform)).OrderBy(u => u.Id).ToList();
-            foreach (var shard in shards)
-            {
-                if (shard.Merged)
-                    continue;
-                var partner = shards.FirstOrDefault(o => o != shard && !o.Merged && o.Stats == shard.Stats && Distance(shard, o) == 1);
-                var whole = UnitStats.Enemies.FirstOrDefault(e => e.SplitsInto == shard.Stats);
-                if (partner == null || whole == null)
-                    continue;
-                foreach (var part in new[] { shard, partner })
-                {
-                    part.Merged = true;
-                    part.IsPlaced = false;
-                }
-
-                var merged = new Unit(_nextId++, shard.Team, whole) { Pos = shard.Pos, IsPlaced = true, Reformed = true };
-                merged.Hp = Math.Min(merged.MaxHp, shard.Hp + partner.Hp);
-                merged.Ap = merged.MaxAp;
-                merged.Moves = merged.MaxMoves;
-                _units.Add(merged);
-                events.Add(new ReformEvent(shard, partner, merged));
-            }
         }
 
         /// <summary>Howl: every wolf of its side that hasn't acted yet this turn gets <see cref="HowlMoves"/> extra moves.</summary>
@@ -1778,7 +1733,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>
         /// Blows up a mine, bomb or barricade at <paramref name="center"/>: every living unit in the area
-        /// (the 3x3, or just the tile for a bomb) takes the damage, friend or foe (unless the owner is Blast
+        /// (the 3x3, or just the tile for a bomb or mine) takes the damage, friend or foe (unless the owner is Blast
         /// Proof). Mines and bombs inside the area go off too, one after another.
         /// </summary>
         internal void Explode(GridPos center, int damage, string cause, Unit owner, List<BattleEvent> events)
@@ -1917,7 +1872,7 @@ namespace ArmyRoguelike.Core
                     Explode(target.Pos, PowderKegDamage, "powder keg", target, after);
             }
 
-            if (!target.IsAlive && target.Stats.SplitsInto != null && !target.Reformed)
+            if (!target.IsAlive && target.Stats.SplitsInto != null)
                 Split(target, after);
 
             // A cutpurse grabs gold with its first landed hit, then runs for it.
