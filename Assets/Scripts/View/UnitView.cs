@@ -341,8 +341,6 @@ namespace ArmyRoguelike.View
             }
 
             _selected = selected;
-            if (selected)
-                _body.transform.localRotation = Quaternion.identity;
         }
 
         /// <summary>Darkens a statue that has finished its turn.</summary>
@@ -393,13 +391,7 @@ namespace ArmyRoguelike.View
             transform.localScale = Vector3.one * BattleScenery.UnitScale;
             ShedDust();
             UpdateWake();
-            if (Live.Count > 0 && Live[0] == this)
-                ScheduleCreak();
         }
-
-        private void OnEnable() => Live.Add(this);
-
-        private void OnDisable() => Live.Remove(this);
 
         // ---------- Idle life ----------
 
@@ -434,66 +426,6 @@ namespace ArmyRoguelike.View
                 Fx.Dust(transform.position, 4, 0.2f);
                 Sfx.Play("unit_step", transform.position, pitch: 0.08f);
             }
-        }
-
-        private static readonly List<UnitView> Live = new List<UnitView>();
-        private static float _nextCreak = -1f;
-        private static UnitView _lastCreak;
-        private bool _creaking;
-
-        /// <summary>
-        /// Every few seconds one statue on the board (never the same twice running) creaks: a sudden small
-        /// tilt in two jerks, held, then settling back. One at a time across the board, so it reads as
-        /// statues holding still rather than all twitching together.
-        /// </summary>
-        private static void ScheduleCreak()
-        {
-            if (_nextCreak < 0f)
-                _nextCreak = Time.time + Random.Range(2f, 4f);
-            if (Time.time < _nextCreak)
-                return;
-            var candidates = Live.FindAll(v => v != _lastCreak && !v._selected && !v._creaking && !v._hidden && v._wake <= 0f && v.IsLivingStatue);
-            // Fewer statues creak less often each; a full board still only creaks every second or two.
-            _nextCreak = Time.time + Mathf.Max(1.5f, Random.Range(8f, 14f) / Mathf.Max(1, candidates.Count));
-            if (candidates.Count == 0)
-                return;
-            _lastCreak = candidates[Random.Range(0, candidates.Count)];
-            _lastCreak.StartCoroutine(_lastCreak.Creak());
-        }
-
-        private IEnumerator Creak()
-        {
-            _creaking = true;
-            var angle = Random.Range(1.2f, 2.2f) * (Random.value < 0.5f ? -1f : 1f);
-            // Two quick jerks to the full tilt (the second shaking off a little dust), held, then settling
-            // back. Selecting the statue cuts it short (SetSelected stands it straight).
-            var steps = new[] { (angle * 0.6f, 0.04f, 0.08f), (angle, 0.04f, Random.Range(0.25f, 0.5f)), (0f, 0.12f, 0f) };
-            var from = 0f;
-            for (var s = 0; s < steps.Length && !_selected; s++)
-            {
-                var (to, move, hold) = steps[s];
-                for (var t = 0f; t < 1f && !_selected; t += Time.deltaTime / move)
-                {
-                    _body.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(from, to, t * t * (3f - 2f * t)));
-                    yield return null;
-                }
-
-                if (_selected)
-                    break;
-                _body.transform.localRotation = Quaternion.Euler(0f, 0f, to);
-                from = to;
-                if (s == 1)
-                {
-                    Fx.Dust(transform.position, 2, 0.12f);
-                    if (Random.value < 0.5f)
-                        StartCoroutine(Crumble());
-                }
-
-                for (var t = 0f; t < hold && !_selected; t += Time.deltaTime)
-                    yield return null;
-            }
-
-            _creaking = false;
         }
 
         private float _nextDust = -1f;
