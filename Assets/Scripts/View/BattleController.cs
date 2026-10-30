@@ -1423,7 +1423,8 @@ namespace ArmyRoguelike.View
             foreach (var u in army)
             {
                 var item = u.Equipment != null ? $" [{u.Equipment.Name}]" : "";
-                var label = $"{u.Stats.Name}{item}{(u.IsPlaced ? "  (placed)" : "")}{(u == _toPlace ? "  <" : "")}";
+                var level = u.Member != null && u.Member.Level > 0 ? $" (level {u.Member.Level})" : "";
+                var label = $"{u.Stats.Name}{level}{item}{(u.IsPlaced ? "  (placed)" : "")}{(u == _toPlace ? "  <" : "")}";
                 if (GUILayout.Button(label, GUILayout.Height(ButtonHeight)))
                     _toPlace = u;
             }
@@ -1719,7 +1720,8 @@ namespace ArmyRoguelike.View
 
             var team = u.Team == Team.Enemy ? EnemyHeader : PlayerHeader;
             var item = u.Equipment != null ? $"   <color={DimColor}><size=14>[{u.Equipment.Name}]</size></color>" : "";
-            rows.Add(($"<color={team}>{u.Stats.Name}</color>{item}", header, 0f));
+            var level = u.Member != null ? $"   <color={DimColor}><size=14>level {u.Member.Level}</size></color>" : "";
+            rows.Add(($"<color={team}>{u.Stats.Name}</color>{level}{item}", header, 0f));
             rows.Add(($"<color=white><b>HP {u.Hp} / {u.MaxHp}</b></color>   <color={DimColor}>{u.MaxAp} AP  ·  {u.MaxMoves} {(u.MaxMoves == 1 ? "move" : "moves")}  ·  range {u.Range}</color>",
                 stats, HpBarHeight + 4f));
 
@@ -1730,6 +1732,8 @@ namespace ArmyRoguelike.View
             }
 
             var passives = Abilities.PassivesOf(u.Stats);
+            foreach (var technique in TechniquesOf(u).Where(t => !t.Action.HasValue))
+                passives.Add((technique.Name, technique.Description));
             var itemAbility = u.Equipment?.Ability ?? Ability.None;
             if (itemAbility != Ability.None)
                 passives.Add(($"{Abilities.Name(itemAbility)} ({u.Equipment.Name})", Abilities.Describe(itemAbility)));
@@ -1744,7 +1748,10 @@ namespace ArmyRoguelike.View
             }
 
             rows.Add(($"<color={ActionColor}>ACTIONS</color>", section, 10f));
-            foreach (var (action, cost, kind, text) in Abilities.ActionsOf(u.Stats, Battle.EffectiveDamage(u)))
+            var actions = Abilities.ActionsOf(u.Stats, Battle.EffectiveDamage(u));
+            foreach (var technique in TechniquesOf(u).Where(t => t.Action.HasValue))
+                actions.Add((technique.Name, Battle.ActionCost(technique.Action.Value), technique.Action, technique.Description));
+            foreach (var (action, cost, kind, text) in actions)
             {
                 var cooldown = kind.HasValue ? $"  ·  cooldown {Battle.Cooldown(kind.Value)}" : "";
                 var left = kind.HasValue ? u.CooldownLeft(kind.Value) : 0;
@@ -1787,6 +1794,9 @@ namespace ArmyRoguelike.View
             GUILayout.EndArea();
             return true;
         }
+
+        /// <summary>The techniques a unit has learned (none for enemies and summons).</summary>
+        private static IEnumerable<Technique> TechniquesOf(Unit u) => u.Member?.Techniques ?? (IEnumerable<Technique>)new Technique[0];
 
         /// <summary>A health bar just under the card's header, in the space left for it.</summary>
         private static void DrawHpBar(Rect header, Unit u)
@@ -1896,7 +1906,8 @@ namespace ArmyRoguelike.View
         private string UnitLine(Unit u)
         {
             var item = u.Equipment != null ? $"  [{u.Equipment.Name}]" : "";
-            return $"{u.Stats.Name}  HP {u.Hp}/{u.MaxHp}  DMG {Battle.EffectiveDamage(u)}  RNG {u.Range}  MV {u.MaxMoves}{item}";
+            var level = u.Member != null ? $"  level {u.Member.Level}" : "";
+            return $"{u.Stats.Name}{level}  HP {u.Hp}/{u.MaxHp}  DMG {Battle.EffectiveDamage(u)}  RNG {u.Range}  MV {u.MaxMoves}{item}";
         }
 
         private static string AbilityLines(Unit u)
@@ -1904,6 +1915,8 @@ namespace ArmyRoguelike.View
             var lines = new List<string>();
             foreach (var ability in u.Stats.Abilities)
                 lines.Add($"{Abilities.Name(ability)}: {Abilities.Describe(ability)}");
+            foreach (var technique in TechniquesOf(u))
+                lines.Add($"{technique.Name}: {technique.Description}");
             var itemAbility = u.Equipment?.Ability ?? Ability.None;
             if (itemAbility != Ability.None)
                 lines.Add($"{Abilities.Name(itemAbility)} ({u.Equipment.Name}): {Abilities.Describe(itemAbility)}");

@@ -156,7 +156,10 @@ namespace ArmyRoguelike.View
         private static bool TestModeAvailable => Application.isEditor || Debug.isDebugBuild;
 
         private bool _testMode;
-        private readonly System.Collections.Generic.List<UnitStats> _testArmy = new System.Collections.Generic.List<UnitStats>();
+        private readonly System.Collections.Generic.List<ArmyMember> _testArmy = new System.Collections.Generic.List<ArmyMember>();
+
+        // Index in the test army of the unit whose techniques are shown, or -1.
+        private int _testSelected = -1;
         private Encounter _testEncounter = Encounter.MoonShrine;
         private readonly System.Collections.Generic.List<Encounter> _testFought = new System.Collections.Generic.List<Encounter>();
 
@@ -169,13 +172,13 @@ namespace ArmyRoguelike.View
             // Test battles aren't part of a run, so no run log is written for this one.
             _runLog = null;
             if (_testArmy.Count == 0)
-                _testArmy.AddRange(new[] { UnitStats.Warrior, UnitStats.Archer, UnitStats.Rogue });
+                _testArmy.AddRange(new[] { UnitStats.Warrior, UnitStats.Archer, UnitStats.Rogue }.Select(s => new ArmyMember(s)));
         }
 
         private void StartTestBattle()
         {
             var seed = Environment.TickCount;
-            var army = _testArmy.Select(s => new ArmyMember(s)).ToList();
+            var army = _testArmy.ToList();
             var battle = _testEncounter.CreateBattle(army, new System.Random(seed), _testFought.ToList());
             if (_testOmen.HasValue)
                 battle.AddOmen(_testOmen.Value.omen, _testOmen.Value.blessing ? Team.Player : Team.Enemy);
@@ -191,6 +194,23 @@ namespace ArmyRoguelike.View
             _controller.Init(board, Camera.main, context, () => Do(FinishTestBattle));
         }
 
+        /// <summary>
+        /// Learns a technique, or drops a known one. Dropping rebuilds the unit from its other techniques (and
+        /// those that needed the dropped one go too), so its level always equals what it knows.
+        /// </summary>
+        private void ToggleTestTechnique(int index, Technique technique)
+        {
+            var member = _testArmy[index];
+            if (!member.Knows(technique))
+            {
+                member.Learn(technique);
+                return;
+            }
+
+            var keep = member.Techniques.Where(t => t != technique && t.Requires != technique).ToArray();
+            _testArmy[index] = new ArmyMember(member.Stats, member.Equipment, keep);
+        }
+
         private void FinishTestBattle()
         {
             Destroy(_battleRoot);
@@ -203,33 +223,71 @@ namespace ArmyRoguelike.View
             const float w = 860;
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 10, w, 700), GUI.skin.box);
             GUILayout.Label("Test battle", Title);
-            GUILayout.Label("For testing only: any army, any encounter, any blessing or curse. Normal battle rules; no run, gold or map.");
+            GUILayout.Label("For testing only: any army with any techniques, any encounter, any blessing or curse. Normal battle rules; no run, gold or map.");
             GUILayout.BeginHorizontal();
 
-            // Left: every unit type, click to add (up to the army limit).
+            // Left: every unit type, click to add (up to the army limit); below, the chosen unit's techniques.
             GUILayout.BeginVertical(GUILayout.Width(300));
             GUILayout.Label($"Add a unit ({_testArmy.Count}/{Run.MaxArmySize}):");
-            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(560));
             foreach (var type in UnitStats.BaseUnits)
             {
                 GUI.enabled = _testArmy.Count < Run.MaxArmySize;
                 var pick = type;
                 if (GUILayout.Button(type.Name))
-                    Do(() => _testArmy.Add(pick));
+                    Do(() =>
+                    {
+                        _testArmy.Add(new ArmyMember(pick));
+                        _testSelected = _testArmy.Count - 1;
+                    });
                 GUI.enabled = true;
             }
 
-            GUILayout.EndScrollView();
+            GUILayout.Space(10);
+            if (_testSelected >= 0 && _testSelected < _testArmy.Count)
+            {
+                var member = _testArmy[_testSelected];
+                GUILayout.Label($"{member.Stats.Name}'s techniques (click to learn or drop; level {member.Level}):");
+                _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(400));
+                foreach (var technique in Technique.All.Where(t => t.Line == member.Stats))
+                {
+                    var known = member.Knows(technique);
+                    var needs = !known && technique.Requires != null && !member.Knows(technique.Requires) ? $"  (needs {technique.Requires.Name})" : "";
+                    GUI.enabled = known || technique.CanLearn(member);
+                    var t = technique;
+                    var index = _testSelected;
+                    if (GUILayout.Button(new GUIContent($"{(known ? "[X]" : "[  ]")} {technique.Name}{needs}", technique.Description)))
+                        Do(() => ToggleTestTechnique(index, t));
+                    GUI.enabled = true;
+                }
+
+                GUILayout.EndScrollView();
+            }
+            else
+            {
+                GUILayout.Label("Click a unit in the army to give it techniques.");
+            }
+
             GUILayout.EndVertical();
 
             // Middle: the army and the encounter.
             GUILayout.BeginVertical(GUILayout.Width(260));
-            GUILayout.Label("Army (click to remove):");
+            GUILayout.Label("Army (click a unit for its techniques, x to remove):");
             for (var i = 0; i < _testArmy.Count; i++)
             {
                 var index = i;
-                if (GUILayout.Button($"x  {_testArmy[i].Name}"))
-                    Do(() => _testArmy.RemoveAt(index));
+                var m = _testArmy[i];
+                GUILayout.BeginHorizontal();
+                var marker = i == _testSelected ? "> " : "";
+                if (GUILayout.Button($"{marker}{m.Stats.Name} (level {m.Level})"))
+                    Do(() => _testSelected = index);
+                if (GUILayout.Button("x", GUILayout.Width(28)))
+                    Do(() =>
+                    {
+                        _testArmy.RemoveAt(index);
+                        if (_testSelected >= _testArmy.Count)
+                            _testSelected = _testArmy.Count - 1;
+                    });
+                GUILayout.EndHorizontal();
             }
 
             GUILayout.Space(10);
