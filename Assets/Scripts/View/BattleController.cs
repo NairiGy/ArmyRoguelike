@@ -1147,9 +1147,6 @@ namespace ArmyRoguelike.View
                     view.RefreshHp(effect.HpAfter);
                     yield return effect.HpAfter <= 0 ? view.Die() : view.Hit();
                     yield break;
-                case EffectKind.Bloodthirst:
-                    DamagePopup.Spawn(at, "+1 DMG", DamagePopup.AbilityColor, 48);
-                    break;
                 case EffectKind.LastStand:
                     DamagePopup.Spawn(at, "Last Stand!", DamagePopup.AbilityColor, 48);
                     view.RefreshHp(effect.HpAfter);
@@ -1820,8 +1817,6 @@ namespace ArmyRoguelike.View
                     break;
             }
 
-            if (u.Member != null && u.Member.BonusDamage + u.GainedDamage > 0)
-                lines.Add($"Bloodthirst so far: +{u.Member.BonusDamage + u.GainedDamage} damage");
             if (u.Shield > 0)
                 lines.Add($"Shield {u.Shield}");
             if (u.MoonShield > 0)
@@ -1912,8 +1907,6 @@ namespace ArmyRoguelike.View
             var itemAbility = u.Equipment?.Ability ?? Ability.None;
             if (itemAbility != Ability.None)
                 lines.Add($"{Abilities.Name(itemAbility)} ({u.Equipment.Name}): {Abilities.Describe(itemAbility)}");
-            if (u.Member != null && u.Member.BonusDamage + u.GainedDamage > 0)
-                lines.Add($"Bloodthirst so far: +{u.Member.BonusDamage + u.GainedDamage} damage");
             var status = new List<string>();
             if (u.Shield > 0)
                 status.Add($"shield {u.Shield}");

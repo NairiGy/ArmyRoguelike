@@ -210,11 +210,11 @@ namespace ArmyRoguelike.View
             GUILayout.BeginVertical(GUILayout.Width(300));
             GUILayout.Label($"Add a unit ({_testArmy.Count}/{Run.MaxArmySize}):");
             _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(560));
-            foreach (var type in UnitStats.AllPlayerTypes)
+            foreach (var type in UnitStats.BaseUnits)
             {
                 GUI.enabled = _testArmy.Count < Run.MaxArmySize;
                 var pick = type;
-                if (GUILayout.Button($"{type.Name} (tier {type.Tier}, {type.Root.Name} line)"))
+                if (GUILayout.Button(type.Name))
                     Do(() => _testArmy.Add(pick));
                 GUI.enabled = true;
             }
@@ -390,7 +390,7 @@ namespace ArmyRoguelike.View
             {
                 var why = technique.CanLearn(member) ? ""
                     : member.Knows(technique) ? "  (knows it)"
-                    : technique.Requires != null && !member.Knows(technique.Requires) && (technique.IsShared || member.Stats.Root == technique.Line) ? $"  (needs {technique.Requires.Name})"
+                    : technique.Requires != null && !member.Knows(technique.Requires) && (technique.IsShared || member.Stats == technique.Line) ? $"  (needs {technique.Requires.Name})"
                     : "  (other line)";
                 GUI.enabled = can(member);
                 var m = member;

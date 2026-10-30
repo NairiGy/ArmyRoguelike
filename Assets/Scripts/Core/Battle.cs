@@ -117,9 +117,6 @@ namespace ArmyRoguelike.Core
         public const int SlamDamage = 3;
         public const int TauntRange = 2;
 
-        /// <summary>Most damage Bloodthirst can add over a whole run.</summary>
-        public const int BloodthirstCap = 3;
-
         // Actions (placeholders).
         public const int ActionRange = 3;
         public const int FireballRange = 3;
@@ -1775,7 +1772,7 @@ namespace ArmyRoguelike.Core
         /// <summary>
         /// Every point of damage goes through here, so abilities apply to all sources. Guard redirects
         /// attacks, Shield Wall and Tough reduce, Dodge and wards absorb, Lucky Charm can stop a death,
-        /// and a kill triggers the killer's Bloodthirst, Vampire Fang and Momentum. Attacks also carry
+        /// and a kill triggers the killer's Vampire Fang and Momentum. Attacks also carry
         /// Poison and Chill. Follow-up effects are added to <paramref name="after"/>.
         /// </summary>
         private Hit Damage(Unit target, int amount, Unit source, DamageKind kind, List<BattleEvent> after)
@@ -1840,13 +1837,6 @@ namespace ArmyRoguelike.Core
 
             if (!target.IsAlive && hostile && source.IsAlive)
             {
-                // Bloodthirst stops growing once the run-long bonus reaches the cap.
-                if (source.Has(Ability.Bloodthirst) && (source.Member?.BonusDamage ?? 0) + source.GainedDamage < BloodthirstCap)
-                {
-                    source.GainedDamage++;
-                    after.Add(new EffectEvent(EffectKind.Bloodthirst, source, 1, source.Hp, source));
-                }
-
                 if (source.Has(Ability.VampireFang) && source.Hp < source.MaxHp)
                 {
                     var healed = Math.Min(VampireHeal, source.MaxHp - source.Hp);

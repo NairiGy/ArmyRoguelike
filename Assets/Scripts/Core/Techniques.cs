@@ -53,7 +53,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Whether this member could learn it now: its line, not known yet, and its requirement known.</summary>
         public bool CanLearn(ArmyMember member) =>
-            (Line == null || member.Stats.Root == Line) && !member.Knows(this) && (Requires == null || member.Knows(Requires));
+            (Line == null || member.Stats == Line) && !member.Knows(this) && (Requires == null || member.Knows(Requires));
 
         public override string ToString() => Name;
 

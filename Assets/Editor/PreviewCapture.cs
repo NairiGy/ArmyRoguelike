@@ -51,13 +51,13 @@ public static class PreviewCapture
         var army = ArmyMember.StartingArmy();
         army.Add(new ArmyMember(UnitStats.Sapper));
 
-        // -previewUnits "Juggernaut,Sniper,...": show these unit types instead (up to 16, filling the back two rows).
+        // -previewUnits "Warrior,Archer,...": show these unit types instead (up to 16, filling the back two rows).
         var args = System.Environment.GetCommandLineArgs();
         var unitsArg = System.Array.IndexOf(args, "-previewUnits");
         if (unitsArg >= 0 && unitsArg + 1 < args.Length)
         {
             var names = args[unitsArg + 1].Split(',').Select(n => n.Trim());
-            army = names.Select(n => UnitStats.AllPlayerTypes.Concat(new[] { UnitStats.Turret }).FirstOrDefault(s => s.Name == n))
+            army = names.Select(n => UnitStats.BaseUnits.Concat(new[] { UnitStats.Turret }).FirstOrDefault(s => s.Name == n))
                 .Where(s => s != null).Take(16).Select(s => new ArmyMember(s)).ToList();
         }
 

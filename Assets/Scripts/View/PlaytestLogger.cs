@@ -63,7 +63,7 @@ namespace ArmyRoguelike.View
                 _log.placements.Add(new PlacementEntry
                 {
                     unit = Name(u), x = u.Pos.X, y = u.Pos.Y, equipment = u.Equipment?.Name ?? "", maxHp = u.MaxHp,
-                    damage = u.BaseDamage, range = u.Range, maxAp = u.MaxAp, maxMoves = u.MaxMoves, tier = u.Stats.Tier, line = u.Stats.Root.Name,
+                    damage = u.BaseDamage, range = u.Range, maxAp = u.MaxAp, maxMoves = u.MaxMoves, tier = u.Stats.Tier, line = u.Stats.Name,
                 });
         }
 
@@ -297,7 +297,6 @@ namespace ArmyRoguelike.View
             {
                 case EffectKind.Heal: return "heal";
                 case EffectKind.Thorns: return "thorns";
-                case EffectKind.Bloodthirst: return "bloodthirst";
                 case EffectKind.LastStand: return "last stand";
                 case EffectKind.Dodge: return "dodge";
                 case EffectKind.Absorb: return "shield absorb";

@@ -59,19 +59,11 @@ public static class GamepediaWriter
         html.Append("</div></section>");
     }
 
-    /// <summary>A unit card, with its evolutions laid out underneath it.</summary>
+    /// <summary>A unit card in the tree layout (base units have no children since evolutions went).</summary>
     private static void Node(StringBuilder html, UnitStats unit)
     {
         html.Append("<div class=\"node\">");
         UnitCard(html, unit);
-        if (unit.Evolutions.Count > 0)
-        {
-            html.Append("<div class=\"children\">");
-            foreach (var child in unit.Evolutions)
-                Node(html, child);
-            html.Append("</div>");
-        }
-
         html.Append("</div>");
     }
 
@@ -83,8 +75,7 @@ public static class GamepediaWriter
             ? $"<img src=\"{image}\" alt=\"{Esc(unit.Name)}\">"
             : $"<div class=\"noimg\">{Esc(unit.Label)}</div>");
         html.Append("<div class=\"body\">");
-        var tier = unit.Tier > 0 ? $"<span class=\"badge\">Tier {unit.Tier}</span>" : "";
-        html.Append($"<h4>{Esc(unit.Name)} {tier}</h4>");
+        html.Append($"<h4>{Esc(unit.Name)}</h4>");
         html.Append($"<p class=\"stats\">HP {unit.MaxHp} · DMG {unit.Damage} · RNG {unit.Range} · AP {unit.MaxAp} · MV {unit.Moves}");
         if (unit.Size > 1)
             html.Append($" · {unit.Size}x{unit.Size}");
@@ -98,14 +89,12 @@ public static class GamepediaWriter
                 html.Append($"<li class=\"action\"><b>{Esc(Abilities.AttackName(unit))}</b> ({Battle.AttackCost} AP): {Esc(Abilities.DescribeAttack(unit, unit.Damage))}</li>");
             foreach (var a in unit.Abilities)
             {
-                var isNew = unit.EvolvesFrom == null || !unit.EvolvesFrom.Has(a);
-                html.Append($"<li class=\"{(isNew ? "new" : "")}\"><b>{Esc(Abilities.Name(a))}</b>: {Esc(Abilities.Describe(a))}</li>");
+                html.Append($"<li><b>{Esc(Abilities.Name(a))}</b>: {Esc(Abilities.Describe(a))}</li>");
             }
 
             foreach (var a in unit.Actions)
             {
-                var isNew = unit.EvolvesFrom == null || !unit.EvolvesFrom.HasAction(a);
-                html.Append($"<li class=\"action {(isNew ? "new" : "")}\"><b>{Esc(Abilities.Name(a))}</b> ({Battle.ActionCost(a)} AP, cooldown {Battle.Cooldown(a)}): {Esc(Abilities.Describe(a))}</li>");
+                html.Append($"<li class=\"action\"><b>{Esc(Abilities.Name(a))}</b> ({Battle.ActionCost(a)} AP, cooldown {Battle.Cooldown(a)}): {Esc(Abilities.Describe(a))}</li>");
             }
 
             html.Append("</ul>");
@@ -428,7 +417,7 @@ public static class GamepediaWriter
         html.Append("<table><tr><th>Action</th><th>AP</th><th>Effect</th><th>Used by</th></tr>");
         foreach (ActionKind a in Enum.GetValues(typeof(ActionKind)))
         {
-            var users = UnitStats.AllPlayerTypes.Where(u => u.HasAction(a)).Select(u => Link(u.Name));
+            var users = UnitStats.BaseUnits.Where(u => u.HasAction(a)).Select(u => Link(u.Name));
             html.Append($"<tr><td>{Esc(Abilities.Name(a))}</td><td>{Battle.ActionCost(a)}</td><td>{Esc(Abilities.Describe(a))}</td><td>{string.Join(", ", users)}</td></tr>");
         }
 
@@ -443,7 +432,7 @@ public static class GamepediaWriter
         {
             if (a == Ability.None)
                 continue;
-            var from = UnitStats.AllPlayerTypes.Where(u => u.Has(a)).Select(u => Link(u.Name))
+            var from = UnitStats.BaseUnits.Where(u => u.Has(a)).Select(u => Link(u.Name))
                 .Concat(Equipment.Catalog.Where(e => e.Ability == a).Select(e => $"<i>{Esc(e.Name)}</i>"))
                 .Concat(a == Ability.Immobile ? new[] { "Turret", "Moon Shrine", "Totem" } : new string[0]);
             html.Append($"<tr><td>{Esc(Abilities.Name(a))}</td><td>{Esc(Abilities.Describe(a))}</td><td>{string.Join(", ", from)}</td></tr>");
@@ -465,7 +454,7 @@ public static class GamepediaWriter
         html.Append($"<li>Won battle: {Run.BaseGold} gold + {Run.GoldPerSurvivor} per surviving unit (+{Run.AmbushBonusGold} for an ambush). Gold carried off by escaped cutpurses is lost.</li>");
         html.Append($"<li><b>Technique pick</b>: every won fight except the boss and the Moon Shrine offers {Run.RewardCount} techniques your units can learn; one unit learns one and goes up a level, or skip for {Run.SkipGold} gold.</li>");
         html.Append($"<li><b>Shop</b>: {Run.ShopSize} techniques ({Technique.CommonPrice} gold common, {Technique.RarePrice} rare), {Run.ShopItemCount} items, forgetting a technique for {Run.ForgetPrice} gold, and a random base-unit recruit for {Run.RecruitPrice} gold (if the army has room).</li>");
-        html.Append("<li>Every battle starts at full HP and dead units come back. Techniques, levels, Bloodthirst damage and shrine HP last the whole run.</li>");
+        html.Append("<li>Every battle starts at full HP and dead units come back. Techniques, levels, items and shrine HP last the whole run.</li>");
         html.Append("</ul><h3>? events</h3><table><tr><th>Event</th><th>What happens</th></tr>");
         html.Append($"<tr><td>Wandering Recruit</td><td>A random base unit joins for free ({Run.FullArmyGold} gold instead if the army is full).</td></tr>");
         html.Append("<tr><td>Abandoned Cart</td><td>A random technique one of your units can learn (it goes up a level) or a random item, or leave it.</td></tr>");

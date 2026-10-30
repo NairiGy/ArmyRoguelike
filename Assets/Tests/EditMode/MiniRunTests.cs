@@ -697,7 +697,7 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(recruit, run.Army[3].Stats);
         }
 
-        // ---------- Draft and trainer ----------
+        // ---------- Draft ----------
 
         [Test]
         public void Draft_ThreeDifferentBaseUnits()
@@ -705,35 +705,11 @@ namespace ArmyRoguelike.Tests
             var run = new Run(1);
             Assert.AreEqual(RunState.Draft, run.State);
             Assert.IsFalse(run.Draft(UnitStats.Warrior, UnitStats.Warrior, UnitStats.Rogue), "no duplicates");
-            Assert.IsFalse(run.Draft(UnitStats.Warrior, UnitStats.Swordsman, UnitStats.Rogue), "base units only");
+            Assert.IsFalse(run.Draft(UnitStats.Warrior, UnitStats.Wolf, UnitStats.Rogue), "player units only");
             Assert.IsFalse(run.Draft(UnitStats.Warrior, UnitStats.Rogue), "exactly three");
             Assert.IsTrue(run.Draft(UnitStats.Apprentice, UnitStats.Sapper, UnitStats.Rogue));
             Assert.AreEqual(RunState.Map, run.State);
             Assert.AreEqual(3, run.Army.Count);
-        }
-
-        [Test]
-        public void Trees_ThreeTiers_TwoBranchesEach_StrongerAsTheyGo()
-        {
-            Assert.AreEqual(5, UnitStats.BaseUnits.Count);
-            // 7 per tree, except the mage apprentice, which has three tier-2 branches: 4 x 7 + 10.
-            Assert.AreEqual(38, UnitStats.AllPlayerTypes.Count());
-            foreach (var type in UnitStats.AllPlayerTypes)
-            {
-                var branches = type == UnitStats.Apprentice ? 3 : type.Tier < 3 ? 2 : 0;
-                Assert.AreEqual(branches, type.Evolutions.Count, type.Name);
-                foreach (var next in type.Evolutions)
-                {
-                    Assert.AreEqual(type.Tier + 1, next.Tier);
-                    Assert.GreaterOrEqual(next.MaxHp, type.MaxHp, $"{next.Name} HP");
-                    Assert.GreaterOrEqual(next.Damage, type.Damage, $"{next.Name} damage");
-                    // The Trapper lost Snare to the archer's Pinning Shot; its new action is still to be designed.
-                    if (next == UnitStats.Trapper)
-                        continue;
-                    Assert.IsTrue(next.Abilities.Count + next.Actions.Count > type.Abilities.Count + type.Actions.Count ||
-                                  next.Abilities.Except(type.Abilities).Any(), $"{next.Name} adds something");
-                }
-            }
         }
 
         [Test]
@@ -780,32 +756,6 @@ namespace ArmyRoguelike.Tests
             WinCurrentBattle(run, 3);
             run.FinishBattle();
             Assert.AreEqual(before + Run.GoldFor(3) + Run.AmbushBonusGold, run.Gold);
-        }
-
-        [Test]
-        public void Bloodthirst_DamageCarriesToNextBattle()
-        {
-            var run = NewRun(4);
-            run.Army.Single(m => m.Stats == UnitStats.Rogue).Stats = UnitStats.Assassin;
-            run.ChooseNode(0);
-            var b = run.StartBattle();
-            var x = 0;
-            foreach (var u in b.Units.Where(u => u.Team == Team.Player))
-                b.Place(u, new GridPos(x++, 0));
-            b.StartBattle();
-            var rogue = b.Units.Single(u => u.Stats == UnitStats.Assassin);
-            // Elementals split when they die, so keep going until nothing is left standing.
-            for (var e = b.Living(Team.Enemy).FirstOrDefault(); e != null && !b.IsOver; e = b.Living(Team.Enemy).FirstOrDefault())
-            {
-                e.Hp = 1;
-                rogue.Ap = 99;
-                rogue.Pos = new GridPos(e.Pos.X, e.Pos.Y - 1);
-                b.PlayerAttack(rogue, e);
-            }
-
-            var kills = b.Units.Count(u => u.Team == Team.Enemy);
-            run.FinishBattle();
-            Assert.AreEqual(System.Math.Min(kills, Battle.BloodthirstCap), run.Army.Single(m => m.Stats == UnitStats.Assassin).BonusDamage);
         }
 
         // ---------- Walk up and attack ----------

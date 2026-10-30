@@ -12,7 +12,7 @@ namespace ArmyRoguelike.Core
 
         public Equipment Equipment { get; internal set; }
 
-        /// <summary>Damage gained during the run, e.g. from Bloodthirst kills.</summary>
+        /// <summary>Damage gained during the run from sources other than levels (none for now).</summary>
         public int BonusDamage { get; internal set; }
 
         /// <summary>Max HP gained during the run, e.g. from a shrine.</summary>
@@ -49,13 +49,13 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>Max HP from levels.</summary>
-        public int LevelHp => Growth.Hp(Stats.Root, Level);
+        public int LevelHp => Growth.Hp(Stats, Level);
 
         /// <summary>Damage from levels.</summary>
-        public int LevelDamage => Growth.Damage(Stats.Root, Level);
+        public int LevelDamage => Growth.Damage(Stats, Level);
 
         /// <summary>Extra mines on the board from levels.</summary>
-        public int LevelMines => Growth.Mines(Stats.Root, Level);
+        public int LevelMines => Growth.Mines(Stats, Level);
 
         public bool HasTechniqueAbility(Ability ability) => _techniques.Any(t => t.Ability == ability);
 
@@ -517,10 +517,6 @@ namespace ArmyRoguelike.Core
             var battle = CurrentBattle;
             if (State != RunState.Battle || battle == null || !battle.IsOver)
                 throw new InvalidOperationException("The current battle isn't over.");
-
-            // Run-long gains from this battle, such as Bloodthirst, stick to the army member.
-            foreach (var unit in battle.Units.Where(u => u.Member != null))
-                unit.Member.BonusDamage += unit.GainedDamage;
 
             if (battle.Phase == Phase.Defeat)
             {

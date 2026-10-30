@@ -111,9 +111,6 @@ namespace ArmyRoguelike.Core
         /// <summary>The Lucky Charm has already saved this unit in this battle.</summary>
         public bool LastStandUsed { get; internal set; }
 
-        /// <summary>Damage gained in this battle (Bloodthirst). Added to the army member when the battle ends.</summary>
-        public int GainedDamage { get; internal set; }
-
         /// <summary>Gold a cutpurse is carrying after a hit. It flees with it; killing it gets it back.</summary>
         public int CarryingLoot { get; internal set; }
 
@@ -138,7 +135,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Max HP from a Pack Leader's Pack Bond: +1 while one lives, -1 once the last one dies.</summary>
         public int PackHp { get; internal set; }
-        public int BaseDamage => Math.Max(1, Stats.Damage + (Member?.BonusDamage ?? 0) + (Member?.LevelDamage ?? 0) + GainedDamage);
+        public int BaseDamage => Math.Max(1, Stats.Damage + (Member?.BonusDamage ?? 0) + (Member?.LevelDamage ?? 0));
 
         /// <summary>Attack range in steps. Long Reach makes it 2 (still melee).</summary>
         public int Range => Math.Max(Has(Ability.LongReach) ? 2 : 1, Stats.Range);

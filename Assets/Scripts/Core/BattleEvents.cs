@@ -177,9 +177,6 @@ namespace ArmyRoguelike.Core
         /// <summary>Thorned Mail hurt the melee attacker for <see cref="EffectEvent.Amount"/>.</summary>
         Thorns,
 
-        /// <summary>Bloodthirst: +<see cref="EffectEvent.Amount"/> damage for the run.</summary>
-        Bloodthirst,
-
         /// <summary>Lucky Charm kept the unit alive at 1 HP.</summary>
         LastStand,
 
