@@ -310,9 +310,9 @@ Decided and built 2026-10-28 (branch `feature/act1-12-steps`), not yet playteste
 - **Bloodthirst capped at +3 for the run.**
 - **Later:** fights get split into difficulty pools (and more fights added); each step then draws from a pool. New node types and events after a playtest of this act.
 
-## Experiment: small board, one move (branch `experiment/small-board`)
+## Small board, one move (merged into `main` 2026-10-30)
 
-An idea test, built 2026-10-29, not playtested. It lives only on its branch (worktree `.claude/worktrees/small-board`); `main` keeps the 8x8 rules. Keep it or drop it after a playtest. Why: positioning should matter more, every step should count, and the board should read at a glance.
+Built 2026-10-29 as an idea test on `experiment/small-board`, playtested 2026-10-30 ("feels ok": tight fights of 5-6 turns, one loss in three) and merged into `main` the same day. These are now the game's rules; the 8x8 numbers above are history. Why: positioning should matter more, every step should count, and the board should read at a glance.
 
 - **Board 6x6.** Each side still deploys in its back 2 rows, so only 2 empty rows lie between the armies.
 - **Moves are separate from AP.** Every unit walks **1 tile per turn**, before or after acting; unused moves don't carry over. AP now only pays for attacks and actions. AP pools are unchanged for the first test, so units attack more often (rogues and archers get 2 attacks a turn).
