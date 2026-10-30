@@ -285,21 +285,33 @@ namespace ArmyRoguelike.View
 
         private Material _playerStatueMaterial;
         private Material _enemyStatueMaterial;
+        private IReadOnlyDictionary<UnitKind, Material> _enemyStatueMaterialsByKind;
 
         private UnitView NewView(Unit unit)
         {
             var view = UnitView.Create(unit, transform);
-            view.SetStatueMaterial(unit.Team == Team.Player ? _playerStatueMaterial : _enemyStatueMaterial);
+            view.SetStatueMaterial(StatueMaterialFor(unit));
             return view;
         }
 
-        /// <summary>Draws painted statues with these materials (per team), now and for units that appear later.</summary>
-        public void SetStatueMaterials(Material player, Material enemy)
+        /// <summary>
+        /// Draws painted statues with these materials (per team, and for enemies of some kinds their faction's
+        /// own), now and for units that appear later.
+        /// </summary>
+        public void SetStatueMaterials(Material player, Material enemy, IReadOnlyDictionary<UnitKind, Material> enemyByKind = null)
         {
             _playerStatueMaterial = player;
             _enemyStatueMaterial = enemy;
+            _enemyStatueMaterialsByKind = enemyByKind;
             foreach (var kv in _units)
-                kv.Value.SetStatueMaterial(kv.Key.Team == Team.Player ? player : enemy);
+                kv.Value.SetStatueMaterial(StatueMaterialFor(kv.Key));
+        }
+
+        private Material StatueMaterialFor(Unit unit)
+        {
+            if (unit.Team == Team.Player)
+                return _playerStatueMaterial;
+            return _enemyStatueMaterialsByKind != null && _enemyStatueMaterialsByKind.TryGetValue(unit.Stats.Kind, out var m) ? m : _enemyStatueMaterial;
         }
 
         /// <summary>Recolours the ground to suit the battle's scenery palette.</summary>

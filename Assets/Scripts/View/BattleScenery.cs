@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ArmyRoguelike.Core;
 using UnityEngine;
 
 namespace ArmyRoguelike.View
@@ -45,6 +46,35 @@ namespace ArmyRoguelike.View
 
         // Moon marble is the main look; torch gold and pale bone stay as alternatives.
         public static int PlayerRampOption = 0;
+
+        /// <summary>
+        /// Enemy factions whose stone leans towards a colour of their own (a hint, not a paint job), so the
+        /// teams still read apart by brightness first. Goblins (and their totem) lean mossy green.
+        /// </summary>
+        private static readonly (UnitKind[] kinds, Color tint)[] FactionTints =
+        {
+            (new[] { UnitKind.Goblin, UnitKind.GoblinBomber, UnitKind.Totem }, new Color(0.45f, 0.62f, 0.3f)),
+        };
+
+        /// <summary>How far a faction's stone moves towards its colour (0 = plain enemy stone).</summary>
+        public static float FactionTintAmount = 0.45f;
+
+        /// <summary>Each stop moved towards the tint at the stop's own brightness, so only the hue changes.</summary>
+        private static Color[] Tinted(Color[] stops, Color tint, float amount)
+        {
+            var tintLuma = Luma(tint);
+            var tinted = new Color[stops.Length];
+            for (var i = 0; i < stops.Length; i++)
+            {
+                var target = tint * (Luma(stops[i]) / tintLuma);
+                target.a = 1f;
+                tinted[i] = Color.Lerp(stops[i], target, amount);
+            }
+
+            return tinted;
+        }
+
+        private static float Luma(Color c) => 0.299f * c.r + 0.587f * c.g + 0.114f * c.b;
 
         private static readonly string[][] EnemyRamps =
         {
@@ -169,7 +199,17 @@ namespace ArmyRoguelike.View
                 var moon = Sample(stops, 1f);
                 player.SetColor("_RimColor", TeamGlow ? new Color(0.6f, 0.85f, 1f, 0.85f) : new Color(moon.r, moon.g, moon.b, 0.6f));
                 enemy.SetColor("_RimColor", TeamGlow ? new Color(1f, 0.4f, 0.2f, 0.85f) : new Color(moon.r, moon.g, moon.b, 0.6f));
-                board.SetStatueMaterials(player, enemy);
+                // Factions lean their enemy stone towards a hue of their own, keeping its darkness.
+                var byKind = new Dictionary<UnitKind, Material>();
+                foreach (var (kinds, tint) in FactionTints)
+                {
+                    var faction = new Material(enemy);
+                    faction.SetTexture("_Ramp", MakeRamp(Tinted(ParseStops(EnemyRamps[p]), tint, FactionTintAmount)));
+                    foreach (var kind in kinds)
+                        byKind[kind] = faction;
+                }
+
+                board.SetStatueMaterials(player, enemy, byKind);
             }
             var root = new GameObject("Scenery").transform;
             root.gameObject.AddComponent<ArtTuning>();
