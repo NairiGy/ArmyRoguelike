@@ -104,7 +104,7 @@ namespace ArmyRoguelike.View
                 return custom;
             if (!Painted.TryGetValue(kind, out var sprite))
             {
-                var name = "Statues/" + (kind == UnitKind.PackLeader ? UnitKind.Wolf : kind);
+                var name = "Statues/" + kind;
                 sprite = Resources.Load<Sprite>(name + "_figure");
                 if (sprite != null)
                     FigureOnly.Add(kind);

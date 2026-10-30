@@ -529,6 +529,10 @@ public static class ArtExperiment
         { UnitKind.Cutpurse, 1.0f },
         // The skull staff rises above the hood.
         { UnitKind.Necromancer, 1.35f },
+        // A small hunched piece of the elemental, below a goblin.
+        { UnitKind.Shard, 0.6f },
+        // A wolf with its head raised to howl; UnitView scales the pack leader by 1.25 on top.
+        { UnitKind.PackLeader, 0.85f },
     };
 
     private static float FigureHeight(UnitKind kind) => FigureHeights.TryGetValue(kind, out var h) ? h : DefaultFigureHeight;
