@@ -159,6 +159,42 @@ namespace ArmyRoguelike.Core
         /// <summary>Every special action costs the unit's one AP.</summary>
         public static int ActionCost(ActionKind action) => action == ActionKind.PlaceMine ? MineCost : AttackCost;
 
+        /// <summary>
+        /// Cooldown of every action in the unit's own turns *(placeholders)*: used now, ready again this many turns
+        /// later. Basic attacks have none.
+        /// </summary>
+        public static int Cooldown(ActionKind action)
+        {
+            switch (action)
+            {
+                case ActionKind.Fireball:
+                case ActionKind.IceWall:
+                case ActionKind.Mend:
+                case ActionKind.Turret:
+                case ActionKind.Detonate:
+                case ActionKind.Vanish:
+                case ActionKind.Raise:
+                case ActionKind.Caltrops:
+                    return 3;
+                default:
+                    return 2;
+            }
+        }
+
+        /// <summary>
+        /// Whether the action is off cooldown for the unit's coming or current turn. During your turn an enemy's
+        /// cooldowns still tick once before it acts, so one turn left counts as ready (for the AI and its intent).
+        /// </summary>
+        public bool Ready(Unit unit, ActionKind action) =>
+            unit.CooldownLeft(action) <= (unit.Team == Team.Enemy && Phase != Phase.EnemyTurn ? 1 : 0);
+
+        /// <summary>Pays for an action and puts it on cooldown.</summary>
+        private static void UseUp(Unit unit, ActionKind action)
+        {
+            SpendAp(unit, ActionCost(action));
+            unit.StartCooldown(action, Cooldown(action));
+        }
+
         public readonly Board Board;
 
         private readonly List<Unit> _units = new List<Unit>();
@@ -758,7 +794,7 @@ namespace ArmyRoguelike.Core
 
         public bool CanUseAction(Unit unit, ActionKind action, GridPos tile)
         {
-            if (IsOver || !unit.IsAlive || !unit.Stats.HasAction(action) || unit.Ap < ActionCost(action) || !Board.InBounds(tile))
+            if (IsOver || !unit.IsAlive || !unit.Stats.HasAction(action) || unit.Ap < ActionCost(action) || !Ready(unit, action) || !Board.InBounds(tile))
                 return false;
             var target = UnitAt(tile);
             var steps = Distance(tile, 1, unit);
@@ -808,7 +844,7 @@ namespace ArmyRoguelike.Core
                 return null;
             ActiveUnit = unit;
             var events = new List<BattleEvent>();
-            SpendAp(unit, ActionCost(action));
+            UseUp(unit, action);
             switch (action)
             {
                 case ActionKind.PlaceMine:
@@ -1033,13 +1069,13 @@ namespace ArmyRoguelike.Core
             _units.Where(u => u.IsPlaced && u.IsAlive && u.Team != unit.Team && Distance(unit, u) == 1).ToList();
 
         public bool CanRaise(Unit raiser, Unit remains) =>
-            !IsOver && raiser.IsAlive && raiser.Stats.CanRaise && raiser.Ap >= raiser.Stats.RaiseCost &&
+            !IsOver && raiser.IsAlive && raiser.Stats.CanRaise && raiser.Ap >= raiser.Stats.RaiseCost && Ready(raiser, ActionKind.Raise) &&
             remains != null && remains.IsRemains && remains.Team == raiser.Team &&
             Distance(raiser, remains) <= raiser.Stats.RaiseRange && UnitAt(remains.Pos) == null;
 
         public bool CanThrow(Unit thrower, Unit target)
         {
-            if (IsOver || !thrower.IsAlive || !thrower.Stats.CanThrow || thrower.Ap < thrower.Stats.ThrowCost)
+            if (IsOver || !thrower.IsAlive || !thrower.Stats.CanThrow || thrower.Ap < thrower.Stats.ThrowCost || !Ready(thrower, ActionKind.Boulder))
                 return false;
             if (target == null || !target.IsAlive || target.Team == thrower.Team || target.IsHidden)
                 return false;
@@ -1049,7 +1085,7 @@ namespace ArmyRoguelike.Core
 
         public bool CanBomb(Unit thrower, Unit target)
         {
-            if (IsOver || !thrower.IsAlive || !thrower.Stats.CanBomb || thrower.Ap < thrower.Stats.BombCost)
+            if (IsOver || !thrower.IsAlive || !thrower.Stats.CanBomb || thrower.Ap < thrower.Stats.BombCost || !Ready(thrower, ActionKind.Bomb))
                 return false;
             if (target == null || !target.IsAlive || target.Team == thrower.Team || target.IsHidden)
                 return false;
@@ -1373,7 +1409,7 @@ namespace ArmyRoguelike.Core
 
         internal List<BattleEvent> DoThrow(Unit thrower, Unit target)
         {
-            SpendAp(thrower, thrower.Stats.ThrowCost);
+            UseUp(thrower, ActionKind.Boulder);
             var rock = RockTileFor(thrower, target);
             var after = new List<BattleEvent>();
             var hit = Damage(target, thrower.Stats.ThrowDamage, thrower, DamageKind.Attack, after);
@@ -1399,7 +1435,7 @@ namespace ArmyRoguelike.Core
         /// </summary>
         public (Unit goblin, GridPos from, GridPos to)? FlingOption(Unit thrower, Unit target)
         {
-            if (IsOver || !thrower.IsAlive || !thrower.Has(Ability.Fling) || target == null || !target.IsAlive ||
+            if (IsOver || !thrower.IsAlive || !thrower.Has(Ability.Fling) || !Ready(thrower, ActionKind.Fling) || target == null || !target.IsAlive ||
                 target.Team == thrower.Team || target.IsObjective || target.IsHidden || IsShroudedFrom(target, thrower.Team))
                 return null;
             var steps = Distance(thrower, target);
@@ -1426,7 +1462,7 @@ namespace ArmyRoguelike.Core
             var option = FlingOption(thrower, target);
             if (option == null || thrower.Ap < AttackCost)
                 return null;
-            SpendAp(thrower, AttackCost);
+            UseUp(thrower, ActionKind.Fling);
             var (goblin, from, to) = option.Value;
             var events = new List<BattleEvent>();
             if (goblin == null)
@@ -1456,7 +1492,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Howl: every wolf of its side that hasn't acted yet this turn gets <see cref="HowlMoves"/> extra moves.</summary>
         internal List<BattleEvent> DoHowl(Unit leader)
         {
-            SpendAp(leader, AttackCost);
+            UseUp(leader, ActionKind.Howl);
             var wolves = Living(leader.Team).Where(u => u.IsWolf && !u.IsDone && CanMove(u)).ToList();
             foreach (var wolf in wolves)
                 wolf.Moves += HowlMoves;
@@ -1465,7 +1501,7 @@ namespace ArmyRoguelike.Core
 
         internal List<BattleEvent> DoBomb(Unit thrower, Unit target)
         {
-            SpendAp(thrower, thrower.Stats.BombCost);
+            UseUp(thrower, ActionKind.Bomb);
             _bombs.Add(new Bomb(target.Pos, thrower, thrower.Stats.BombDamage));
             return new List<BattleEvent> { new BombThrowEvent(thrower, target.Pos) };
         }
@@ -1476,7 +1512,7 @@ namespace ArmyRoguelike.Core
         /// </summary>
         internal List<BattleEvent> DoRaise(Unit raiser, Unit remains)
         {
-            SpendAp(raiser, raiser.Stats.RaiseCost);
+            UseUp(raiser, ActionKind.Raise);
             var piles = new List<Unit> { remains };
             piles.AddRange(Remains(raiser.Team).Where(r => r != remains && Distance(raiser, r) <= raiser.Stats.RaiseRange && UnitAt(r.Pos) == null)
                 .OrderBy(r => Distance(raiser, r)).ThenBy(r => r.Id));
@@ -1694,7 +1730,7 @@ namespace ArmyRoguelike.Core
         /// </summary>
         internal List<BattleEvent> DoSlam(Unit slammer)
         {
-            SpendAp(slammer, AttackCost);
+            UseUp(slammer, ActionKind.Slam);
             var events = new List<BattleEvent>();
             var area = Board.AllTiles().Where(p => Distance(p, 1, slammer) <= 2 && !Cells(slammer).Contains(p)).ToList();
             var after = new List<BattleEvent>();
@@ -1810,6 +1846,7 @@ namespace ArmyRoguelike.Core
                 u.MovedThisTurn = false;
                 u.AttackedThisTurn = false;
                 u.ActedThisTurn = false;
+                u.TickCooldowns();
             }
 
             BiteChain = 0;

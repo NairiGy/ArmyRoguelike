@@ -205,7 +205,7 @@ namespace ArmyRoguelike.Core
         /// </summary>
         public static bool ShouldHowl(Battle battle, Unit leader)
         {
-            if (!leader.Has(Ability.Howl) || (battle.Phase == Phase.EnemyTurn && leader.Ap < Battle.AttackCost))
+            if (!leader.Has(Ability.Howl) || !battle.Ready(leader, ActionKind.Howl) || (battle.Phase == Phase.EnemyTurn && leader.Ap < Battle.AttackCost))
                 return false;
             var helped = battle.Living(leader.Team)
                 .Where(w => w.IsWolf && (battle.Phase != Phase.EnemyTurn || !w.IsDone) && battle.CanMove(w))
@@ -236,7 +236,7 @@ namespace ArmyRoguelike.Core
             if (enemy.CarryingLoot > 0)
                 return new Intent(IntentKind.Flee, enemy);
 
-            if (enemy.Stats.CanRaise)
+            if (enemy.Stats.CanRaise && battle.Ready(enemy, ActionKind.Raise))
             {
                 // Intent is shown during the player's turn, so assume a full enemy AP pool.
                 var remains = battle.Remains(enemy.Team)
@@ -265,7 +265,7 @@ namespace ArmyRoguelike.Core
             if (enemy.Stats.CanBomb)
             {
                 var steps = Battle.Distance(enemy, target);
-                if (steps >= 2 && steps <= enemy.Stats.BombRange && battle.BombAt(target.Pos) == null)
+                if (battle.Ready(enemy, ActionKind.Bomb) && steps >= 2 && steps <= enemy.Stats.BombRange && battle.BombAt(target.Pos) == null)
                     return new Intent(IntentKind.Bomb, target, target.Pos);
                 return new Intent(IntentKind.Attack, target);
             }
@@ -277,7 +277,7 @@ namespace ArmyRoguelike.Core
                 var action = GiantAction(battle, enemy, target);
                 if (action == IntentKind.Slam)
                     return new Intent(IntentKind.Slam, enemy);
-                if (action == IntentKind.None && enemy.Stats.CanThrow && steps >= 2 && steps <= enemy.Stats.ThrowRange &&
+                if (action == IntentKind.None && enemy.Stats.CanThrow && battle.Ready(enemy, ActionKind.Boulder) && steps >= 2 && steps <= enemy.Stats.ThrowRange &&
                     !RockWallsOff(battle, enemy, target) && !battle.IsShroudedFrom(target.Pos, enemy.Team))
                     action = IntentKind.Throw;
                 if (action == IntentKind.Throw)
@@ -449,7 +449,7 @@ namespace ArmyRoguelike.Core
             var adjacent = battle.AdjacentFoes(ogre).Count(u => !u.IsObjective);
             var near = battle.Living(Team.Player).Count(u => !u.IsObjective && Battle.Distance(ogre, u) <= 2);
             var smash = adjacent * ogre.Stats.Damage;
-            var slam = ogre.Stats.Slams && near >= 2 ? near * Battle.SlamDamage : 0;
+            var slam = ogre.Stats.Slams && battle.Ready(ogre, ActionKind.Slam) && near >= 2 ? near * Battle.SlamDamage : 0;
             if (slam > smash)
                 return IntentKind.Slam;
             if (adjacent > 0)

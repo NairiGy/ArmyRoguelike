@@ -144,9 +144,13 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(1 - Battle.MineCost, sapper.Ap);
             Assert.IsFalse(b.CanPlaceMine(sapper, P(2, 1)), "one action a turn");
             sapper.Ap = 99;
+            Assert.IsFalse(b.CanPlaceMine(sapper, P(2, 1)), "on cooldown");
+            sapper.ClearCooldowns();
             Assert.IsFalse(b.CanPlaceMine(sapper, P(3, 2)), "already mined");
             Assert.IsNotNull(b.PlayerPlaceMine(sapper, P(2, 1)));
+            sapper.ClearCooldowns();
             Assert.IsNotNull(b.PlayerPlaceMine(sapper, P(4, 1)));
+            sapper.ClearCooldowns();
             Assert.IsFalse(b.CanPlaceMine(sapper, P(3, 0)), "at most 3 mines");
             Assert.AreEqual(3, b.Mines.Count);
         }
@@ -174,6 +178,7 @@ namespace ArmyRoguelike.Tests
             var sapper = Player(b);
             sapper.Ap = 2;
             b.PlayerPlaceMine(sapper, P(3, 2));
+            sapper.ClearCooldowns();
             // A second mine diagonally next to the first, inside its blast.
             b.PlayerPlaceMine(sapper, P(2, 1));
             var events = b.EndPlayerTurn();

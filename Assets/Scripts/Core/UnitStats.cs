@@ -186,7 +186,7 @@ namespace ArmyRoguelike.Core
         PowderKeg,
     }
 
-    /// <summary>A special action a player unit can spend AP on, besides moving and attacking.</summary>
+    /// <summary>A special action a unit can spend AP on besides its basic attack. Every one has a cooldown.</summary>
     public enum ActionKind
     {
         PlaceMine,
@@ -203,6 +203,17 @@ namespace ArmyRoguelike.Core
         ShieldBash,
         Vanish,
         Blink,
+
+        // Enemy actions: never in a unit's Actions list (the AI uses them), but they share the cooldown table.
+        Slam,
+        Boulder,
+        Bomb,
+        Raise,
+        Howl,
+        Fling,
+        Overwatch,
+        Caltrops,
+        BullRush,
     }
 
     /// <summary>

@@ -41,6 +41,29 @@ namespace ArmyRoguelike.Core
         /// <summary>Has attacked this turn.</summary>
         public bool AttackedThisTurn { get; internal set; }
 
+        // Own turns left before each action is ready again (missing = ready).
+        private readonly Dictionary<ActionKind, int> _cooldowns = new Dictionary<ActionKind, int>();
+
+        /// <summary>Own turns until the action is ready again; 0 = ready now.</summary>
+        public int CooldownLeft(ActionKind action) => _cooldowns.TryGetValue(action, out var left) ? left : 0;
+
+        internal void StartCooldown(ActionKind action, int turns)
+        {
+            if (turns > 0)
+                _cooldowns[action] = turns;
+        }
+
+        /// <summary>Every action ready again (tests).</summary>
+        internal void ClearCooldowns() => _cooldowns.Clear();
+
+        /// <summary>Start of its own turn: every cooldown counts down by one.</summary>
+        internal void TickCooldowns()
+        {
+            foreach (var action in new List<ActionKind>(_cooldowns.Keys))
+                if (--_cooldowns[action] <= 0)
+                    _cooldowns.Remove(action);
+        }
+
         // Ids of the units this one has attacked this battle (for the Deadeye's opening shot).
         private readonly HashSet<int> _struck = new HashSet<int>();
 
