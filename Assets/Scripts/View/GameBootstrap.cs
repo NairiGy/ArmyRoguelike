@@ -430,15 +430,14 @@ namespace ArmyRoguelike.View
         }
 
         /// <summary>One button's text for a technique: name, rarity, line, requirement and rule.</summary>
-        private static string Describe(Technique t, bool price = false)
+        private static string Describe(Technique t)
         {
             var tags = new System.Collections.Generic.List<string> { t.Rarity == TechniqueRarity.Rare ? "rare" : "common", t.IsShared ? "any unit" : t.Line.Name };
             if (t.Requires != null)
                 tags.Add($"needs {t.Requires.Name}");
             if (t.Action.HasValue)
                 tags.Add($"action, cooldown {Battle.Cooldown(t.Action.Value)}");
-            var cost = price ? $"   {t.Price} gold" : "";
-            return $"{t.Name}  ({string.Join(", ", tags)}){cost}\n{t.Description}";
+            return $"{t.Name}  ({string.Join(", ", tags)})\n{t.Description}";
         }
 
         /// <summary>Who can learn a technique: one button per army member, disabled when it can't.</summary>
@@ -446,17 +445,21 @@ namespace ArmyRoguelike.View
         {
             foreach (var member in _run.Army)
             {
-                var why = technique.CanLearn(member) ? ""
-                    : member.Knows(technique) ? "  (knows it)"
-                    : technique.Requires != null && !member.Knows(technique.Requires) && (technique.IsShared || member.Stats == technique.Line) ? $"  (needs {technique.Requires.Name})"
-                    : "  (other line)";
+                var why = WhyNot(technique, member);
                 GUI.enabled = can(member);
                 var m = member;
-                if (GUILayout.Button($"{member.Stats.Name} (level {member.Level} -> {member.Level + 1}){why}"))
+                if (GUILayout.Button($"{member.Stats.Name} (level {member.Level} -> {member.Level + 1}){(why.Length > 0 ? $"  ({why})" : "")}"))
                     Do(() => learn(m));
                 GUI.enabled = true;
             }
         }
+
+        /// <summary>Why a member can't learn a technique, or "" when it can.</summary>
+        private static string WhyNot(Technique technique, ArmyMember member) =>
+            technique.CanLearn(member) ? ""
+            : member.Knows(technique) ? "knows it"
+            : technique.Requires != null && !member.Knows(technique.Requires) && (technique.IsShared || member.Stats == technique.Line) ? $"needs {technique.Requires.Name}"
+            : "other line";
 
         /// <summary>One line describing a unit type: stats, abilities and actions.</summary>
         private static string Describe(UnitStats s)
@@ -546,140 +549,343 @@ namespace ArmyRoguelike.View
             GUILayout.EndArea();
         }
 
+        // ---------- Shop screen ----------
+        // Offers are cards in rows; picking one turns the army row at the bottom into "who gets it?".
+
+        private const float ShopWidth = 940f;
+        private const int ShopPad = 14;
+        private const float CardGap = 10f;
+        private const float MemberCardHeight = 146f;
+
+        private static readonly Color GoldColor = new Color(1f, 0.82f, 0.35f);
+        private static readonly Color TooDearColor = new Color(1f, 0.45f, 0.4f);
+        private static readonly Color RareColor = new Color(0.78f, 0.62f, 1f);
+        private static readonly Color TextColor = new Color(0.9f, 0.9f, 0.9f);
+        private static readonly Color DimText = new Color(0.62f, 0.62f, 0.67f);
+        private static readonly Color Faded = new Color(1f, 1f, 1f, 0.5f);
+
+        private GUIStyle _shopTitle, _cardName, _cardText, _cardTag, _section, _price, _chip;
+
+        private void EnsureShopStyles()
+        {
+            if (_shopTitle != null)
+                return;
+            _shopTitle = new GUIStyle(GUI.skin.label) { fontSize = 26, fontStyle = FontStyle.Bold };
+            _cardName = new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, wordWrap = false, clipping = TextClipping.Clip };
+            _cardText = new GUIStyle(GUI.skin.label) { fontSize = 12, wordWrap = true, padding = new RectOffset() };
+            _cardTag = new GUIStyle(_cardText) { fontSize = 11, richText = true };
+            _section = new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold };
+            _price = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
+            _chip = new GUIStyle(GUI.skin.button) { fontSize = 11, fixedHeight = 20, padding = new RectOffset(8, 8, 2, 2) };
+        }
+
+        private static void Label(Rect rect, string text, GUIStyle style, Color color)
+        {
+            style.normal.textColor = color;
+            GUI.Label(rect, text, style);
+        }
+
+        private void Section(string text, Color color)
+        {
+            _section.normal.textColor = color;
+            GUILayout.Label(text, _section);
+        }
+
+        /// <summary>Draws a card's background (lit on hover, gold-edged when selected) and returns whether it was clicked.</summary>
+        private static bool Card(Rect rect, bool selected, bool clickable)
+        {
+            var hover = clickable && rect.Contains(Event.current.mousePosition);
+            GUI.DrawTexture(rect, HudArt.Solid(selected ? HudArt.CardAimColor : hover ? HudArt.CardHoverColor : HudArt.CardColor));
+            if (selected)
+                GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 3f), HudArt.Solid(GoldColor));
+            return clickable && GUI.Button(rect, GUIContent.none, GUIStyle.none);
+        }
+
+        private void Price(Rect card, int price)
+        {
+            Label(new Rect(card.x + 10, card.yMax - 26, card.width - 20, 20), $"{price} gold", _price, _run.Gold >= price ? GoldColor : TooDearColor);
+        }
+
+        /// <summary>A unit's statue, fitted into the area and standing on its bottom edge.</summary>
+        private static void DrawStatue(Rect area, UnitKind kind)
+        {
+            var sprite = PlaceholderArt.Statue(kind);
+            if (sprite == null)
+                return;
+            var tex = sprite.texture;
+            var uv = sprite.textureRect;
+            var w = Mathf.Min(area.width, area.height * uv.width / uv.height);
+            var h = w * uv.height / uv.width;
+            GUI.DrawTextureWithTexCoords(new Rect(area.center.x - w * 0.5f, area.yMax - h, w, h), tex,
+                new Rect(uv.x / tex.width, uv.y / tex.height, uv.width / tex.width, uv.height / tex.height));
+        }
+
+        private static string TechniqueTags(Technique t)
+        {
+            var rarity = t.Rarity == TechniqueRarity.Rare ? $"<color=#{ColorUtility.ToHtmlStringRGB(RareColor)}>Rare</color>" : "Common";
+            var tags = new System.Collections.Generic.List<string> { rarity, t.IsShared ? "any unit" : t.Line.Name };
+            if (t.Requires != null)
+                tags.Add($"needs {t.Requires.Name}");
+            if (t.Action.HasValue)
+                tags.Add($"action, cooldown {Battle.Cooldown(t.Action.Value)}");
+            return string.Join("  ·  ", tags);
+        }
+
+        /// <summary>Height of an offer card: name, tag line, rule text and the price row.</summary>
+        private float OfferHeight(string tags, string text, float width) =>
+            8 + 22 + _cardTag.CalcHeight(new GUIContent(tags), width - 20) + 4 + _cardText.CalcHeight(new GUIContent(text), width - 20) + 30;
+
+        private void DrawOffer(Rect r, string name, string tags, string text, int price, bool selected, Action select)
+        {
+            var old = GUI.color;
+            var affordable = _run.Gold >= price;
+            if (!affordable)
+                GUI.color = Faded;
+            if (Card(r, selected, affordable))
+                Do(select);
+            var x = r.x + 10;
+            var inner = r.width - 20;
+            var y = r.y + 8;
+            Label(new Rect(x, y, inner, 22), name, _cardName, Color.white);
+            y += 22;
+            var tagHeight = _cardTag.CalcHeight(new GUIContent(tags), inner);
+            Label(new Rect(x, y, inner, tagHeight), tags, _cardTag, DimText);
+            y += tagHeight + 4;
+            Label(new Rect(x, y, inner, r.yMax - 28 - y), text, _cardText, TextColor);
+            Price(r, price);
+            GUI.color = old;
+        }
+
+        /// <summary>A row of offer cards, three to a row's width so cards keep their size as they sell.</summary>
+        private void OfferRow<T>(System.Collections.Generic.IReadOnlyList<T> offers, float width, Func<T, float, float> height, Action<Rect, T> draw)
+        {
+            const int columns = 3;
+            var cardWidth = (width - CardGap * (columns - 1)) / columns;
+            var row = GUILayoutUtility.GetRect(width, offers.Max(o => height(o, cardWidth)), GUILayout.ExpandWidth(false));
+            for (var i = 0; i < offers.Count; i++)
+                draw(new Rect(row.x + i * (cardWidth + CardGap), row.y, cardWidth, row.height), offers[i]);
+        }
+
         private void DrawShop(float screenWidth)
         {
-            const float w = 560;
-            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 30, w, 660), GUI.skin.box);
-            GUILayout.Label("Shop", Title);
-            GUILayout.Label($"Gold: {_run.Gold}");
-            GUILayout.Label("A unit that learns a technique goes up a level. Each unit has one item slot; a new item replaces the old.");
-            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(520));
+            EnsureShopStyles();
+            var w = Mathf.Min(ShopWidth, screenWidth - 20f);
+            var inner = w - 2 * ShopPad;
+            var scrollInner = inner - 18f;
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 10, w, ReferenceHeight - 20), HudArt.PanelStyle(HudArt.PanelColor, ShopPad));
 
-            GUILayout.Label("Techniques for sale (click one):");
-            if (_run.Offers.Count == 0)
-                GUILayout.Label("  Sold out.");
-            var style = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.UpperLeft, wordWrap = true };
-            foreach (var offer in _run.Offers.ToList())
-            {
-                var marker = offer == _selectedOffer ? "> " : "";
-                GUI.enabled = _run.Gold >= offer.Price;
-                if (GUILayout.Button(marker + Describe(offer, true), style))
-                {
-                    _selectedOffer = offer;
-                    _selectedItem = null;
-                }
-
-                GUI.enabled = true;
-            }
-
-            GUILayout.Space(6);
-            GUILayout.Label("Items for sale (click one):");
-            if (_run.ItemOffers.Count == 0)
-                GUILayout.Label("  Sold out.");
-            foreach (var item in _run.ItemOffers.ToList())
-            {
-                var marker = item == _selectedItem ? "> " : "";
-                GUI.enabled = _run.Gold >= item.Price;
-                if (GUILayout.Button($"{marker}{item.Name}   {item.Effect}   {item.Price} gold"))
-                {
-                    _selectedItem = item;
-                    _selectedOffer = null;
-                }
-
-                GUI.enabled = true;
-            }
-
-            if (_run.ShopHasRecruit)
-            {
-                GUILayout.Space(6);
-                GUI.enabled = _run.CanBuyRecruit;
-                var recruit = _run.ShopRecruit;
-                if (GUILayout.Button($"Recruit a {recruit.Name} ({recruit.Role})   {Run.RecruitPrice} gold"))
-                    Do(() =>
-                    {
-                        if (_run.BuyRecruit())
-                            _runLog.RecordRecruit(recruit.Name, Run.RecruitPrice);
-                    });
-
-                GUI.enabled = true;
-            }
-
+            GUILayout.BeginHorizontal();
+            _shopTitle.normal.textColor = Color.white;
+            GUILayout.Label("Shop", _shopTitle);
+            GUILayout.FlexibleSpace();
+            _shopTitle.normal.textColor = GoldColor;
+            GUILayout.Label($"{_run.Gold} gold", _shopTitle);
+            GUILayout.EndHorizontal();
+            _cardText.normal.textColor = DimText;
+            GUILayout.Label("A unit that learns a technique goes up a level. Each unit has one item slot; a new item replaces the old.", _cardText);
             GUILayout.Space(8);
-            if (_selectedOffer != null && _run.Offers.Contains(_selectedOffer))
-            {
-                GUILayout.Label($"Who learns {_selectedOffer.Name}?");
-                var offer = _selectedOffer;
-                DrawLearners(offer, m => _run.CanBuy(offer, m), buyer =>
-                {
-                    if (_run.Buy(offer, buyer))
-                    {
-                        _runLog.RecordPurchase(offer, buyer);
-                        _selectedOffer = null;
-                    }
-                });
-            }
-            else if (_selectedItem != null && _run.ItemOffers.Contains(_selectedItem))
-            {
-                GUILayout.Label($"Give the {_selectedItem.Name} to:");
-                foreach (var member in _run.Army)
-                {
-                    var current = member.Equipment != null ? $"replaces {member.Equipment.Name}" : "empty slot";
-                    GUI.enabled = _run.CanBuyItem(_selectedItem, member);
-                    if (GUILayout.Button($"{member.Stats.Name}   ({current})"))
-                    {
-                        var buyer = member;
-                        var item = _selectedItem;
-                        Do(() =>
-                        {
-                            var replaced = buyer.Equipment;
-                            if (_run.BuyItem(item, buyer))
-                            {
-                                _runLog.RecordItemPurchase(item, buyer, replaced);
-                                _selectedItem = null;
-                            }
-                        });
-                    }
 
-                    GUI.enabled = true;
-                }
-            }
+            _scroll = GUILayout.BeginScrollView(_scroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar, GUIStyle.none, GUILayout.ExpandHeight(true));
+
+            Section("Techniques", GoldColor);
+            var techniques = _run.Offers.ToList();
+            if (techniques.Count == 0)
+                Section("Sold out.", DimText);
             else
-            {
-                DrawArmy();
-            }
-
-            // Forgetting: frees a unit of a technique it doesn't want; the level stays.
-            if (_run.Army.Any(m => m.Techniques.Count > 0))
-            {
-                GUILayout.Space(8);
-                GUILayout.Label($"Forget a technique ({Run.ForgetPrice} gold; the level stays, and techniques that need it go too):");
-                foreach (var member in _run.Army.Where(m => m.Techniques.Count > 0))
-                {
-                    GUILayout.BeginHorizontal();
-                    GUILayout.Label(member.Stats.Name, GUILayout.Width(110));
-                    foreach (var technique in member.Techniques.ToList())
+                OfferRow(techniques, scrollInner, (t, cw) => OfferHeight(TechniqueTags(t), t.Description, cw),
+                    (r, t) => DrawOffer(r, t.Name, TechniqueTags(t), t.Description, t.Price, t == _selectedOffer, () =>
                     {
-                        GUI.enabled = _run.CanForget(member, technique);
-                        var m = member;
-                        var t = technique;
-                        if (GUILayout.Button(technique.Name))
-                            Do(() =>
-                            {
-                                if (_run.Forget(m, t))
-                                    _runLog.RecordForget(t, m);
-                            });
-                        GUI.enabled = true;
-                    }
+                        _selectedOffer = t;
+                        _selectedItem = null;
+                    }));
 
-                    GUILayout.EndHorizontal();
+            GUILayout.Space(10);
+            Section("Items", GoldColor);
+            var items = _run.ItemOffers.ToList();
+            if (items.Count == 0)
+                Section("Sold out.", DimText);
+            else
+                OfferRow(items, scrollInner, (e, cw) => OfferHeight("Item", e.Effect, cw),
+                    (r, e) => DrawOffer(r, e.Name, "Item", e.Effect, e.Price, e == _selectedItem, () =>
+                    {
+                        _selectedItem = e;
+                        _selectedOffer = null;
+                    }));
+
+            var forgetters = _run.Army.Where(m => m.Techniques.Count > 0).ToList();
+            if (_run.ShopHasRecruit || forgetters.Count > 0)
+            {
+                GUILayout.Space(10);
+                Section("Services", GoldColor);
+                var forgetHeight = 8 + 22 + 20 + forgetters.Count * 24 + 30;
+                var row = GUILayoutUtility.GetRect(scrollInner, Mathf.Max(112f, forgetHeight), GUILayout.ExpandWidth(false));
+                var recruitWidth = (scrollInner - CardGap * 2) / 3;
+                var forgetRect = row;
+                if (_run.ShopHasRecruit)
+                {
+                    DrawRecruitCard(new Rect(row.x, row.y, recruitWidth, row.height));
+                    forgetRect = new Rect(row.x + recruitWidth + CardGap, row.y, row.width - recruitWidth - CardGap, row.height);
                 }
+
+                if (forgetters.Count > 0)
+                    DrawForgetCard(forgetRect, forgetters);
             }
 
             GUILayout.EndScrollView();
+
+            GUILayout.Space(10);
+            Section(_selectedOffer != null ? $"Who learns {_selectedOffer.Name}?"
+                : _selectedItem != null ? $"Who gets the {_selectedItem.Name}?"
+                : "Your army", _selectedOffer != null || _selectedItem != null ? GoldColor : TextColor);
+            var armyRow = GUILayoutUtility.GetRect(inner, MemberCardHeight, GUILayout.ExpandWidth(false));
+            var memberWidth = (inner - CardGap * (Run.MaxArmySize - 1)) / Run.MaxArmySize;
+            for (var i = 0; i < _run.Army.Count; i++)
+                DrawMemberCard(new Rect(armyRow.x + i * (memberWidth + CardGap), armyRow.y, memberWidth, armyRow.height), _run.Army[i]);
+
+            GUILayout.Space(10);
+            GUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Leave the shop", GUILayout.Height(32)))
+            if (GUILayout.Button("Leave the shop", GUILayout.Width(220), GUILayout.Height(34)))
                 Do(LeaveShop);
+            GUILayout.EndHorizontal();
             GUILayout.EndArea();
+        }
+
+        private void DrawRecruitCard(Rect r)
+        {
+            var recruit = _run.ShopRecruit;
+            var can = _run.CanBuyRecruit;
+            var old = GUI.color;
+            if (!can)
+                GUI.color = Faded;
+            if (Card(r, false, can))
+                Do(() =>
+                {
+                    if (_run.BuyRecruit())
+                        _runLog.RecordRecruit(recruit.Name, Run.RecruitPrice);
+                });
+            DrawStatue(new Rect(r.x + 6, r.y + 8, 56, r.height - 16), recruit.Kind);
+            var x = r.x + 68;
+            var inner = r.xMax - 10 - x;
+            Label(new Rect(x, r.y + 8, inner, 22), $"Recruit a {recruit.Name}", _cardName, Color.white);
+            Label(new Rect(x, r.y + 30, inner, r.height - 60), recruit.Role, _cardText, TextColor);
+            if (_run.Army.Count >= Run.MaxArmySize)
+                Label(new Rect(x, r.yMax - 26, inner, 20), "Army is full", _cardText, TooDearColor);
+            Price(r, Run.RecruitPrice);
+            GUI.color = old;
+        }
+
+        // Forgetting: frees a unit of a technique it doesn't want; the level stays.
+        private void DrawForgetCard(Rect r, System.Collections.Generic.List<ArmyMember> forgetters)
+        {
+            Card(r, false, false);
+            var x = r.x + 10;
+            var inner = r.width - 20;
+            Label(new Rect(x, r.y + 8, inner, 22), "Forget a technique", _cardName, Color.white);
+            Label(new Rect(x, r.y + 30, inner, 18), "The level stays, and techniques that need it go too. Click one to forget it.", _cardText, DimText);
+            var y = r.y + 52;
+            foreach (var member in forgetters)
+            {
+                Label(new Rect(x, y + 2, 100, 18), member.Stats.Name, _cardText, TextColor);
+                var cx = x + 104;
+                foreach (var technique in member.Techniques.ToList())
+                {
+                    var size = _chip.CalcSize(new GUIContent(technique.Name));
+                    GUI.enabled = _run.CanForget(member, technique);
+                    var m = member;
+                    var t = technique;
+                    if (GUI.Button(new Rect(cx, y, size.x, 20), technique.Name, _chip))
+                        Do(() =>
+                        {
+                            if (_run.Forget(m, t))
+                                _runLog.RecordForget(t, m);
+                        });
+                    GUI.enabled = true;
+                    cx += size.x + 6;
+                }
+
+                y += 24;
+            }
+
+            Price(r, Run.ForgetPrice);
+        }
+
+        /// <summary>A unit in the army row: statue, level, item and techniques. While an offer is picked, clicking it buys the offer for that unit.</summary>
+        private void DrawMemberCard(Rect r, ArmyMember m)
+        {
+            var technique = _selectedOffer != null && _run.Offers.Contains(_selectedOffer) ? _selectedOffer : null;
+            var item = _selectedItem != null && _run.ItemOffers.Contains(_selectedItem) ? _selectedItem : null;
+            var choosing = technique != null || item != null;
+            var can = technique != null ? _run.CanBuy(technique, m) : item != null && _run.CanBuyItem(item, m);
+            var old = GUI.color;
+            if (choosing && !can)
+                GUI.color = Faded;
+            if (Card(r, false, can))
+                Do(() =>
+                {
+                    if (technique != null)
+                        BuyTechnique(technique, m);
+                    else
+                        BuyItem(item, m);
+                });
+            if (choosing && can)
+                GUI.DrawTexture(new Rect(r.x, r.y, r.width, 3f), HudArt.Solid(GoldColor));
+
+            DrawStatue(new Rect(r.x + 6, r.y + 10, 58, r.height - 20), m.Stats.Kind);
+            var x = r.x + 70;
+            var inner = r.xMax - 8 - x;
+            var y = r.y + 8;
+            Label(new Rect(x, y, inner, 22), m.Stats.Name, _cardName, Color.white);
+            y += 22;
+            var levelUp = technique != null && can;
+            Label(new Rect(x, y, inner, 16), levelUp ? $"Level {m.Level} -> {m.Level + 1}" : $"Level {m.Level}", _cardText, levelUp ? HudArt.BuffColor : TextColor);
+            y += 16;
+            var replacing = item != null && can && m.Equipment != null;
+            Label(new Rect(x, y, inner, 16), replacing ? $"Replaces {m.Equipment.Name}" : $"Item: {(m.Equipment != null ? m.Equipment.Name : "none")}",
+                _cardText, replacing ? HudArt.HarmColor : TextColor);
+            y += 16;
+            var bonus = new System.Collections.Generic.List<string>();
+            if (m.LevelHp + m.BonusMaxHp > 0)
+                bonus.Add($"+{m.LevelHp + m.BonusMaxHp} max HP");
+            if (m.LevelDamage + m.BonusDamage > 0)
+                bonus.Add($"+{m.LevelDamage + m.BonusDamage} damage");
+            if (m.LevelMines > 0)
+                bonus.Add($"+{m.LevelMines} mine");
+            if (bonus.Count > 0)
+            {
+                Label(new Rect(x, y, inner, 16), string.Join(", ", bonus), _cardText, TextColor);
+                y += 16;
+            }
+
+            y += 4;
+            var techniques = m.Techniques.Count > 0 ? string.Join(", ", m.Techniques.Select(t => t.Name)) : "No techniques yet";
+            Label(new Rect(x, y, inner, r.yMax - 24 - y), techniques, _cardText, DimText);
+            if (technique != null && !can)
+            {
+                var why = WhyNot(technique, m);
+                Label(new Rect(x, r.yMax - 22, inner, 18), why.Length > 0 ? char.ToUpper(why[0]) + why.Substring(1) : "", _cardText, TooDearColor);
+            }
+
+            GUI.color = old;
+        }
+
+        private void BuyTechnique(Technique offer, ArmyMember buyer)
+        {
+            if (_run.Buy(offer, buyer))
+            {
+                _runLog.RecordPurchase(offer, buyer);
+                _selectedOffer = null;
+            }
+        }
+
+        private void BuyItem(Equipment item, ArmyMember buyer)
+        {
+            var replaced = buyer.Equipment;
+            if (_run.BuyItem(item, buyer))
+            {
+                _runLog.RecordItemPurchase(item, buyer, replaced);
+                _selectedItem = null;
+            }
         }
 
         private void DrawEvent(float screenWidth)
