@@ -126,6 +126,7 @@ namespace ArmyRoguelike.Tests
             Assert.IsFalse(Player(b, 1).HasAction(ActionKind.Fireball));
             b.PlayerUseAction(mage, ActionKind.Fireball, P(3, 3));
             Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.FireballDamage, Enemy(b, 0).Hp);
+            Assert.AreEqual(1, mage.TimesUsed(ActionKind.Fireball), "counted for the playtest log");
         }
 
         [Test]

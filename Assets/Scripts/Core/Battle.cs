@@ -204,6 +204,7 @@ namespace ArmyRoguelike.Core
         {
             SpendAp(unit, ActionCost(action));
             unit.StartCooldown(action, Cooldown(action));
+            unit.CountUse(action);
         }
 
         public readonly Board Board;

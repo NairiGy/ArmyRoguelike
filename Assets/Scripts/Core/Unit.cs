@@ -54,6 +54,14 @@ namespace ArmyRoguelike.Core
                 _cooldowns[action] = turns;
         }
 
+        // How often each special action was used this battle (for the playtest log).
+        private readonly Dictionary<ActionKind, int> _uses = new Dictionary<ActionKind, int>();
+
+        /// <summary>Times the unit used this special action in this battle.</summary>
+        public int TimesUsed(ActionKind action) => _uses.TryGetValue(action, out var n) ? n : 0;
+
+        internal void CountUse(ActionKind action) => _uses[action] = TimesUsed(action) + 1;
+
         /// <summary>Every action ready again (tests).</summary>
         internal void ClearCooldowns() => _cooldowns.Clear();
 
