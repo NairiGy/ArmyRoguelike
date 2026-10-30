@@ -4,7 +4,7 @@ using System.Text;
 using ArmyRoguelike.Core;
 
 /// <summary>
-/// Writes the gamepedia HTML from the game's data: every evolution tree, enemy, item, action,
+/// Writes the gamepedia HTML from the game's data: every unit and technique, enemy, item, action,
 /// ability, encounter, map node and event. Plain C# with no Unity dependency, so it can also run
 /// outside the editor; <see cref="GamepediaExporter"/> calls it with statue images.
 /// </summary>
@@ -21,11 +21,11 @@ public static class GamepediaWriter
         html.Append("<header><h1>ArmyRoguelike Gamepedia</h1>");
         html.Append($"<p class=\"muted\">Generated from the game data on {DateTime.Now:yyyy-MM-dd HH:mm} ({generatedBy}). All numbers are placeholders. ");
         html.Append("Re-export with <b>Tools → Export Gamepedia</b>.</p>");
-        html.Append("<nav><a href=\"#trees\">Evolution trees</a><a href=\"#enemies\">Enemies</a><a href=\"#enemy-ai\">Enemy AI</a><a href=\"#encounters\">Encounters</a>");
+        html.Append("<nav><a href=\"#units\">Units &amp; techniques</a><a href=\"#enemies\">Enemies</a><a href=\"#enemy-ai\">Enemy AI</a><a href=\"#encounters\">Encounters</a>");
         html.Append("<a href=\"#items\">Items</a><a href=\"#actions\">Actions</a><a href=\"#abilities\">Abilities</a>");
         html.Append("<a href=\"#run\">Run &amp; map</a><a href=\"#rules\">Battle rules</a></nav></header><main>");
 
-        Trees(html);
+        Units(html);
         Enemies(html);
         EnemyAISection(html);
         Encounters(html);
@@ -42,16 +42,28 @@ public static class GamepediaWriter
 
     // ---------- Sections ----------
 
-    private static void Trees(StringBuilder html)
+    private static void Units(StringBuilder html)
     {
-        html.Append("<section id=\"trees\"><h2>Evolution trees</h2>");
-        html.Append("<p>You draft 3 of these 5 base units. At a Trainer every unit can go up one tier, choosing a branch. ");
-        html.Append("Higher tiers are stronger; units on the same tier play differently. Stone colour shows the tier: marble, bronze, gold.</p>");
-        foreach (var root in UnitStats.BaseUnits)
+        html.Append("<section id=\"units\"><h2>Units and techniques</h2>");
+        html.Append($"<p>You draft {Run.DraftSize} of these 5 units. They grow during the run by learning <b>techniques</b>: every won fight ");
+        html.Append($"(except the boss and the Moon Shrine) offers {Run.RewardCount} that your units can learn; one unit learns one, or you skip for {Run.SkipGold} gold. ");
+        html.Append($"Shops sell them too ({Technique.CommonPrice} gold common, {Technique.RarePrice} rare). Each technique belongs to one line, and some need another first. ");
+        html.Append("A unit's <b>level</b> is the number of techniques it has learned; forgetting one (at a shop) keeps the level.</p>");
+        foreach (var unit in UnitStats.BaseUnits)
         {
-            html.Append($"<div class=\"tree\"><h3>{Esc(root.Name)} line</h3>");
-            Node(html, root);
+            html.Append($"<div class=\"line\"><h3>{Esc(unit.Name)} line</h3><div class=\"grid\">");
+            UnitCard(html, unit);
             html.Append("</div>");
+            html.Append($"<p class=\"stats\">Per level: {Esc(GrowthText(unit))}</p>");
+            html.Append("<table><tr><th>Technique</th><th>Kind</th><th>Rarity</th><th>Needs</th><th>Effect</th></tr>");
+            foreach (var t in Technique.All.Where(t => t.Line == unit))
+            {
+                var kind = t.Action.HasValue ? $"action ({Battle.ActionCost(t.Action.Value)} AP, cooldown {Battle.Cooldown(t.Action.Value)})" : "passive";
+                var rarity = $"{(t.Rarity == TechniqueRarity.Rare ? "rare" : "common")}, {t.Price} gold";
+                html.Append($"<tr id=\"t-{Id(t.Name)}\"><td><b>{Esc(t.Name)}</b></td><td>{kind}</td><td>{rarity}</td><td>{(t.Requires != null ? TechniqueLink(t.Requires) : "")}</td><td>{Esc(t.Description)}</td></tr>");
+            }
+
+            html.Append("</table></div>");
         }
 
         html.Append("<h3>Summons</h3><div class=\"grid\">");
@@ -59,12 +71,16 @@ public static class GamepediaWriter
         html.Append("</div></section>");
     }
 
-    /// <summary>A unit card in the tree layout (base units have no children since evolutions went).</summary>
-    private static void Node(StringBuilder html, UnitStats unit)
+    /// <summary>What each level gives a line, e.g. "+1 HP; +1 damage at levels 3 and 6".</summary>
+    private static string GrowthText(UnitStats line)
     {
-        html.Append("<div class=\"node\">");
-        UnitCard(html, unit);
-        html.Append("</div>");
+        var parts = new System.Collections.Generic.List<string> { $"+{Growth.HpPerLevel(line)} max HP" };
+        var damage = Growth.DamageLevels(line);
+        if (damage.Count > 0)
+            parts.Add($"+1 damage at level {string.Join(", ", damage)}");
+        if (Growth.MineLevel(line) > 0)
+            parts.Add($"+1 mine on the board at level {Growth.MineLevel(line)}");
+        return string.Join("; ", parts);
     }
 
     private static void UnitCard(StringBuilder html, UnitStats unit)
@@ -417,7 +433,8 @@ public static class GamepediaWriter
         html.Append("<table><tr><th>Action</th><th>AP</th><th>Effect</th><th>Used by</th></tr>");
         foreach (ActionKind a in Enum.GetValues(typeof(ActionKind)))
         {
-            var users = UnitStats.BaseUnits.Where(u => u.HasAction(a)).Select(u => Link(u.Name));
+            var users = UnitStats.BaseUnits.Where(u => u.HasAction(a)).Select(u => Link(u.Name))
+                .Concat(Technique.All.Where(t => t.Action == a).Select(t => $"{TechniqueLink(t)} ({Esc(t.Line.Name)} technique)"));
             html.Append($"<tr><td>{Esc(Abilities.Name(a))}</td><td>{Battle.ActionCost(a)}</td><td>{Esc(Abilities.Describe(a))}</td><td>{string.Join(", ", users)}</td></tr>");
         }
 
@@ -433,6 +450,7 @@ public static class GamepediaWriter
             if (a == Ability.None)
                 continue;
             var from = UnitStats.BaseUnits.Where(u => u.Has(a)).Select(u => Link(u.Name))
+                .Concat(Technique.All.Where(t => t.Ability == a).Select(t => $"{TechniqueLink(t)} ({Esc(t.Line.Name)} technique)"))
                 .Concat(Equipment.Catalog.Where(e => e.Ability == a).Select(e => $"<i>{Esc(e.Name)}</i>"))
                 .Concat(a == Ability.Immobile ? new[] { "Turret", "Moon Shrine", "Totem" } : new string[0]);
             html.Append($"<tr><td>{Esc(Abilities.Name(a))}</td><td>{Esc(Abilities.Describe(a))}</td><td>{string.Join(", ", from)}</td></tr>");
@@ -495,6 +513,8 @@ public static class GamepediaWriter
 
     private static string Link(string name) => $"<a href=\"#{Id(name)}\">{Esc(name)}</a>";
 
+    private static string TechniqueLink(Technique t) => $"<a href=\"#t-{Id(t.Name)}\">{Esc(t.Name)}</a>";
+
     private static string Head() => @"<!doctype html>
 <html lang=""en""><head><meta charset=""utf-8""><meta name=""viewport"" content=""width=device-width, initial-scale=1"">
 <title>ArmyRoguelike Gamepedia</title>
@@ -507,9 +527,7 @@ h1 { margin:0 0 4px; font-size:26px; } h2 { margin:32px 0 12px; font-size:21px; 
 h3 { margin:18px 0 10px; font-size:17px; color:var(--accent); } h4 { margin:0 0 4px; font-size:15px; }
 nav { display:flex; flex-wrap:wrap; gap:14px; margin:10px 0; } nav a, a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
 main { padding:0 32px 48px; } .muted { color:var(--muted); margin:0; }
-.tree { overflow-x:auto; padding-bottom:8px; }
-.node { display:flex; flex-direction:column; align-items:center; }
-.children { display:flex; gap:12px; margin-top:12px; padding-top:12px; border-top:2px solid var(--line); align-items:flex-start; }
+.line { margin-bottom:18px; }
 .card { display:flex; gap:10px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px; width:300px; }
 .card.wide { width:440px; } .ai { margin:6px 0 0; font-size:13px; }
 .card.tier2 { border-color:#7a6040; } .card.tier3 { border-color:#a08a30; }
