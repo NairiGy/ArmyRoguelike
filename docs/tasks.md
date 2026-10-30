@@ -50,6 +50,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [ ] Platform built from pieces (painted slabs per tile plus edge and wall pieces along the outline) instead of one painting, so boards can be any size or shape (16x16 already works by zooming out; odd shapes need this). Later, when non-rectangular boards are planned.
 - [x] Highlights that fit the theme: smooth glowing tiles with a gentle pulse (2026-10-25). Not yet playtested; path markers not done.
 - [x] Feel pass: attack wind-up, hit-stop, projectiles, heavy steps with dust; hit flash and chips, cracks as HP drops, crumbling deaths, popping damage numbers, explosions with shake (2026-10-25). Not yet playtested.
+- [x] Idle life (2026-10-30, `UnitView`): idle creaks on one statue at a time, and the selected statue wakes (lifts, brighter rim via `_Wake` in `StatueRamp.shader`) and drops back with a thud when deselected; replaces the selection bob. Not playtested.
 - [ ] Tune the cloud layers' values once settled (live in the Inspector: Scenery → Scenery Clouds) and make them the defaults.
 - [x] Merge `experiment/art-style` into `main` (done 2026-10-28; the branch is deleted, art work now goes on `main`).
 
@@ -98,6 +99,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [ ] Before release: ElevenLabs free-plan sounds (`sun_mark_1`, `_2`, `sun_charge_2`-`_12`, the `unit_*` sounds and any later ones) need "elevenlabs.io" in the game credits, or regenerate them on a paid plan. See `Assets/Audio/CREDITS.md`.
 - [ ] Unused ElevenLabs generations the user liked, for later effects: "warm golden glow" #1, #3, #4 and all four "heavy stone rune lighting up with heat" (in the ElevenLabs history, sharing to Explore is off).
 - [ ] Sound pass, still to do: ranged attacks, mines and bombs, the other effects, ambience (wind, braziers).
+- [ ] Idle creak and wake sounds (art chat, 2026-10-30): the statue creak is silent (a soft stone grind would suit it, very quiet, since it happens every second or two); the wake drop reuses `unit_step`. Ask the user how they should feel first.
 
 ## Marketing
 

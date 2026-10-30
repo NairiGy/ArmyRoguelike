@@ -13,6 +13,7 @@ Shader "ArmyRoguelike/StatueRamp"
         _RimColor ("Moonlight rim colour", Color) = (0, 0, 0, 0)
         [PerRendererData] _Crack ("Cracks (damage 0..1)", Float) = 0
         [PerRendererData] _Flash ("Hit flash (0..1)", Float) = 0
+        [PerRendererData] _Wake ("Selected and awake (0..1)", Float) = 0
     }
     SubShader
     {
@@ -37,6 +38,7 @@ Shader "ArmyRoguelike/StatueRamp"
             float4 _RimColor;
             float _Crack;
             float _Flash;
+            float _Wake;
 
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; };
             struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; float2 wpos : TEXCOORD1; };
@@ -63,11 +65,12 @@ Shader "ArmyRoguelike/StatueRamp"
                 float3 col = tex2D(_Ramp, float2(value, 0.5)).rgb;
 
                 // An edge lit by the moon: this pixel is solid but the one a few texels up-left is empty.
-                float2 towardLight = float2(-1, 1) * _MainTex_TexelSize.xy * 3;
+                // The selected (awake) statue gets a thicker, steady, brighter rim.
+                float2 towardLight = float2(-1, 1) * _MainTex_TexelSize.xy * (3 + 2 * _Wake);
                 float rim = c.a * (1 - tex2D(_MainTex, i.uv + towardLight).a);
                 // A slow pulse, out of step from statue to statue (by position).
-                rim *= 0.7 + 0.3 * sin(_Time.y * 2.2 + (i.wpos.x + i.wpos.y) * 2);
-                col = lerp(col, _RimColor.rgb, rim * _RimColor.a);
+                rim *= lerp(0.7 + 0.3 * sin(_Time.y * 2.2 + (i.wpos.x + i.wpos.y) * 2), 1, _Wake);
+                col = lerp(col, _RimColor.rgb, saturate(rim * _RimColor.a * (1 + 0.6 * _Wake)));
                 // Damage cracks the stone; a hit flashes it white for a moment.
                 col *= 1 - 0.8 * cracks(i.uv * float2(6, 8), _Crack);
                 // Light from nearby effects warms the stone, the bright parts most.
