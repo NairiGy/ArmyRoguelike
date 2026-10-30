@@ -533,6 +533,9 @@ public static class ArtExperiment
         { UnitKind.Shard, 0.6f },
         // A wolf with its head raised to howl; UnitView scales the pack leader by 1.25 on top.
         { UnitKind.PackLeader, 0.85f },
+        // The objectives tower over the units around them.
+        { UnitKind.Shrine, 1.6f },
+        { UnitKind.Totem, 1.3f },
     };
 
     private static float FigureHeight(UnitKind kind) => FigureHeights.TryGetValue(kind, out var h) ? h : DefaultFigureHeight;
