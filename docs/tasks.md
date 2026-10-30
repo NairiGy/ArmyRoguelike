@@ -57,6 +57,8 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 
 ## Gameplay (mechanics chat)
 
+- [ ] **Next big piece: techniques instead of evolutions** (decided 2026-10-30, see "Techniques instead of evolutions" in the design note). Write an implementation plan with the user first, then build: technique data (line pools, requirements, shared items), unit levels with per-line growth, the reward pick after each won fight (skip for gold), techniques and Forget in the shop, remove evolutions, Trainers and the item slot, the map's steps 5 and 9, test mode, both loggers, the tests and the gamepedia. Art table row once it ships: the reward pick screen and the level on the hover card.
+- [ ] After techniques (parked, suggested order, see the design note): battlefield modifiers on map nodes, Banners, a first choice at run start then Commanders, unlocks between runs, a branching map, ? events with trade-offs.
 - [x] Zone of control made visible while a unit is selected (2026-10-27, branch `feature/zoc-visibility`): enemy reach tiles in faint red, move tiles that cost extra AP in orange, a dotted link to each enemy holding the selected unit, and "Engaged by ..." in the HUD and enemy hover. Not playtested; art row added above.
 - [x] Full Act 1 playtest (2026-10-27, logs in `../ArmyRoguelike-sound/Playtests`): won in under 7 minutes with only 4 fights; one faction fight, Rogue at +10 Bloodthirst, Giant dead in 2 turns, Break the Ritual easy, Moon Shrine held at 4 HP. Led to the 12-step act below.
 - [x] Act 1 is 12 steps with elites (harder rematches that pay an item pick); battles bring unbeaten factions, then rematches; Bloodthirst capped at +3; run log now gets each battle's log file even when Continue is clicked early (2026-10-28, branch `feature/act1-12-steps`). Not playtested.
@@ -71,7 +73,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [x] Boss kits (2026-10-30, on `main`): Giant gets Colossus and Wrath, Necromancer gets Soul Harvest and Corpse Blast (see the design note). Not playtested.
 - [x] Bundle playtest fixes (2026-10-30): Upheaval no longer leaves a rock, Shards lost Reform, mines hit only their own tile. Not playtested.- [ ] Design later with the user: what Upheaval should do to the board instead of a lasting rock (it felt like too many rocks), and a new passive for the Shard.
 - [ ] Design later with the user: what Upheaval should do to the board instead of a lasting rock (too many rocks in play), and a new passive for the Shard.
-- [ ] Unit kits still to design: the player's units, one line at a time with the user. Next: the Rogue line (5 HP problem, Bloodthirst leftover on its evolutions).
+- [ ] Unit kits still to design: the player's units, one line at a time with the user. Next: the Rogue line (5 HP problem, Bloodthirst leftover on its evolutions). Since 2026-10-30 evolutions are going away (techniques): this becomes the 5 base kits plus the technique pool; the Trapper task above folds into it.
 - [x] Playtest the small-board version (2026-10-30): felt ok; 3 finished fights (2 wins, 1 loss), 5-6 turns each. Merged into `main` the same day.
 - [ ] Next (new gameplay chat): tune units from the playtest. Weak spots seen: the Rogue dies first in every fight (5 HP on a 1-move board); Pinning Shot and Blink were never used; Fling and the bandit kits are unplayed; cooldowns are placeholders.
 - [ ] Re-export the illustrated gamepedia (Tools → Export Gamepedia): `docs/gamepedia.html` is the text-only version since the small-board work.

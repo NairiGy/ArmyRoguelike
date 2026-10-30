@@ -66,9 +66,9 @@ A roguelike army-builder: lead a small squad across a Slay the Spire–style map
 - Different unit types (warrior, archer, …). Each type differs in AP pool and costs.
 - A unit is a "card" in the army-builder sense, but there is no drawing in battle.
 - **Battle effects stay in the battle.** Every unit starts every fight at full HP. Damage, death and other effects reset afterwards.
-- **Run-persistent growth comes only from explicit abilities**, for example "this unit gets +1 damage after killing an enemy, persists for the run". There is no universal leveling.
+- **Run-persistent growth comes only from explicit abilities**, for example "this unit gets +1 damage after killing an enemy, persists for the run". There is no universal leveling (once techniques are built, a unit levels only by learning techniques; see "Techniques instead of evolutions").
 - Identity direction: each unit carries its own rule, like Balatro's jokers. Abilities come from the unit type (one built-in each) and from items; there are no separately earned abilities.
-- **Equipment:** units can wear equipment, possibly bought at shops.
+- **Equipment:** units can wear equipment, possibly bought at shops. (Items become shared techniques once techniques are built.)
 - **Rewards scale with how many units survived the fight.** This is the cost of death.
 - Difficulty modifiers may change these rules later.
 
@@ -249,7 +249,7 @@ Goal: battles that don't repeat and a boss that checks the build. The run is a s
 - **Necromancer** (14 HP, 3 dmg bolt, range 3): his army is raised from the factions beaten this act — 2 of each faction's representative (Bone Wolf, Bone Goblin Bomber, Bone Crossbowman, Bone Shard), topped up with Skeletons to at least 4. All of them leave bone piles and can be raised again (within 5 tiles, 3 AP).
 - **Giant** (the ogre, 36 HP): Slam (2 AP) shoves everyone within 2 tiles 1 tile away when 2+ of your units are that close; plus the club smash and boulders that stay as rocks.
 
-**Trainer economy** — one evolution per unit per visit. The first evolution of a visit is free, the second costs 20 gold, each after that 35. A won fight pays 15–25, so a typical act (2–3 fights) buys about one recruit (15), one item (7–10) and one paid evolution.
+**Trainer economy** — one evolution per unit per visit. The first evolution of a visit is free, the second costs 20 gold, each after that 35. A won fight pays 15–25, so a typical act (2–3 fights) buys about one recruit (15), one item (7–10) and one paid evolution. (Trainers and evolutions go once techniques are built; see "Techniques instead of evolutions".)
 
 **Zone of control** — each step out of a tile next to an enemy costs +2 AP, both sides.
 
@@ -357,6 +357,28 @@ Built 2026-10-29 as an idea test on `experiment/small-board`, playtested 2026-10
   - **Sapper line:** unchanged (Strike, Place Mine).
 - **Hover card:** hovering a unit shows a card at the top right: name and HP, AP / moves / range, **Next** (what an enemy will do), then **Passive**, **Actions** and **Now** (statuses, pack state, engaged). Colours are placeholders for the art chat. Readability pass 2026-10-30: solid dark panel with a team-coloured top edge, an HP bar, bigger text, and each passive and action as a name line (cost and cooldown in gold) with its description underneath.
 - **Action cards:** the selected unit's special actions are cards in a row at the bottom centre (key, name, cost and cooldown or "ready in N", description). Click or press the key to aim, again to cancel; the aimed card turns gold, unusable ones are faded. Done and End turn stay at the bottom right (2026-10-30).
+
+## Techniques instead of evolutions (decided 2026-10-30, not built)
+
+Decided with the user 2026-10-30, not built yet. Why: evolution added little to the run (every unit evolved at every Trainer, the only real choice was the tier-2 branch), 33 evolution kits were still to design, and the run should feel more like deckbuilding: a pick after every fight and builds that grow one card at a time. Replaces evolutions, Trainers and items once built; the sections above describe what is in the game until then.
+
+- **No evolutions.** The 5 base units stay (Warrior, Archer, Rogue, Mage Apprentice, Sapper) with their base kits, which work as a starter deck; the 33 evolved types go. Statues are unaffected (evolved units already shared their line's statue).
+- **Techniques:** passives or actions (actions use the normal 1 AP and cooldown rules). Today's tier-2 and tier-3 additions become techniques, so almost the whole pool is already built:
+  - Core (from tier 2): Sweep, Guard (Warrior); Steady Aim+ (Archer); Pincer, Counter (Rogue); Fireball, Chill, Ward (Mage); Big Mines, Barricade (Sapper).
+  - Follow-ups (from tier 3): Long Reach, Double Strike, Charge, Taunt, Tough (Warrior); Pierce, Opening Shot, Prey, Volley (Archer); Momentum, Poison, Counter All, Dodge (Rogue); Burning, Concussive, Ice Wall, Shatter, Wide Ward, Mend (Mage); Throw Bomb, Blast Proof, Turret, Detonate (Sapper).
+  - Shared, any unit: Vampire Fang, Thorned Mail, Spring Boots, Lucky Charm (today's items).
+- **Line pools:** a technique belongs to one line (Fireball stays a mage's), except the shared ones.
+- **Requirements only where the rule needs them:** Shatter needs Chill; Burning and Concussive need Fireball; Wide Ward and Mend need Ward; Turret and Detonate need Barricade; Counter All needs Counter. These chains are the deckbuilding pull.
+- **No slot limit** for the first version. About 7 fights means about 7 picks across 3–4 units, and with 1 AP extra actions add choice, not power. Watch stacked passives in the logs; add a cap if one unit snowballs.
+- **Levels:** a unit's level is the number of techniques it has learned. Each level grows the unit by its line *(placeholders)*: Warrior +2 HP; Archer +1 HP, +1 damage at levels 3 and 6; Rogue +1 HP, +1 damage at levels 2, 4 and 6; Mage +1 HP, +1 damage at levels 3 and 6; Sapper +1 HP, +1 max mine at level 3. Damage stays rare on purpose (HP is 5–12 on a 6x6 board). Forgetting a technique keeps the level. The level shows on the hover card.
+- **Reward pick:** after every won fight, normal gold, then pick 1 of 3 techniques or skip for gold (+8 *(placeholder)*). Offers only include techniques at least one of your units can learn (line and requirements); you choose which unit learns it. Elites: at least one rare offer (replaces the elite item pick). Break the Ritual's item pick becomes a technique pick.
+- **No Trainers; the shop does it.** The shop sells 3 techniques (only learnable ones) and a Forget service for a small fee. No "+" upgrades in the first version (levels already give growth).
+- **Map** (12-step act): step 5 Trainer / Shop becomes Shop / ?; step 9 Trainer / ? becomes ? / Battle (one more optional fight, one more pick).
+- **Economy:** gold now goes only to shops (plus skipped picks); prices need a pass after the first run.
+- **Logs:** the run log records each pick's offers, the choice or skip, which unit learned it, shop buys and forgets, and levels; battle logs record how often each technique is used.
+- **Loop:** draft 3 base units → fight → pick 1 of 3 techniques (the unit levels up) or skip for gold → spend gold at shops on techniques or Forget → boss.
+
+Ideas from the same discussion, parked for after techniques (suggested order): battlefield modifiers shown on the map node (Broken Parapet where pushes off the edge kill, Ice Floor, Fog, Mud, High Ground, Crumbling Floor, Braziers, Ley Line); Banners as army-wide rules (see "Later / maybe"); a first choice at run start (pick 1 of 3: a bonus technique, gold, a curse for a strong banner), then Commanders that set the draft pool, a starting banner and a rule twist; unlocks between runs; a branching map; ? events with trade-offs.
 
 ## Test mode (for testing only)
 
