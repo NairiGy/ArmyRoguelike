@@ -43,6 +43,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [ ] Archer, rogue, sapper and wolf keep their painted pedestals or slab for now (user's call); redraw them the new way later if the mix looks off.
 - [ ] Improve the player statues' colour (moon marble is better than before, not final).
 - [ ] Labels and health bars over the statues: restyle (part of the UI pass).
+- [ ] Statue rim (2026-10-30): at 3 texels it is under a screen pixel and barely shows; 8 texels was too much and was reverted. The user will think about what they want.
 - [ ] UI/HUD pass (IMGUI panels are still placeholders). Started 2026-10-30: hover card readability, action cards at the bottom, intent badges with Alt and on hover (see the Art needed rows). Not playtested.
 - [ ] Decide whether effects change colour by team (e.g. a moon shield on an enemy in ember red instead of silver). User's call; everything is silver/gold for both sides for now.
 - [x] Lightning strike effect onto a tile (2026-10-27, `LightningStrike`): sky flickers, a painted bolt flickering between three shapes, the board flashes white-blue, sparks and a scorch. No rule uses it yet; in test battles press L to strike the hovered tile. Not playtested.

@@ -65,13 +65,11 @@ Shader "ArmyRoguelike/StatueRamp"
                 float3 col = tex2D(_Ramp, float2(value, 0.5)).rgb;
 
                 // An edge lit by the moon: this pixel is solid but the one a few texels up-left is empty.
-                // About 8 texels: the art is drawn at roughly 3 texels per screen pixel, so this reads as a
-                // 2-3 pixel edge (3 texels was under a pixel and barely showed). The selected (awake) statue
-                // gets a thicker, steady, brighter rim.
-                float2 towardLight = float2(-1, 1) * _MainTex_TexelSize.xy * (8 + 5 * _Wake);
+                // The selected (awake) statue gets a thicker, steady, brighter rim.
+                float2 towardLight = float2(-1, 1) * _MainTex_TexelSize.xy * (3 + 2 * _Wake);
                 float rim = c.a * (1 - tex2D(_MainTex, i.uv + towardLight).a);
                 // A slow pulse, out of step from statue to statue (by position).
-                rim *= lerp(0.85 + 0.15 * sin(_Time.y * 2.2 + (i.wpos.x + i.wpos.y) * 2), 1, _Wake);
+                rim *= lerp(0.7 + 0.3 * sin(_Time.y * 2.2 + (i.wpos.x + i.wpos.y) * 2), 1, _Wake);
                 col = lerp(col, _RimColor.rgb, saturate(rim * _RimColor.a * (1 + 0.6 * _Wake)));
                 // Damage cracks the stone; a hit flashes it white for a moment.
                 col *= 1 - 0.8 * cracks(i.uv * float2(6, 8), _Crack);
