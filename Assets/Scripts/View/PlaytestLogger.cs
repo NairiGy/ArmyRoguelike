@@ -436,6 +436,8 @@ namespace ArmyRoguelike.View
                     case "attack":
                     case "smash":
                     case "boulder":
+                    case "fling":
+                    case "slam":
                     case "explosion":
                     case "thorns":
                     case "sweep":
