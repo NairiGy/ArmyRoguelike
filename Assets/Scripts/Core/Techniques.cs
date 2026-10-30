@@ -17,8 +17,8 @@ namespace ArmyRoguelike.Core
     /// </summary>
     public sealed class Technique
     {
-        public const int CommonPrice = 10;
-        public const int RarePrice = 16;
+        public const int CommonPrice = 15;
+        public const int RarePrice = 24;
 
         /// <summary>The passive it grants, or None for an action.</summary>
         public readonly Ability Ability;

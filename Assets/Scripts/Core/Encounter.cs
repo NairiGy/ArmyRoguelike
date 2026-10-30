@@ -220,8 +220,8 @@ namespace ArmyRoguelike.Core
                 var plan = new Plan();
                 foreach (var x in AlternateColumns(rng))
                     plan.Rocks.Add(P(x, 3));
-                PlaceRandom(plan, rng, UnitStats.GoblinBomber, 3, 5, 5);
-                PlaceRandom(plan, rng, UnitStats.Goblin, 2, 4, 4);
+                PlaceRandom(plan, rng, UnitStats.GoblinBomber, 2, 5, 5);
+                PlaceRandom(plan, rng, UnitStats.Goblin, 3, 4, 4);
                 return plan;
             });
 
@@ -276,7 +276,7 @@ namespace ArmyRoguelike.Core
         public const int RitualTurns = 5;
 
         public static readonly IReadOnlyList<int> RitualWaveTurns = new[] { 1, 3 };
-        public const int RitualWaveSize = 2;
+        public const int RitualWaveSize = 1;
         public const int RitualDeployRange = 2;
 
         public static readonly GridPos ShrineTile = new GridPos(2, 2);

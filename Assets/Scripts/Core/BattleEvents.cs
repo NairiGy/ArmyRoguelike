@@ -365,6 +365,25 @@ namespace ArmyRoguelike.Core
         public override Unit Actor => Source;
     }
 
+    /// <summary>A unit attacked a barricade. At 0 HP it breaks (a TileEvent removing it follows).</summary>
+    public sealed class BarricadeHitEvent : BattleEvent
+    {
+        public readonly Unit Attacker;
+        public readonly GridPos Tile;
+        public readonly int Damage;
+        public readonly int HpAfter;
+
+        public BarricadeHitEvent(Unit attacker, GridPos tile, int damage, int hpAfter)
+        {
+            Attacker = attacker;
+            Tile = tile;
+            Damage = damage;
+            HpAfter = hpAfter;
+        }
+
+        public override Unit Actor => Attacker;
+    }
+
     /// <summary>A unit was created during the battle (a turret).</summary>
     public sealed class SummonEvent : BattleEvent
     {

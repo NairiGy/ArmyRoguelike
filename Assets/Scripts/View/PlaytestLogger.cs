@@ -201,6 +201,14 @@ namespace ArmyRoguelike.View
                         damage = tick.Hit.Damage, targetHpAfter = tick.Hit.HpAfter, killed = tick.Hit.Killed,
                     });
                     break;
+                case BarricadeHitEvent barricade:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = barricade.Attacker.Team.ToString(), unit = Name(barricade.Attacker), type = "barricade hit",
+                        damage = barricade.Damage, targetHpAfter = barricade.HpAfter, killed = barricade.HpAfter == 0,
+                        toX = barricade.Tile.X, toY = barricade.Tile.Y,
+                    });
+                    break;
                 case TileEvent tile:
                     _log.actions.Add(new ActionEntry
                     {

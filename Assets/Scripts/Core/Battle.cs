@@ -128,6 +128,9 @@ namespace ArmyRoguelike.Core
         public const int MendHeal = 3;
         public const int MaxBarricades = 3;
         public const int BarricadeBlastDamage = 3;
+
+        /// <summary>HP of a barricade: either side can attack it, and it breaks at 0.</summary>
+        public const int BarricadeHp = 4;
         public const int ChargeRange = 3;
 
         /// <summary>Pinning Shot (archers): damage, and the target can't move on its next turn.</summary>
@@ -209,6 +212,7 @@ namespace ArmyRoguelike.Core
         private readonly List<Mine> _mines = new List<Mine>();
         private readonly List<Bomb> _bombs = new List<Bomb>();
         private readonly List<(GridPos tile, Unit owner)> _barricades = new List<(GridPos, Unit)>();
+        private readonly Dictionary<GridPos, int> _barricadeHp = new Dictionary<GridPos, int>();
         private readonly Dictionary<GridPos, int> _ice = new Dictionary<GridPos, int>();
         private readonly Dictionary<GridPos, int> _burning = new Dictionary<GridPos, int>();
         private readonly HashSet<GridPos> _caltrops = new HashSet<GridPos>();
@@ -445,6 +449,9 @@ namespace ArmyRoguelike.Core
 
         public bool IsBarricade(GridPos p) => _barricades.Any(b => b.tile == p);
 
+        /// <summary>HP left on the barricade at this tile (0 if there is none).</summary>
+        public int BarricadeHpAt(GridPos p) => _barricadeHp.TryGetValue(p, out var hp) ? hp : 0;
+
         /// <summary>A tile with no rock and no living unit. Bone piles, mines and bombs don't block.</summary>
         public bool IsFree(GridPos p) => Board.InBounds(p) && !Board.IsObstacle(p) && UnitAt(p) == null;
 
@@ -541,6 +548,53 @@ namespace ArmyRoguelike.Core
             if (attacker.Has(Ability.FirstShotDouble) && !attacker.HasStruck(target))
                 damage *= 2;
             return damage;
+        }
+
+        /// <summary>
+        /// The HP the target would lose if the attacker attacked it now, for the hover preview: its damage against
+        /// this target, then the same reductions as <see cref="Damage"/> (Shield Wall, Tough, Dodge, wards, Lucky
+        /// Charm), over both strikes of a Double Strike. Changes nothing. A Guard next to the target would take the
+        /// hit instead: then the target loses 0 and <paramref name="guard"/> is set.
+        /// </summary>
+        public int PredictHpLoss(Unit attacker, Unit target, out Unit guard)
+        {
+            guard = _units.FirstOrDefault(g => g != target && g.Team == target.Team && g.IsPlaced && g.IsAlive &&
+                                               g.Has(Ability.Guard) && Distance(g, target) == 1);
+            if (guard != null)
+                return 0;
+
+            var hp = target.Hp;
+            var shield = target.Shield + target.MoonShield;
+            var dodge = target.Has(Ability.Dodge) && !target.DodgeUsed;
+            var lucky = target.Has(Ability.LuckyCharm) && !target.LastStandUsed;
+            var strikes = attacker.Has(Ability.DoubleStrike) ? 2 : 1;
+            for (var i = 0; i < strikes && hp > 0; i++)
+            {
+                var amount = DamageAgainst(attacker, target);
+                // The opening shot only doubles the first strike.
+                if (i > 0 && attacker.Has(Ability.FirstShotDouble) && !attacker.HasStruck(target))
+                    amount /= 2;
+                if (IsShielded(target))
+                    amount = Math.Max(1, amount - 1);
+                if (target.Has(Ability.Tough))
+                    amount = Math.Max(1, amount - 1);
+                if (dodge)
+                {
+                    dodge = false;
+                    amount = 0;
+                }
+
+                var absorbed = Math.Min(shield, amount);
+                shield -= absorbed;
+                hp -= amount - absorbed;
+                if (hp <= 0 && lucky)
+                {
+                    hp = 1;
+                    lucky = false;
+                }
+            }
+
+            return target.Hp - Math.Max(0, hp);
         }
 
         /// <summary>An ally of the attacker stands on the far side of a 1x1 target.</summary>
@@ -938,6 +992,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Barricade:
                     Board.AddObstacle(tile);
                     _barricades.Add((tile, unit));
+                    _barricadeHp[tile] = BarricadeHp;
                     events.Add(new TileEvent("barricade", tile, true, unit));
                     break;
                 case ActionKind.Turret:
@@ -956,6 +1011,7 @@ namespace ArmyRoguelike.Core
                         if (!_barricades.Contains(b))
                             continue;
                         _barricades.Remove(b);
+                        _barricadeHp.Remove(b.tile);
                         Board.RemoveObstacle(b.tile);
                         events.Add(new TileEvent("barricade", b.tile, false, unit));
                         Explode(b.tile, BarricadeBlastDamage, "barricade", unit, events);
@@ -1200,6 +1256,57 @@ namespace ArmyRoguelike.Core
                 return null;
             ActiveUnit = unit;
             return DoMove(unit, target);
+        }
+
+        /// <summary>A player unit attacks a barricade (any side's). Returns the events, or null if not allowed.</summary>
+        public List<BattleEvent> PlayerAttackBarricade(Unit unit, GridPos tile)
+        {
+            if (!CanAct(unit) || !CanAttackBarricade(unit, tile))
+                return null;
+            ActiveUnit = unit;
+            return DoAttackBarricade(unit, tile);
+        }
+
+        /// <summary>
+        /// Whether the unit could hit the barricade on this tile now with its basic attack: within its range
+        /// (ranged attacks need line of sight). Objectives and units without an attack can't.
+        /// </summary>
+        public bool CanAttackBarricade(Unit attacker, GridPos tile)
+        {
+            if (IsOver || !attacker.IsAlive || attacker.IsObjective || attacker.Stats.Damage <= 0 || attacker.Ap < AttackCost || !IsBarricade(tile))
+                return false;
+            var steps = Cells(attacker).Min(c => c.StepsTo(tile));
+            return steps <= attacker.Range && (steps == 1 || Cells(attacker).Any(c => Board.HasLineOfSight(c, tile)));
+        }
+
+        /// <summary>
+        /// A basic attack on a barricade: the attacker's damage (no target bonuses), one hit. At 0 HP the
+        /// barricade breaks and its tile is free again. Attacking reveals a vanished unit.
+        /// </summary>
+        internal List<BattleEvent> DoAttackBarricade(Unit attacker, GridPos tile)
+        {
+            var events = new List<BattleEvent>();
+            SpendAp(attacker, AttackCost);
+            attacker.AttackedThisTurn = true;
+            var damage = EffectiveDamage(attacker);
+            var hp = Math.Max(0, BarricadeHpAt(tile) - damage);
+            _barricadeHp[tile] = hp;
+            events.Add(new BarricadeHitEvent(attacker, tile, damage, hp));
+            if (hp == 0)
+            {
+                _barricades.RemoveAll(b => b.tile == tile);
+                _barricadeHp.Remove(tile);
+                Board.RemoveObstacle(tile);
+                events.Add(new TileEvent("barricade", tile, false, attacker));
+            }
+
+            if (attacker.IsHidden)
+            {
+                attacker.HiddenTurns = 0;
+                events.Add(new StatusEvent(attacker, attacker, StatusKind.Reveal, 0));
+            }
+
+            return events;
         }
 
         /// <summary>A player unit's basic attack. Returns the events, or null if not allowed.</summary>

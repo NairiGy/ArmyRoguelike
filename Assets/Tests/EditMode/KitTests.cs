@@ -441,6 +441,63 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void Barricade_HasHp_AndBreaks()
+        {
+            var b = Setup(new[] { M(UnitStats.Sapper, Technique.Barricade), M(UnitStats.Warrior) }, new[] { P(3, 1), P(4, 2) }, new[] { Far });
+            var sapper = Player(b, 0);
+            var warrior = Player(b, 1);
+            b.PlayerUseAction(sapper, ActionKind.Barricade, P(3, 2));
+            Assert.AreEqual(Battle.BarricadeHp, b.BarricadeHpAt(P(3, 2)));
+            b.EndUnitTurn(sapper);
+            Assert.IsTrue(b.CanAttackBarricade(warrior, P(3, 2)), "your own side can break it too");
+            var events = b.PlayerAttackBarricade(warrior, P(3, 2));
+            Assert.AreEqual(Battle.BarricadeHp - warrior.BaseDamage, b.BarricadeHpAt(P(3, 2)));
+            Assert.IsTrue(events.OfType<BarricadeHitEvent>().Any());
+            Assert.IsTrue(b.Board.IsObstacle(P(3, 2)), "still standing");
+
+            warrior.Ap = 1;
+            events = b.PlayerAttackBarricade(warrior, P(3, 2));
+            Assert.IsFalse(b.IsBarricade(P(3, 2)));
+            Assert.IsFalse(b.Board.IsObstacle(P(3, 2)), "broken: the tile is free");
+            Assert.IsTrue(events.OfType<TileEvent>().Any(t => t.Kind == "barricade" && !t.Added));
+        }
+
+        [Test]
+        public void Barricade_EnemyWithNobodyToHitBreaksIt()
+        {
+            var b = Setup(new[] { M(UnitStats.Sapper, Technique.Barricade) }, new[] { P(0, 0) }, new[] { E(UnitStats.Brute, 3, 4) });
+            var sapper = Player(b);
+            sapper.Pos = P(3, 2);
+            b.PlayerUseAction(sapper, ActionKind.Barricade, P(3, 3));
+            // Fence the brute in so the barricade is the only thing it can reach.
+            sapper.Pos = P(0, 0);
+            b.EndUnitTurn(sapper);
+            Enemy(b).SnareTurns = 1;
+            var events = b.EndPlayerTurn();
+            Assert.IsTrue(events.OfType<BarricadeHitEvent>().Any(e => e.Attacker == Enemy(b)));
+            Assert.Less(b.BarricadeHpAt(P(3, 3)), Battle.BarricadeHp);
+        }
+
+        // ---------- Attack preview ----------
+
+        [Test]
+        public void PredictHpLoss_MatchesTheHit_WithToughAndGuard()
+        {
+            var b = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(3, 2) }, new[] { E(UnitStats.Brute, 3, 3), E(UnitStats.Wolf, 7, 7) });
+            var warrior = Player(b);
+            var brute = Enemy(b, 0);
+            var predicted = b.PredictHpLoss(warrior, brute, out var guard);
+            Assert.IsNull(guard);
+            var hpBefore = brute.Hp;
+            b.PlayerAttack(warrior, brute);
+            Assert.AreEqual(hpBefore - brute.Hp, predicted, "the preview matches the real hit");
+
+            var guarded = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(3, 2) }, new[] { E(UnitStats.Wolf, 3, 3), E(UnitStats.Brute, 4, 3) });
+            Assert.AreEqual(0, guarded.PredictHpLoss(Player(guarded), Enemy(guarded, 0), out var brute2));
+            Assert.AreEqual(Enemy(guarded, 1), brute2, "the brute guards the wolf");
+        }
+
+        [Test]
         public void Turret_Shoots_AndDoesNotCountForDefeat()
         {
             var b = Setup(new[] { M(UnitStats.Sapper, Technique.Barricade, Technique.Turret) }, new[] { P(3, 1) }, new[] { E(UnitStats.Ogre, 3, 5) });

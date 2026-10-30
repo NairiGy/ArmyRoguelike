@@ -201,7 +201,7 @@ namespace ArmyRoguelike.Core
         public const int SkipGold = 8;
 
         /// <summary>The shop's fee to make a unit forget a technique (its level stays).</summary>
-        public const int ForgetPrice = 5;
+        public const int ForgetPrice = 8;
 
         /// <summary>Map steps (0-based) where both choices are fights, so every run has at least this many before the boss.</summary>
         public static readonly IReadOnlyList<int> FightSteps = new[] { 0, 3, 5, 7, 9 };
