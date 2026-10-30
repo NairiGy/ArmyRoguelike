@@ -26,12 +26,12 @@ namespace ArmyRoguelike.Tests
         // ---------- Learning ----------
 
         [Test]
-        public void Learn_OnlyOwnLineOrShared()
+        public void Learn_OnlyOwnLine()
         {
             var warrior = M(UnitStats.Warrior);
             Assert.IsFalse(warrior.Learn(Technique.Fireball), "a mage technique");
             Assert.IsTrue(warrior.Learn(Technique.Sweep));
-            Assert.IsTrue(warrior.Learn(Technique.VampireFang), "shared");
+            Assert.IsTrue(warrior.Learn(Technique.Guard));
             Assert.IsFalse(warrior.Learn(Technique.Sweep), "already known");
             Assert.AreEqual(2, warrior.Level);
         }
@@ -61,7 +61,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Catalog_EveryRequirementIsInTheSameLine()
         {
-            Assert.AreEqual(37, Technique.All.Count);
+            Assert.AreEqual(33, Technique.All.Count);
             foreach (var t in Technique.All.Where(t => t.Requires != null))
                 Assert.AreEqual(t.Line, t.Requires.Line, t.Name);
             Assert.AreEqual(Technique.All.Count, Technique.All.Select(t => t.Name).Distinct().Count(), "unique names");

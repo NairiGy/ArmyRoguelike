@@ -19,6 +19,7 @@ namespace ArmyRoguelike.View
         private GameObject _battleRoot;
         private BattleController _controller;
         private Technique _selectedOffer;
+        private Equipment _selectedItem;
         private string _lastNote;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -69,6 +70,7 @@ namespace ArmyRoguelike.View
             _runLog.RecordChoice(_run.CurrentChoices[index], other);
             _run.ChooseNode(index);
             _selectedOffer = null;
+            _selectedItem = null;
             switch (_run.State)
             {
                 case RunState.Battle:
@@ -364,7 +366,8 @@ namespace ArmyRoguelike.View
                     bonus += $", +{m.LevelDamage + m.BonusDamage} damage";
                 if (m.LevelMines > 0)
                     bonus += $", +{m.LevelMines} mine";
-                GUILayout.Label($"  {m.Stats.Name} (level {m.Level}): {techniques}{bonus}");
+                var item = m.Equipment != null ? $" [{m.Equipment.Name}]" : "";
+                GUILayout.Label($"  {m.Stats.Name} (level {m.Level}){item}: {techniques}{bonus}");
             }
         }
 
@@ -477,7 +480,7 @@ namespace ArmyRoguelike.View
             }
 
             GUILayout.Space(8);
-            GUILayout.Label("? = something unexpected. Shops sell techniques, a recruit, and help forgetting a technique. Every won fight offers a technique pick.");
+            GUILayout.Label("? = something unexpected. Shops sell techniques, items, a recruit, and help forgetting a technique. Every won fight offers a technique pick.");
             GUILayout.Label("Moon Shrine: defend it for 5 enemy turns to earn a blessing. If it breaks, you take a curse.");
             GUILayout.Label("Break the Ritual: smash 3 totems before enemy turn 4 to earn a technique pick. If the summoning completes, you take a curse.");
             GUILayout.Label("Battle: a faction you haven't beaten (a rematch once you've met them all). Elite: a harder rematch of a faction you beat; its pick has a rare technique. Battles and elites show their faction when you reach their step.");
@@ -491,8 +494,8 @@ namespace ArmyRoguelike.View
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 30, w, 660), GUI.skin.box);
             GUILayout.Label("Shop", Title);
             GUILayout.Label($"Gold: {_run.Gold}");
-            GUILayout.Label("A unit that learns a technique goes up a level.");
-            GUILayout.Space(8);
+            GUILayout.Label("A unit that learns a technique goes up a level. Each unit has one item slot; a new item replaces the old.");
+            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(520));
 
             GUILayout.Label("Techniques for sale (click one):");
             if (_run.Offers.Count == 0)
@@ -503,7 +506,28 @@ namespace ArmyRoguelike.View
                 var marker = offer == _selectedOffer ? "> " : "";
                 GUI.enabled = _run.Gold >= offer.Price;
                 if (GUILayout.Button(marker + Describe(offer, true), style))
+                {
                     _selectedOffer = offer;
+                    _selectedItem = null;
+                }
+
+                GUI.enabled = true;
+            }
+
+            GUILayout.Space(6);
+            GUILayout.Label("Items for sale (click one):");
+            if (_run.ItemOffers.Count == 0)
+                GUILayout.Label("  Sold out.");
+            foreach (var item in _run.ItemOffers.ToList())
+            {
+                var marker = item == _selectedItem ? "> " : "";
+                GUI.enabled = _run.Gold >= item.Price;
+                if (GUILayout.Button($"{marker}{item.Name}   {item.Effect}   {item.Price} gold"))
+                {
+                    _selectedItem = item;
+                    _selectedOffer = null;
+                }
+
                 GUI.enabled = true;
             }
 
@@ -535,6 +559,31 @@ namespace ArmyRoguelike.View
                         _selectedOffer = null;
                     }
                 });
+            }
+            else if (_selectedItem != null && _run.ItemOffers.Contains(_selectedItem))
+            {
+                GUILayout.Label($"Give the {_selectedItem.Name} to:");
+                foreach (var member in _run.Army)
+                {
+                    var current = member.Equipment != null ? $"replaces {member.Equipment.Name}" : "empty slot";
+                    GUI.enabled = _run.CanBuyItem(_selectedItem, member);
+                    if (GUILayout.Button($"{member.Stats.Name}   ({current})"))
+                    {
+                        var buyer = member;
+                        var item = _selectedItem;
+                        Do(() =>
+                        {
+                            var replaced = buyer.Equipment;
+                            if (_run.BuyItem(item, buyer))
+                            {
+                                _runLog.RecordItemPurchase(item, buyer, replaced);
+                                _selectedItem = null;
+                            }
+                        });
+                    }
+
+                    GUI.enabled = true;
+                }
             }
             else
             {
@@ -568,6 +617,7 @@ namespace ArmyRoguelike.View
                 }
             }
 
+            GUILayout.EndScrollView();
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("Leave the shop", GUILayout.Height(32)))
                 Do(LeaveShop);
@@ -606,13 +656,34 @@ namespace ArmyRoguelike.View
                 case EventKind.AbandonedCart:
                     GUILayout.Label("An Abandoned Cart", Title);
                     var cart = _run.CartTechnique;
-                    GUILayout.Label("Inside, an old training manual:\n" + Describe(cart));
-                    GUILayout.Label("Who learns it?");
-                    DrawLearners(cart, cart.CanLearn, taker =>
+                    if (cart != null)
                     {
-                        _run.TakeCart(taker);
-                        AfterEvent($"{cart.Name} -> {taker.Stats.Name}");
-                    });
+                        GUILayout.Label("Inside, an old training manual:\n" + Describe(cart));
+                        GUILayout.Label("Who learns it?");
+                        DrawLearners(cart, cart.CanLearn, taker =>
+                        {
+                            _run.TakeCart(taker);
+                            AfterEvent($"{cart.Name} -> {taker.Stats.Name}");
+                        });
+                    }
+                    else
+                    {
+                        var cartItem = _run.CartItem;
+                        GUILayout.Label($"Inside: {cartItem.Name} ({cartItem.Effect}).");
+                        foreach (var member in _run.Army)
+                        {
+                            var current = member.Equipment != null ? $"replaces {member.Equipment.Name}" : "empty slot";
+                            GUI.enabled = cartItem.CanEquip(member.Stats);
+                            var taker = member;
+                            if (GUILayout.Button($"Give it to the {member.Stats.Name} ({current})"))
+                                Do(() =>
+                                {
+                                    _run.TakeCart(taker);
+                                    AfterEvent($"{cartItem.Name} -> {taker.Stats.Name}");
+                                });
+                            GUI.enabled = true;
+                        }
+                    }
 
                     if (GUILayout.Button("Leave it"))
                         Do(() =>

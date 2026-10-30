@@ -572,6 +572,25 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void Shop_ItemReplacesSlot_AndSpendsGold()
+        {
+            var run = RunInShop();
+            Assert.AreEqual(Run.ShopItemCount, run.ItemOffers.Distinct().Count());
+            var warrior = run.Army[0];
+            var items = run.ItemOffers.OrderBy(o => o.Price).ToList();
+            Assert.IsTrue(run.BuyItem(items[0], warrior));
+            Assert.AreEqual(items[0], warrior.Equipment);
+            Assert.AreEqual(0, warrior.Level, "items don't level a unit");
+            Assert.IsFalse(run.ItemOffers.Contains(items[0]), "bought items leave the shop");
+            var gold = run.Gold;
+            if (run.BuyItem(items[1], warrior))
+            {
+                Assert.AreEqual(items[1], warrior.Equipment, "one slot: the new item replaces the old");
+                Assert.AreEqual(gold - items[1].Price, run.Gold);
+            }
+        }
+
+        [Test]
         public void Shop_ForgetCostsGold_KeepsTheLevel()
         {
             var run = RunInShop();
@@ -727,14 +746,24 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Event_Cart_TeachesATechnique()
+        public void Event_Cart_TeachesATechniqueOrGivesAnItem()
         {
             var run = RunAtEvent(EventKind.AbandonedCart);
-            var technique = run.CartTechnique;
-            var member = run.Army.First(technique.CanLearn);
-            Assert.IsTrue(run.TakeCart(member));
-            Assert.IsTrue(member.Knows(technique));
-            Assert.AreEqual(1, member.Level);
+            Assert.IsTrue(run.CartTechnique == null ^ run.CartItem == null, "a technique or an item, never both");
+            if (run.CartTechnique != null)
+            {
+                var technique = run.CartTechnique;
+                var member = run.Army.First(technique.CanLearn);
+                Assert.IsTrue(run.TakeCart(member));
+                Assert.IsTrue(member.Knows(technique));
+                Assert.AreEqual(1, member.Level);
+            }
+            else
+            {
+                var item = run.CartItem;
+                Assert.IsTrue(run.TakeCart(run.Army[0]));
+                Assert.AreEqual(item, run.Army[0].Equipment);
+            }
         }
 
         [Test]

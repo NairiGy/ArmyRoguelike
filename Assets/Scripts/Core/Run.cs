@@ -97,7 +97,7 @@ namespace ArmyRoguelike.Core
         /// <summary>A random base unit offers to join for free (or pays gold if the army is full).</summary>
         WanderingRecruit,
 
-        /// <summary>A random free technique for one unit.</summary>
+        /// <summary>A random free technique or item for one unit.</summary>
         AbandonedCart,
 
         /// <summary>Pay gold for a 50% chance at more.</summary>
@@ -179,7 +179,11 @@ namespace ArmyRoguelike.Core
     {
         public const int BaseGold = 10;
         public const int GoldPerSurvivor = 5;
+        /// <summary>Techniques for sale in a shop.</summary>
         public const int ShopSize = 3;
+
+        /// <summary>Items for sale in a shop, next to the techniques.</summary>
+        public const int ShopItemCount = 3;
         public const int DraftSize = 3;
         public const int MaxArmySize = 4;
         public const int RecruitPrice = 15;
@@ -204,6 +208,7 @@ namespace ArmyRoguelike.Core
 
         private readonly Random _rng;
         private readonly List<Technique> _offers = new List<Technique>();
+        private readonly List<Equipment> _itemOffers = new List<Equipment>();
         private readonly List<IReadOnlyList<MapNode>> _map = new List<IReadOnlyList<MapNode>>();
         private readonly List<int> _chosen = new List<int>();
 
@@ -225,8 +230,11 @@ namespace ArmyRoguelike.Core
 
         public EventKind CurrentEvent { get; private set; }
 
-        /// <summary>The technique an Abandoned Cart event offers.</summary>
+        /// <summary>The technique an Abandoned Cart event offers, or null when it holds an item.</summary>
         public Technique CartTechnique { get; private set; }
+
+        /// <summary>The item an Abandoned Cart event offers, or null when it holds a technique.</summary>
+        public Equipment CartItem { get; private set; }
 
         /// <summary>The base unit a Wandering Recruit event offers.</summary>
         public UnitStats EventRecruit { get; private set; }
@@ -239,6 +247,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>The techniques for sale in the current shop.</summary>
         public IReadOnlyList<Technique> Offers => _offers;
+
+        /// <summary>The items for sale in the current shop.</summary>
+        public IReadOnlyList<Equipment> ItemOffers => _itemOffers;
         public IReadOnlyList<IReadOnlyList<MapNode>> Map => _map;
 
         /// <summary>Index of the node chosen at each past step.</summary>
@@ -584,6 +595,21 @@ namespace ArmyRoguelike.Core
             return true;
         }
 
+        public bool CanBuyItem(Equipment item, ArmyMember member) =>
+            State == RunState.Shop && _itemOffers.Contains(item) && Army.Contains(member) &&
+            Gold >= item.Price && item.CanEquip(member.Stats);
+
+        /// <summary>Buys an item and puts it in the member's slot, replacing (and losing) its old item.</summary>
+        public bool BuyItem(Equipment item, ArmyMember member)
+        {
+            if (!CanBuyItem(item, member))
+                return false;
+            Gold -= item.Price;
+            member.Equipment = item;
+            _itemOffers.Remove(item);
+            return true;
+        }
+
         public bool CanBuyRecruit => State == RunState.Shop && ShopRecruit != null && Gold >= RecruitPrice && Army.Count < MaxArmySize;
 
         public bool BuyRecruit()
@@ -601,6 +627,7 @@ namespace ArmyRoguelike.Core
             if (State != RunState.Shop)
                 return;
             _offers.Clear();
+            _itemOffers.Clear();
             ShopRecruit = null;
             NextStep();
         }
@@ -609,6 +636,8 @@ namespace ArmyRoguelike.Core
         {
             _offers.Clear();
             _offers.AddRange(RollTechniques(ShopSize, false));
+            _itemOffers.Clear();
+            _itemOffers.AddRange(Equipment.Catalog.OrderBy(_ => _rng.Next()).Take(ShopItemCount));
             ShopRecruit = Army.Count < MaxArmySize ? UnitStats.BaseUnits[_rng.Next(UnitStats.BaseUnits.Count)] : null;
         }
 
@@ -616,11 +645,20 @@ namespace ArmyRoguelike.Core
 
         private void RollEvent()
         {
-            var cart = RollTechniques(1, false).FirstOrDefault();
-            // An empty cart is no event: with nothing left to learn, it doesn't come up.
-            var kinds = ((EventKind[])Enum.GetValues(typeof(EventKind))).Where(k => k != EventKind.AbandonedCart || cart != null).ToList();
-            CurrentEvent = kinds[_rng.Next(kinds.Count)];
-            CartTechnique = CurrentEvent == EventKind.AbandonedCart ? cart : null;
+            var kinds = (EventKind[])Enum.GetValues(typeof(EventKind));
+            CurrentEvent = kinds[_rng.Next(kinds.Length)];
+            CartTechnique = null;
+            CartItem = null;
+            if (CurrentEvent == EventKind.AbandonedCart)
+            {
+                // Half the time a technique (if any unit can still learn one), otherwise an item.
+                var technique = _rng.Next(2) == 0 ? RollTechniques(1, false).FirstOrDefault() : null;
+                if (technique != null)
+                    CartTechnique = technique;
+                else
+                    CartItem = Equipment.Catalog[_rng.Next(Equipment.Catalog.Count)];
+            }
+
             EventRecruit = CurrentEvent == EventKind.WanderingRecruit ? UnitStats.BaseUnits[_rng.Next(UnitStats.BaseUnits.Count)] : null;
             var fresh = FreshFactions();
             AmbushEncounter = CurrentEvent == EventKind.Ambush && fresh.Count > 0 ? fresh[_rng.Next(fresh.Count)] : null;
@@ -646,16 +684,31 @@ namespace ArmyRoguelike.Core
             NextStep();
         }
 
-        /// <summary>Abandoned Cart: a member learns the technique, or leave it with null.</summary>
+        /// <summary>
+        /// Abandoned Cart: a member learns its technique or takes its item (replacing its old item), or leave it
+        /// with null.
+        /// </summary>
         public bool TakeCart(ArmyMember member)
         {
             if (State != RunState.Event || CurrentEvent != EventKind.AbandonedCart)
                 return false;
             if (member != null)
             {
-                if (!Army.Contains(member) || !member.Learn(CartTechnique))
+                if (!Army.Contains(member))
                     return false;
-                EventOutcome = $"The {member.Stats.Name} learns {CartTechnique.Name}.";
+                if (CartTechnique != null)
+                {
+                    if (!member.Learn(CartTechnique))
+                        return false;
+                    EventOutcome = $"The {member.Stats.Name} learns {CartTechnique.Name}.";
+                }
+                else
+                {
+                    if (!CartItem.CanEquip(member.Stats))
+                        return false;
+                    member.Equipment = CartItem;
+                    EventOutcome = $"The {member.Stats.Name} takes the {CartItem.Name}.";
+                }
             }
             else
             {

@@ -108,17 +108,23 @@ namespace ArmyRoguelike.View
                 goldBefore = _run.Gold,
                 recruitOffered = _run.ShopHasRecruit,
                 offers = _run.Offers.Select(o => new Offer { technique = o.Name, price = o.Price, rarity = o.Rarity.ToString() }).ToList(),
+                itemOffers = _run.ItemOffers.Select(o => new ItemOffer { item = o.Name, price = o.Price, effect = o.Effect }).ToList(),
             };
         }
 
         public void RecordPurchase(Technique technique, ArmyMember member)
         {
-            _shop?.purchases.Add(new Purchase { item = technique.Name, price = technique.Price, unit = member.Stats.Name, levelAfter = member.Level });
+            _shop?.purchases.Add(new Purchase { kind = "technique", item = technique.Name, price = technique.Price, unit = member.Stats.Name, levelAfter = member.Level });
+        }
+
+        public void RecordItemPurchase(Equipment item, ArmyMember member, Equipment replaced)
+        {
+            _shop?.purchases.Add(new Purchase { kind = "item", item = item.Name, price = item.Price, unit = member.Stats.Name, levelAfter = member.Level, replaced = replaced?.Name ?? "" });
         }
 
         public void RecordRecruit(string unit, int price)
         {
-            _shop?.purchases.Add(new Purchase { item = "recruit", price = price, unit = unit });
+            _shop?.purchases.Add(new Purchase { kind = "recruit", item = unit, price = price, unit = unit });
         }
 
         /// <summary>A technique forgotten at the shop (techniques that needed it went too).</summary>
@@ -149,6 +155,7 @@ namespace ArmyRoguelike.View
             {
                 step = Step, kind = _run.CurrentEvent.ToString(), goldBefore = _run.Gold,
                 technique = _run.CartTechnique?.Name ?? "",
+                item = _run.CartItem?.Name ?? "",
             };
         }
 
@@ -177,7 +184,7 @@ namespace ArmyRoguelike.View
             _log.fought = _run.Fought.Select(f => f.Name).ToList();
             _log.finalArmy = _run.Army.Select(m => new ArmyEntry
             {
-                unit = m.Stats.Name, level = m.Level, techniques = m.Techniques.Select(t => t.Name).ToList(),
+                unit = m.Stats.Name, level = m.Level, techniques = m.Techniques.Select(t => t.Name).ToList(), equipment = m.Equipment?.Name ?? "",
                 levelHp = m.LevelHp, levelDamage = m.LevelDamage, bonusDamage = m.BonusDamage, bonusMaxHp = m.BonusMaxHp,
             }).ToList();
             PlaytestFiles.Write($"run-{_created:yyyyMMdd-HHmmss}.json", JsonUtility.ToJson(_log, true));
@@ -291,6 +298,7 @@ namespace ArmyRoguelike.View
             public int goldAfter;
             public bool recruitOffered;
             public List<Offer> offers = new List<Offer>();
+            public List<ItemOffer> itemOffers = new List<ItemOffer>();
             public List<Purchase> purchases = new List<Purchase>();
             public List<Forget> forgets = new List<Forget>();
         }
@@ -304,13 +312,27 @@ namespace ArmyRoguelike.View
         }
 
         [Serializable]
+        private sealed class ItemOffer
+        {
+            public string item;
+            public int price;
+            public string effect;
+        }
+
+        [Serializable]
         private sealed class Purchase
         {
-            /// <summary>The technique bought, or "recruit".</summary>
+            /// <summary>"technique", "item" or "recruit".</summary>
+            public string kind;
+
+            /// <summary>The technique, item or recruited unit.</summary>
             public string item;
             public int price;
             public string unit;
             public int levelAfter;
+
+            /// <summary>Items only: the item it replaced.</summary>
+            public string replaced = "";
         }
 
         [Serializable]
@@ -327,8 +349,9 @@ namespace ArmyRoguelike.View
             public int step;
             public string kind;
 
-            /// <summary>The Abandoned Cart's technique.</summary>
+            /// <summary>The Abandoned Cart's technique or item (one of them is empty).</summary>
             public string technique;
+            public string item;
             public string choice;
             public string outcome;
             public int goldBefore;
@@ -341,6 +364,7 @@ namespace ArmyRoguelike.View
             public string unit;
             public int level;
             public List<string> techniques = new List<string>();
+            public string equipment;
             public int levelHp;
             public int levelDamage;
             public int bonusDamage;

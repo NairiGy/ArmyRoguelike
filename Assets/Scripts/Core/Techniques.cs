@@ -10,9 +10,10 @@ namespace ArmyRoguelike.Core
     }
 
     /// <summary>
-    /// A passive or action a unit learns during the run (from a reward pick or the shop). Each one belongs to a
-    /// base line, or is shared by every line, and some need another technique first. Learning one also levels the
-    /// unit up (see <see cref="Growth"/>). Numbers are placeholders.
+    /// A passive or action a unit learns during the run (from a reward pick, the shop or a cart). Each one belongs to
+    /// a base line (a null line would mean any line, but none is shared for now: effects for any unit are items), and
+    /// some need another technique first. Learning one also levels the unit up (see <see cref="Growth"/>). Numbers are
+    /// placeholders.
     /// </summary>
     public sealed class Technique
     {
@@ -112,13 +113,6 @@ namespace ArmyRoguelike.Core
         public static readonly Technique Turret = Act(UnitStats.Sapper, ActionKind.Turret, Rare, Barricade);
         public static readonly Technique Detonate = Act(UnitStats.Sapper, ActionKind.Detonate, Rare, Barricade);
 
-        // ---------- Shared (the old items) ----------
-
-        public static readonly Technique VampireFang = P(null, Ability.VampireFang);
-        public static readonly Technique ThornedMail = P(null, Ability.ThornedMail);
-        public static readonly Technique SpringBoots = P(null, Ability.SpringBoots);
-        public static readonly Technique LuckyCharm = P(null, Ability.LuckyCharm);
-
         public static readonly IReadOnlyList<Technique> All = new[]
         {
             Sweep, Guard, LongReach, DoubleStrike, Charge, Taunt, Tough,
@@ -126,7 +120,6 @@ namespace ArmyRoguelike.Core
             Pincer, Riposte, Momentum, Poison, RipostePlus, Dodge,
             Fireball, Chill, Ward, Burning, Concussive, IceWall, Shatter, WideWard, Mend,
             BigMines, Barricade, ThrowBomb, BlastProof, Turret, Detonate,
-            VampireFang, ThornedMail, SpringBoots, LuckyCharm,
         };
 
         /// <summary>The techniques a member could learn now.</summary>
