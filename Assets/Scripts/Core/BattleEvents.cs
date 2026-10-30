@@ -432,6 +432,21 @@ namespace ArmyRoguelike.Core
         public override Unit Actor => Thrower;
     }
 
+    /// <summary>A crossbowman took aim: during your next turn it shoots the first of your units that walks onto one of the tiles.</summary>
+    public sealed class OverwatchEvent : BattleEvent
+    {
+        public readonly Unit Watcher;
+        public readonly IReadOnlyList<GridPos> Tiles;
+
+        public OverwatchEvent(Unit watcher, IReadOnlyList<GridPos> tiles)
+        {
+            Watcher = watcher;
+            Tiles = tiles;
+        }
+
+        public override Unit Actor => Watcher;
+    }
+
     /// <summary>A Pack Leader howled: every wolf that hasn't acted yet gets extra moves this turn.</summary>
     public sealed class HowlEvent : BattleEvent
     {

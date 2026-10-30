@@ -152,6 +152,9 @@ namespace ArmyRoguelike.Core
         /// <summary>Powder Keg (goblin bombers): damage to everyone in the 3x3 when it dies.</summary>
         public const int PowderKegDamage = 2;
 
+        /// <summary>Caltrops (cutpurses): damage to a unit of yours stepping on them; its movement ends there.</summary>
+        public const int CaltropsDamage = 1;
+
         // Omens (placeholders).
         public const int SunDamage = 3;
         public const int MoonShield = 4;
@@ -203,6 +206,8 @@ namespace ArmyRoguelike.Core
         private readonly List<(GridPos tile, Unit owner)> _barricades = new List<(GridPos, Unit)>();
         private readonly Dictionary<GridPos, int> _ice = new Dictionary<GridPos, int>();
         private readonly Dictionary<GridPos, int> _burning = new Dictionary<GridPos, int>();
+        private readonly HashSet<GridPos> _caltrops = new HashSet<GridPos>();
+        private readonly Dictionary<Unit, HashSet<GridPos>> _overwatch = new Dictionary<Unit, HashSet<GridPos>>();
         private int _nextId;
 
         // Ritual fights: where the player deploys (null = the back rows) and enemies still to arrive.
@@ -223,6 +228,12 @@ namespace ArmyRoguelike.Core
         public IEnumerable<GridPos> Barricades => _barricades.Select(b => b.tile);
         public IReadOnlyDictionary<GridPos, int> Ice => _ice;
         public IReadOnlyDictionary<GridPos, int> BurningTiles => _burning;
+
+        /// <summary>Bandit caltrops on the board: a unit of yours stepping on them takes 1 and stops.</summary>
+        public IReadOnlyCollection<GridPos> Caltrops => _caltrops;
+
+        /// <summary>Tiles watched by a crossbowman on overwatch (your next unit walking onto one gets shot).</summary>
+        public IEnumerable<GridPos> OverwatchTiles => _overwatch.Where(o => o.Key.IsAlive).SelectMany(o => o.Value).Distinct();
 
         public Phase Phase { get; private set; } = Phase.Placement;
 
@@ -432,7 +443,7 @@ namespace ArmyRoguelike.Core
         /// <summary>A tile with no rock and no living unit. Bone piles, mines and bombs don't block.</summary>
         public bool IsFree(GridPos p) => Board.InBounds(p) && !Board.IsObstacle(p) && UnitAt(p) == null;
 
-        private bool HasHazard(GridPos p) => MineAt(p) != null || BombAt(p) != null;
+        private bool HasHazard(GridPos p) => MineAt(p) != null || BombAt(p) != null || _caltrops.Contains(p);
 
         /// <summary>Whether the unit could stand with its anchor on this tile.</summary>
         public bool CanStand(Unit unit, GridPos anchor)
@@ -611,7 +622,7 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>Immobile, pinned or slowed units can't move, and nobody moves again after spending AP that turn.</summary>
-        public bool CanMove(Unit unit) => !unit.Has(Ability.Immobile) && !unit.RootedThisTurn && !unit.ActedThisTurn;
+        public bool CanMove(Unit unit) => !unit.Has(Ability.Immobile) && !unit.RootedThisTurn && (!unit.ActedThisTurn || unit.Has(Ability.LightFingers));
 
         /// <summary>Pays for an attack or action. Once a unit has spent AP it can't move for the rest of the turn.</summary>
         private static void SpendAp(Unit unit, int cost)
@@ -702,6 +713,8 @@ namespace ArmyRoguelike.Core
                 return false;
             }
 
+            if (attacker.IsRanged && steps > 1 && InCover(target))
+                return false;
             if (attacker.IsRanged && steps > 1 && IsShroudedFrom(target, attacker.Team))
                 return false;
             if (!attacker.IsRanged || attacker.Has(Ability.ArcaneBolt))
@@ -1272,6 +1285,22 @@ namespace ArmyRoguelike.Core
                 }
             }
 
+            // Your units stop on the first caltrops or watched tile on the way.
+            var caltrop = false;
+            Unit watcher = null;
+            if (unit.Team == Team.Player)
+            {
+                for (var i = 0; i < path.Count; i++)
+                {
+                    caltrop = _caltrops.Contains(path[i]);
+                    watcher = WatcherOf(path[i], unit);
+                    if (!caltrop && watcher == null)
+                        continue;
+                    path = path.Take(i + 1).ToList();
+                    break;
+                }
+            }
+
             var from = unit.Pos;
             var cost = PathCost(unit, path);
             var zoc = ZocSteps(unit, path);
@@ -1281,6 +1310,28 @@ namespace ArmyRoguelike.Core
             var events = new List<BattleEvent> { new MoveEvent(unit, from, path, cost, zoc) };
             if (triggered != null)
                 Explode(triggered.Tile, triggered.Damage, "mine", triggered.Owner, events);
+
+            if (caltrop)
+            {
+                _caltrops.Remove(unit.Pos);
+                unit.Moves = 0;
+                events.Add(new TileEvent("caltrops", unit.Pos, false, null));
+                var after = new List<BattleEvent>();
+                events.Add(new TickEvent("caltrops", Damage(unit, CaltropsDamage, null, DamageKind.Tick, after)));
+                events.AddRange(after);
+            }
+
+            if (watcher != null && unit.IsAlive)
+            {
+                // Overwatch: one shot, then it stops watching.
+                _overwatch.Remove(watcher);
+                var after = new List<BattleEvent>();
+                var hit = Damage(unit, DamageAgainst(watcher, unit), watcher, DamageKind.Attack, after);
+                events.Add(new AttackEvent(watcher, hit.Target, hit.Damage, hit.HpAfter));
+                events.AddRange(after);
+            }
+
+            CheckEnd();
             return events;
         }
 
@@ -1485,6 +1536,68 @@ namespace ArmyRoguelike.Core
             var hit = Damage(target, FlingDamage, thrower, DamageKind.Attack, after);
             events.Add(new FlingEvent(thrower, goblin, from, to, target, hit));
             events.AddRange(after);
+            CheckEnd();
+            return events;
+        }
+
+        // ---------- Bandits ----------
+
+        /// <summary>Behind Cover: a unit with it standing next to a rock (or ice, or a barricade) can't be hit from range.</summary>
+        public bool InCover(Unit unit) =>
+            unit.Has(Ability.BehindCover) && Cells(unit).Any(c => c.Neighbours().Any(Board.IsObstacle));
+
+        /// <summary>Caltrops: on the cutpurse's own tile or a free tile next to it, with none there yet.</summary>
+        public bool CanDropCaltrops(Unit unit, GridPos tile) =>
+            !IsOver && unit.IsAlive && unit.Has(Ability.Caltrops) && unit.Ap >= AttackCost && Ready(unit, ActionKind.Caltrops) &&
+            (tile == unit.Pos || (tile.StepsTo(unit.Pos) == 1 && IsFree(tile))) && !HasHazard(tile) && !Board.IsObstacle(tile);
+
+        internal List<BattleEvent> DoCaltrops(Unit unit, GridPos tile)
+        {
+            UseUp(unit, ActionKind.Caltrops);
+            _caltrops.Add(tile);
+            return new List<BattleEvent> { new TileEvent("caltrops", tile, true, unit) };
+        }
+
+        /// <summary>The tiles a unit could shoot at from where it stands: in range, in line of sight, not shrouded.</summary>
+        private List<GridPos> SightTiles(Unit unit) =>
+            Board.AllTiles().Where(p =>
+            {
+                var steps = Distance(p, 1, unit);
+                return steps >= 1 && steps <= unit.Range && !Board.IsObstacle(p) && !IsShroudedFrom(p, unit.Team) &&
+                       Cells(unit).Any(c => Board.HasLineOfSight(c, p));
+            }).ToList();
+
+        /// <summary>Overwatch: until its next turn it watches every tile it could shoot at.</summary>
+        internal List<BattleEvent> DoOverwatch(Unit unit)
+        {
+            UseUp(unit, ActionKind.Overwatch);
+            var tiles = SightTiles(unit);
+            _overwatch[unit] = new HashSet<GridPos>(tiles);
+            return new List<BattleEvent> { new OverwatchEvent(unit, tiles) };
+        }
+
+        /// <summary>The watcher (alive, still on overwatch) that would shoot a unit stepping onto this tile, if any.</summary>
+        private Unit WatcherOf(GridPos tile, Unit mover) =>
+            mover.IsHidden ? null : _overwatch.Where(o => o.Key.IsAlive && o.Key.Team != mover.Team && o.Value.Contains(tile)).Select(o => o.Key).FirstOrDefault();
+
+        /// <summary>Bull Rush: a melee hit on an adjacent 1x1 unit that also pushes it 1 tile.</summary>
+        public bool CanBullRush(Unit unit, Unit target) =>
+            unit.Has(Ability.BullRush) && Ready(unit, ActionKind.BullRush) && CanAttack(unit, target) &&
+            target.Size == 1 && unit.Size == 1 && Distance(unit, target) == 1;
+
+        internal List<BattleEvent> DoBullRush(Unit unit, Unit target)
+        {
+            UseUp(unit, ActionKind.BullRush);
+            var events = new List<BattleEvent>();
+            var after = new List<BattleEvent>();
+            var hit = Damage(target, DamageAgainst(unit, target), unit, DamageKind.Attack, after);
+            unit.AttackedThisTurn = true;
+            events.Add(new AttackEvent(unit, hit.Target, hit.Damage, hit.HpAfter));
+            events.AddRange(after);
+            Thorns(unit, hit.Target, events);
+            Riposte(hit.Target, unit, events);
+            if (hit.Target == target && target.IsAlive && unit.IsAlive)
+                Push(target, StraightDirection(unit.Pos, target.Pos).Value, unit, events, hurtsBlocker: true);
             CheckEnd();
             return events;
         }
@@ -1832,6 +1945,10 @@ namespace ArmyRoguelike.Core
                     if (--u.HiddenTurns == 0)
                         events.Add(new StatusEvent(u, u, StatusKind.Reveal, 0));
             }
+
+            // Overwatch lasts until the watcher's own next turn.
+            foreach (var u in Living(team))
+                _overwatch.Remove(u);
 
             foreach (var u in Living(team))
             {

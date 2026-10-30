@@ -184,6 +184,23 @@ namespace ArmyRoguelike.Core
 
         /// <summary>When it dies it explodes: damage to everyone around it, its own side included.</summary>
         PowderKeg,
+
+        // ---------- Bandits ----------
+
+        /// <summary>The only unit that may still move after attacking.</summary>
+        LightFingers,
+
+        /// <summary>Its action can be Caltrops: a unit of yours stepping on them takes 1 and its movement ends.</summary>
+        Caltrops,
+
+        /// <summary>While next to a rock it can't be hit by ranged attacks (melee, bombs and blasts still reach it).</summary>
+        BehindCover,
+
+        /// <summary>Its action can be Overwatch: the first of your units that walks into its sight next turn gets shot.</summary>
+        Overwatch,
+
+        /// <summary>Its action can be Bull Rush: a hit that also pushes the target 1 tile.</summary>
+        BullRush,
     }
 
     /// <summary>A special action a unit can spend AP on besides its basic attack. Every one has a cooldown.</summary>
@@ -561,18 +578,18 @@ namespace ArmyRoguelike.Core
 
         public static readonly UnitStats Cutpurse = new UnitStats(UnitKind.Cutpurse, "Cutpurse", 5, 2, 1, 1)
         {
-            StealsGold = 5, Abilities = A(Ability.Swift),
-            Role = "On a hit it steals 5 gold and runs for the far edge. If it gets away, the gold is gone. Kill it to get the gold back.",
+            StealsGold = 5, Abilities = A(Ability.Swift, Ability.LightFingers, Ability.Caltrops),
+            Role = "Stabs, grabs 5 gold and runs in the same turn, dropping caltrops behind it. Kill it before it gets away.",
         };
 
         public static readonly UnitStats Crossbowman = new UnitStats(UnitKind.Crossbowman, "Crossbowman", 6, 3, 3, 1)
         {
-            Role = "Ranged (needs line of sight). Hides behind cover.",
+            Abilities = A(Ability.BehindCover, Ability.Overwatch), Role = "Shoots from behind a rock, and covers the approach when nobody is in range.",
         };
 
         public static readonly UnitStats Brute = new UnitStats(UnitKind.Brute, "Bandit Brute", 12, 3, 1, 1)
         {
-            Abilities = A(Ability.Tough), Role = "Slow, heavy hitter that takes 1 less damage.",
+            Abilities = A(Ability.Guard, Ability.BullRush), Role = "Takes the hits meant for the bandits next to it, and rushes your line apart.",
         };
 
         // ---------- Elementals ----------

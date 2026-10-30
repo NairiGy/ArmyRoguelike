@@ -23,6 +23,12 @@ namespace ArmyRoguelike.Core
 
         /// <summary>A goblin flinging another goblin, a bomb or a mine at one of your units.</summary>
         Fling,
+
+        /// <summary>A crossbowman aiming: it shoots the first of your units that walks onto the marked tiles.</summary>
+        Overwatch,
+
+        /// <summary>A brute about to hit and shove its target 1 tile.</summary>
+        BullRush,
     }
 
     /// <summary>What an enemy plans to do next, for the hover display.</summary>
@@ -63,6 +69,9 @@ namespace ArmyRoguelike.Core
         /// <summary>Slam, area smash and boulder throws.</summary>
         Giant,
 
+        /// <summary>Shoots from cover; with no shot it walks closer and goes on overwatch.</summary>
+        Shooter,
+
         /// <summary>Walks up and strikes; when it can't reach anyone, flings what is next to it.</summary>
         Goblin,
 
@@ -93,6 +102,8 @@ namespace ArmyRoguelike.Core
                 return EnemyBehaviour.Thief;
             if (stats.CanBomb)
                 return EnemyBehaviour.Bomber;
+            if (stats.Has(Ability.Overwatch))
+                return EnemyBehaviour.Shooter;
             if (stats.Has(Ability.Fling))
                 return EnemyBehaviour.Goblin;
             if (stats.Has(Ability.Howl))
@@ -255,6 +266,13 @@ namespace ArmyRoguelike.Core
             if (ShouldHowl(battle, enemy))
                 return new Intent(IntentKind.Howl, enemy);
 
+            if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Shooter && !CanReachToAttack(battle, enemy, target) &&
+                battle.Ready(enemy, ActionKind.Overwatch))
+                return new Intent(IntentKind.Overwatch, target);
+
+            if (enemy.Has(Ability.BullRush) && battle.Ready(enemy, ActionKind.BullRush) && CanReachToAttack(battle, enemy, target))
+                return new Intent(IntentKind.BullRush, target);
+
             if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Goblin)
             {
                 var fling = AsIfItsTurn(battle, enemy, 0, () => ChooseFling(battle, enemy, target));
@@ -304,6 +322,9 @@ namespace ArmyRoguelike.Core
                 case EnemyBehaviour.Giant:
                     OgreTurn(battle, enemy, events);
                     break;
+                case EnemyBehaviour.Shooter:
+                    ShooterTurn(battle, enemy, events);
+                    break;
                 case EnemyBehaviour.Goblin:
                     GoblinTurn(battle, enemy, events);
                     break;
@@ -328,6 +349,12 @@ namespace ArmyRoguelike.Core
                 var target = ChooseTarget(battle, enemy);
                 if (target == null)
                     return;
+
+                if (battle.CanBullRush(enemy, target))
+                {
+                    events.AddRange(battle.DoBullRush(enemy, target));
+                    continue;
+                }
 
                 if (battle.CanAttack(enemy, target))
                 {
@@ -388,6 +415,70 @@ namespace ArmyRoguelike.Core
             return null;
         }
 
+        /// <summary>Where a cutpurse drops caltrops: the free tile next to it nearest your units, else its own tile.</summary>
+        private static GridPos? CaltropsTile(Battle battle, Unit thief)
+        {
+            var nearest = Visible(battle).OrderBy(u => Battle.Distance(thief, u)).FirstOrDefault();
+            return thief.Pos.Neighbours().Concat(new[] { thief.Pos })
+                .Where(p => battle.CanDropCaltrops(thief, p))
+                .OrderBy(p => nearest == null ? 0 : Battle.Distance(p, 1, nearest))
+                .Select(p => (GridPos?)p)
+                .FirstOrDefault();
+        }
+
+        /// <summary>
+        /// Shoot its target if it can from where it stands. Otherwise walk to the cheapest tile with a shot,
+        /// preferring one next to a rock (Behind Cover), and shoot. With no shot this turn: walk closer, ending
+        /// next to a rock if it can, then go on overwatch.
+        /// </summary>
+        private static void ShooterTurn(Battle battle, Unit shooter, List<BattleEvent> events)
+        {
+            while (!battle.IsOver && shooter.IsAlive)
+            {
+                var target = ChooseTarget(battle, shooter);
+                if (target == null)
+                    return;
+
+                if (battle.CanAttack(shooter, target))
+                {
+                    events.AddRange(battle.DoAttack(shooter, target));
+                    continue;
+                }
+
+                bool Covered(GridPos p) => p.Neighbours().Any(battle.Board.IsObstacle);
+                var reachable = battle.GetReachable(shooter);
+                if (shooter.Ap >= Battle.AttackCost)
+                {
+                    var spot = reachable.Where(kv => battle.CanHitFrom(shooter, kv.Key, target))
+                        .OrderBy(kv => Covered(kv.Key) ? 0 : 1).ThenBy(kv => kv.Value)
+                        .Select(kv => (GridPos?)kv.Key).FirstOrDefault();
+                    if (spot.HasValue && battle.DoMove(shooter, spot.Value) is var walk && walk != null)
+                    {
+                        events.AddRange(walk);
+                        continue;
+                    }
+                }
+
+                // No shot this turn: one step closer (into cover if it can), then watch the approach.
+                if (reachable.Count > 0)
+                {
+                    var distance = Battle.Distance(shooter, target);
+                    var step = reachable.Where(kv => Battle.Distance(kv.Key, shooter.Size, target) < distance)
+                        .OrderBy(kv => Covered(kv.Key) ? 0 : 1).ThenBy(kv => Battle.Distance(kv.Key, shooter.Size, target))
+                        .Select(kv => (GridPos?)kv.Key).FirstOrDefault();
+                    if (step.HasValue && battle.DoMove(shooter, step.Value) is var move && move != null)
+                    {
+                        events.AddRange(move);
+                        continue;
+                    }
+                }
+
+                if (shooter.Has(Ability.Overwatch) && shooter.Ap >= Battle.AttackCost && battle.Ready(shooter, ActionKind.Overwatch))
+                    events.AddRange(battle.DoOverwatch(shooter));
+                return;
+            }
+        }
+
         /// <summary>
         /// Without loot: walk up and stab like any melee unit. With loot: run for the far edge (the
         /// enemies' back row) and escape once it gets there.
@@ -405,8 +496,8 @@ namespace ArmyRoguelike.Core
                         return;
                     }
 
-                    // Furthest row reachable, cheapest first. Cornered (it can't get any further back this
-                    // turn): it hits whoever it can instead of standing still.
+                    // Furthest row reachable, cheapest first. Once it can't get any further back this turn: if it
+                    // ran, it drops caltrops behind it; if it's cornered, it hits whoever it can.
                     var best = battle.GetReachable(thief)
                         .OrderByDescending(kv => kv.Key.Y)
                         .ThenBy(kv => kv.Value)
@@ -414,8 +505,13 @@ namespace ArmyRoguelike.Core
                     if (best.Key.Y <= thief.Pos.Y)
                     {
                         var cornered = ChooseTarget(battle, thief);
-                        if (cornered != null && battle.CanAttack(thief, cornered))
+                        var trap = CaltropsTile(battle, thief);
+                        if (thief.MovedThisTurn && trap.HasValue)
+                            events.AddRange(battle.DoCaltrops(thief, trap.Value));
+                        else if (cornered != null && battle.CanAttack(thief, cornered))
                             events.AddRange(battle.DoAttack(thief, cornered));
+                        else if (trap.HasValue)
+                            events.AddRange(battle.DoCaltrops(thief, trap.Value));
                         return;
                     }
                     var move = battle.DoMove(thief, best.Key);

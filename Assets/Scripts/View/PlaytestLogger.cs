@@ -227,6 +227,12 @@ namespace ArmyRoguelike.View
                     _log.actions.Add(entry);
                     break;
                 }
+                case OverwatchEvent watch:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = watch.Watcher.Team.ToString(), unit = Name(watch.Watcher), type = "overwatch", amount = watch.Tiles.Count,
+                    });
+                    break;
                 case HowlEvent howl:
                     _log.actions.Add(new ActionEntry
                     {

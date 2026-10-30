@@ -64,6 +64,8 @@ namespace ArmyRoguelike.View
         private static readonly Color RaiseColor = new Color(0.7f, 0.4f, 1f, 0.6f);
         private static readonly Color BombZoneColor = new Color(1f, 0.45f, 0.1f, 0.4f);
         private static readonly Color MineSpotColor = new Color(1f, 0.9f, 0.3f, 0.5f);
+        private static readonly Color OverwatchColor = new Color(0.95f, 0.2f, 0.45f, 0.22f);
+        private static readonly Color CaltropsColor = new Color(0.55f, 0.55f, 0.6f, 0.6f);
         // Zone of control, while one of your units is selected: tiles next to enemies (their reach), move tiles
         // that end the unit's movement early, and a dotted link to each enemy holding the selected unit.
         private static readonly Color EnemyReachColor = new Color(0.9f, 0.25f, 0.2f, 0.18f);
@@ -624,6 +626,11 @@ namespace ArmyRoguelike.View
             foreach (var bomb in Battle.Bombs)
             foreach (var p in Battle.BombArea(bomb.Tile))
                 _board.SetHighlight(p, BombZoneColor);
+            // Placeholders (see the "Art needed" table): caltrops and the tiles a crossbowman is watching.
+            foreach (var p in Battle.OverwatchTiles)
+                _board.SetHighlight(p, OverwatchColor);
+            foreach (var p in Battle.Caltrops)
+                _board.SetHighlight(p, CaltropsColor);
         }
 
         // One intent line per enemy while Alt is held.
@@ -827,6 +834,10 @@ namespace ArmyRoguelike.View
 
                     break;
                 }
+                case OverwatchEvent watch:
+                    DamagePopup.Spawn(_board.ViewOf(watch.Watcher).TopWorld + Vector3.up * 0.25f, "Overwatch!", DamagePopup.AbilityColor, 44);
+                    yield return new WaitForSeconds(0.35f);
+                    break;
                 case HowlEvent howl:
                 {
                     // Placeholder: popups only (see the "Art needed" table).
@@ -1433,7 +1444,9 @@ namespace ArmyRoguelike.View
                 GUI.enabled = Battle.ActionTargets(_selected, action).Count > 0;
                 var label = _action == action
                     ? $"Cancel {Abilities.Name(action)} ({i + 1})"
-                    : $"{Abilities.Name(action)}: {Battle.ActionCost(action)} AP ({i + 1})";
+                    : _selected.CooldownLeft(action) > 0
+                        ? $"{Abilities.Name(action)}: ready in {_selected.CooldownLeft(action)} ({i + 1})"
+                        : $"{Abilities.Name(action)}: {Battle.ActionCost(action)} AP, cooldown {Battle.Cooldown(action)} ({i + 1})";
                 if (GUILayout.Button(new GUIContent(label, $"{Abilities.Name(action)}: {Abilities.Describe(action)}"), GUILayout.Height(ButtonHeight)))
                     ToggleAction(action);
                 GUI.enabled = true;
@@ -1510,6 +1523,10 @@ namespace ArmyRoguelike.View
                         : "Shrouded: your units can't hit enemies here from range.";
                 if (Battle.BombAt(p) is Bomb bomb)
                     return $"Bomb: explodes at the start of the enemy turn for {bomb.Damage} damage to whoever stands on this tile.";
+                if (Battle.Caltrops.Contains(p))
+                    return $"Caltrops: a unit of yours stepping here takes {Battle.CaltropsDamage} and its movement ends.";
+                if (Battle.OverwatchTiles.Contains(p))
+                    return "Overwatch: a crossbowman is aiming here. The first of your units to walk onto a marked tile is shot and stops.";
                 if (Battle.MineAt(p) != null)
                     return $"Your mine: an enemy stepping here sets it off ({Battle.MineDamage} damage to everyone around, your units too).";
                 if (Battle.RemainsAt(p) is Unit bones)
@@ -1569,8 +1586,13 @@ namespace ArmyRoguelike.View
             }
 
             rows.Add(($"<color={ActionColor}>ACTIONS</color>", section));
-            foreach (var (name, cost, text) in Abilities.ActionsOf(u.Stats, Battle.EffectiveDamage(u)))
-                rows.Add(($"<b>{name}</b> <color={DimColor}>({cost} AP)  {text}</color>", body));
+            foreach (var (name, cost, kind, text) in Abilities.ActionsOf(u.Stats, Battle.EffectiveDamage(u)))
+            {
+                var cooldown = kind.HasValue ? $", cooldown {Battle.Cooldown(kind.Value)}" : "";
+                var left = kind.HasValue ? u.CooldownLeft(kind.Value) : 0;
+                var ready = left > 0 ? $"  <color={NextColor}>ready in {left} turn{(left == 1 ? "" : "s")}</color>" : "";
+                rows.Add(($"<b>{name}</b> <color={DimColor}>({cost} AP{cooldown})  {text}</color>{ready}", body));
+            }
 
             var state = StateLines(u);
             if (state.Count > 0)
@@ -1667,6 +1689,10 @@ namespace ArmyRoguelike.View
                     return intent.Thrown != null
                         ? $"fling the {intent.Thrown.Stats.Name} at the {name}: {Battle.FlingDamage} damage, it lands on the dark tile and can still act"
                         : $"fling an explosive from next to it at the {name}: it goes off there";
+                case IntentKind.Overwatch:
+                    return "overwatch: no shot this turn, so it aims; the first of your units to walk into its sight next turn gets shot";
+                case IntentKind.BullRush:
+                    return $"bull rush the {name}: hit it and push it 1 tile";
                 case IntentKind.Howl:
                     return $"howl: every wolf gets +{Battle.HowlMoves} move this turn (wolves lit up)";
                 default:

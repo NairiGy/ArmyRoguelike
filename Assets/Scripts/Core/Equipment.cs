@@ -83,6 +83,11 @@ namespace ArmyRoguelike.Core
                 case Ability.Slippery: return "Slippery";
                 case Ability.Fling: return "Fling";
                 case Ability.PowderKeg: return "Powder Keg";
+                case Ability.LightFingers: return "Light Fingers";
+                case Ability.Caltrops: return "Caltrops";
+                case Ability.BehindCover: return "Behind Cover";
+                case Ability.Overwatch: return "Overwatch";
+                case Ability.BullRush: return "Bull Rush";
                 default: return "";
             }
         }
@@ -133,6 +138,11 @@ namespace ArmyRoguelike.Core
                 case Ability.Slippery: return "ignores zone of control: leaving your units' reach doesn't use up its moves";
                 case Ability.Fling: return $"throws what is next to it at a unit 2-{Battle.FlingRange} tiles away, over obstacles: a bomb or mine goes off there with its own blast; a goblin that hasn't acted lands next to the unit, deals {Battle.FlingDamage}, and can still act";
                 case Ability.PowderKeg: return $"when it dies it explodes: {Battle.PowderKegDamage} damage to everyone around it, its own side included";
+                case Ability.LightFingers: return "the only unit that can still move after attacking: it stabs, grabs the gold and runs in the same turn";
+                case Ability.Caltrops: return $"drops caltrops on its tile or a free tile next to it; a unit of yours stepping on them takes {Battle.CaltropsDamage} and its movement ends";
+                case Ability.BehindCover: return "while next to a rock it can't be hit by ranged attacks; melee, bombs and blasts still reach it";
+                case Ability.Overwatch: return "instead of shooting, it aims: during your next turn the first of your units that walks onto a tile it can see in range is shot and stops there";
+                case Ability.BullRush: return $"hit a unit next to it and push it 1 tile; if it slams into a unit, both take {Battle.CollisionDamage}";
                 default: return "";
             }
         }
@@ -147,6 +157,15 @@ namespace ArmyRoguelike.Core
                 case ActionKind.ShieldBash: return "Shield Bash";
                 case ActionKind.Vanish: return "Vanish";
                 case ActionKind.Blink: return "Blink";
+                case ActionKind.Slam: return "Slam";
+                case ActionKind.Boulder: return "Boulder";
+                case ActionKind.Bomb: return "Bomb";
+                case ActionKind.Raise: return "Raise";
+                case ActionKind.Howl: return "Howl";
+                case ActionKind.Fling: return "Fling";
+                case ActionKind.Overwatch: return "Overwatch";
+                case ActionKind.Caltrops: return "Caltrops";
+                case ActionKind.BullRush: return "Bull Rush";
                 case ActionKind.Fireball: return "Fireball";
                 case ActionKind.IceWall: return "Ice Wall";
                 case ActionKind.Ward: return "Ward";
@@ -186,7 +205,9 @@ namespace ArmyRoguelike.Core
         // ---------- A unit's kit: passives and actions ----------
 
         /// <summary>Abilities that describe one of the unit's actions rather than a passive (listed with the actions).</summary>
-        public static bool IsAction(Ability ability) => ability == Ability.WolfBite || ability == Ability.Howl || ability == Ability.Fling;
+        public static bool IsAction(Ability ability) =>
+            ability == Ability.WolfBite || ability == Ability.Howl || ability == Ability.Fling || ability == Ability.Caltrops ||
+            ability == Ability.Overwatch || ability == Ability.BullRush;
 
         /// <summary>The name of a unit type's basic attack, which is one of its actions.</summary>
         public static string AttackName(UnitStats s)
@@ -216,27 +237,33 @@ namespace ArmyRoguelike.Core
             return $"{damage} damage to a unit next to it";
         }
 
-        /// <summary>Every action a unit type can spend AP on: its attack first, then special actions.</summary>
-        public static List<(string name, int cost, string text)> ActionsOf(UnitStats s, int damage)
+        /// <summary>
+        /// Every action a unit type can spend AP on: its attack first (no cooldown), then special actions, each with
+        /// the action it is for its cooldown (null for the attack).
+        /// </summary>
+        public static List<(string name, int cost, ActionKind? kind, string text)> ActionsOf(UnitStats s, int damage)
         {
-            var list = new List<(string, int, string)>();
+            var list = new List<(string, int, ActionKind?, string)>();
             if (s.Damage > 0)
-                list.Add((AttackName(s), Battle.AttackCost, DescribeAttack(s, damage)));
+                list.Add((AttackName(s), Battle.AttackCost, null, DescribeAttack(s, damage)));
             foreach (var action in s.Actions)
-                list.Add((Name(action), Battle.ActionCost(action), Describe(action)));
+                list.Add((Name(action), Battle.ActionCost(action), action, Describe(action)));
             if (s.Slams)
-                list.Add(("Slam", Battle.AttackCost,
+                list.Add(("Slam", Battle.AttackCost, ActionKind.Slam,
                     $"{Battle.SlamDamage} damage to each of your units within 2 tiles, then shoves everyone within 2 tiles 1 tile away"));
             if (s.CanThrow)
-                list.Add(("Boulder", s.ThrowCost, $"{s.ThrowDamage} damage to a unit 2-{s.ThrowRange} tiles away, over obstacles; the rock stays"));
+                list.Add(("Boulder", s.ThrowCost, ActionKind.Boulder, $"{s.ThrowDamage} damage to a unit 2-{s.ThrowRange} tiles away, over obstacles; the rock stays"));
             if (s.CanBomb)
-                list.Add(("Bomb", s.BombCost, $"lands on a unit 2-{s.BombRange} tiles away and explodes on that tile for {s.BombDamage} at the start of the next enemy turn"));
+                list.Add(("Bomb", s.BombCost, ActionKind.Bomb, $"lands on a unit 2-{s.BombRange} tiles away and explodes on that tile for {s.BombDamage} at the start of the next enemy turn"));
             if (s.CanRaise)
-                list.Add(("Raise", s.RaiseCost, $"brings back every bone pile within {s.RaiseRange} tiles at full HP"));
-            if (s.Has(Ability.Fling))
-                list.Add((Name(Ability.Fling), Battle.AttackCost, Describe(Ability.Fling)));
-            if (s.Has(Ability.Howl))
-                list.Add((Name(Ability.Howl), Battle.AttackCost, Describe(Ability.Howl)));
+                list.Add(("Raise", s.RaiseCost, ActionKind.Raise, $"brings back every bone pile within {s.RaiseRange} tiles at full HP"));
+            foreach (var (ability, kind) in new[]
+                     {
+                         (Ability.Fling, ActionKind.Fling), (Ability.Howl, ActionKind.Howl), (Ability.Caltrops, ActionKind.Caltrops),
+                         (Ability.Overwatch, ActionKind.Overwatch), (Ability.BullRush, ActionKind.BullRush),
+                     })
+                if (s.Has(ability))
+                    list.Add((Name(ability), Battle.AttackCost, kind, Describe(ability)));
             return list;
         }
 

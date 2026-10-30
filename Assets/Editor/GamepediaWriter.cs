@@ -105,7 +105,7 @@ public static class GamepediaWriter
             foreach (var a in unit.Actions)
             {
                 var isNew = unit.EvolvesFrom == null || !unit.EvolvesFrom.HasAction(a);
-                html.Append($"<li class=\"action {(isNew ? "new" : "")}\"><b>{Esc(Abilities.Name(a))}</b> ({Battle.ActionCost(a)} AP): {Esc(Abilities.Describe(a))}</li>");
+                html.Append($"<li class=\"action {(isNew ? "new" : "")}\"><b>{Esc(Abilities.Name(a))}</b> ({Battle.ActionCost(a)} AP, cooldown {Battle.Cooldown(a)}): {Esc(Abilities.Describe(a))}</li>");
             }
 
             html.Append("</ul>");
@@ -162,20 +162,23 @@ public static class GamepediaWriter
         var cost = Battle.AttackCost;
         lines.Add($"<b>{Esc(Abilities.AttackName(e))}</b> ({cost} AP): {Esc(Abilities.DescribeAttack(e, e.Damage))}.");
         if (e.Has(Ability.Fling))
-            lines.Add($"<b>Fling</b> ({cost} AP): {Esc(Abilities.Describe(Ability.Fling))}.");
+        foreach (var (ability, kind) in new[] { (Ability.Caltrops, ActionKind.Caltrops), (Ability.Overwatch, ActionKind.Overwatch), (Ability.BullRush, ActionKind.BullRush) })
+            if (e.Has(ability))
+                lines.Add($"<b>{Esc(Abilities.Name(ability))}</b> ({cost} AP, cooldown {Battle.Cooldown(kind)}): {Esc(Abilities.Describe(ability))}.");
+            lines.Add($"<b>Fling</b> ({cost} AP, cooldown {Battle.Cooldown(ActionKind.Fling)}): {Esc(Abilities.Describe(Ability.Fling))}.");
         if (e.Has(Ability.Howl))
-            lines.Add($"<b>Howl</b> ({cost} AP): {Esc(Abilities.Describe(Ability.Howl))}. The leader acts before the other enemies, so the move reaches wolves that haven't acted.");
+            lines.Add($"<b>Howl</b> ({cost} AP, cooldown {Battle.Cooldown(ActionKind.Howl)}): {Esc(Abilities.Describe(Ability.Howl))}. The leader acts before the other enemies, so the move reaches wolves that haven't acted.");
         if (e.Slams)
-            lines.Add($"<b>Slam</b> ({cost} AP): {Battle.SlamDamage} damage to each of your units within 2 tiles, then shoves every other 1x1 unit within 2 tiles (yours and its own) 1 tile away from it. " +
+            lines.Add($"<b>Slam</b> ({cost} AP, cooldown {Battle.Cooldown(ActionKind.Slam)}): {Battle.SlamDamage} damage to each of your units within 2 tiles, then shoves every other 1x1 unit within 2 tiles (yours and its own) 1 tile away from it. " +
                       $"A unit pushed into a rock, unit or the edge takes {Battle.CollisionDamage} damage.");
         if (e.CanThrow)
-            lines.Add($"<b>Boulder</b> ({e.ThrowCost} AP, once a turn): {e.ThrowDamage} damage to a unit 2-{e.ThrowRange} tiles away, ignoring line of sight. " +
+            lines.Add($"<b>Boulder</b> ({e.ThrowCost} AP, cooldown {Battle.Cooldown(ActionKind.Boulder)}): {e.ThrowDamage} damage to a unit 2-{e.ThrowRange} tiles away, ignoring line of sight. " +
                       "The boulder stays as a rock on the free tile next to the target that is closest to the thrower, burying any mine or bomb there.");
         if (e.CanBomb)
-            lines.Add($"<b>Bomb</b> ({e.BombCost} AP, once a turn): lobbed onto the tile of a unit 2-{e.BombRange} tiles away that has no bomb on it yet, ignoring line of sight. " +
+            lines.Add($"<b>Bomb</b> ({e.BombCost} AP, cooldown {Battle.Cooldown(ActionKind.Bomb)}): lobbed onto the tile of a unit 2-{e.BombRange} tiles away that has no bomb on it yet, ignoring line of sight. " +
                       $"It explodes at the start of the next enemy turn for {e.BombDamage} damage to whoever stands on that tile, its own side included, and sets off a mine or bomb on it.");
         if (e.CanRaise)
-            lines.Add($"<b>Raise</b> ({e.RaiseCost} AP): brings every one of its side's bone piles within {e.RaiseRange} tiles back at full HP at once, unless someone stands on it. " +
+            lines.Add($"<b>Raise</b> ({e.RaiseCost} AP, cooldown {Battle.Cooldown(ActionKind.Raise)}): brings every one of its side's bone piles within {e.RaiseRange} tiles back at full HP at once, unless someone stands on it. " +
                       "The raised unit acts from the next enemy turn.");
         return lines.ToArray();
     }
@@ -270,6 +273,7 @@ public static class GamepediaWriter
             case EnemyBehaviour.Giant: return "Giant";
             case EnemyBehaviour.PackLeader: return "Pack Leader";
             case EnemyBehaviour.Goblin: return "Goblin";
+            case EnemyBehaviour.Shooter: return "Shooter";
             case EnemyBehaviour.Necromancer: return "Necromancer";
             default: throw new ArgumentOutOfRangeException(nameof(b), b, "Add a name and steps for this behaviour to the gamepedia.");
         }
@@ -290,13 +294,20 @@ public static class GamepediaWriter
             case EnemyBehaviour.Advance:
                 return new[]
                 {
-                    $"If it can hit its {target} from where it stands: attack.",
+                    $"If it can hit its {target} from where it stands: attack, or Bull Rush instead when it has it ready (Bandit Brute).",
                     $"Otherwise {approach} to it.",
+                };
+            case EnemyBehaviour.Shooter:
+                return new[]
+                {
+                    $"If it can shoot its {target} from where it stands: shoot.",
+                    "Otherwise walk to the cheapest tile with a shot, preferring one next to a rock (Behind Cover), and shoot.",
+                    "With no shot this turn: walk closer, into cover if it can, then go on Overwatch if it's ready.",
                 };
             case EnemyBehaviour.Thief:
                 return new[]
                 {
-                    "Carrying stolen gold: if it is on the enemies' back row, escape with the gold. Otherwise move to the reachable tile furthest back (the cheapest of those). If it can't get any further back this turn, it stops.",
+                    "Carrying stolen gold: if it is on the enemies' back row, escape with the gold. Otherwise move to the reachable tile furthest back (the cheapest of those). Once it can't get any further back this turn: if it ran, it drops caltrops on the free tile next to it nearest your units; if it's cornered, it strikes whoever it can. Light Fingers lets it run in the same turn it steals.",
                     $"Not carrying gold: attack its {target} if it can, otherwise {approach}, like Walk up and hit. Its first hit that does damage steals the gold, and it spends the rest of its moves running.",
                 };
             case EnemyBehaviour.Goblin:
@@ -457,6 +468,7 @@ public static class GamepediaWriter
     {
         html.Append("<section id=\"rules\"><h2>Battle rules</h2><ul>");
         html.Append($"<li>Moves are separate from AP: every unit walks {Battle.BaseMoves} tile per turn ({Battle.BaseMoves + 1} with Swift, +1 with Spring Boots), 4 directions, no diagonals. Move first: once a unit spends AP (an attack or action) it can't move again that turn, for both sides. Unused moves don't carry over. AP pays for attacks and actions: every unit has {Battle.AttackCost} AP, so one attack or action per turn, and unused AP doesn't carry over.</li>");
+        html.Append("<li><b>Cooldowns</b>: basic attacks have none. Every other action, yours and the enemies', is ready again a set number of the unit's own turns after it's used (cooldown 2: used now, ready again two turns later).</li>");
         html.Append("<li>Side phases: all your units act (one at a time), then all enemies.</li>");
         html.Append($"<li><b>Zone of control</b>: stepping out of a tile next to an enemy uses up all your remaining moves, for both sides. You can always back off one tile, but you can't slip past.</li>");
         html.Append("<li>Ranged attacks need line of sight (rocks block); Arcane Bolt ignores it. Bombs, boulders and fireballs are lobbed.</li>");

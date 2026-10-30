@@ -176,7 +176,7 @@ namespace ArmyRoguelike.Tests
             var behind = Enemy(crowd, 1);
             crowd.PlayerUseAction(Player(crowd), ActionKind.ShieldBash, front.Pos);
             Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.CollisionDamage, front.Hp);
-            Assert.AreEqual(UnitStats.Brute.MaxHp - (Battle.CollisionDamage - 1), behind.Hp, "the unit it slams into is hurt too (the brute is Tough)");
+            Assert.AreEqual(UnitStats.Brute.MaxHp - Battle.CollisionDamage, behind.Hp, "the unit it slams into is hurt too");
         }
 
         [Test]
@@ -198,7 +198,7 @@ namespace ArmyRoguelike.Tests
 
             var normal = b.EffectiveDamage(rogue);
             var hit = b.PlayerAttack(rogue, brute).OfType<AttackEvent>().First();
-            Assert.AreEqual(normal + Battle.VanishBonus - 1, hit.Damage, "the reveal bonus (brute is Tough)");
+            Assert.AreEqual(normal + Battle.VanishBonus, hit.Damage, "the reveal bonus");
             Assert.IsFalse(rogue.IsHidden, "attacking reveals it");
         }
 

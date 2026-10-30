@@ -293,6 +293,88 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void Cooldown_ActionReadyAgainTwoTurnsLater_AttackHasNone()
+        {
+            var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 1) },
+                new[] { (UnitStats.Brute, new GridPos(3, 2)), (UnitStats.Wolf, new GridPos(7, 7)) }, new GridPos(3, 4));
+            var warrior = Player(b);
+            Assert.IsNotNull(b.PlayerUseAction(warrior, ActionKind.ShieldBash, new GridPos(3, 2)));
+            Assert.AreEqual(Battle.Cooldown(ActionKind.ShieldBash), warrior.CooldownLeft(ActionKind.ShieldBash));
+            b.EndPlayerTurn();
+            Assert.AreEqual(1, warrior.CooldownLeft(ActionKind.ShieldBash));
+            b.EndPlayerTurn();
+            Assert.AreEqual(0, warrior.CooldownLeft(ActionKind.ShieldBash), "ready two of its turns later");
+        }
+
+        [Test]
+        public void LightFingers_CutpurseStealsAndRunsInTheSameTurn()
+        {
+            var b = Started(new[] { UnitStats.Archer }, new[] { new GridPos(3, 1) }, new[] { (UnitStats.Cutpurse, new GridPos(3, 2)) });
+            var thief = Enemy(b);
+            b.EndPlayerTurn();
+            Assert.AreEqual(UnitStats.Cutpurse.StealsGold, thief.CarryingLoot);
+            Assert.AreEqual(new GridPos(3, 3), thief.Pos, "stabbed, then ran (stepping out of the archer's reach uses up its moves)");
+        }
+
+        [Test]
+        public void Caltrops_StopYourUnitAndHurt()
+        {
+            var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 0) }, new[] { (UnitStats.Cutpurse, new GridPos(7, 7)) });
+            var warrior = Player(b);
+            var thief = Enemy(b);
+            thief.Ap = 1;
+            thief.Pos = new GridPos(4, 2);
+            b.DoCaltrops(thief, new GridPos(3, 2));
+            thief.Pos = new GridPos(7, 7);
+            warrior.Moves = 3;
+            b.PlayerMove(warrior, new GridPos(3, 3));
+            Assert.AreEqual(new GridPos(3, 2), warrior.Pos, "stopped on the caltrops");
+            Assert.AreEqual(0, warrior.Moves);
+            Assert.AreEqual(warrior.MaxHp - Battle.CaltropsDamage, warrior.Hp);
+            Assert.AreEqual(0, b.Caltrops.Count, "used up");
+        }
+
+        [Test]
+        public void BehindCover_NoRangedHitsNextToARock()
+        {
+            var b = Started(new[] { UnitStats.Archer }, new[] { new GridPos(3, 1) }, new[] { (UnitStats.Crossbowman, new GridPos(3, 4)) }, new GridPos(4, 4));
+            var archer = Player(b);
+            var crossbow = Enemy(b);
+            Assert.IsFalse(b.CanAttack(archer, crossbow), "next to the rock");
+            crossbow.Pos = new GridPos(2, 3);
+            Assert.IsTrue(b.CanAttack(archer, crossbow), "out of cover");
+        }
+
+        [Test]
+        public void Overwatch_ShootsTheFirstUnitWalkingIntoSight()
+        {
+            var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 0) }, new[] { (UnitStats.Crossbowman, new GridPos(3, 5)) });
+            var warrior = Player(b);
+            var crossbow = Enemy(b);
+            Assert.AreEqual(IntentKind.Overwatch, EnemyAI.PredictIntent(b, crossbow).Kind);
+            var events = b.EndPlayerTurn();
+            Assert.IsTrue(events.OfType<OverwatchEvent>().Any());
+            Assert.IsTrue(b.OverwatchTiles.Contains(new GridPos(3, 1)));
+
+            var move = b.PlayerMove(warrior, new GridPos(3, 1));
+            var shot = move.OfType<AttackEvent>().Single();
+            Assert.AreEqual(crossbow, shot.Attacker);
+            Assert.AreEqual(warrior.MaxHp - UnitStats.Crossbowman.Damage, warrior.Hp);
+            Assert.IsFalse(b.OverwatchTiles.Any(), "one shot, then it stops watching");
+        }
+
+        [Test]
+        public void BullRush_HitsAndPushes()
+        {
+            var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 1) }, new[] { (UnitStats.Brute, new GridPos(3, 2)) });
+            var warrior = Player(b);
+            Assert.AreEqual(IntentKind.BullRush, EnemyAI.PredictIntent(b, Enemy(b)).Kind);
+            b.EndPlayerTurn();
+            Assert.AreEqual(new GridPos(3, 0), warrior.Pos, "pushed away");
+            Assert.AreEqual(warrior.MaxHp - UnitStats.Brute.Damage, warrior.Hp);
+        }
+
+        [Test]
         public void Howl_GivesWolvesAnExtraMoveWhenItHelps()
         {
             var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 0) },

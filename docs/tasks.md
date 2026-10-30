@@ -25,6 +25,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 | Scenarios | Blessing pick and item pick screens | Plain IMGUI panels (part of the UI pass) | Needed |
 | Zone of control | Enemy reach tiles, orange "costs extra AP" move tiles, dotted link to the enemies holding the selected unit | Flat colours (`EnemyReachColor`, `CostlyMoveColor`) and a red dotted line (`EngagedLinkColor`) in `BattleController` | Needed |
 | Unit card (branch `experiment/small-board`) | The hover card's look: panel, header, section colours | IMGUI box with rich-text colours (`DrawUnitCard` in `BattleController`) | Needed only if the experiment is kept |
+| Bandits (branch `experiment/small-board`) | Caltrops on a tile; the tiles a crossbowman is watching (Overwatch) and its shot; Bull Rush | Grey tile tint for caltrops, a faint pink tint for watched tiles, an "Overwatch!" popup; the shot and the rush use the normal attack and push | Needed only if the experiment is kept |
 | Goblins (branch `experiment/small-board`) | Fling (a goblin or explosive flying through the air), Powder Keg explosion | Thrower lunges, the thrown goblin pops to its landing tile with a "Flung!" popup; an explosive flies as a small square; the keg uses the normal blast | Needed only if the experiment is kept |
 | Howl (branch `experiment/small-board`) | The Pack Leader's howl, and the "+1 move" on each wolf | "Howl!" and "+1 move" popups and a small shake (`HowlEvent` in `BattleController`) | Needed only if the experiment is kept |
 | Base-line actions (branch `experiment/small-board`) | Vanish (hidden rogue), Blink (teleport), Shield Bash, Pinning Shot | Vanished statue at 40% opacity (`UnitView.SetHidden`); Blink slides like a 1-tile move; Shield Bash is just the push; Pinning Shot is a normal shot plus a "Pinned" popup | Needed only if the experiment is kept |
@@ -59,7 +60,8 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [x] Base-line actions (2026-10-29, same branch): Shield Bash (warriors), Pinning Shot (archers), Vanish (rogues), Blink (mages); evolutions inherit them.
 - [ ] Trapper line: design a new action to replace Snare (Pinning Shot took its job).
 - [x] Goblin kits (2026-10-29, same branch): Slippery + Fling for the Goblin, Powder Keg for the Bomber.
-- [ ] Unit kits for the other enemy factions (bandits, elementals, skeleton, bosses) and for the player's units: a passive and actions for each, designed one faction or line at a time with the user.
+- [x] Bandit kits and cooldowns (2026-10-30, same branch): Light Fingers + Caltrops, Behind Cover + Overwatch, Guard + Bull Rush; every non-attack action has a cooldown.
+- [ ] Unit kits for the other enemy factions (elementals, skeleton, bosses) and for the player's units: a passive and actions for each, designed one faction or line at a time with the user.
 - [ ] Playtest the small-board experiment (open the worktree folder as its own project in Unity Hub), then decide: keep and merge, tune, or drop the branch. Watch for: fights now slower (one attack a turn each) and whether HP needs cutting, ranged units too strong, bombers too weak with 1x1 bombs, the bosses' new single actions, crowding in elites and the Necromancer fight.
 - [ ] Next: playtest the 12-step Act 1 as a full run and summarise from the logs. Then decide on new node types and events, and the balance pass.
 - [ ] Later: split fights into difficulty pools (and add more fights); each map step draws from a pool.
@@ -71,7 +73,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [ ] Later (parked ideas, see "Later / maybe" in the design note): Banners, more acts, terrain features, post-battle reward choice, difficulty scaling.
 - [x] Gamepedia documents enemy AI: per-enemy actions and traits, shared AI rules, each behaviour's decision list, hover intent (2026-10-26, branch `docs/enemy-ai-wiki`, worktree `../ArmyRoguelike-enemy-ai-wiki`). Not merged yet; after merging, re-export with Tools → Export Gamepedia to get the statue images back (the committed page is text only).
 - [ ] When merging `docs/enemy-ai-wiki`: the scenario targeting rules (Moon Shrine: go for the shrine unless a defender is adjacent; Break the Ritual: go for whoever is within 2 tiles of a totem; totems never act and have no intent) need documenting there. When adding enemy AI: add a value to `EnemyBehaviour` in `EnemyAI.cs` and its name and decision list in `GamepediaWriter.BehaviourSteps`; the export fails until the text exists.
-- [ ] Crossbowman's role text says "Hides behind cover", but its AI just walks to the cheapest tile with a shot (only the Camp layout starts it behind rocks). Fix the text or give it cover-seeking AI. Ask first.
+- [x] Crossbowman role text vs AI (2026-10-30, small-board branch): it now has Behind Cover and its AI prefers covered tiles. Still open on `main`.
 - [ ] Goblin Bomber hover intent only checks the nearest unit: it shows "attack" when it will bomb a farther unit, and ignores backing off. Decide whether the intent should match.
 
 ## Sound (sound chat, branch `feature/sound`, worktree `../ArmyRoguelike-sound`)
