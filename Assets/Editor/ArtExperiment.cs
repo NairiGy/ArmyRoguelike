@@ -501,6 +501,11 @@ public static class ArtExperiment
             if (!Enum.TryParse<UnitKind>(unit, true, out var kind))
                 continue;
             var (_, tex, pivot, ppu) = CutOutFigure(Path.GetFileName(file), unit + "_figure", FigureHeight(kind));
+            if (DrawnFacingRight.Contains(kind))
+            {
+                tex = Mirrored(tex);
+                pivot.x = 1f - pivot.x;
+            }
             SaveSprite(StatueFolder + kind + "_figure.png", tex, pivot, ppu);
             Debug.Log($"Imported statue {kind} (no ground) from {file}");
         }
@@ -539,6 +544,23 @@ public static class ArtExperiment
     };
 
     private static float FigureHeight(UnitKind kind) => FigureHeights.TryGetValue(kind, out var h) ? h : DefaultFigureHeight;
+
+    // Enemies drawn facing down-right; they are mirrored on import so they face down-left, towards the camera.
+    private static readonly HashSet<UnitKind> DrawnFacingRight = new HashSet<UnitKind> { UnitKind.Goblin, UnitKind.GoblinBomber };
+
+    private static Texture2D Mirrored(Texture2D tex)
+    {
+        int w = tex.width, h = tex.height;
+        var src = tex.GetPixels();
+        var dst = new Color[src.Length];
+        for (var y = 0; y < h; y++)
+            for (var x = 0; x < w; x++)
+                dst[y * w + x] = src[y * w + (w - 1 - x)];
+        var mirrored = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        mirrored.SetPixels(dst);
+        mirrored.Apply();
+        return mirrored;
+    }
 
     /// <summary>A figure drawn standing on nothing: sized by its height, standing halfway between its feet.</summary>
     private static (string, Texture2D, Vector2, float) CutOutFigure(string file, string name, float height)
