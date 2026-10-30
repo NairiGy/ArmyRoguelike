@@ -68,6 +68,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [x] Elemental and skeleton kits (2026-10-30, on `main`): Upheaval for the Elemental, Reform for Shards, Grasp for the Skeleton (see the design note). Not playtested.
 - [x] Boss kits (2026-10-30, on `main`): Giant gets Colossus and Wrath, Necromancer gets Soul Harvest and Corpse Blast (see the design note). Not playtested.
 - [x] Bundle playtest fixes (2026-10-30): Upheaval no longer leaves a rock, Shards lost Reform, mines hit only their own tile. Not playtested.- [ ] Design later with the user: what Upheaval should do to the board instead of a lasting rock (it felt like too many rocks), and a new passive for the Shard.
+- [ ] Design later with the user: what Upheaval should do to the board instead of a lasting rock (too many rocks in play), and a new passive for the Shard.
 - [ ] Unit kits still to design: the player's units, one line at a time with the user. Next: the Rogue line (5 HP problem, Bloodthirst leftover on its evolutions).
 - [x] Playtest the small-board version (2026-10-30): felt ok; 3 finished fights (2 wins, 1 loss), 5-6 turns each. Merged into `main` the same day.
 - [ ] Next (new gameplay chat): tune units from the playtest. Weak spots seen: the Rogue dies first in every fight (5 HP on a 1-move board); Pinning Shot and Blink were never used; Fling and the bandit kits are unplayed; cooldowns are placeholders.
