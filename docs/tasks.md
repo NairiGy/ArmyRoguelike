@@ -7,7 +7,7 @@ updates it when it finishes something or finds something new. Decisions themselv
 Format: `- [ ] task (where it stands / what it needs)`. Tick it with `[x]` and the date when done,
 and move done items to the "Done" section at the bottom now and then.
 
-## Visuals (art chat, branch `experiment/art-style`)
+## Visuals (art chat)
 
 ### Art needed for gameplay features
 
@@ -41,7 +41,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [x] Highlights that fit the theme: smooth glowing tiles with a gentle pulse (2026-10-25). Not yet playtested; path markers not done.
 - [x] Feel pass: attack wind-up, hit-stop, projectiles, heavy steps with dust; hit flash and chips, cracks as HP drops, crumbling deaths, popping damage numbers, explosions with shake (2026-10-25). Not yet playtested.
 - [ ] Tune the cloud layers' values once settled (live in the Inspector: Scenery → Scenery Clouds) and make them the defaults.
-- [ ] Merge `experiment/art-style` into `main` when the battle's look is settled.
+- [x] Merge `experiment/art-style` into `main` (done 2026-10-28; the branch is deleted, art work now goes on `main`).
 
 ## Gameplay (mechanics chat)
 

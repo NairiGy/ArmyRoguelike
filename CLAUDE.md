@@ -75,4 +75,4 @@ The chats share one project folder, so:
 
 - Only one chat uses Unity at a time (batch renders and imports fail while the editor is open).
 - Don't edit the same files as another chat at the same time; commit only your own files, and never switch branches, stash or reset. For bigger parallel work, a chat can get its own worktree on its own branch.
-- Visual work currently lives on the branch `experiment/art-style`; it is merged into `main` when the battle's look is settled.
+- This folder is checked out on `main`, which holds all work; `experiment/art-style` was merged and deleted on 2026-10-28.
