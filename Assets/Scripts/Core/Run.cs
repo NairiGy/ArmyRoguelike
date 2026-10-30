@@ -7,7 +7,7 @@ namespace ArmyRoguelike.Core
     /// <summary>A unit in the player's army between battles: its type, its item and run-long bonuses.</summary>
     public sealed class ArmyMember
     {
-        /// <summary>The unit's current type. Changes when it evolves at a Trainer.</summary>
+        /// <summary>The unit's type: one of the base units.</summary>
         public UnitStats Stats { get; internal set; }
 
         public Equipment Equipment { get; internal set; }
@@ -83,13 +83,12 @@ namespace ArmyRoguelike.Core
         Battle,
         Shop,
         Event,
-        Trainer,
         Boss,
 
         /// <summary>A scenario fight (Moon Shrine or Break the Ritual): win for a reward; lose it and take a curse.</summary>
         Ritual,
 
-        /// <summary>A harder rematch of a faction you've beaten: high risk, pays gold plus an item pick.</summary>
+        /// <summary>A harder rematch of a faction you've beaten: high risk; its technique pick has a rare one.</summary>
         Elite,
     }
 
@@ -98,7 +97,7 @@ namespace ArmyRoguelike.Core
         /// <summary>A random base unit offers to join for free (or pays gold if the army is full).</summary>
         WanderingRecruit,
 
-        /// <summary>A random free item for one unit.</summary>
+        /// <summary>A random free technique for one unit.</summary>
         AbandonedCart,
 
         /// <summary>Pay gold for a 50% chance at more.</summary>
@@ -143,7 +142,6 @@ namespace ArmyRoguelike.Core
                         return Encounter == null ? "Elite" : $"Elite: {Encounter.Base.Name}";
                     case NodeKind.Boss: return $"Boss: {Encounter.Name}";
                     case NodeKind.Shop: return "Shop";
-                    case NodeKind.Trainer: return "Trainer";
                     case NodeKind.Ritual: return Encounter.Name;
                     default: return "?";
                 }
@@ -161,22 +159,21 @@ namespace ArmyRoguelike.Core
         Battle,
         Shop,
         Event,
-        Trainer,
 
         /// <summary>The Moon Shrine held: picking a blessing.</summary>
         Blessing,
 
-        /// <summary>The ritual broken: picking an item for one unit.</summary>
-        ItemReward,
+        /// <summary>A fight won: picking a technique for one unit, or skipping it for gold.</summary>
+        Reward,
         Won,
         Lost,
     }
 
     /// <summary>
     /// A run: draft a starting army, then cross a branching map where each step offers two nodes
-    /// (battle, shop, ? event or trainer); the last step is one of the bosses. Gold depends on how many
-    /// units survived. Every battle starts with the whole army at full HP; evolutions, items and
-    /// run-long bonuses carry over.
+    /// (battle, shop or ? event); the last step is one of the bosses. Gold depends on how many units
+    /// survived, and every won fight offers a technique pick. Every battle starts with the whole army at
+    /// full HP; techniques, levels and run-long bonuses carry over.
     /// </summary>
     public sealed class Run
     {
@@ -193,17 +190,22 @@ namespace ArmyRoguelike.Core
         public const int FullArmyGold = 15;
         public const int ShrineHp = 2;
 
-        /// <summary>Map steps (0-based) that always offer a Trainer as one of the two choices.</summary>
-        public static readonly IReadOnlyList<int> TrainerSteps = new[] { 4, 8 };
+        /// <summary>Techniques offered after a won fight.</summary>
+        public const int RewardCount = 3;
+
+        /// <summary>Gold for skipping a technique pick.</summary>
+        public const int SkipGold = 8;
+
+        /// <summary>The shop's fee to make a unit forget a technique (its level stays).</summary>
+        public const int ForgetPrice = 5;
 
         /// <summary>Map steps (0-based) where both choices are fights, so every run has at least this many before the boss.</summary>
         public static readonly IReadOnlyList<int> FightSteps = new[] { 0, 3, 5, 7, 9 };
 
         private readonly Random _rng;
-        private readonly List<Equipment> _offers = new List<Equipment>();
+        private readonly List<Technique> _offers = new List<Technique>();
         private readonly List<IReadOnlyList<MapNode>> _map = new List<IReadOnlyList<MapNode>>();
         private readonly List<int> _chosen = new List<int>();
-        private readonly HashSet<ArmyMember> _evolvedThisVisit = new HashSet<ArmyMember>();
 
         public readonly int Seed;
         public readonly List<ArmyMember> Army = new List<ArmyMember>();
@@ -223,8 +225,8 @@ namespace ArmyRoguelike.Core
 
         public EventKind CurrentEvent { get; private set; }
 
-        /// <summary>The item an Abandoned Cart event offers.</summary>
-        public Equipment CartItem { get; private set; }
+        /// <summary>The technique an Abandoned Cart event offers.</summary>
+        public Technique CartTechnique { get; private set; }
 
         /// <summary>The base unit a Wandering Recruit event offers.</summary>
         public UnitStats EventRecruit { get; private set; }
@@ -235,7 +237,8 @@ namespace ArmyRoguelike.Core
         /// <summary>Text describing how the last event turned out, for the screen.</summary>
         public string EventOutcome { get; private set; }
 
-        public IReadOnlyList<Equipment> Offers => _offers;
+        /// <summary>The techniques for sale in the current shop.</summary>
+        public IReadOnlyList<Technique> Offers => _offers;
         public IReadOnlyList<IReadOnlyList<MapNode>> Map => _map;
 
         /// <summary>Index of the node chosen at each past step.</summary>
@@ -277,7 +280,8 @@ namespace ArmyRoguelike.Core
         /// boss. A battle brings a faction you haven't beaten yet (a normal-strength rematch once you've met them
         /// all); an elite is a harder rematch of one you have beaten. Battle and elite nodes are filled in when
         /// the run reaches their step (see <see cref="ResolveStep"/>). The two scenario fights sit at steps 4
-        /// and 8 in random order; Trainers at 5 and 9; shops and ? events fill the rest; step 12 is a boss.
+        /// and 8 in random order; step 9 offers one more optional battle; shops and ? events fill the rest;
+        /// step 12 is a boss.
         /// </summary>
         private void GenerateMap()
         {
@@ -285,7 +289,6 @@ namespace ArmyRoguelike.Core
             MapNode Elite() => new MapNode(NodeKind.Elite);
             var shop = new MapNode(NodeKind.Shop);
             var unknown = new MapNode(NodeKind.Event);
-            var trainer = new MapNode(NodeKind.Trainer);
             var scenarios = new[] { Encounter.MoonShrine, Encounter.BreakRitual }.OrderBy(_ => _rng.Next())
                 .Select(e => new MapNode(NodeKind.Ritual, e)).ToList();
 
@@ -293,11 +296,11 @@ namespace ArmyRoguelike.Core
             AddStep(shop, unknown);
             AddStep(Battle(), unknown);
             AddStep(scenarios[0], Battle());
-            AddStep(trainer, shop);
+            AddStep(shop, unknown);
             AddStep(Elite(), Battle());
             AddStep(shop, unknown);
             AddStep(scenarios[1], Battle());
-            AddStep(trainer, unknown);
+            AddStep(unknown, Battle());
             AddStep(Elite(), Battle());
             AddStep(shop, unknown);
             _map.Add(new[] { new MapNode(NodeKind.Boss, Encounter.Bosses[_rng.Next(Encounter.Bosses.Count)]) });
@@ -377,10 +380,6 @@ namespace ArmyRoguelike.Core
                     State = RunState.Event;
                     RollEvent();
                     break;
-                case NodeKind.Trainer:
-                    State = RunState.Trainer;
-                    _evolvedThisVisit.Clear();
-                    break;
             }
         }
 
@@ -431,33 +430,52 @@ namespace ArmyRoguelike.Core
                 _curses.Add(pool[_rng.Next(pool.Count)]);
         }
 
-        /// <summary>After breaking the ritual: the items on offer (3 different ones from the catalog).</summary>
-        public IReadOnlyList<Equipment> RewardItems => _rewardItems;
+        // ---------- Technique picks ----------
 
-        private readonly List<Equipment> _rewardItems = new List<Equipment>();
+        /// <summary>After a won fight: the techniques on offer.</summary>
+        public IReadOnlyList<Technique> RewardOffers => _rewardOffers;
 
-        public const int RewardItemCount = 3;
+        private readonly List<Technique> _rewardOffers = new List<Technique>();
 
-        public bool CanTakeRewardItem(Equipment item, ArmyMember member) =>
-            State == RunState.ItemReward && _rewardItems.Contains(item) && Army.Contains(member) && item.CanEquip(member.Stats);
-
-        /// <summary>Gives one of the offered items to a member (replacing its old item) and moves on.</summary>
-        public bool TakeRewardItem(Equipment item, ArmyMember member)
+        /// <summary>
+        /// Up to <paramref name="count"/> different techniques that at least one unit of the army can learn now.
+        /// With <paramref name="rare"/>, one of them is rare whenever a rare one is learnable.
+        /// </summary>
+        private List<Technique> RollTechniques(int count, bool rare)
         {
-            if (!CanTakeRewardItem(item, member))
+            var pool = Technique.All.Where(t => Army.Any(t.CanLearn)).OrderBy(_ => _rng.Next()).ToList();
+            var picks = pool.Take(count).ToList();
+            if (rare && picks.Count > 0 && picks.All(t => t.Rarity != TechniqueRarity.Rare))
+            {
+                var rares = pool.Where(t => t.Rarity == TechniqueRarity.Rare).ToList();
+                if (rares.Count > 0)
+                    picks[picks.Count - 1] = rares[_rng.Next(rares.Count)];
+            }
+
+            return picks;
+        }
+
+        public bool CanTakeReward(Technique technique, ArmyMember member) =>
+            State == RunState.Reward && _rewardOffers.Contains(technique) && Army.Contains(member) && technique.CanLearn(member);
+
+        /// <summary>Teaches one of the offered techniques to a member and moves on.</summary>
+        public bool TakeReward(Technique technique, ArmyMember member)
+        {
+            if (!CanTakeReward(technique, member))
                 return false;
-            member.Equipment = item;
-            _rewardItems.Clear();
+            member.Learn(technique);
+            _rewardOffers.Clear();
             NextStep();
             return true;
         }
 
-        /// <summary>Leaves the reward items behind and moves on.</summary>
-        public void SkipRewardItem()
+        /// <summary>Skips the pick for gold and moves on.</summary>
+        public void SkipReward()
         {
-            if (State != RunState.ItemReward)
+            if (State != RunState.Reward)
                 return;
-            _rewardItems.Clear();
+            Gold += SkipGold;
+            _rewardOffers.Clear();
             NextStep();
         }
 
@@ -520,76 +538,49 @@ namespace ArmyRoguelike.Core
                 return earned;
             }
 
-            // Breaking the ritual or beating an elite pays an item pick on top of the gold.
-            if (CurrentEncounter == Encounter.BreakRitual || CurrentEncounter.IsElite)
-            {
-                _rewardItems.Clear();
-                _rewardItems.AddRange(Equipment.Catalog.OrderBy(_ => _rng.Next()).Take(RewardItemCount));
-                State = RunState.ItemReward;
-                return earned;
-            }
             if (IsFinalStep)
             {
                 State = RunState.Won;
                 return earned;
             }
 
-            NextStep();
+            // Every other won fight offers a technique pick on top of the gold; an elite's has a rare one.
+            _rewardOffers.Clear();
+            _rewardOffers.AddRange(RollTechniques(RewardCount, CurrentEncounter.IsElite));
+            if (_rewardOffers.Count > 0)
+                State = RunState.Reward;
+            else
+                NextStep();
             return earned;
-        }
-
-        // ---------- Trainer ----------
-
-        /// <summary>Price of the next evolution this visit: the first is free, then 20, then 35 each.</summary>
-        public const int SecondEvolutionPrice = 20;
-
-        public const int LaterEvolutionPrice = 35;
-
-        public int NextEvolutionPrice =>
-            _evolvedThisVisit.Count == 0 ? 0 : _evolvedThisVisit.Count == 1 ? SecondEvolutionPrice : LaterEvolutionPrice;
-
-        /// <summary>
-        /// Each unit can go up one tier per Trainer visit, into one of its listed evolutions. The first
-        /// evolution of a visit is free; more cost gold.
-        /// </summary>
-        public bool CanEvolve(ArmyMember member, UnitStats into) =>
-            State == RunState.Trainer && Army.Contains(member) && !_evolvedThisVisit.Contains(member) &&
-            member.Stats.Evolutions.Contains(into) && Gold >= NextEvolutionPrice;
-
-        public bool HasEvolvedThisVisit(ArmyMember member) => _evolvedThisVisit.Contains(member);
-
-        public bool Evolve(ArmyMember member, UnitStats into)
-        {
-            if (!CanEvolve(member, into))
-                return false;
-            Gold -= NextEvolutionPrice;
-            member.Stats = into;
-            _evolvedThisVisit.Add(member);
-            return true;
-        }
-
-        public void LeaveTrainer()
-        {
-            if (State != RunState.Trainer)
-                return;
-            _evolvedThisVisit.Clear();
-            NextStep();
         }
 
         // ---------- Shop ----------
 
-        public bool CanBuy(Equipment item, ArmyMember member) =>
-            State == RunState.Shop && _offers.Contains(item) && Army.Contains(member) &&
-            Gold >= item.Price && item.CanEquip(member.Stats);
+        public bool CanBuy(Technique technique, ArmyMember member) =>
+            State == RunState.Shop && _offers.Contains(technique) && Army.Contains(member) &&
+            Gold >= technique.Price && technique.CanLearn(member);
 
-        /// <summary>Buys an offer and puts it in the member's slot, replacing (and losing) its old item.</summary>
-        public bool Buy(Equipment item, ArmyMember member)
+        /// <summary>Buys an offered technique for a member, who learns it (and goes up a level).</summary>
+        public bool Buy(Technique technique, ArmyMember member)
         {
-            if (!CanBuy(item, member))
+            if (!CanBuy(technique, member))
                 return false;
-            Gold -= item.Price;
-            member.Equipment = item;
-            _offers.Remove(item);
+            Gold -= technique.Price;
+            member.Learn(technique);
+            _offers.Remove(technique);
+            return true;
+        }
+
+        public bool CanForget(ArmyMember member, Technique technique) =>
+            State == RunState.Shop && Army.Contains(member) && member.Knows(technique) && Gold >= ForgetPrice;
+
+        /// <summary>Pays the fee to make a member forget a technique (and any that needed it). Its level stays.</summary>
+        public bool Forget(ArmyMember member, Technique technique)
+        {
+            if (!CanForget(member, technique))
+                return false;
+            Gold -= ForgetPrice;
+            member.Forget(technique);
             return true;
         }
 
@@ -617,14 +608,7 @@ namespace ArmyRoguelike.Core
         private void RollOffers()
         {
             _offers.Clear();
-            var pool = Equipment.Catalog.ToList();
-            while (_offers.Count < ShopSize && pool.Count > 0)
-            {
-                var i = _rng.Next(pool.Count);
-                _offers.Add(pool[i]);
-                pool.RemoveAt(i);
-            }
-
+            _offers.AddRange(RollTechniques(ShopSize, false));
             ShopRecruit = Army.Count < MaxArmySize ? UnitStats.BaseUnits[_rng.Next(UnitStats.BaseUnits.Count)] : null;
         }
 
@@ -632,9 +616,11 @@ namespace ArmyRoguelike.Core
 
         private void RollEvent()
         {
-            var kinds = (EventKind[])Enum.GetValues(typeof(EventKind));
-            CurrentEvent = kinds[_rng.Next(kinds.Length)];
-            CartItem = CurrentEvent == EventKind.AbandonedCart ? Equipment.Catalog[_rng.Next(Equipment.Catalog.Count)] : null;
+            var cart = RollTechniques(1, false).FirstOrDefault();
+            // An empty cart is no event: with nothing left to learn, it doesn't come up.
+            var kinds = ((EventKind[])Enum.GetValues(typeof(EventKind))).Where(k => k != EventKind.AbandonedCart || cart != null).ToList();
+            CurrentEvent = kinds[_rng.Next(kinds.Count)];
+            CartTechnique = CurrentEvent == EventKind.AbandonedCart ? cart : null;
             EventRecruit = CurrentEvent == EventKind.WanderingRecruit ? UnitStats.BaseUnits[_rng.Next(UnitStats.BaseUnits.Count)] : null;
             var fresh = FreshFactions();
             AmbushEncounter = CurrentEvent == EventKind.Ambush && fresh.Count > 0 ? fresh[_rng.Next(fresh.Count)] : null;
@@ -660,17 +646,16 @@ namespace ArmyRoguelike.Core
             NextStep();
         }
 
-        /// <summary>Abandoned Cart: give the item to a member (replacing its item), or leave it with null.</summary>
-        public bool TakeCartItem(ArmyMember member)
+        /// <summary>Abandoned Cart: a member learns the technique, or leave it with null.</summary>
+        public bool TakeCart(ArmyMember member)
         {
             if (State != RunState.Event || CurrentEvent != EventKind.AbandonedCart)
                 return false;
             if (member != null)
             {
-                if (!CartItem.CanEquip(member.Stats) || !Army.Contains(member))
+                if (!Army.Contains(member) || !member.Learn(CartTechnique))
                     return false;
-                member.Equipment = CartItem;
-                EventOutcome = $"The {member.Stats.Name} takes the {CartItem.Name}.";
+                EventOutcome = $"The {member.Stats.Name} learns {CartTechnique.Name}.";
             }
             else
             {

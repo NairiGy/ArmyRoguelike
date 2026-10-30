@@ -18,7 +18,7 @@ namespace ArmyRoguelike.View
         private RunLogger _runLog;
         private GameObject _battleRoot;
         private BattleController _controller;
-        private Equipment _selectedOffer;
+        private Technique _selectedOffer;
         private string _lastNote;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -80,9 +80,6 @@ namespace ArmyRoguelike.View
                 case RunState.Event:
                     _runLog.OpenEvent();
                     break;
-                case RunState.Trainer:
-                    _runLog.OpenTrainer();
-                    break;
             }
         }
 
@@ -102,23 +99,6 @@ namespace ArmyRoguelike.View
         {
             if (_run.Draft(_draftPicks.ToList()))
                 _runLog.RecordDraft(_draftPicks);
-        }
-
-        // ---------- Trainer ----------
-
-        private void Evolve(ArmyMember member, UnitStats into)
-        {
-            var from = member.Stats;
-            var price = _run.NextEvolutionPrice;
-            if (_run.Evolve(member, into))
-                _runLog.RecordEvolution(from, into, price);
-        }
-
-        private void LeaveTrainer()
-        {
-            _runLog.CloseTrainer();
-            _run.LeaveTrainer();
-            _lastNote = null;
         }
 
         private void StartBattle()
@@ -347,9 +327,6 @@ namespace ArmyRoguelike.View
                 case RunState.Draft:
                     DrawDraft(width);
                     break;
-                case RunState.Trainer:
-                    DrawTrainer(width);
-                    break;
                 case RunState.Map:
                     DrawMap(width);
                     break;
@@ -359,8 +336,8 @@ namespace ArmyRoguelike.View
                 case RunState.Event:
                     DrawEvent(width);
                     break;
-                case RunState.ItemReward:
-                    DrawItemReward(width);
+                case RunState.Reward:
+                    DrawReward(width);
                     break;
                 case RunState.Blessing:
                     DrawBlessing(width);
@@ -379,13 +356,44 @@ namespace ArmyRoguelike.View
             GUILayout.Label("Your army:");
             foreach (var m in _run.Army)
             {
-                var item = m.Equipment != null ? $"{m.Equipment.Name} ({m.Equipment.Effect})" : "no item";
+                var techniques = m.Techniques.Count > 0 ? string.Join(", ", m.Techniques.Select(t => t.Name)) : "no techniques";
                 var bonus = "";
-                if (m.BonusDamage > 0)
-                    bonus += $", +{m.BonusDamage} damage";
-                if (m.BonusMaxHp > 0)
-                    bonus += $", +{m.BonusMaxHp} max HP";
-                GUILayout.Label($"  {m.Stats.Name} (tier {m.Stats.Tier}): {item}{bonus}");
+                if (m.LevelHp + m.BonusMaxHp > 0)
+                    bonus += $", +{m.LevelHp + m.BonusMaxHp} max HP";
+                if (m.LevelDamage + m.BonusDamage > 0)
+                    bonus += $", +{m.LevelDamage + m.BonusDamage} damage";
+                if (m.LevelMines > 0)
+                    bonus += $", +{m.LevelMines} mine";
+                GUILayout.Label($"  {m.Stats.Name} (level {m.Level}): {techniques}{bonus}");
+            }
+        }
+
+        /// <summary>One button's text for a technique: name, rarity, line, requirement and rule.</summary>
+        private static string Describe(Technique t, bool price = false)
+        {
+            var tags = new System.Collections.Generic.List<string> { t.Rarity == TechniqueRarity.Rare ? "rare" : "common", t.IsShared ? "any unit" : t.Line.Name };
+            if (t.Requires != null)
+                tags.Add($"needs {t.Requires.Name}");
+            if (t.Action.HasValue)
+                tags.Add($"action, cooldown {Battle.Cooldown(t.Action.Value)}");
+            var cost = price ? $"   {t.Price} gold" : "";
+            return $"{t.Name}  ({string.Join(", ", tags)}){cost}\n{t.Description}";
+        }
+
+        /// <summary>Who can learn a technique: one button per army member, disabled when it can't.</summary>
+        private void DrawLearners(Technique technique, Func<ArmyMember, bool> can, Action<ArmyMember> learn)
+        {
+            foreach (var member in _run.Army)
+            {
+                var why = technique.CanLearn(member) ? ""
+                    : member.Knows(technique) ? "  (knows it)"
+                    : technique.Requires != null && !member.Knows(technique.Requires) && (technique.IsShared || member.Stats.Root == technique.Line) ? $"  (needs {technique.Requires.Name})"
+                    : "  (other line)";
+                GUI.enabled = can(member);
+                var m = member;
+                if (GUILayout.Button($"{member.Stats.Name} (level {member.Level} -> {member.Level + 1}){why}"))
+                    Do(() => learn(m));
+                GUI.enabled = true;
             }
         }
 
@@ -407,7 +415,7 @@ namespace ArmyRoguelike.View
             const float w = 600;
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 20, w, 680), GUI.skin.box);
             GUILayout.Label("Choose your army", Title);
-            GUILayout.Label($"Pick {Run.DraftSize} different units. Each can evolve twice at Trainers along the road.");
+            GUILayout.Label($"Pick {Run.DraftSize} different units. Each won fight lets one of them learn a technique (and go up a level).");
             _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(540));
             foreach (var unit in _run.DraftPool)
             {
@@ -424,52 +432,6 @@ namespace ArmyRoguelike.View
             GUI.enabled = true;
             if (TestModeAvailable && GUILayout.Button("Test battle (testing only: any army, encounter and omen)"))
                 Do(EnterTestMode);
-            GUILayout.EndArea();
-        }
-
-        private void DrawTrainer(float screenWidth)
-        {
-            const float w = 700;
-            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 20, w, 680), GUI.skin.box);
-            GUILayout.Label("Trainer", Title);
-            var price = _run.NextEvolutionPrice;
-            GUILayout.Label($"Each unit may go up one tier per visit, into one of its paths. The first evolution is free, then {Run.SecondEvolutionPrice} gold, then {Run.LaterEvolutionPrice} each.");
-            GUILayout.Label(price == 0 ? $"Next evolution: free.   Gold: {_run.Gold}" : $"Next evolution: {price} gold.   Gold: {_run.Gold}");
-            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(560));
-            var style = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.UpperLeft, wordWrap = true };
-            foreach (var member in _run.Army)
-            {
-                GUILayout.Label($"{member.Stats.Name} (tier {member.Stats.Tier})", new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold });
-                if (_run.HasEvolvedThisVisit(member))
-                {
-                    GUILayout.Label("  Evolved this visit.");
-                    continue;
-                }
-
-                if (member.Stats.Evolutions.Count == 0)
-                {
-                    GUILayout.Label("  Fully evolved.");
-                    continue;
-                }
-
-                GUILayout.BeginHorizontal();
-                foreach (var into in member.Stats.Evolutions)
-                {
-                    var m = member;
-                    var target = into;
-                    GUI.enabled = _run.CanEvolve(member, into);
-                    var pressed = GUILayout.Button(Describe(into), style, GUILayout.Width((w - 40) / member.Stats.Evolutions.Count));
-                    GUI.enabled = true;
-                    if (pressed)
-                        Do(() => Evolve(m, target));
-                }
-
-                GUILayout.EndHorizontal();
-            }
-
-            GUILayout.EndScrollView();
-            if (GUILayout.Button("Leave the trainer", GUILayout.Height(32)))
-                Do(LeaveTrainer);
             GUILayout.EndArea();
         }
 
@@ -515,10 +477,10 @@ namespace ArmyRoguelike.View
             }
 
             GUILayout.Space(8);
-            GUILayout.Label("? = something unexpected. Shops sell items and a recruit. Trainers evolve every unit one tier, for free.");
+            GUILayout.Label("? = something unexpected. Shops sell techniques, a recruit, and help forgetting a technique. Every won fight offers a technique pick.");
             GUILayout.Label("Moon Shrine: defend it for 5 enemy turns to earn a blessing. If it breaks, you take a curse.");
-            GUILayout.Label("Break the Ritual: smash 3 totems before enemy turn 4 to earn an item. If the summoning completes, you take a curse.");
-            GUILayout.Label("Battle: a faction you haven't beaten (a rematch once you've met them all). Elite: a harder rematch of a faction you beat; pays an item too. Battles and elites show their faction when you reach their step.");
+            GUILayout.Label("Break the Ritual: smash 3 totems before enemy turn 4 to earn a technique pick. If the summoning completes, you take a curse.");
+            GUILayout.Label("Battle: a faction you haven't beaten (a rematch once you've met them all). Elite: a harder rematch of a faction you beat; its pick has a rare technique. Battles and elites show their faction when you reach their step.");
             DrawArmy();
             GUILayout.EndArea();
         }
@@ -529,17 +491,18 @@ namespace ArmyRoguelike.View
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 30, w, 660), GUI.skin.box);
             GUILayout.Label("Shop", Title);
             GUILayout.Label($"Gold: {_run.Gold}");
-            GUILayout.Label("Each unit has one slot. Buying replaces (and loses) the old item.");
+            GUILayout.Label("A unit that learns a technique goes up a level.");
             GUILayout.Space(8);
 
-            GUILayout.Label("For sale (click one):");
+            GUILayout.Label("Techniques for sale (click one):");
             if (_run.Offers.Count == 0)
                 GUILayout.Label("  Sold out.");
+            var style = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.UpperLeft, wordWrap = true };
             foreach (var offer in _run.Offers.ToList())
             {
                 var marker = offer == _selectedOffer ? "> " : "";
                 GUI.enabled = _run.Gold >= offer.Price;
-                if (GUILayout.Button($"{marker}{offer.Name}   {offer.Effect}   {offer.Price} gold"))
+                if (GUILayout.Button(marker + Describe(offer, true), style))
                     _selectedOffer = offer;
                 GUI.enabled = true;
             }
@@ -562,33 +525,47 @@ namespace ArmyRoguelike.View
             GUILayout.Space(8);
             if (_selectedOffer != null && _run.Offers.Contains(_selectedOffer))
             {
-                GUILayout.Label($"Give the {_selectedOffer.Name} to:");
-                foreach (var member in _run.Army)
+                GUILayout.Label($"Who learns {_selectedOffer.Name}?");
+                var offer = _selectedOffer;
+                DrawLearners(offer, m => _run.CanBuy(offer, m), buyer =>
                 {
-                    var current = member.Equipment != null ? $"replaces {member.Equipment.Name}" : "empty slot";
-                    var reason = !_selectedOffer.CanEquip(member.Stats) ? "  (can't use it)" : "";
-                    GUI.enabled = _run.CanBuy(_selectedOffer, member);
-                    if (GUILayout.Button($"{member.Stats.Name}   ({current}){reason}"))
+                    if (_run.Buy(offer, buyer))
                     {
-                        var buyer = member;
-                        var offer = _selectedOffer;
-                        Do(() =>
-                        {
-                            var replaced = buyer.Equipment;
-                            if (_run.Buy(offer, buyer))
-                            {
-                                _runLog.RecordPurchase(offer, buyer, replaced);
-                                _selectedOffer = null;
-                            }
-                        });
+                        _runLog.RecordPurchase(offer, buyer);
+                        _selectedOffer = null;
                     }
-
-                    GUI.enabled = true;
-                }
+                });
             }
             else
             {
                 DrawArmy();
+            }
+
+            // Forgetting: frees a unit of a technique it doesn't want; the level stays.
+            if (_run.Army.Any(m => m.Techniques.Count > 0))
+            {
+                GUILayout.Space(8);
+                GUILayout.Label($"Forget a technique ({Run.ForgetPrice} gold; the level stays, and techniques that need it go too):");
+                foreach (var member in _run.Army.Where(m => m.Techniques.Count > 0))
+                {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label(member.Stats.Name, GUILayout.Width(110));
+                    foreach (var technique in member.Techniques.ToList())
+                    {
+                        GUI.enabled = _run.CanForget(member, technique);
+                        var m = member;
+                        var t = technique;
+                        if (GUILayout.Button(technique.Name))
+                            Do(() =>
+                            {
+                                if (_run.Forget(m, t))
+                                    _runLog.RecordForget(t, m);
+                            });
+                        GUI.enabled = true;
+                    }
+
+                    GUILayout.EndHorizontal();
+                }
             }
 
             GUILayout.FlexibleSpace();
@@ -628,29 +605,19 @@ namespace ArmyRoguelike.View
 
                 case EventKind.AbandonedCart:
                     GUILayout.Label("An Abandoned Cart", Title);
-                    GUILayout.Label($"Inside: {_run.CartItem.Name} ({_run.CartItem.Effect}).");
-                    foreach (var member in _run.Army)
+                    var cart = _run.CartTechnique;
+                    GUILayout.Label("Inside, an old training manual:\n" + Describe(cart));
+                    GUILayout.Label("Who learns it?");
+                    DrawLearners(cart, cart.CanLearn, taker =>
                     {
-                        var current = member.Equipment != null ? $"replaces {member.Equipment.Name}" : "empty slot";
-                        GUI.enabled = _run.CartItem.CanEquip(member.Stats);
-                        if (GUILayout.Button($"Give it to the {member.Stats.Name} ({current})"))
-                        {
-                            var taker = member;
-                            Do(() =>
-                            {
-                                var item = _run.CartItem.Name;
-                                _run.TakeCartItem(taker);
-                                AfterEvent($"{item} -> {taker.Stats.Name}");
-                            });
-                        }
-
-                        GUI.enabled = true;
-                    }
+                        _run.TakeCart(taker);
+                        AfterEvent($"{cart.Name} -> {taker.Stats.Name}");
+                    });
 
                     if (GUILayout.Button("Leave it"))
                         Do(() =>
                         {
-                            _run.TakeCartItem(null);
+                            _run.TakeCart(null);
                             AfterEvent("leave");
                         });
 
@@ -742,52 +709,41 @@ namespace ArmyRoguelike.View
             GUILayout.EndArea();
         }
 
-        private Equipment _selectedReward;
+        private Technique _selectedReward;
 
-        private void DrawItemReward(float screenWidth)
+        /// <summary>After a won fight: pick one technique for one unit, or skip it for gold.</summary>
+        private void DrawReward(float screenWidth)
         {
             const float w = 560;
-            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 40, w, 620), GUI.skin.box);
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 40, w, 640), GUI.skin.box);
             var elite = _run.CurrentEncounter != null && _run.CurrentEncounter.IsElite;
-            GUILayout.Label(elite ? $"{_run.CurrentEncounter.Name} beaten" : "The ritual is broken", Title);
+            GUILayout.Label(elite ? $"{_run.CurrentEncounter.Name} beaten" : "Victory", Title);
             if (!string.IsNullOrEmpty(_lastNote))
                 GUILayout.Label(_lastNote);
-            GUILayout.Label((elite ? "They left their loot behind." : "The guards left their loot behind.") +
-                            " Pick one item for one unit (it replaces that unit's item).");
+            GUILayout.Label("Pick a technique for one unit (it goes up a level), or skip it for gold." + (elite ? " An elite's pick holds a rare one." : ""));
             GUILayout.Space(6);
-            foreach (var item in _run.RewardItems)
+            var style = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.UpperLeft, wordWrap = true };
+            foreach (var technique in _run.RewardOffers)
             {
-                var marker = item == _selectedReward ? "> " : "";
-                if (GUILayout.Button($"{marker}{item.Name}   {item.Effect}"))
-                    _selectedReward = item;
+                var marker = technique == _selectedReward ? "> " : "";
+                if (GUILayout.Button(marker + Describe(technique), style))
+                    _selectedReward = technique;
             }
 
             GUILayout.Space(8);
-            if (_selectedReward != null && _run.RewardItems.Contains(_selectedReward))
+            if (_selectedReward != null && _run.RewardOffers.Contains(_selectedReward))
             {
-                GUILayout.Label($"Give the {_selectedReward.Name} to:");
-                foreach (var member in _run.Army)
+                GUILayout.Label($"Who learns {_selectedReward.Name}?");
+                var pick = _selectedReward;
+                DrawLearners(pick, m => _run.CanTakeReward(pick, m), taker =>
                 {
-                    var current = member.Equipment != null ? $"replaces {member.Equipment.Name}" : "empty slot";
-                    GUI.enabled = _run.CanTakeRewardItem(_selectedReward, member);
-                    if (GUILayout.Button($"{member.Stats.Name}   ({current})"))
-                    {
-                        var taker = member;
-                        var item = _selectedReward;
-                        Do(() =>
-                        {
-                            var replaced = taker.Equipment;
-                            var offered = _run.RewardItems.ToList();
-                            if (!_run.TakeRewardItem(item, taker))
-                                return;
-                            _runLog.RecordRewardItem(offered, item, taker, replaced);
-                            _lastNote = $"The {taker.Stats.Name} takes the {item.Name}.";
-                            _selectedReward = null;
-                        });
-                    }
-
-                    GUI.enabled = true;
-                }
+                    var offered = _run.RewardOffers.ToList();
+                    if (!_run.TakeReward(pick, taker))
+                        return;
+                    _runLog.RecordReward(offered, pick, taker);
+                    _lastNote = $"The {taker.Stats.Name} learns {pick.Name} (level {taker.Level}).";
+                    _selectedReward = null;
+                });
             }
             else
             {
@@ -795,13 +751,13 @@ namespace ArmyRoguelike.View
             }
 
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Leave the items", GUILayout.Height(32)))
+            if (GUILayout.Button($"Skip (+{Run.SkipGold} gold)", GUILayout.Height(32)))
                 Do(() =>
                 {
-                    var offered = _run.RewardItems.ToList();
-                    _run.SkipRewardItem();
-                    _runLog.RecordRewardItem(offered, null, null, null);
-                    _lastNote = null;
+                    var offered = _run.RewardOffers.ToList();
+                    _run.SkipReward();
+                    _runLog.RecordReward(offered, null, null);
+                    _lastNote = $"Skipped the pick: +{Run.SkipGold} gold.";
                     _selectedReward = null;
                 });
             GUILayout.EndArea();

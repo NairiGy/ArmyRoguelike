@@ -379,7 +379,7 @@ public static class GamepediaWriter
         foreach (var enc in Encounter.Regular)
             EncounterCard(html, enc, enc.EnemySummary());
         html.Append("</div><h3>Elites</h3><p>A harder rematch of a faction you've beaten: more of the same enemies. High risk, high reward: ");
-        html.Append("normal gold plus a pick of 1 of " + Run.RewardItemCount + " items.</p><div class=\"grid\">");
+        html.Append("normal gold, and its technique pick always holds a rare one.</p><div class=\"grid\">");
         foreach (var enc in Encounter.Elites)
             EncounterCard(html, enc, enc.EnemySummary());
         html.Append("</div><h3>Bosses</h3><div class=\"grid\">");
@@ -397,7 +397,7 @@ public static class GamepediaWriter
         html.Append($"Shield Wall and Guard; your own blasts and volleys hurt it. Reinforcements arrive on edge tiles at least {Battle.RitualSpawnDistance} steps from it.</p>");
         html.Append($"<p><b>Break the Ritual</b>: {Encounter.TotemCount} totems ({UnitStats.Totem.MaxHp} HP) stand on the far half, guarded by goblins. ");
         html.Append($"Smash them all before the summoning completes at the start of enemy turn {Encounter.SummonTurn}: you win, the guards flee, ");
-        html.Append($"and you pick 1 of {Run.RewardItemCount} items for one unit. If the summoning completes, the fight is lost (no gold) and you take a random curse; ");
+        html.Append($"and you get the usual technique pick. If the summoning completes, the fight is lost (no gold) and you take a random curse; ");
         html.Append($"the run goes on. Guards go for whichever of your units is within {EnemyAI.TotemThreatRange} tiles of a totem; their own bombs don't hurt the totems. ");
         html.Append("The shrine and totems can't attack, so they have no zone of control.</p>");
         html.Append("</section>");
@@ -458,17 +458,17 @@ public static class GamepediaWriter
         html.Append($"<li>Draft {Run.DraftSize} different base units. Army size up to {Run.MaxArmySize}.</li>");
         html.Append($"<li>Act 1 has {Run.Steps} steps; each step offers 2 nodes. At steps {string.Join(", ", Run.FightSteps.Select(s => s + 1))} both choices are fights, ");
         html.Append($"so every run has at least {Run.FightSteps.Count} fights before the boss. ");
-        html.Append($"Steps {string.Join(" and ", Run.TrainerSteps.Select(s => s + 1))} offer a Trainer; the last step is a boss (Necromancer or Giant).</li>");
+        html.Append("Step 9 offers one more optional battle; the last step is a boss (Necromancer or Giant).</li>");
         html.Append("<li>A <b>Battle</b> brings a faction you haven't beaten yet; once you've met them all it's a normal-strength rematch. ");
         html.Append("An <b>Elite</b> (steps 6 and 10) is a harder rematch of a faction you've beaten. Both show their faction when you reach their step.</li>");
         html.Append("<li>The two scenario fights sit at steps 4 and 8, next to a battle: the Moon Shrine at one, Break the Ritual at the other. Shops and ? events fill the rest.</li>");
         html.Append($"<li>Won battle: {Run.BaseGold} gold + {Run.GoldPerSurvivor} per surviving unit (+{Run.AmbushBonusGold} for an ambush). Gold carried off by escaped cutpurses is lost.</li>");
-        html.Append($"<li><b>Trainer</b>: each unit can evolve one tier per visit. The first evolution of a visit is free, the second costs {Run.SecondEvolutionPrice} gold, each after that {Run.LaterEvolutionPrice}.</li>");
-        html.Append($"<li><b>Shop</b>: {Run.ShopSize} items and a random base-unit recruit for {Run.RecruitPrice} gold (if the army has room).</li>");
-        html.Append("<li>Every battle starts at full HP and dead units come back. Evolutions, items, Bloodthirst damage and shrine HP last the whole run.</li>");
+        html.Append($"<li><b>Technique pick</b>: every won fight except the boss and the Moon Shrine offers {Run.RewardCount} techniques your units can learn; one unit learns one and goes up a level, or skip for {Run.SkipGold} gold.</li>");
+        html.Append($"<li><b>Shop</b>: {Run.ShopSize} techniques ({Technique.CommonPrice} gold common, {Technique.RarePrice} rare), forgetting a technique for {Run.ForgetPrice} gold, and a random base-unit recruit for {Run.RecruitPrice} gold (if the army has room).</li>");
+        html.Append("<li>Every battle starts at full HP and dead units come back. Techniques, levels, Bloodthirst damage and shrine HP last the whole run.</li>");
         html.Append("</ul><h3>? events</h3><table><tr><th>Event</th><th>What happens</th></tr>");
         html.Append($"<tr><td>Wandering Recruit</td><td>A random base unit joins for free ({Run.FullArmyGold} gold instead if the army is full).</td></tr>");
-        html.Append("<tr><td>Abandoned Cart</td><td>A random item for any unit, or leave it.</td></tr>");
+        html.Append("<tr><td>Abandoned Cart</td><td>A random technique one of your units can learn (it goes up a level), or leave it.</td></tr>");
         html.Append($"<tr><td>Gambler</td><td>Pay {Run.GambleCost} gold for a 50% chance at {Run.GambleWin}.</td></tr>");
         html.Append($"<tr><td>Ambush</td><td>A fight against a faction you haven't met (and won't meet later on the map) that pays +{Run.AmbushBonusGold} gold. If none is left, they flee and drop gold.</td></tr>");
         html.Append($"<tr><td>Shrine</td><td>One unit gets +{Run.ShrineHp} max HP for the run.</td></tr>");
