@@ -159,6 +159,8 @@ namespace ArmyRoguelike.View
             public float Haze;
             // No braziers lit.
             public bool Daylight;
+            // A FarBelow sea: its painting moves like water except where this mask (same framing) is dark.
+            public string WaterMask;
         }
 
         private static readonly Dictionary<Setting, IsoScene> IsoScenes = new Dictionary<Setting, IsoScene>
@@ -169,7 +171,7 @@ namespace ArmyRoguelike.View
             // The void painting is framed like the tower painting, so the tower layer fits it as it is.
             [Setting.IsoVoid] = new IsoScene { Texture = "Backdrops/void_backdrop", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", Void = true, FadeFrom = 640, FadeTo = 770, Hole = new Vector3(415, 191, 57) },
             [Setting.IsoFields] = new IsoScene { Texture = "Backdrops/wheat_backdrop_colour", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", FarBelow = true, Daylight = true, Haze = 0.72f, FadeFrom = 620, FadeTo = 800 },
-            [Setting.IsoSea] = new IsoScene { Texture = "Backdrops/sea_backdrop", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", FarBelow = true, Haze = 0.55f, FadeFrom = 620, FadeTo = 800 },
+            [Setting.IsoSea] = new IsoScene { Texture = "Backdrops/sea_backdrop", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", FarBelow = true, Haze = 0.55f, FadeFrom = 620, FadeTo = 800, WaterMask = "Backdrops/sea_backdrop_mask" },
         };
 
         /// <summary>The ring image's empty middle, as a fraction of its width: fitted over the painted hole.</summary>
@@ -317,6 +319,9 @@ namespace ArmyRoguelike.View
                         sr.transform.position = centre;
                         sr.sprite = Sprite.Create(land, new Rect(0, 0, land.width, land.height), new Vector2(0.5f, 0.5f), land.width / w);
                         sr.sortingOrder = BackdropOrder;
+                        var mask = scene.WaterMask != null ? Resources.Load<Texture2D>(scene.WaterMask) : null;
+                        if (mask != null)
+                            SceneryWater.Attach(sr, mask);
                     }
 
                     var screenBottom = centre.y - viewH * 0.5f;
