@@ -72,6 +72,8 @@ namespace ArmyRoguelike.View
         private static readonly Color CostlyMoveColor = new Color(1f, 0.6f, 0.2f, 0.45f);
         private static readonly Color EngagedLinkColor = new Color(0.95f, 0.3f, 0.25f, 0.9f);
         private static readonly Color ShroudColor = new Color(0.25f, 0.2f, 0.55f, 0.45f);
+        // Placeholder (see the "Art needed" table): a tile lightning will strike at the end of the enemy turn.
+        private static readonly Color StormMarkColor = new Color(0.75f, 0.85f, 1f, 0.5f);
 
         // Wolf tints: warm while the leader's aura reaches them, pale and cold once the leader is dead.
         private static readonly Color BondedTint = new Color(1.25f, 0.8f, 0.75f);
@@ -148,7 +150,7 @@ namespace ArmyRoguelike.View
             _hovered = HoveredTile();
             _hoveredUnit = _hovered.HasValue ? Battle.UnitAt(_hovered.Value) : null;
 
-            // Test battles only: L strikes the hovered tile with lightning, to try the effect (no rules yet).
+            // Test battles only: L strikes the hovered tile with lightning, to try the effect (visual only).
             if (_context.Test && keyboard != null && keyboard.lKey.wasPressedThisFrame && _hovered.HasValue)
                 StartCoroutine(LightningStrike.Strike(_board.transform, _hovered.Value));
             var clicked = !_busy && !_confirmEndTurn && Mouse.current.leftButton.wasPressedThisFrame && _hovered.HasValue;
@@ -625,13 +627,18 @@ namespace ArmyRoguelike.View
                 link.Hide();
         }
 
-        /// <summary>Shrouded tiles, and the tiles a sun beam will strike at the start of the enemy turn.</summary>
+        /// <summary>
+        /// Shrouded tiles, the tiles a sun beam will strike at the start of the enemy turn, and the tiles lightning
+        /// will strike at its end (Storm).
+        /// </summary>
         private void DrawOmenTiles()
         {
             foreach (var p in Battle.Shroud.Keys)
                 _board.SetHighlight(p, ShroudColor);
             foreach (var p in Battle.SunMarks)
                 _board.AddSunMark(p);
+            foreach (var p in Battle.StormMarks)
+                _board.SetHighlight(p, StormMarkColor);
         }
 
         /// <summary>Every waiting bomb shows its blast area, so it can be dodged.</summary>
@@ -655,6 +662,9 @@ namespace ArmyRoguelike.View
         /// </summary>
         private void DrawEnemyHover()
         {
+            // What's On His Mind?: no intents at all.
+            if (Battle.IntentsHidden)
+                return;
             var keyboard = Keyboard.current;
             if (keyboard != null && keyboard.altKey.isPressed)
             {
@@ -925,6 +935,16 @@ namespace ArmyRoguelike.View
                 case ExplosionEvent blast:
                 {
                     // A sun beam leaves any mine or bomb on its tile alone.
+                    if (blast.Cause == "lightning")
+                    {
+                        DamagePopup.Spawn(IsoMath.GridToWorld(blast.Center) + Vector3.up * 0.9f, "Lightning!", DamagePopup.AbilityColor, 44);
+                        yield return LightningStrike.Strike(_board.transform, blast.Center);
+                        foreach (var hit in blast.Hits)
+                            ShowHit(hit);
+                        yield return PlayHitReactions(blast.Hits);
+                        break;
+                    }
+
                     if (blast.Cause == "sun")
                     {
                         yield return _board.SunStrike(blast.Center, () =>
@@ -1079,6 +1099,39 @@ namespace ArmyRoguelike.View
                     }
 
                     _board.SyncTiles();
+                    break;
+                }
+                case FallEvent fall:
+                {
+                    // Placeholder: slides off the edge, crumbles and is gone.
+                    var view = _board.ViewOf(fall.Unit);
+                    DamagePopup.Spawn(view.TopWorld + Vector3.up * 0.25f, "Fell!", DamagePopup.DamageColor, 48);
+                    yield return view.Slide(fall.Edge, fall.Beyond, null);
+                    ShowHit(fall.Hit);
+                    yield return view.Die();
+                    view.gameObject.SetActive(false);
+                    break;
+                }
+                case FieldEvent field:
+                {
+                    var view = _board.ViewOf(field.Unit);
+                    if (view == null)
+                        break;
+                    if (field.Field == Battlefield.FortunesFavored)
+                    {
+                        // The last round's favored lose their pip.
+                        foreach (var u in Battle.Units.Where(u => u.IsAlive))
+                            _board.ViewOf(u)?.RefreshStatus();
+                        DamagePopup.Spawn(view.TopWorld + Vector3.up * 0.25f, "Favored!", DamagePopup.AbilityColor, 40);
+                    }
+                    else
+                    {
+                        DamagePopup.Spawn(view.TopWorld + Vector3.up * 0.25f, "Storm mark", DamagePopup.DamageColor, 40);
+                        foreach (var p in field.Tiles)
+                            _board.SetHighlight(p, StormMarkColor);
+                    }
+
+                    yield return new WaitForSeconds(0.35f);
                     break;
                 }
                 case EscapeEvent escape:
@@ -1429,20 +1482,30 @@ namespace ArmyRoguelike.View
             }
         }
 
-        /// <summary>The blessings, curses and banners in play, one per line.</summary>
+        /// <summary>The battlefield, blessings, curses and banners in play, one per line.</summary>
         private string OmenLine =>
+            (Battle.Field.HasValue ? $"\nBattlefield: {Battlefields.Name(Battle.Field.Value)}" : "") +
             string.Concat(Battle.Omens.Select(o => $"\n{Omens.Name(o.omen, o.side == Team.Player)}")) +
             string.Concat(Battle.Banners.Select(b => $"\nBanner: {Banners.Name(b)}"));
+
+        /// <summary>The battlefield's rule in full, for the placement panel. Empty without one.</summary>
+        private string FieldRule => Battle.Field.HasValue
+            ? $"{Battlefields.Name(Battle.Field.Value)}: {Battlefields.Describe(Battle.Field.Value)}"
+            : "";
 
         private void DrawPlacementHud()
         {
             var army = Battle.Units.Where(u => u.Team == Team.Player && !u.IsObjective).ToList();
             var omens = OmenLine.Trim();
-            var h = 110 + army.Count * (ButtonHeight + 2) + 10 + (omens.Length > 0 ? 20 * (Battle.Omens.Count + Battle.Banners.Count) : 0);
+            var rule = FieldRule;
+            var ruleHeight = rule.Length > 0 ? TextStyle.CalcHeight(new GUIContent(rule), PanelWidth - 12f) + 6f : 0f;
+            var h = 110 + army.Count * (ButtonHeight + 2) + 10 + (omens.Length > 0 ? 20 * omens.Split('\n').Length : 0) + ruleHeight;
             GUILayout.BeginArea(Panel(Margin, Margin, PanelWidth, h), GUI.skin.box);
             GUILayout.Label(Header);
             GUILayout.Label("Place your army in the blue tiles. Click a placed statue to move it.", TextStyle);
             GUILayout.Label(_context.LayoutRule, TextStyle);
+            if (rule.Length > 0)
+                GUILayout.Label(rule, TextStyle);
             if (omens.Length > 0)
                 GUILayout.Label(omens, TextStyle);
             foreach (var u in army)
@@ -1588,7 +1651,7 @@ namespace ArmyRoguelike.View
                 var status = aiming ? $"<color={ActionColor}>Aiming: click a yellow tile</color>"
                     : cooldown > 0 ? $"<color={NextColor}>Ready in {cooldown} turn{(cooldown == 1 ? "" : "s")}</color>"
                     : !usable ? $"<color={DimColor}>No target in reach</color>"
-                    : $"<color={ActionColor}>{Battle.ActionCost(action)} AP  ·  cooldown {Battle.Cooldown(action)}</color>";
+                    : $"<color={ActionColor}>{Battle.ActionCost(action)} AP  ·  cooldown {Battle.CooldownIn(action)}</color>";
                 GUILayout.Label(status, cost);
                 GUILayout.Label($"<color={TextColor}>{Capitalise(Abilities.Describe(action))}</color>", text);
                 GUILayout.EndArea();
@@ -1768,7 +1831,7 @@ namespace ArmyRoguelike.View
             rows.Add(($"<color=white><b>HP {u.Hp} / {u.MaxHp}</b></color>{preview}   <color={DimColor}>{u.MaxAp} AP  ·  {u.MaxMoves} {(u.MaxMoves == 1 ? "move" : "moves")}  ·  range {u.Range}</color>",
                 stats, HpBarHeight + 4f));
 
-            if (u.Team == Team.Enemy)
+            if (u.Team == Team.Enemy && !Battle.IntentsHidden)
             {
                 rows.Add(($"<color={NextColor}>NEXT TURN</color>", section, 10f));
                 rows.Add(($"<color={NextColor}>{Capitalise(IntentText(EnemyAI.PredictIntent(Battle, u)))}</color>", body, 0f));
@@ -1796,7 +1859,7 @@ namespace ArmyRoguelike.View
                 actions.Add((technique.Name, Battle.ActionCost(technique.Action.Value), technique.Action, technique.Description));
             foreach (var (action, cost, kind, text) in actions)
             {
-                var cooldown = kind.HasValue ? $"  ·  cooldown {Battle.Cooldown(kind.Value)}" : "";
+                var cooldown = kind.HasValue ? $"  ·  cooldown {Battle.CooldownIn(kind.Value)}" : "";
                 var left = kind.HasValue ? u.CooldownLeft(kind.Value) : 0;
                 var ready = left > 0 ? $"   <color={NextColor}>ready in {left} turn{(left == 1 ? "" : "s")}</color>" : "";
                 rows.Add(($"<b><color=white>{action}</color></b>   <color={ActionColor}><size=13>{cost} AP{cooldown}</size></color>{ready}", name, 2f));
@@ -1900,6 +1963,10 @@ namespace ArmyRoguelike.View
                 lines.Add($"Shield {u.Shield}");
             if (u.MoonShield > 0)
                 lines.Add($"Moon shield {u.MoonShield}");
+            if (u.Favored)
+                lines.Add($"Favored by fortune: {Battlefields.FavoredMultiplier}x damage this round");
+            if (Battle.OnStormMark(u))
+                lines.Add($"On a storm mark: lightning strikes for {Battlefields.StormDamage} after the enemy turn");
             if (u.Team == Team.Player && Battle.Phase == Phase.PlayerTurn && u.ActedThisTurn && !u.IsDone)
                 lines.Add("Has acted: can't move again this turn");
             if (u.IsSnared)

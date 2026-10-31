@@ -206,6 +206,9 @@ namespace ArmyRoguelike.View
         // Null for no omen; otherwise the omen and whether it's a blessing (true) or a curse.
         private (Omen omen, bool blessing)? _testOmen;
 
+        // Null for no battlefield.
+        private Battlefield? _testField;
+
         // Banners that change the battle itself (Loser and Mercenaries work between fights, so they aren't here).
         private static readonly Banner[] TestableBanners = { Banner.Vampiric, Banner.ThirdWheel, Banner.BatteringRam };
         private readonly System.Collections.Generic.HashSet<Banner> _testBanners = new System.Collections.Generic.HashSet<Banner>();
@@ -228,6 +231,7 @@ namespace ArmyRoguelike.View
                 battle.AddOmen(_testOmen.Value.omen, _testOmen.Value.blessing ? Team.Player : Team.Enemy);
             foreach (var banner in _testBanners)
                 battle.AddBanner(banner);
+            battle.SetField(_testField);
 
             _battleRoot = new GameObject("Test battle");
             _battleRoot.transform.SetParent(transform, false);
@@ -269,7 +273,7 @@ namespace ArmyRoguelike.View
             const float w = 860;
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 10, w, 700), GUI.skin.box);
             GUILayout.Label("Test battle", Title);
-            GUILayout.Label("For testing only: any army with any techniques, any encounter, any blessing or curse, any battle banners. Normal battle rules; no run, gold or map.");
+            GUILayout.Label("For testing only: any army with any techniques, any encounter, any blessing or curse, any battle banners, any battlefield. Normal battle rules; no run, gold or map.");
             GUILayout.BeginHorizontal();
 
             // Left: every unit type, click to add (up to the army limit); below, the chosen unit's techniques.
@@ -388,6 +392,17 @@ namespace ArmyRoguelike.View
                         if (!_testBanners.Remove(pick))
                             _testBanners.Add(pick);
                     });
+            }
+
+            GUILayout.Space(10);
+            GUILayout.Label("Battlefield:");
+            if (GUILayout.Button((_testField == null ? "> " : "") + "None"))
+                Do(() => _testField = null);
+            foreach (var field in Battlefields.All)
+            {
+                var pick = field;
+                if (GUILayout.Button(new GUIContent((_testField == field ? "> " : "") + Battlefields.Name(field), Battlefields.Describe(field))))
+                    Do(() => _testField = pick);
             }
 
             GUILayout.Label(GUI.tooltip, new GUIStyle(GUI.skin.label) { wordWrap = true });
@@ -623,12 +638,18 @@ namespace ArmyRoguelike.View
                     var chosen = past && _run.Chosen[step] == i;
                     var current = step == _run.StepIndex;
                     var label = chosen ? $"> {node.Label}" : node.Label;
-                    GUI.enabled = current;
+                    if (node.Field.HasValue)
+                        label += $"  ·  {Battlefields.Name(node.Field.Value)}";
+                    var rule = node.Field.HasValue ? $"{Battlefields.Name(node.Field.Value)}: {Battlefields.Describe(node.Field.Value)}" : "";
+                    // Tooltips only work on enabled controls, so future steps stay enabled but ignore clicks.
+                    GUI.enabled = current || (!past && node.Field.HasValue);
                     var oldColor = GUI.color;
                     if (past && !chosen)
                         GUI.color = new Color(1f, 1f, 1f, 0.35f);
+                    else if (!current && !past)
+                        GUI.color = new Color(1f, 1f, 1f, 0.6f);
                     var index = i;
-                    if (GUILayout.Button(label, GUILayout.Height(current ? 30 : 22)) && current)
+                    if (GUILayout.Button(new GUIContent(label, rule), GUILayout.Height(current ? 30 : 22)) && current)
                         Do(() => ChooseNode(index));
                     GUI.color = oldColor;
                     GUI.enabled = true;
@@ -637,6 +658,8 @@ namespace ArmyRoguelike.View
                 GUILayout.EndHorizontal();
             }
 
+            GUILayout.Label(string.IsNullOrEmpty(GUI.tooltip) ? "Every battle, elite and boss has a battlefield rule, named on its node. Hover one to read it." : GUI.tooltip,
+                new GUIStyle(GUI.skin.label) { wordWrap = true });
             GUILayout.Space(8);
             GUILayout.Label("? = something unexpected. Shops sell techniques, items, a recruit, and help forgetting a technique. Every won fight offers a technique pick.");
             GUILayout.Label("Moon Shrine: defend it for 5 enemy turns to earn a blessing. If it breaks, you take a curse.");

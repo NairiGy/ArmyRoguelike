@@ -7,7 +7,7 @@ namespace ArmyRoguelike.View
     /// <summary>
     /// A lightning bolt striking a tile: the sky flickers, then a painted bolt cracks down from above the
     /// screen, flickering between three shapes, and the whole board flashes white-blue. Sparks, a shake
-    /// and a scorch that flashes blue-white and goes dark. Visual only; no rule uses it yet (test key L).
+    /// and a scorch that flashes blue-white and goes dark. Visual only; the Storm battlefield uses it (test key L too).
     /// </summary>
     public static class LightningStrike
     {

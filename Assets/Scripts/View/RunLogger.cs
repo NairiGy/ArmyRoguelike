@@ -31,9 +31,15 @@ namespace ArmyRoguelike.View
 
         private int Step => _run.StepIndex + 1;
 
+        private static string FieldName(Battlefield? field) => field.HasValue ? Battlefields.Name(field.Value) : "";
+
         public void RecordChoice(MapNode chosen, MapNode other)
         {
-            _log.choices.Add(new Choice { step = Step, chosen = chosen.Label, other = other?.Label ?? "" });
+            _log.choices.Add(new Choice
+            {
+                step = Step, chosen = chosen.Label, other = other?.Label ?? "",
+                chosenField = FieldName(chosen.Field), otherField = FieldName(other?.Field),
+            });
         }
 
         public void RecordBattle(Battle battle, int goldEarned, string logFile, bool ambush)
@@ -48,6 +54,7 @@ namespace ArmyRoguelike.View
                 ambush = ambush,
                 elite = _run.CurrentEncounter != null && _run.CurrentEncounter.IsElite,
                 rematch = !ambush && node != null && node.IsRematch,
+                battlefield = FieldName(battle?.Field),
                 skipped = battle != null && battle.WasSkipped,
                 result = battle != null && battle.Phase == Phase.Victory ? "victory" : "defeat",
                 turns = battle?.TurnNumber ?? 0,
@@ -276,6 +283,11 @@ namespace ArmyRoguelike.View
             public int step;
             public string chosen;
             public string other;
+
+            /// <summary>The battlefield on each node ("" for none).</summary>
+            public string chosenField;
+
+            public string otherField;
         }
 
         [Serializable]
@@ -288,6 +300,9 @@ namespace ArmyRoguelike.View
             /// <summary>An elite (harder rematch), or a normal-strength rematch of a faction already beaten.</summary>
             public bool elite;
             public bool rematch;
+
+            /// <summary>The battlefield rule of the fight ("" for none).</summary>
+            public string battlefield;
             public bool skipped;
             public string result;
             public int turns;

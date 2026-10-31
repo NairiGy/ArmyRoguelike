@@ -36,6 +36,7 @@ namespace ArmyRoguelike.View
             _goldIfWon = context.GoldIfWon;
             _log.omens = battle.Omens.Select(o => Omens.Name(o.omen, o.side == Team.Player)).ToList();
             _log.banners = battle.Banners.Select(Banners.Name).ToList();
+            _log.battlefield = battle.Field.HasValue ? Battlefields.Name(battle.Field.Value) : "";
             _log.ritualTurns = battle.RitualTurns;
             _log.summonTurn = battle.SummonTurn;
         }
@@ -278,6 +279,23 @@ namespace ArmyRoguelike.View
                         target = Name(omen.Unit), toX = omen.Unit.Pos.X, toY = omen.Unit.Pos.Y,
                     });
                     break;
+                case FieldEvent field:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = field.Unit.Team.ToString(), unit = "",
+                        type = field.Field == Battlefield.Storm ? "storm mark" : "favored",
+                        target = Name(field.Unit), toX = field.Unit.Pos.X, toY = field.Unit.Pos.Y,
+                    });
+                    break;
+                case FallEvent fall:
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = fall.Pusher?.Team.ToString() ?? "", unit = fall.Pusher != null ? Name(fall.Pusher) : "",
+                        type = "fall", target = Name(fall.Unit), fromX = fall.Edge.X, fromY = fall.Edge.Y,
+                        damage = fall.Hit.Damage, targetHpAfter = 0, killed = true,
+                        friendlyFire = fall.Pusher != null && fall.Pusher.Team == fall.Unit.Team,
+                    });
+                    break;
                 case SummonEvent summon:
                     _log.actions.Add(new ActionEntry
                     {
@@ -300,6 +318,7 @@ namespace ArmyRoguelike.View
         {
             turn = turn, team = blast.Owner?.Team.ToString() ?? "", unit = blast.Owner != null ? Name(blast.Owner) : "",
             type = "explosion", note = blast.Cause, toX = blast.Center.X, toY = blast.Center.Y, chainDepth = blast.ChainDepth,
+            favored = blast.Owner != null && blast.Owner.Favored,
         };
 
         private static string EffectType(EffectKind kind)
@@ -320,7 +339,7 @@ namespace ArmyRoguelike.View
         {
             turn = turn, team = attacker.Team.ToString(), unit = Name(attacker), type = type, target = Name(hit.Target),
             damage = hit.Damage, targetHpAfter = hit.HpAfter, killed = hit.Killed, apAfter = ApAfter(attacker),
-            ranged = attacker.IsRanged && Battle.Distance(attacker, hit.Target) > 1,
+            ranged = attacker.IsRanged && Battle.Distance(attacker, hit.Target) > 1, favored = attacker.Favored,
         };
 
         private static int ApAfter(Unit u) => u.Team == Team.Player ? u.Ap : -1;
@@ -482,6 +501,7 @@ namespace ArmyRoguelike.View
                     case "long reach":
                     case "fireball":
                     case "push":
+                    case "fall":
                     case "tick":
                         if (string.IsNullOrEmpty(a.target))
                             break;
@@ -574,6 +594,12 @@ namespace ArmyRoguelike.View
             /// <summary>The army's banners in play this battle.</summary>
             public List<string> banners = new List<string>();
 
+            /// <summary>
+            /// The battlefield rule ("" for none). Its actions: "fall" (pushed off the board), "storm mark" and
+            /// "favored" (the unit picked), explosions with note "lightning", and "favored" on hits a favored unit dealt.
+            /// </summary>
+            public string battlefield;
+
             /// <summary>Blessings and curses in play this battle.</summary>
             public List<string> omens = new List<string>();
 
@@ -649,6 +675,9 @@ namespace ArmyRoguelike.View
 
             /// <summary>Attacks and area hits: a ranged shot from 2+ tiles away (for the ranged vs melee damage split).</summary>
             public bool ranged;
+
+            /// <summary>Hits and explosions: dealt by a unit favored by fortune (Fortune's Favored), so at double damage.</summary>
+            public bool favored;
 
             /// <summary>Smash: how many units the one swing hit.</summary>
             public int smashTargets;
