@@ -16,13 +16,19 @@ namespace ArmyRoguelike.View
         /// Where the battle takes place. TowerSky builds a tower from pieces in front of a flat sky picture;
         /// the others are single isometric paintings whose empty central platform the board is fitted onto.
         /// </summary>
-        public enum Setting { TowerSky, IsoTower, IsoTemple, IsoGraveyard }
+        public enum Setting { TowerSky, IsoTower, IsoTemple, IsoGraveyard, IsoVoid }
 
-        public static readonly string[] PaletteNames = { "Amber dusk", "Toxic green", "Cold night" };
+        public static readonly string[] PaletteNames = { "Amber dusk", "Toxic green", "Cold night", "Void" };
 
         /// <summary>What battles use: the isometric tower at night. The other settings and palettes are kept for later.</summary>
         public const Setting MainSetting = Setting.IsoTower;
         public const int MainPalette = 2;
+
+        /// <summary>
+        /// Edge of the World battles swap the main setting for the void: the tower's roof hanging over a
+        /// black hole, with no clouds below, in the void palette.
+        /// </summary>
+        public const int VoidPalette = 3;
 
         /// <summary>Colour painted statues through their team's ramp of the current palette, so units match the scene.</summary>
         public static bool StatueRamps = true;
@@ -34,6 +40,7 @@ namespace ArmyRoguelike.View
             new[] { "#2a1a12", "#6b4a2e", "#b08850", "#e8c88a", "#fff0c8" },
             new[] { "#2a2620", "#6a6048", "#b0a478", "#e2d8b0", "#fbf6e0" },
             new[] { "#2a2030", "#6a5060", "#b08a80", "#e6c0a0", "#fff0d8" },
+            new[] { "#241e30", "#5a4e6a", "#9c8ea8", "#d8cce0", "#fbf6ff" },
         };
 
         /// <summary>Player ramp choices for the night palette, and which one to use (-1 = the palette's own).</summary>
@@ -81,6 +88,7 @@ namespace ArmyRoguelike.View
             new[] { "#1a1212", "#3a2a28", "#5c4a44", "#8a7468", "#b8a490" },
             new[] { "#14181c", "#2a3434", "#465652", "#6a8278", "#98b0a0" },
             new[] { "#10141e", "#222e40", "#3a4a60", "#5e7290", "#90a4c0" },
+            new[] { "#100e1a", "#231e36", "#3b3452", "#5f5678", "#9288b0" },
         };
 
         /// <summary>
@@ -130,6 +138,11 @@ namespace ArmyRoguelike.View
             public bool Clouds;
             // The painting's tower alone (same framing), drawn over the clouds that pass behind it.
             public string TowerLayer;
+            // The void: Texture is the void painting behind the tower layer (same framing), whose walls fade
+            // out from FadeFrom to FadeTo (image rows); Hole is the black hole's centre and radius in the painting.
+            public bool Void;
+            public float FadeFrom, FadeTo;
+            public Vector3 Hole;
         }
 
         private static readonly Dictionary<Setting, IsoScene> IsoScenes = new Dictionary<Setting, IsoScene>
@@ -137,7 +150,12 @@ namespace ArmyRoguelike.View
             [Setting.IsoTower] = new IsoScene { Texture = "Backdrops/iso_tower", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", Clouds = true, TowerLayer = "Backdrops/iso_tower_layer" },
             [Setting.IsoTemple] = new IsoScene { Texture = "Backdrops/iso_temple", Top = new Vector2(745, 220), Left = new Vector2(355, 430), Bottom = new Vector2(880, 735), Right = new Vector2(1265, 470) },
             [Setting.IsoGraveyard] = new IsoScene { Texture = "Backdrops/iso_graveyard", Top = new Vector2(840, 210), Left = new Vector2(325, 470), Bottom = new Vector2(905, 765), Right = new Vector2(1330, 490) },
+            // The void painting is framed like the tower painting, so the tower layer fits it as it is.
+            [Setting.IsoVoid] = new IsoScene { Texture = "Backdrops/void_backdrop", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", Void = true, FadeFrom = 640, FadeTo = 770, Hole = new Vector3(415, 191, 57) },
         };
+
+        /// <summary>The ring image's empty middle, as a fraction of its width: fitted over the painted hole.</summary>
+        private const float RingHoleFraction = 0.235f;
 
         // Each palette runs from its darkest to its brightest colour.
         private static readonly string[][] Palettes =
@@ -145,6 +163,8 @@ namespace ArmyRoguelike.View
             new[] { "#110c0c", "#2d201c", "#4c3a2c", "#6f6343", "#9a9567", "#f0b850" },
             new[] { "#12141c", "#232a3a", "#34463c", "#4f6b3a", "#7fa046", "#c9ec7a" },
             new[] { "#0b0f18", "#16223a", "#25384f", "#3a5268", "#5c7486", "#c48d8c" },
+            // Void: black through indigo and violet stone to the pale gold of the light around the hole.
+            new[] { "#05040a", "#151129", "#2b2347", "#4a3f68", "#7a6e98", "#e6cf9a" },
         };
 
         private const float WallDepth = 2f;
@@ -176,7 +196,13 @@ namespace ArmyRoguelike.View
         /// <summary>Builds the scenery for a framed board. Call after the camera has been framed.</summary>
         public static void Apply(Camera cam, BoardView board, int palette, bool pixelateBackdrop = false, Setting setting = Setting.TowerSky)
         {
-            var p = ((palette % Palettes.Length) + Palettes.Length) % Palettes.Length;
+            if (setting == MainSetting && board.Battle.EdgeKills)
+            {
+                setting = Setting.IsoVoid;
+                palette = VoidPalette;
+            }
+
+            var p =((palette % Palettes.Length) + Palettes.Length) % Palettes.Length;
             var stops = ParseStops(Palettes[p]);
             var shader = Resources.Load<Shader>("Shaders/PaletteRamp");
             if (shader == null)
@@ -227,7 +253,25 @@ namespace ArmyRoguelike.View
                 var sky = Resources.Load<Texture2D>("Backdrops/sky_panorama");
                 var puffy = Resources.Load<Texture2D>("Backdrops/cloud_puffy");
                 var wispy = Resources.Load<Texture2D>("Backdrops/cloud_wispy");
-                if (scene.Clouds && tower != null && sky != null && puffy != null && wispy != null)
+                if (scene.Void && tower != null)
+                {
+                    // The void painting behind, the tower's walls dissolving into it, and its black hole's
+                    // ring of light turning over the painted hole; debris drifts in, specks peel off the roof.
+                    var voidMaterial = NewMaterial(shader, Resources.Load<Texture2D>(scene.Texture), ramp);
+                    // The painting stops short of the screen's top: its top rows fade into the background colour.
+                    BuildIsoScene(root, board, scene, voidMaterial, BackdropOrder, (0f, 0f), (140f, 1f));
+                    BuildIsoScene(root, board, scene, NewMaterial(shader, tower, ramp), TowerLayerOrder, (scene.FadeFrom, 1f), (scene.FadeTo, 0f));
+                    var map = ImageToWorld(board, scene);
+                    var hole = map(scene.Hole.x, scene.Hole.y);
+                    var holeRadius = (map(scene.Hole.x + scene.Hole.z, scene.Hole.y) - hole).magnitude;
+                    var corners = BoardCorners(board);
+                    var rockArt = System.Array.FindAll(Resources.LoadAll<Sprite>(scene.ArtFolder), s => s.name.StartsWith("rock_"));
+                    SceneryVoid.Create(root, Resources.Load<Texture2D>("Backdrops/void_ring"), RingHoleFraction, hole, holeRadius,
+                        rockArt, NewMaterial(shader, Texture2D.whiteTexture, ramp), new Material(Resources.Load<Shader>("Shaders/Glow")),
+                        Sample(stops, 1f), new[] { corners.top, corners.left, corners.bottom, corners.right }, centre, viewW, viewH,
+                        BackdropOrder + 1, BackCloudOrder, TowerLayerOrder + 1);
+                }
+                else if (scene.Clouds && tower != null && sky != null && puffy != null && wispy != null)
                 {
                     // Everything in the sky moves. Parallax: a seamless sky panorama and cloud layers slide right
                     // with one wind, the farther (higher, fainter, smaller) the slower; all of them pass behind
@@ -313,19 +357,60 @@ namespace ArmyRoguelike.View
         /// Places an isometric painting so its platform lies under the board: the best affine fit of the
         /// platform's four corners onto the board's four corners (the painting's angle is never exactly 2:1).
         /// </summary>
-        private static void BuildIsoScene(Transform root, BoardView board, IsoScene scene, Material material, int order = BackdropOrder)
+        /// <param name="fades">Optional (image row, opacity) pairs, top to bottom: the painting's opacity runs between them.</param>
+        private static void BuildIsoScene(Transform root, BoardView board, IsoScene scene, Material material, int order = BackdropOrder,
+            params (float row, float alpha)[] fades)
         {
             var tex = (Texture2D)material.mainTexture;
             if (tex == null)
                 return;
+            var map = ImageToWorld(board, scene);
+            if (fades.Length == 0)
+            {
+                // Image rows run downwards; the quad goes counter-clockwise from the image's bottom left.
+                Quad(root, "Scene", material, order, map(0, tex.height), map(tex.width, tex.height), map(tex.width, 0), map(0, 0), Value(1f));
+                return;
+            }
+
+            // Horizontal bands from the image's top to its bottom, opacity blending between the given rows.
+            var stops = new List<(float row, float alpha)> { (0f, fades[0].alpha) };
+            stops.AddRange(fades);
+            stops.Add((tex.height, fades[fades.Length - 1].alpha));
+            var vertices = new Vector3[stops.Count * 2];
+            var uv = new Vector2[stops.Count * 2];
+            var colors = new Color[stops.Count * 2];
+            var triangles = new List<int>();
+            for (var i = 0; i < stops.Count; i++)
+            {
+                var (row, alpha) = stops[i];
+                vertices[i * 2] = map(0, row);
+                vertices[i * 2 + 1] = map(tex.width, row);
+                uv[i * 2] = new Vector2(0f, 1f - row / tex.height);
+                uv[i * 2 + 1] = new Vector2(1f, 1f - row / tex.height);
+                colors[i * 2] = colors[i * 2 + 1] = new Color(1f, 0f, 0f, alpha);
+                if (i > 0)
+                    triangles.AddRange(new[] { i * 2 - 2, i * 2, i * 2 + 1, i * 2 - 2, i * 2 + 1, i * 2 - 1 });
+            }
+
+            var mesh = new Mesh { name = "Scene", vertices = vertices, uv = uv, colors = colors };
+            mesh.triangles = triangles.ToArray();
+            var go = new GameObject("Scene");
+            go.transform.SetParent(root, false);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = material;
+            mr.sortingOrder = order;
+        }
+
+        /// <summary>Where a pixel of the setting's painting lands in the world, with its platform fitted under the board.</summary>
+        private static System.Func<float, float, Vector2> ImageToWorld(BoardView board, IsoScene scene)
+        {
             var c = BoardCorners(board);
             var image = new[] { scene.Top, scene.Left, scene.Bottom, scene.Right };
             var world = new[] { c.top, c.left, c.bottom, c.right };
             var fx = FitAffine(image, world, p => p.x);
             var fy = FitAffine(image, world, p => p.y);
-            Vector2 Map(float px, float py) => new Vector2(fx.x * px + fx.y * py + fx.z, fy.x * px + fy.y * py + fy.z);
-            // Image rows run downwards; the quad goes counter-clockwise from the image's bottom left.
-            Quad(root, "Scene", material, order, Map(0, tex.height), Map(tex.width, tex.height), Map(tex.width, 0), Map(0, 0), Value(1f));
+            return (px, py) => new Vector2(fx.x * px + fx.y * py + fx.z, fy.x * px + fy.y * py + fy.z);
         }
 
         /// <summary>Least-squares (a, b, c) with a*px + b*py + c ≈ target(world) over the point pairs.</summary>

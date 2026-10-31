@@ -33,7 +33,7 @@ public static class PreviewCapture
                 int.TryParse(args[i + 1], out encounter);
             if (args[i] == "-previewPalette" && i + 1 < args.Length)
                 int.TryParse(args[i + 1], out palette);
-            // -previewSetting TowerSky|IsoTower|IsoTemple|IsoGraveyard
+            // -previewSetting TowerSky|IsoTower|IsoTemple|IsoGraveyard|IsoVoid
             if (args[i] == "-previewSetting" && i + 1 < args.Length)
                 System.Enum.TryParse(args[i + 1], out setting);
         }
@@ -62,6 +62,10 @@ public static class PreviewCapture
         }
 
         var battle = encounters[Mathf.Clamp(encounter, 0, encounters.Length - 1)].CreateBattle(army);
+        // -previewField EdgeOfTheWorld|Storm|...: the fight's battlefield (Edge of the World shows the void).
+        var fieldArg = System.Array.IndexOf(args, "-previewField");
+        if (fieldArg >= 0 && fieldArg + 1 < args.Length && System.Enum.TryParse(args[fieldArg + 1], out Battlefield field))
+            battle.SetField(field);
         if (placeArmy)
         {
             var i = 0;
