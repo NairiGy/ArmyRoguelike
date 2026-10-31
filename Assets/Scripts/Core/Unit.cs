@@ -122,6 +122,9 @@ namespace ArmyRoguelike.Core
         /// <summary>Gold a cutpurse is carrying after a hit. It flees with it; killing it gets it back.</summary>
         public int CarryingLoot { get; internal set; }
 
+        /// <summary>Hired for this battle only (Mercenaries banner): fights, but doesn't count as a survivor or keep the fight going alone.</summary>
+        public bool IsMercenary { get; internal set; }
+
         /// <summary>Left the board (a cutpurse that got away). No longer in the battle.</summary>
         public bool Escaped { get; internal set; }
 
@@ -147,13 +150,18 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Attack range in steps. Long Reach makes it 2 (still melee).</summary>
         public int Range => Math.Max(Has(Ability.LongReach) ? 2 : 1, Stats.Range);
-        public int MaxAp => Math.Max(1, Stats.MaxAp) + (InWrath ? 1 : 0);
+        public int MaxAp => Math.Max(1, Stats.MaxAp) + (InWrath ? 1 : 0) + BannerAp;
+
+        /// <summary>AP and moves from the army's banners (Third Wheel), set when the battle starts.</summary>
+        public int BannerAp { get; internal set; }
+
+        public int BannerMoves { get; internal set; }
 
         /// <summary>Wrath (the Giant): at half HP or less it gets one more AP each turn.</summary>
         public bool InWrath => Has(Ability.Wrath) && IsAlive && Hp * 2 <= MaxHp;
 
-        /// <summary>Tiles per turn: the type's moves (1, or 2 with Swift), plus 1 for Spring Boots.</summary>
-        public int MaxMoves => Stats.Moves + (Stats.Moves > 0 && Has(Ability.SpringBoots) ? 1 : 0);
+        /// <summary>Tiles per turn: the type's moves (1, or 2 with Swift), plus 1 for Spring Boots and 1 for Third Wheel.</summary>
+        public int MaxMoves => Stats.Moves + (Stats.Moves > 0 ? (Has(Ability.SpringBoots) ? 1 : 0) + BannerMoves : 0);
 
         public int Size => Stats.Size;
 

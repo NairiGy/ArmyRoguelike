@@ -347,6 +347,43 @@ namespace ArmyRoguelike.Core
         /// <summary>Puts an omen in play for this battle, helping <paramref name="side"/>. Call before the battle starts.</summary>
         public void AddOmen(Omen omen, Team side) => _omens.Add((omen, side));
 
+        // ---------- Banners ----------
+
+        private readonly HashSet<Banner> _banners = new HashSet<Banner>();
+
+        /// <summary>The player's banners in play this battle.</summary>
+        public IReadOnlyCollection<Banner> Banners => _banners;
+
+        public bool HasBanner(Banner banner) => _banners.Contains(banner);
+
+        /// <summary>
+        /// Puts one of the player's banners in play. Call before the battle starts, after the army is in.
+        /// Third Wheel gives the army's units their AP and move; Vampiric brings the Curse of the Sun.
+        /// </summary>
+        public void AddBanner(Banner banner)
+        {
+            if (!_banners.Add(banner))
+                return;
+            if (banner == Banner.ThirdWheel)
+            {
+                foreach (var u in _units.Where(u => u.Team == Team.Player && u.Member != null))
+                {
+                    u.BannerAp = Core.Banners.ThirdWheelAp;
+                    u.BannerMoves = Core.Banners.ThirdWheelMoves;
+                }
+            }
+
+            if (banner == Banner.Vampiric && !_omens.Contains((Omen.Sun, Team.Enemy)))
+                AddOmen(Omen.Sun, Team.Enemy);
+        }
+
+        /// <summary>Marks the unit of this army member as a hired mercenary (Mercenaries banner). Call before the battle starts.</summary>
+        public void MarkMercenary(ArmyMember member)
+        {
+            foreach (var u in _units.Where(u => u.Member == member))
+                u.IsMercenary = true;
+        }
+
         /// <summary>A unit on this tile can't be hit from range by the given team: it's shrouded against them.</summary>
         public bool IsShroudedFrom(GridPos tile, Team attackerTeam) => _shroud.TryGetValue(tile, out var side) && side != attackerTeam;
 
@@ -433,8 +470,8 @@ namespace ArmyRoguelike.Core
 
         public IEnumerable<Unit> Living(Team team) => _units.Where(u => u.Team == team && u.IsAlive && u.IsPlaced);
 
-        /// <summary>Living army units, not counting summons such as turrets.</summary>
-        public IEnumerable<Unit> LivingArmy => Living(Team.Player).Where(u => !u.IsSummon);
+        /// <summary>Living army units, not counting summons such as turrets or hired mercenaries.</summary>
+        public IEnumerable<Unit> LivingArmy => Living(Team.Player).Where(u => !u.IsSummon && !u.IsMercenary);
 
         public Unit UnitAt(GridPos p) =>
             _units.FirstOrDefault(u => u.IsPlaced && u.IsAlive && Cells(u).Contains(p));
@@ -1097,43 +1134,85 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>
-        /// Shoves a unit one tile. If something is in the way it slams into it and takes collision damage.
-        /// An enemy shoved onto a mine sets it off.
+        /// Tiles a push moves a unit: 1, +1 for a small unit and -1 for a huge one, +1 when your unit pushes with
+        /// Battering Ram. 0 means it doesn't budge.
+        /// </summary>
+        public int PushDistance(Unit unit, Unit pusher)
+        {
+            var distance = 1;
+            if (unit.Stats.Weight == Weight.Small)
+                distance++;
+            else if (unit.Stats.Weight == Weight.Huge)
+                distance--;
+            if (IsRamming(pusher))
+                distance += Core.Banners.RamDistance;
+            return Math.Max(0, distance);
+        }
+
+        private bool IsRamming(Unit pusher) => pusher != null && pusher.Team == Team.Player && HasBanner(Banner.BatteringRam);
+
+        /// <summary>
+        /// Shoves a unit <see cref="PushDistance"/> tiles, one at a time. If something is in the way it slams into it,
+        /// stops and takes collision damage. An enemy shoved onto a mine sets it off. Battering Ram adds its damage
+        /// at the end, whether the unit moved or not.
         /// </summary>
         private void Push(Unit unit, GridPos dir, Unit pusher, List<BattleEvent> events, bool hurtsBlocker = false)
         {
             // The shrine is rooted to its tile, and nothing moves a Colossus.
             if (!unit.IsAlive || unit.IsObjective || unit.Has(Ability.Colossus))
                 return;
-            var from = unit.Pos;
-            var to = from + dir;
-            if (!CanStand(unit, to))
+            var start = unit.Pos;
+            var distance = PushDistance(unit, pusher);
+            for (var step = 0; step < distance && unit.IsAlive; step++)
             {
-                // Whoever it slams into, if the push says so (Shield Bash), takes the same damage.
-                var blockers = hurtsBlocker
-                    ? Footprint(to, unit.Size).Select(UnitAt).Where(u => u != null && u != unit).Distinct().ToList()
-                    : new List<Unit>();
-                var after = new List<BattleEvent>();
-                var hit = Damage(unit, CollisionDamage, pusher, DamageKind.Collision, after);
-                events.Add(new PushEvent(unit, pusher, from, from, hit));
-                events.AddRange(after);
-                foreach (var blocker in blockers.Where(b => b.IsAlive))
+                var from = unit.Pos;
+                var to = from + dir;
+                if (!CanStand(unit, to))
                 {
-                    var blockerAfter = new List<BattleEvent>();
-                    events.Add(new TickEvent("collision", Damage(blocker, CollisionDamage, pusher, DamageKind.Collision, blockerAfter)));
-                    events.AddRange(blockerAfter);
+                    if (from != start)
+                        events.Add(new PushEvent(unit, pusher, start, from, null));
+                    start = from;
+
+                    // Whoever it slams into, if the push says so (Shield Bash), takes the same damage.
+                    var blockers = hurtsBlocker
+                        ? Footprint(to, unit.Size).Select(UnitAt).Where(u => u != null && u != unit).Distinct().ToList()
+                        : new List<Unit>();
+                    var after = new List<BattleEvent>();
+                    var hit = Damage(unit, CollisionDamage, pusher, DamageKind.Collision, after);
+                    events.Add(new PushEvent(unit, pusher, from, from, hit));
+                    events.AddRange(after);
+                    foreach (var blocker in blockers.Where(b => b.IsAlive))
+                    {
+                        var blockerAfter = new List<BattleEvent>();
+                        events.Add(new TickEvent("collision", Damage(blocker, CollisionDamage, pusher, DamageKind.Collision, blockerAfter)));
+                        events.AddRange(blockerAfter);
+                    }
+
+                    break;
                 }
 
-                return;
+                unit.Pos = to;
+                if (unit.Team == Team.Enemy)
+                {
+                    var mine = Cells(unit).Select(MineAt).FirstOrDefault(m => m != null);
+                    if (mine != null)
+                    {
+                        // The slide so far shows before the blast.
+                        events.Add(new PushEvent(unit, pusher, start, to, null));
+                        start = to;
+                        Explode(mine.Tile, mine.Damage, "mine", mine.Owner, events);
+                    }
+                }
             }
 
-            unit.Pos = to;
-            events.Add(new PushEvent(unit, pusher, from, to, null));
-            if (unit.Team == Team.Enemy)
+            if (unit.Pos != start)
+                events.Add(new PushEvent(unit, pusher, start, unit.Pos, null));
+
+            if (IsRamming(pusher) && unit.IsAlive)
             {
-                var mine = Cells(unit).Select(MineAt).FirstOrDefault(m => m != null);
-                if (mine != null)
-                    Explode(mine.Tile, mine.Damage, "mine", mine.Owner, events);
+                var after = new List<BattleEvent>();
+                events.Add(new TickEvent("ram", Damage(unit, Core.Banners.RamDamage, pusher, DamageKind.Collision, after)));
+                events.AddRange(after);
             }
         }
 
@@ -1942,6 +2021,15 @@ namespace ArmyRoguelike.Core
             target.Hp = Math.Max(0, hp);
             if (!wasInWrath && target.InWrath)
                 after.Add(new StatusEvent(target, target, StatusKind.Wrath, 0));
+
+            // Vampiric banner: every attack of yours that lands heals the attacker.
+            if (hostile && kind == DamageKind.Attack && amount > 0 && source.Team == Team.Player && source.IsAlive &&
+                HasBanner(Banner.Vampiric) && source.Hp < source.MaxHp)
+            {
+                var healed = Math.Min(Core.Banners.VampiricHeal, source.MaxHp - source.Hp);
+                source.Hp += healed;
+                after.Add(new EffectEvent(EffectKind.Heal, source, healed, source.Hp, source));
+            }
 
             if (!target.IsAlive && hostile && source.IsAlive)
             {

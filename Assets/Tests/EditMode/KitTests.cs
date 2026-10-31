@@ -95,7 +95,7 @@ namespace ArmyRoguelike.Tests
             Assert.IsTrue(b.CanUseAction(jug, ActionKind.Charge, wolf.Pos));
             b.PlayerUseAction(jug, ActionKind.Charge, wolf.Pos);
             Assert.AreEqual(P(3, 3), jug.Pos);
-            Assert.AreEqual(P(3, 5), wolf.Pos, "knocked back one tile");
+            Assert.AreEqual(P(3, 6), wolf.Pos, "a small unit: knocked back two tiles");
         }
 
         [Test]
@@ -165,7 +165,7 @@ namespace ArmyRoguelike.Tests
             var b = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far });
             var wolf = Enemy(b);
             b.PlayerUseAction(Player(b), ActionKind.ShieldBash, wolf.Pos);
-            Assert.AreEqual(P(3, 3), wolf.Pos);
+            Assert.AreEqual(P(3, 4), wolf.Pos, "a small unit goes two tiles");
             Assert.AreEqual(UnitStats.Wolf.MaxHp, wolf.Hp, "no damage");
 
             var walled = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far }, P(3, 3));
@@ -339,7 +339,7 @@ namespace ArmyRoguelike.Tests
             var wolf = Enemy(b, 1);
             wolf.Hp = 20;
             var events = b.PlayerUseAction(Player(b, 0), ActionKind.Fireball, P(5, 3));
-            Assert.AreEqual(P(3, 3), wolf.Pos, "pushed one tile away from the centre");
+            Assert.AreEqual(P(2, 3), wolf.Pos, "a small unit: pushed two tiles away from the centre");
             Assert.IsTrue(events.OfType<ExplosionEvent>().Any(), "the mine inside the area went off");
         }
 

@@ -34,6 +34,17 @@ namespace ArmyRoguelike.Core
         Totem,
     }
 
+    /// <summary>How far pushes move a unit, relative to the push's distance.</summary>
+    public enum Weight
+    {
+        /// <summary>Pushed 1 tile further.</summary>
+        Small,
+        Medium,
+
+        /// <summary>Pushed 1 tile less (a normal push doesn't move it).</summary>
+        Huge,
+    }
+
     /// <summary>A passive rule a unit has, from its type or from an item.</summary>
     public enum Ability
     {
@@ -283,6 +294,9 @@ namespace ArmyRoguelike.Core
         /// <summary>Side length in tiles. 1 for normal units, 2 for a 2x2 unit like the ogre.</summary>
         public int Size { get; private set; } = 1;
 
+        /// <summary>How far pushes move it: small units 1 tile further, huge ones 1 tile less.</summary>
+        public Weight Weight { get; private set; } = Weight.Medium;
+
         /// <summary>Leaves a bone pile when killed, which a necromancer can raise.</summary>
         public bool LeavesRemains { get; private set; }
 
@@ -356,10 +370,10 @@ namespace ArmyRoguelike.Core
         public bool IsPlayerType => Tier > 0;
 
         private static UnitStats Player(UnitKind kind, string name, string label, int hp, int damage, int range, int ap,
-            string role, Ability[] abilities, ActionKind[] actions) =>
+            string role, Ability[] abilities, ActionKind[] actions, Weight weight = Weight.Medium) =>
             new UnitStats(kind, name, hp, damage, range, ap)
             {
-                Tier = 1, Label = label, Role = role, Abilities = abilities, Actions = actions,
+                Tier = 1, Label = label, Role = role, Abilities = abilities, Actions = actions, Weight = weight,
             };
 
         private static Ability[] A(params Ability[] a) => a;
@@ -375,10 +389,10 @@ namespace ArmyRoguelike.Core
             "Fragile ranged damage that likes to stand still.", A(Ability.SteadyAim), Do(ActionKind.PinningShot));
 
         public static readonly UnitStats Rogue = Player(UnitKind.Rogue, "Rogue", "R", 5, 4, 1, 1,
-            "Fast, deadly, fragile. Slips out of sight.", A(Ability.Swift), Do(ActionKind.Vanish));
+            "Fast, deadly, fragile. Slips out of sight.", A(Ability.Swift), Do(ActionKind.Vanish), Weight.Small);
 
         public static readonly UnitStats Apprentice = Player(UnitKind.Mage, "Mage Apprentice", "Ma", 5, 2, 3, 1,
-            "Weak bolt that flies over obstacles.", A(Ability.ArcaneBolt), Do(ActionKind.Blink));
+            "Weak bolt that flies over obstacles.", A(Ability.ArcaneBolt), Do(ActionKind.Blink), Weight.Small);
 
         public static readonly UnitStats Sapper = Player(UnitKind.Sapper, "Sapper", "Sa", 6, 2, 1, 1,
             "Lays mines that enemies walk into.", A(Ability.Mines), Do(ActionKind.PlaceMine));
@@ -413,19 +427,19 @@ namespace ArmyRoguelike.Core
 
         public static readonly UnitStats Wolf = new UnitStats(UnitKind.Wolf, "Wolf", 6, 2, 1, 1)
         {
-            Abilities = A(Ability.Swift, Ability.BloodScent, Ability.WolfBite),
+            Weight = Weight.Small, Abilities = A(Ability.Swift, Ability.BloodScent, Ability.WolfBite),
             Role = "Fast biter that hunts the weakest. Bites hit harder the more wolves bit before it this turn.",
         };
         public static readonly UnitStats PackLeader = new UnitStats(UnitKind.PackLeader, "Pack Leader", 10, 3, 1, 1)
         {
-            Abilities = A(Ability.Swift, Ability.PackBond, Ability.Howl, Ability.WolfBite),
+            Weight = Weight.Huge, Abilities = A(Ability.Swift, Ability.PackBond, Ability.Howl, Ability.WolfBite),
             Role = "Keeps the pack strong while it lives, and howls to send it further.",
         };
 
         public static readonly UnitStats Skeleton =
             new UnitStats(UnitKind.Skeleton, "Skeleton", 4, 2, 1, 1)
             {
-                LeavesRemains = true, Abilities = A(Ability.Grasp),
+                Weight = Weight.Small, LeavesRemains = true, Abilities = A(Ability.Grasp),
                 Role = "Grabs your units and holds them in place. Leaves a bone pile when killed; a Necromancer can raise it. Stand on the pile to stop that.",
             };
 
@@ -444,7 +458,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Act 1 boss (the ogre). Its basic attack is the club smash, which hits everyone adjacent.</summary>
         public static readonly UnitStats Ogre = new UnitStats(UnitKind.Ogre, "Giant", 36, 5, 1, 1)
         {
-            Size = 2, AreaMelee = true, ThrowCost = 1, ThrowDamage = 4, ThrowRange = 4, Slams = true, Abilities = A(Ability.Colossus, Ability.Wrath),
+            Size = 2, Weight = Weight.Huge, AreaMelee = true, ThrowCost = 1, ThrowDamage = 4, ThrowRange = 4, Slams = true, Abilities = A(Ability.Colossus, Ability.Wrath),
             Role = "Boss, 2x2. One action a turn, two at half HP. Slam: 3 damage to each of your units within 2 tiles, then shoves them 1 tile away. Smash hits every adjacent unit. " +
                    "Or throws a boulder 2-4 tiles away that stays as a rock. Nothing pins, slows or pushes it.",
         };
@@ -453,7 +467,7 @@ namespace ArmyRoguelike.Core
 
         public static readonly UnitStats Cutpurse = new UnitStats(UnitKind.Cutpurse, "Cutpurse", 5, 2, 1, 1)
         {
-            StealsGold = 5, Abilities = A(Ability.Swift, Ability.LightFingers, Ability.Caltrops),
+            Weight = Weight.Small, StealsGold = 5, Abilities = A(Ability.Swift, Ability.LightFingers, Ability.Caltrops),
             Role = "Stabs, grabs 5 gold and runs in the same turn, dropping caltrops behind it. Kill it before it gets away.",
         };
 
@@ -464,19 +478,19 @@ namespace ArmyRoguelike.Core
 
         public static readonly UnitStats Brute = new UnitStats(UnitKind.Brute, "Bandit Brute", 12, 3, 1, 1)
         {
-            Abilities = A(Ability.Guard, Ability.BullRush), Role = "Takes the hits meant for the bandits next to it, and rushes your line apart.",
+            Weight = Weight.Huge, Abilities = A(Ability.Guard, Ability.BullRush), Role = "Takes the hits meant for the bandits next to it, and rushes your line apart.",
         };
 
         // ---------- Elementals ----------
 
         public static readonly UnitStats Shard = new UnitStats(UnitKind.Shard, "Shard", 5, 2, 1, 1)
         {
-            Role = "Half of an Elemental.",
+            Weight = Weight.Small, Role = "Half of an Elemental.",
         };
 
         public static readonly UnitStats Elemental = new UnitStats(UnitKind.Elemental, "Elemental", 10, 3, 1, 1)
         {
-            SplitsInto = Shard, Abilities = A(Ability.Upheaval),
+            Weight = Weight.Huge, SplitsInto = Shard, Abilities = A(Ability.Upheaval),
             Role = "Throws your units out of line with the ground beneath them. When it dies it splits into 2 Shards (5 HP each).",
         };
 
@@ -494,7 +508,7 @@ namespace ArmyRoguelike.Core
                 return r;
             r = new UnitStats(s.Kind, "Bone " + s.Name, s.MaxHp, s.Damage, s.Range, s.MaxAp)
             {
-                Abilities = s.Abilities, LeavesRemains = true, BombCost = s.BombCost, BombDamage = s.BombDamage, BombRange = s.BombRange,
+                Weight = s.Weight, Abilities = s.Abilities, LeavesRemains = true, BombCost = s.BombCost, BombDamage = s.BombDamage, BombRange = s.BombRange,
                 Role = $"Raised {s.Name}. Leaves a bone pile; the Necromancer can raise it again.", IsUndead = true,
             };
             RaisedCache[s] = r;
@@ -513,7 +527,7 @@ namespace ArmyRoguelike.Core
                 return r;
             r = new UnitStats(s.Kind, "Bone " + s.Name, s.MaxHp, s.Damage, s.Has(Ability.LongReach) ? 1 : s.Range, 1)
             {
-                Abilities = s.Has(Ability.Swift) ? A(Ability.Swift) : A(), Label = s.Label, LeavesRemains = true, IsUndead = true,
+                Weight = s.Weight, Abilities = s.Has(Ability.Swift) ? A(Ability.Swift) : A(), Label = s.Label, LeavesRemains = true, IsUndead = true,
                 Role = $"Your fallen {s.Name}, raised by the Necromancer. Only its basic attack; leaves a bone pile it can raise again.",
             };
             HarvestedCache[s] = r;
@@ -522,14 +536,14 @@ namespace ArmyRoguelike.Core
 
         public static readonly UnitStats Goblin = new UnitStats(UnitKind.Goblin, "Goblin", 5, 2, 1, 1)
         {
-            Abilities = A(Ability.Swift, Ability.Slippery, Ability.Fling),
+            Weight = Weight.Small, Abilities = A(Ability.Swift, Ability.Slippery, Ability.Fling),
             Role = "Slips past your line and flings its friends, and your own explosives, at you.",
         };
 
         /// <summary>Lobs bombs that explode at the start of the next enemy turn. Stabs for 1 up close.</summary>
         public static readonly UnitStats GoblinBomber = new UnitStats(UnitKind.GoblinBomber, "Goblin Bomber", 4, 1, 1, 1)
         {
-            BombCost = 1, BombDamage = 3, BombRange = 3, Abilities = A(Ability.PowderKeg),
+            Weight = Weight.Small, BombCost = 1, BombDamage = 3, BombRange = 3, Abilities = A(Ability.PowderKeg),
             Role = "Lobs a bomb onto a unit 2-3 tiles away; it explodes on that tile at the start of the next enemy turn. Keeps its distance, and blows up when it dies.",
         };
 

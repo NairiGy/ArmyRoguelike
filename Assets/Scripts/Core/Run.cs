@@ -165,6 +165,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>A fight won: picking a technique for one unit, or skipping it for gold.</summary>
         Reward,
+
+        /// <summary>The army is over its limit (Third Wheel just taken): choosing who stays.</summary>
+        Dismiss,
         Won,
         Lost,
     }
@@ -185,6 +188,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Items for sale in a shop, next to the techniques.</summary>
         public const int ShopItemCount = 3;
         public const int DraftSize = 3;
+        /// <summary>Most units in the army without banners; see <see cref="ArmyLimit"/>.</summary>
         public const int MaxArmySize = 4;
         public const int RecruitPrice = 15;
         public const int Steps = 12;
@@ -215,7 +219,7 @@ namespace ArmyRoguelike.Core
         public readonly int Seed;
         public readonly List<ArmyMember> Army = new List<ArmyMember>();
 
-        public int Gold { get; private set; }
+        public int Gold { get; internal set; }
 
         /// <summary>The map step the player is on or choosing from (0-based).</summary>
         public int StepIndex { get; private set; }
@@ -263,6 +267,114 @@ namespace ArmyRoguelike.Core
             _rng = new Random(seed);
             GenerateMap();
             ResolveStep();
+            // Its own random source, so the map and events a seed gives stay the same.
+            var bannerRng = new Random(seed ^ 0x5bd1e995);
+            _startBanners.AddRange(Core.Banners.All.OrderBy(_ => bannerRng.Next()).Take(Core.Banners.StartChoices));
+        }
+
+        // ---------- Banners ----------
+
+        private readonly List<Banner> _banners = new List<Banner>();
+        private readonly List<Banner> _startBanners = new List<Banner>();
+
+        /// <summary>The army's banners, in the order taken.</summary>
+        public IReadOnlyList<Banner> Banners => _banners;
+
+        public bool HasBanner(Banner banner) => _banners.Contains(banner);
+
+        /// <summary>The banners offered at the start of the run, before the draft.</summary>
+        public IReadOnlyList<Banner> StartBanners => _startBanners;
+
+        /// <summary>The starting banner has been picked (or there was nothing to pick).</summary>
+        public bool StartBannerChosen => _banners.Count > 0 || _startBanners.Count == 0;
+
+        /// <summary>Most units the army can hold: 4, or 2 with Third Wheel.</summary>
+        public int ArmyLimit => HasBanner(Banner.ThirdWheel) ? Core.Banners.ThirdWheelArmySize : MaxArmySize;
+
+        /// <summary>Units picked in the draft: 3, or fewer if the army limit is lower.</summary>
+        public int DraftCount => Math.Min(DraftSize, ArmyLimit);
+
+        /// <summary>Picks the starting banner, before the draft.</summary>
+        public bool ChooseStartBanner(Banner banner)
+        {
+            if (State != RunState.Draft || StartBannerChosen || !_startBanners.Contains(banner))
+                return false;
+            _banners.Add(banner);
+            return true;
+        }
+
+        /// <summary>Banners the army doesn't hold yet, in random order.</summary>
+        private List<Banner> UnownedBanners() => Core.Banners.All.Where(b => !HasBanner(b)).OrderBy(_ => _rng.Next()).ToList();
+
+        // Where the run goes after the army is cut down to its limit.
+        private RunState _afterDismiss;
+
+        /// <summary>
+        /// Takes a banner mid-run. If the army is now over its limit (Third Wheel), the run waits in
+        /// <see cref="RunState.Dismiss"/> for the player to choose who stays, then goes on to <paramref name="next"/>.
+        /// </summary>
+        private void GainBanner(Banner banner, RunState next)
+        {
+            _banners.Add(banner);
+            if (Army.Count > ArmyLimit)
+            {
+                _afterDismiss = next;
+                State = RunState.Dismiss;
+            }
+            else
+            {
+                State = next;
+            }
+        }
+
+        /// <summary>Keeps exactly <see cref="ArmyLimit"/> members of the army; the rest leave.</summary>
+        public bool Dismiss(IReadOnlyList<ArmyMember> keep)
+        {
+            if (State != RunState.Dismiss || keep.Count != ArmyLimit || keep.Distinct().Count() != keep.Count || keep.Any(m => !Army.Contains(m)))
+                return false;
+            Army.RemoveAll(m => !keep.Contains(m));
+            State = _afterDismiss;
+            return true;
+        }
+
+        // ---------- Mercenaries ----------
+
+        private readonly List<UnitStats> _mercOffers = new List<UnitStats>();
+
+        /// <summary>Base units for hire before the coming fight (Mercenaries banner). Empty once decided.</summary>
+        public IReadOnlyList<UnitStats> MercOffers => _mercOffers;
+
+        /// <summary>A fight is about to start and the hire hasn't been decided yet.</summary>
+        public bool MercPending => State == RunState.Battle && CurrentBattle == null && _mercOffers.Count > 0;
+
+        /// <summary>The mercenary hired for the coming or current fight, or null.</summary>
+        public ArmyMember Merc { get; private set; }
+
+        public bool CanHire(UnitStats unit) => MercPending && _mercOffers.Contains(unit) && Gold >= Core.Banners.MercPrice;
+
+        /// <summary>Hires one of the offered units for the coming fight.</summary>
+        public bool HireMerc(UnitStats unit)
+        {
+            if (!CanHire(unit))
+                return false;
+            Gold -= Core.Banners.MercPrice;
+            Merc = new ArmyMember(unit);
+            _mercOffers.Clear();
+            return true;
+        }
+
+        /// <summary>Fights without a mercenary.</summary>
+        public void DeclineMerc() => _mercOffers.Clear();
+
+        /// <summary>Entering a fight: with Mercenaries, rolls who is for hire.</summary>
+        private void EnterBattle()
+        {
+            State = RunState.Battle;
+            CurrentBattle = null;
+            Merc = null;
+            _mercOffers.Clear();
+            if (HasBanner(Banner.Mercenaries))
+                _mercOffers.AddRange(UnitStats.BaseUnits.OrderBy(_ => _rng.Next()).Take(Core.Banners.MercOffers));
         }
 
         public IReadOnlyList<MapNode> CurrentChoices => _map[StepIndex];
@@ -271,10 +383,10 @@ namespace ArmyRoguelike.Core
 
         public IReadOnlyList<UnitStats> DraftPool => UnitStats.BaseUnits;
 
-        /// <summary>Starts the run with the chosen base units (3 different ones from the pool).</summary>
+        /// <summary>Starts the run with the chosen base units (<see cref="DraftCount"/> different ones from the pool).</summary>
         public bool Draft(IReadOnlyList<UnitStats> picks)
         {
-            if (State != RunState.Draft || picks.Count != DraftSize || picks.Distinct().Count() != DraftSize ||
+            if (State != RunState.Draft || picks.Count != DraftCount || picks.Distinct().Count() != DraftCount ||
                 picks.Any(p => !DraftPool.Contains(p)))
                 return false;
             Army.AddRange(picks.Select(p => new ArmyMember(p)));
@@ -381,7 +493,7 @@ namespace ArmyRoguelike.Core
                 case NodeKind.Ritual:
                 case NodeKind.Elite:
                     CurrentEncounter = CurrentNode.Encounter;
-                    State = RunState.Battle;
+                    EnterBattle();
                     break;
                 case NodeKind.Shop:
                     State = RunState.Shop;
@@ -410,11 +522,18 @@ namespace ArmyRoguelike.Core
         {
             if (State != RunState.Battle)
                 throw new InvalidOperationException($"Can't start a battle while in {State}.");
-            CurrentBattle = CurrentEncounter.CreateBattle(Army, _rng, Fought);
+            // Starting without deciding on a mercenary passes on the hire.
+            _mercOffers.Clear();
+            var fighters = Merc != null ? Army.Concat(new[] { Merc }).ToList() : Army;
+            CurrentBattle = CurrentEncounter.CreateBattle(fighters, _rng, Fought);
+            if (Merc != null)
+                CurrentBattle.MarkMercenary(Merc);
             if (Blessing.HasValue)
                 CurrentBattle.AddOmen(Blessing.Value, Team.Player);
             foreach (var curse in _curses)
                 CurrentBattle.AddOmen(curse, Team.Enemy);
+            foreach (var banner in _banners)
+                CurrentBattle.AddBanner(banner);
             return CurrentBattle;
         }
 
@@ -476,6 +595,7 @@ namespace ArmyRoguelike.Core
                 return false;
             member.Learn(technique);
             _rewardOffers.Clear();
+            RewardBanner = null;
             NextStep();
             return true;
         }
@@ -487,6 +607,7 @@ namespace ArmyRoguelike.Core
                 return;
             Gold += SkipGold;
             _rewardOffers.Clear();
+            RewardBanner = null;
             NextStep();
         }
 
@@ -517,6 +638,21 @@ namespace ArmyRoguelike.Core
             var battle = CurrentBattle;
             if (State != RunState.Battle || battle == null || !battle.IsOver)
                 throw new InvalidOperationException("The current battle isn't over.");
+
+            // The mercenary leaves after the fight, win or lose.
+            Merc = null;
+
+            // Loser: every army unit that fell grows for the rest of the run.
+            _lastLoserGains.Clear();
+            if (HasBanner(Banner.Loser))
+            {
+                foreach (var fallen in battle.Units.Where(u => u.Team == Team.Player && !u.IsAlive && u.Member != null && Army.Contains(u.Member)))
+                {
+                    fallen.Member.BonusMaxHp += Core.Banners.LoserHp;
+                    fallen.Member.BonusDamage += Core.Banners.LoserDamage;
+                    _lastLoserGains.Add(fallen.Member);
+                }
+            }
 
             if (battle.Phase == Phase.Defeat)
             {
@@ -551,14 +687,37 @@ namespace ArmyRoguelike.Core
                 return earned;
             }
 
-            // Every other won fight offers a technique pick on top of the gold; an elite's has a rare one.
+            // Every other won fight offers a technique pick on top of the gold; an elite's has a rare one,
+            // and a banner the army doesn't hold yet that can be taken instead.
             _rewardOffers.Clear();
             _rewardOffers.AddRange(RollTechniques(RewardCount, CurrentEncounter.IsElite));
-            if (_rewardOffers.Count > 0)
+            RewardBanner = CurrentEncounter.IsElite ? UnownedBanners().Cast<Banner?>().FirstOrDefault() : null;
+            if (_rewardOffers.Count > 0 || RewardBanner.HasValue)
                 State = RunState.Reward;
             else
                 NextStep();
             return earned;
+        }
+
+        private readonly List<ArmyMember> _lastLoserGains = new List<ArmyMember>();
+
+        /// <summary>Army members that fell in the last battle and grew from the Loser banner.</summary>
+        public IReadOnlyList<ArmyMember> LastLoserGains => _lastLoserGains;
+
+        /// <summary>After an elite: a banner that can be taken instead of a technique, or null.</summary>
+        public Banner? RewardBanner { get; internal set; }
+
+        /// <summary>Takes the elite's banner instead of a technique and moves on (via choosing who stays, if needed).</summary>
+        public bool TakeRewardBanner()
+        {
+            if (State != RunState.Reward || !RewardBanner.HasValue)
+                return false;
+            var banner = RewardBanner.Value;
+            _rewardOffers.Clear();
+            RewardBanner = null;
+            NextStep();
+            GainBanner(banner, RunState.Map);
+            return true;
         }
 
         // ---------- Shop ----------
@@ -606,7 +765,7 @@ namespace ArmyRoguelike.Core
             return true;
         }
 
-        public bool CanBuyRecruit => State == RunState.Shop && ShopRecruit != null && Gold >= RecruitPrice && Army.Count < MaxArmySize;
+        public bool CanBuyRecruit => State == RunState.Shop && ShopRecruit != null && Gold >= RecruitPrice && Army.Count < ArmyLimit;
 
         public bool BuyRecruit()
         {
@@ -618,6 +777,25 @@ namespace ArmyRoguelike.Core
             return true;
         }
 
+        /// <summary>The banner for sale in the current shop (one the army doesn't hold), or null.</summary>
+        public Banner? ShopBanner { get; internal set; }
+
+        public bool CanBuyBanner => State == RunState.Shop && ShopBanner.HasValue && Gold >= Core.Banners.Price;
+
+        /// <summary>Buys the shop's banner. With Third Wheel and too many units, choosing who stays comes first.</summary>
+        public bool BuyBanner()
+        {
+            if (!CanBuyBanner)
+                return false;
+            Gold -= Core.Banners.Price;
+            var banner = ShopBanner.Value;
+            ShopBanner = null;
+            GainBanner(banner, RunState.Shop);
+            if (Army.Count >= ArmyLimit)
+                ShopRecruit = null;
+            return true;
+        }
+
         public void LeaveShop()
         {
             if (State != RunState.Shop)
@@ -625,6 +803,7 @@ namespace ArmyRoguelike.Core
             _offers.Clear();
             _itemOffers.Clear();
             ShopRecruit = null;
+            ShopBanner = null;
             NextStep();
         }
 
@@ -634,7 +813,8 @@ namespace ArmyRoguelike.Core
             _offers.AddRange(RollTechniques(ShopSize, false));
             _itemOffers.Clear();
             _itemOffers.AddRange(Equipment.Catalog.OrderBy(_ => _rng.Next()).Take(ShopItemCount));
-            ShopRecruit = Army.Count < MaxArmySize ? UnitStats.BaseUnits[_rng.Next(UnitStats.BaseUnits.Count)] : null;
+            ShopRecruit = Army.Count < ArmyLimit ? UnitStats.BaseUnits[_rng.Next(UnitStats.BaseUnits.Count)] : null;
+            ShopBanner = UnownedBanners().Cast<Banner?>().FirstOrDefault();
         }
 
         // ---------- Events ----------
@@ -666,7 +846,7 @@ namespace ArmyRoguelike.Core
         {
             if (State != RunState.Event || CurrentEvent != EventKind.WanderingRecruit)
                 return;
-            if (Army.Count < MaxArmySize)
+            if (Army.Count < ArmyLimit)
             {
                 Army.Add(new ArmyMember(EventRecruit));
                 EventOutcome = $"The {EventRecruit.Name} joins your army.";
@@ -757,7 +937,7 @@ namespace ArmyRoguelike.Core
             CurrentEncounter = AmbushEncounter;
             IsAmbush = true;
             EventOutcome = "Ambush!";
-            State = RunState.Battle;
+            EnterBattle();
         }
 
         /// <summary>

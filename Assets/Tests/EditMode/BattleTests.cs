@@ -85,6 +85,7 @@ namespace ArmyRoguelike.Tests
             Assert.IsFalse(b.CanStillAct(rogue));
 
             var brute = Enemy(b);
+            rogue.Hp = 20; // small: the Bull Rush throws it into the edge, which would kill it
             b.EndPlayerTurn();
             Assert.AreEqual(new GridPos(3, 2), brute.Pos, "the brute hit back and stayed");
             Assert.IsTrue(brute.ActedThisTurn);
