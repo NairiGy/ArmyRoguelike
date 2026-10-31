@@ -16,9 +16,9 @@ namespace ArmyRoguelike.View
         /// Where the battle takes place. TowerSky builds a tower from pieces in front of a flat sky picture;
         /// the others are single isometric paintings whose empty central platform the board is fitted onto.
         /// </summary>
-        public enum Setting { TowerSky, IsoTower, IsoTemple, IsoGraveyard, IsoVoid, IsoFields }
+        public enum Setting { TowerSky, IsoTower, IsoTemple, IsoGraveyard, IsoVoid, IsoFields, IsoSea }
 
-        public static readonly string[] PaletteNames = { "Amber dusk", "Toxic green", "Cold night", "Void", "Harvest" };
+        public static readonly string[] PaletteNames = { "Amber dusk", "Toxic green", "Cold night", "Void", "Harvest", "Storm stone" };
 
         /// <summary>What battles use: the isometric tower at night. The other settings and palettes are kept for later.</summary>
         public const Setting MainSetting = Setting.IsoTower;
@@ -33,6 +33,9 @@ namespace ArmyRoguelike.View
         /// <summary>Fortune's Favored battles: the tower over golden wheat fields in daylight.</summary>
         public const int FieldsPalette = 4;
 
+        /// <summary>Storm battles: the tower over a stormy sea, in cold wet stone.</summary>
+        public const int SeaPalette = 5;
+
         /// <summary>Colour painted statues through their team's ramp of the current palette, so units match the scene.</summary>
         public static bool StatueRamps = true;
 
@@ -45,6 +48,7 @@ namespace ArmyRoguelike.View
             new[] { "#2a2030", "#6a5060", "#b08a80", "#e6c0a0", "#fff0d8" },
             new[] { "#241e30", "#5a4e6a", "#9c8ea8", "#d8cce0", "#fbf6ff" },
             new[] { "#2a1a12", "#6b4a2e", "#b08850", "#e8c88a", "#fff0c8" },
+            new[] { "#2a2030", "#6a5060", "#b08a80", "#e6c0a0", "#fff0d8" },
         };
 
         /// <summary>Player ramp choices for the night palette, and which one to use (-1 = the palette's own).</summary>
@@ -94,6 +98,7 @@ namespace ArmyRoguelike.View
             new[] { "#10141e", "#222e40", "#3a4a60", "#5e7290", "#90a4c0" },
             new[] { "#100e1a", "#231e36", "#3b3452", "#5f5678", "#9288b0" },
             new[] { "#140f0c", "#2e2420", "#4c3e36", "#74624e", "#a89276" },
+            new[] { "#10141e", "#222e40", "#3a4a60", "#5e7290", "#90a4c0" },
         };
 
         /// <summary>
@@ -148,9 +153,12 @@ namespace ArmyRoguelike.View
             public bool Void;
             public float FadeFrom, FadeTo;
             public Vector3 Hole;
-            // Daylight over farmland: Texture is the land far below in full colour, filling the screen behind the tower layer,
-            // whose walls fade into the haze from FadeFrom to FadeTo; cloud shadows and gusts sweep the fields.
-            public bool Fields;
+            // Land or sea far below: Texture is a full-colour painting filling the screen behind the tower layer,
+            // whose walls fade into haze of brightness Haze from FadeFrom to FadeTo; cloud shadows and gusts sweep it.
+            public bool FarBelow;
+            public float Haze;
+            // No braziers lit.
+            public bool Daylight;
         }
 
         private static readonly Dictionary<Setting, IsoScene> IsoScenes = new Dictionary<Setting, IsoScene>
@@ -160,11 +168,9 @@ namespace ArmyRoguelike.View
             [Setting.IsoGraveyard] = new IsoScene { Texture = "Backdrops/iso_graveyard", Top = new Vector2(840, 210), Left = new Vector2(325, 470), Bottom = new Vector2(905, 765), Right = new Vector2(1330, 490) },
             // The void painting is framed like the tower painting, so the tower layer fits it as it is.
             [Setting.IsoVoid] = new IsoScene { Texture = "Backdrops/void_backdrop", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", Void = true, FadeFrom = 640, FadeTo = 770, Hole = new Vector3(415, 191, 57) },
-            [Setting.IsoFields] = new IsoScene { Texture = "Backdrops/wheat_backdrop_colour", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", Fields = true, FadeFrom = 620, FadeTo = 800 },
+            [Setting.IsoFields] = new IsoScene { Texture = "Backdrops/wheat_backdrop_colour", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", FarBelow = true, Daylight = true, Haze = 0.72f, FadeFrom = 620, FadeTo = 800 },
+            [Setting.IsoSea] = new IsoScene { Texture = "Backdrops/sea_backdrop", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", FarBelow = true, Haze = 0.55f, FadeFrom = 620, FadeTo = 800 },
         };
-
-        /// <summary>How bright the haze far below the tower is, over the fields.</summary>
-        private const float FieldsHaze = 0.72f;
 
         /// <summary>The ring image's empty middle, as a fraction of its width: fitted over the painted hole.</summary>
         private const float RingHoleFraction = 0.235f;
@@ -179,6 +185,8 @@ namespace ArmyRoguelike.View
             new[] { "#05040a", "#151129", "#2b2347", "#4a3f68", "#7a6e98", "#e6cf9a" },
             // Harvest: sunlit stone over coloured fields (the land keeps its own colours), warm greys up to near-white.
             new[] { "#1e1a16", "#3e3832", "#6a6056", "#988a78", "#c8b89c", "#fff6e2" },
+            // Storm stone: cold wet greys over the stormy sea, up to the white of foam and cloud.
+            new[] { "#0e1114", "#22282d", "#3e464d", "#626b72", "#959ea4", "#e8ecee" },
         };
 
         private const float WallDepth = 2f;
@@ -219,6 +227,11 @@ namespace ArmyRoguelike.View
             {
                 setting = Setting.IsoFields;
                 palette = FieldsPalette;
+            }
+            else if (setting == MainSetting && board.Battle.Field == Battlefield.Storm)
+            {
+                setting = Setting.IsoSea;
+                palette = SeaPalette;
             }
 
             var p =((palette % Palettes.Length) + Palettes.Length) % Palettes.Length;
@@ -290,7 +303,7 @@ namespace ArmyRoguelike.View
                         Sample(stops, 1f), new[] { corners.top, corners.left, corners.bottom, corners.right }, centre, viewW, viewH,
                         BackdropOrder + 1, BackCloudOrder, TowerLayerOrder + 1);
                 }
-                else if (scene.Fields && tower != null && wispy != null)
+                else if (scene.FarBelow && tower != null && wispy != null)
                 {
                     // The land far below fills the screen (it needn't line up with the tower), in its own colours
                     // rather than the palette: blue river, green hedges, white clouds. Thin cloud drifts between it
@@ -310,7 +323,7 @@ namespace ArmyRoguelike.View
                     SceneryFields.Create(root, centre, viewW, viewH, stops[0], Sample(stops, 1f), BackdropOrder + 1);
                     CloudBand(root, "Wisps below", NewMaterial(shader, wispy, ramp), BackCloudOrder, centre.x, viewW, screenBottom - 0.2f, 1.6f, 1f, 0.003f, 0.55f);
                     BuildIsoScene(root, board, scene, NewMaterial(shader, tower, ramp), TowerLayerOrder,
-                        (scene.FadeFrom, new Color(1f, 0f, FieldsHaze, 1f)), (scene.FadeTo, new Color(1f, 1f, FieldsHaze, 1f)));
+                        (scene.FadeFrom, new Color(1f, 0f, scene.Haze, 1f)), (scene.FadeTo, new Color(1f, 1f, scene.Haze, 1f)));
                 }
                 else if (scene.Clouds && tower != null && sky != null && puffy != null && wispy != null)
                 {
@@ -335,7 +348,7 @@ namespace ArmyRoguelike.View
                     BuildIsoScene(root, board, scene, NewMaterial(shader, Resources.Load<Texture2D>(scene.Texture), ramp));
 
                 // Dust motes at night; chaff blown up from the fields by day.
-                if (scene.Clouds || scene.Fields)
+                if (scene.Clouds || scene.FarBelow)
                     SceneryMotes.Create(root, centre, viewW, viewH, Sample(stops, 0.95f));
 
                 var art = scene.ArtFolder != null ? Resources.LoadAll<Sprite>(scene.ArtFolder) : new Sprite[0];
@@ -355,7 +368,7 @@ namespace ArmyRoguelike.View
                         board.SetRockArt(rocks, spriteMaterial, new Color(1f, 0.55f, 1f, 1f));
                     var brazier = System.Array.Find(art, s => s.name == "brazier");
                     // No fires lit in daylight.
-                    if (Braziers && brazier != null && !scene.Fields)
+                    if (Braziers && brazier != null && !scene.Daylight)
                         BuildBraziers(root, board, brazier, spriteMaterial);
                     return;
                 }

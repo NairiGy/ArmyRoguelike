@@ -3,8 +3,8 @@ using UnityEngine;
 namespace ArmyRoguelike.View
 {
     /// <summary>
-    /// What moves over the fields far below the tower by day: soft cloud shadows drift across the land with
-    /// the wind, and faint gusts run through the wheat as pale streaks.
+    /// What moves over the land or sea far below the tower: soft cloud shadows drift across it with the
+    /// wind, and faint gusts run through the wheat (or over the waves) as pale streaks.
     /// </summary>
     public sealed class SceneryFields : MonoBehaviour
     {
