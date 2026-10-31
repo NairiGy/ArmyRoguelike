@@ -16,9 +16,9 @@ namespace ArmyRoguelike.View
         /// Where the battle takes place. TowerSky builds a tower from pieces in front of a flat sky picture;
         /// the others are single isometric paintings whose empty central platform the board is fitted onto.
         /// </summary>
-        public enum Setting { TowerSky, IsoTower, IsoTemple, IsoGraveyard, IsoVoid }
+        public enum Setting { TowerSky, IsoTower, IsoTemple, IsoGraveyard, IsoVoid, IsoFields }
 
-        public static readonly string[] PaletteNames = { "Amber dusk", "Toxic green", "Cold night", "Void" };
+        public static readonly string[] PaletteNames = { "Amber dusk", "Toxic green", "Cold night", "Void", "Harvest" };
 
         /// <summary>What battles use: the isometric tower at night. The other settings and palettes are kept for later.</summary>
         public const Setting MainSetting = Setting.IsoTower;
@@ -29,6 +29,9 @@ namespace ArmyRoguelike.View
         /// black hole, with no clouds below, in the void palette.
         /// </summary>
         public const int VoidPalette = 3;
+
+        /// <summary>Fortune's Favored battles: the tower over golden wheat fields in daylight.</summary>
+        public const int FieldsPalette = 4;
 
         /// <summary>Colour painted statues through their team's ramp of the current palette, so units match the scene.</summary>
         public static bool StatueRamps = true;
@@ -41,6 +44,7 @@ namespace ArmyRoguelike.View
             new[] { "#2a2620", "#6a6048", "#b0a478", "#e2d8b0", "#fbf6e0" },
             new[] { "#2a2030", "#6a5060", "#b08a80", "#e6c0a0", "#fff0d8" },
             new[] { "#241e30", "#5a4e6a", "#9c8ea8", "#d8cce0", "#fbf6ff" },
+            new[] { "#2a1a12", "#6b4a2e", "#b08850", "#e8c88a", "#fff0c8" },
         };
 
         /// <summary>Player ramp choices for the night palette, and which one to use (-1 = the palette's own).</summary>
@@ -89,6 +93,7 @@ namespace ArmyRoguelike.View
             new[] { "#14181c", "#2a3434", "#465652", "#6a8278", "#98b0a0" },
             new[] { "#10141e", "#222e40", "#3a4a60", "#5e7290", "#90a4c0" },
             new[] { "#100e1a", "#231e36", "#3b3452", "#5f5678", "#9288b0" },
+            new[] { "#140f0c", "#2e2420", "#4c3e36", "#74624e", "#a89276" },
         };
 
         /// <summary>
@@ -143,6 +148,9 @@ namespace ArmyRoguelike.View
             public bool Void;
             public float FadeFrom, FadeTo;
             public Vector3 Hole;
+            // Daylight over farmland: Texture is the land far below, filling the screen behind the tower layer,
+            // whose walls fade into the haze from FadeFrom to FadeTo; cloud shadows and gusts sweep the fields.
+            public bool Fields;
         }
 
         private static readonly Dictionary<Setting, IsoScene> IsoScenes = new Dictionary<Setting, IsoScene>
@@ -152,7 +160,11 @@ namespace ArmyRoguelike.View
             [Setting.IsoGraveyard] = new IsoScene { Texture = "Backdrops/iso_graveyard", Top = new Vector2(840, 210), Left = new Vector2(325, 470), Bottom = new Vector2(905, 765), Right = new Vector2(1330, 490) },
             // The void painting is framed like the tower painting, so the tower layer fits it as it is.
             [Setting.IsoVoid] = new IsoScene { Texture = "Backdrops/void_backdrop", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", Void = true, FadeFrom = 640, FadeTo = 770, Hole = new Vector3(415, 191, 57) },
+            [Setting.IsoFields] = new IsoScene { Texture = "Backdrops/wheat_backdrop", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", Fields = true, FadeFrom = 620, FadeTo = 800 },
         };
+
+        /// <summary>How bright the haze far below the tower is, over the fields.</summary>
+        private const float FieldsHaze = 0.72f;
 
         /// <summary>The ring image's empty middle, as a fraction of its width: fitted over the painted hole.</summary>
         private const float RingHoleFraction = 0.235f;
@@ -165,6 +177,8 @@ namespace ArmyRoguelike.View
             new[] { "#0b0f18", "#16223a", "#25384f", "#3a5268", "#5c7486", "#c48d8c" },
             // Void: black through indigo and violet stone to the pale gold of the light around the hole.
             new[] { "#05040a", "#151129", "#2b2347", "#4a3f68", "#7a6e98", "#e6cf9a" },
+            // Harvest: daylight over ripe wheat, warm browns rising through gold to sunlit cream.
+            new[] { "#22170e", "#4e3820", "#86643a", "#bb9552", "#dfbd78", "#fff0c6" },
         };
 
         private const float WallDepth = 2f;
@@ -200,6 +214,11 @@ namespace ArmyRoguelike.View
             {
                 setting = Setting.IsoVoid;
                 palette = VoidPalette;
+            }
+            else if (setting == MainSetting && board.Battle.Field == Battlefield.FortunesFavored)
+            {
+                setting = Setting.IsoFields;
+                palette = FieldsPalette;
             }
 
             var p =((palette % Palettes.Length) + Palettes.Length) % Palettes.Length;
@@ -259,8 +278,8 @@ namespace ArmyRoguelike.View
                     // ring of light turning over the painted hole; debris drifts in, specks peel off the roof.
                     var voidMaterial = NewMaterial(shader, Resources.Load<Texture2D>(scene.Texture), ramp);
                     // The painting stops short of the screen's top: its top rows fade into the background colour.
-                    BuildIsoScene(root, board, scene, voidMaterial, BackdropOrder, (0f, 0f), (140f, 1f));
-                    BuildIsoScene(root, board, scene, NewMaterial(shader, tower, ramp), TowerLayerOrder, (scene.FadeFrom, 1f), (scene.FadeTo, 0f));
+                    BuildIsoScene(root, board, scene, voidMaterial, BackdropOrder, (0f, Value(1f, 0f)), (140f, Value(1f)));
+                    BuildIsoScene(root, board, scene, NewMaterial(shader, tower, ramp), TowerLayerOrder, (scene.FadeFrom, Value(1f)), (scene.FadeTo, Value(1f, 0f)));
                     var map = ImageToWorld(board, scene);
                     var hole = map(scene.Hole.x, scene.Hole.y);
                     var holeRadius = (map(scene.Hole.x + scene.Hole.z, scene.Hole.y) - hole).magnitude;
@@ -270,6 +289,26 @@ namespace ArmyRoguelike.View
                         rockArt, NewMaterial(shader, Texture2D.whiteTexture, ramp), new Material(Resources.Load<Shader>("Shaders/Glow")),
                         Sample(stops, 1f), new[] { corners.top, corners.left, corners.bottom, corners.right }, centre, viewW, viewH,
                         BackdropOrder + 1, BackCloudOrder, TowerLayerOrder + 1);
+                }
+                else if (scene.Fields && tower != null && wispy != null)
+                {
+                    // The land far below fills the screen (it needn't line up with the tower); thin cloud drifts
+                    // between it and the tower, whose walls sink into the bright haze.
+                    var land = Resources.Load<Texture2D>(scene.Texture);
+                    if (land != null)
+                    {
+                        var aspect = (float)land.width / land.height;
+                        var w = Mathf.Max(viewW, viewH * aspect) * 1.04f;
+                        var h = w / aspect;
+                        var bl = centre - new Vector2(w, h) * 0.5f;
+                        Quad(root, "Land", NewMaterial(shader, land, ramp), BackdropOrder, bl, bl + new Vector2(w, 0f), bl + new Vector2(w, h), bl + new Vector2(0f, h), Value(1f));
+                    }
+
+                    var screenBottom = centre.y - viewH * 0.5f;
+                    SceneryFields.Create(root, centre, viewW, viewH, stops[0], Sample(stops, 1f), BackdropOrder + 1);
+                    CloudBand(root, "Wisps below", NewMaterial(shader, wispy, ramp), BackCloudOrder, centre.x, viewW, screenBottom - 0.2f, 1.6f, 1f, 0.003f, 0.55f);
+                    BuildIsoScene(root, board, scene, NewMaterial(shader, tower, ramp), TowerLayerOrder,
+                        (scene.FadeFrom, new Color(1f, 0f, FieldsHaze, 1f)), (scene.FadeTo, new Color(1f, 1f, FieldsHaze, 1f)));
                 }
                 else if (scene.Clouds && tower != null && sky != null && puffy != null && wispy != null)
                 {
@@ -293,7 +332,8 @@ namespace ArmyRoguelike.View
                 else
                     BuildIsoScene(root, board, scene, NewMaterial(shader, Resources.Load<Texture2D>(scene.Texture), ramp));
 
-                if (scene.Clouds)
+                // Dust motes at night; chaff blown up from the fields by day.
+                if (scene.Clouds || scene.Fields)
                     SceneryMotes.Create(root, centre, viewW, viewH, Sample(stops, 0.95f));
 
                 var art = scene.ArtFolder != null ? Resources.LoadAll<Sprite>(scene.ArtFolder) : new Sprite[0];
@@ -312,7 +352,8 @@ namespace ArmyRoguelike.View
                     if (rocks.Length > 0)
                         board.SetRockArt(rocks, spriteMaterial, new Color(1f, 0.55f, 1f, 1f));
                     var brazier = System.Array.Find(art, s => s.name == "brazier");
-                    if (Braziers && brazier != null)
+                    // No fires lit in daylight.
+                    if (Braziers && brazier != null && !scene.Fields)
                         BuildBraziers(root, board, brazier, spriteMaterial);
                     return;
                 }
@@ -357,9 +398,12 @@ namespace ArmyRoguelike.View
         /// Places an isometric painting so its platform lies under the board: the best affine fit of the
         /// platform's four corners onto the board's four corners (the painting's angle is never exactly 2:1).
         /// </summary>
-        /// <param name="fades">Optional (image row, opacity) pairs, top to bottom: the painting's opacity runs between them.</param>
+        /// <param name="fades">
+        /// Optional (image row, vertex colour) pairs, top to bottom: the painting's opacity and haze (see
+        /// <see cref="Value"/>, <see cref="Haze"/>) blend between them.
+        /// </param>
         private static void BuildIsoScene(Transform root, BoardView board, IsoScene scene, Material material, int order = BackdropOrder,
-            params (float row, float alpha)[] fades)
+            params (float row, Color color)[] fades)
         {
             var tex = (Texture2D)material.mainTexture;
             if (tex == null)
@@ -372,22 +416,22 @@ namespace ArmyRoguelike.View
                 return;
             }
 
-            // Horizontal bands from the image's top to its bottom, opacity blending between the given rows.
-            var stops = new List<(float row, float alpha)> { (0f, fades[0].alpha) };
+            // Horizontal bands from the image's top to its bottom, colours blending between the given rows.
+            var stops = new List<(float row, Color color)> { (0f, fades[0].color) };
             stops.AddRange(fades);
-            stops.Add((tex.height, fades[fades.Length - 1].alpha));
+            stops.Add((tex.height, fades[fades.Length - 1].color));
             var vertices = new Vector3[stops.Count * 2];
             var uv = new Vector2[stops.Count * 2];
             var colors = new Color[stops.Count * 2];
             var triangles = new List<int>();
             for (var i = 0; i < stops.Count; i++)
             {
-                var (row, alpha) = stops[i];
+                var (row, color) = stops[i];
                 vertices[i * 2] = map(0, row);
                 vertices[i * 2 + 1] = map(tex.width, row);
                 uv[i * 2] = new Vector2(0f, 1f - row / tex.height);
                 uv[i * 2 + 1] = new Vector2(1f, 1f - row / tex.height);
-                colors[i * 2] = colors[i * 2 + 1] = new Color(1f, 0f, 0f, alpha);
+                colors[i * 2] = colors[i * 2 + 1] = color;
                 if (i > 0)
                     triangles.AddRange(new[] { i * 2 - 2, i * 2, i * 2 + 1, i * 2 - 2, i * 2 + 1, i * 2 - 1 });
             }
@@ -556,7 +600,7 @@ namespace ArmyRoguelike.View
 
         // ---------- Helpers ----------
 
-        private static Color Value(float v) => new Color(v, 0f, 0f, 1f);
+        private static Color Value(float v, float alpha = 1f) => new Color(v, 0f, 0f, alpha);
 
         /// <summary>Vertex colour for the bottom of a wall: fully faded into the haze.</summary>
         private static Color Haze(float v) => new Color(v, 1f, HazeValue, 1f);
