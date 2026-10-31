@@ -559,4 +559,52 @@ namespace ArmyRoguelike.Core
 
         public override Unit Actor => null;
     }
+
+    /// <summary>
+    /// Edge of the World: a push sent the unit off the board. It slid to <see cref="Edge"/> (shown by the push before
+    /// this) and dropped off towards <see cref="Beyond"/>, dead.
+    /// </summary>
+    public sealed class FallEvent : BattleEvent
+    {
+        public readonly Unit Unit;
+        public readonly Unit Pusher;
+        public readonly GridPos Edge;
+        public readonly GridPos Beyond;
+        public readonly Hit Hit;
+
+        public FallEvent(Unit unit, Unit pusher, GridPos edge, GridPos beyond, Hit hit)
+        {
+            Unit = unit;
+            Pusher = pusher;
+            Edge = edge;
+            Beyond = beyond;
+            Hit = hit;
+        }
+
+        public override Unit Actor => Pusher;
+    }
+
+    /// <summary>
+    /// The battlefield took effect at the start of the player's turn: a storm mark under a unit, or a unit favored by
+    /// fortune. The lightning itself strikes later as an <see cref="ExplosionEvent"/> ("lightning").
+    /// </summary>
+    public sealed class FieldEvent : BattleEvent
+    {
+        public readonly Battlefield Field;
+
+        /// <summary>The unit marked or favored.</summary>
+        public readonly Unit Unit;
+
+        /// <summary>The marked tiles (empty for a favored unit).</summary>
+        public readonly IReadOnlyList<GridPos> Tiles;
+
+        public FieldEvent(Battlefield field, Unit unit, IReadOnlyList<GridPos> tiles)
+        {
+            Field = field;
+            Unit = unit;
+            Tiles = tiles;
+        }
+
+        public override Unit Actor => null;
+    }
 }

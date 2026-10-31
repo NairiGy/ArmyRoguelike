@@ -199,11 +199,15 @@ namespace ArmyRoguelike.Core
         public bool Ready(Unit unit, ActionKind action) =>
             unit.CooldownLeft(action) <= (unit.Team == Team.Enemy && Phase != Phase.EnemyTurn ? 1 : 0);
 
+        /// <summary>The action's cooldown in this battle: Arcane Overflow cuts it, down to 1.</summary>
+        public int CooldownIn(ActionKind action) =>
+            Field == Battlefield.ArcaneOverflow ? Math.Max(1, Cooldown(action) - Battlefields.CooldownCut) : Cooldown(action);
+
         /// <summary>Pays for an action and puts it on cooldown.</summary>
-        private static void UseUp(Unit unit, ActionKind action)
+        private void UseUp(Unit unit, ActionKind action)
         {
             SpendAp(unit, ActionCost(action));
-            unit.StartCooldown(action, Cooldown(action));
+            unit.StartCooldown(action, CooldownIn(action));
             unit.CountUse(action);
         }
 
@@ -347,6 +351,132 @@ namespace ArmyRoguelike.Core
         /// <summary>Puts an omen in play for this battle, helping <paramref name="side"/>. Call before the battle starts.</summary>
         public void AddOmen(Omen omen, Team side) => _omens.Add((omen, side));
 
+        // ---------- Battlefield ----------
+
+        private readonly List<GridPos> _stormMarks = new List<GridPos>();
+
+        /// <summary>This fight's battlefield rule, or null for none.</summary>
+        public Battlefield? Field { get; private set; }
+
+        /// <summary>Sets the battlefield rule. Call before the battle starts.</summary>
+        public void SetField(Battlefield? field) => Field = field;
+
+        /// <summary>Tiles lightning will strike at the end of the enemy turn (Storm).</summary>
+        public IReadOnlyList<GridPos> StormMarks => _stormMarks;
+
+        /// <summary>What's On His Mind?: enemy intents aren't shown.</summary>
+        public bool IntentsHidden => Field == Battlefield.HiddenMinds;
+
+        /// <summary>A push that runs off the board kills (Edge of the World).</summary>
+        public bool EdgeKills => Field == Battlefield.EdgeOfTheWorld;
+
+        /// <summary>
+        /// Where a push from the attacker's side would send the unit: whether it would fall off the board
+        /// (Edge of the World) if pushed along <paramref name="dir"/> now. For the AI and the hover.
+        /// </summary>
+        public bool WouldFall(Unit unit, GridPos dir, Unit pusher)
+        {
+            if (!EdgeKills || !unit.IsAlive || unit.IsObjective || unit.Has(Ability.Colossus) || unit.Size > 1)
+                return false;
+            var p = unit.Pos;
+            for (var step = 0; step < PushDistance(unit, pusher); step++)
+            {
+                var to = p + dir;
+                if (!Board.InBounds(to))
+                    return true;
+                if (!CanStand(unit, to))
+                    return false;
+                p = to;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Edge of the World: the unit drops off the tower. It dies outright (no shield, Guard or Lucky Charm saves
+        /// it), leaves no bone pile and its Powder Keg doesn't go off; a Pack Leader's bond still breaks.
+        /// </summary>
+        private void Fall(Unit unit, Unit pusher, GridPos edge, GridPos dir, List<BattleEvent> events)
+        {
+            var hp = unit.Hp;
+            unit.Hp = 0;
+            unit.Fell = true;
+            unit.PileGone = true;
+            unit.Pos = edge;
+            var after = new List<BattleEvent>();
+            BreakPackBond(unit, after);
+            events.Add(new FallEvent(unit, pusher, edge, edge + dir, new Hit(unit, hp, 0)));
+            events.AddRange(after);
+            CheckEnd();
+        }
+
+        /// <summary>
+        /// Start of the player's turn: Storm marks the tile under a random unit of each side, and Fortune's Favored
+        /// picks a new favored unit on each side.
+        /// </summary>
+        private void ApplyField(List<BattleEvent> events)
+        {
+            if (IsOver)
+                return;
+            if (Field == Battlefield.Storm)
+            {
+                foreach (var team in new[] { Team.Player, Team.Enemy })
+                {
+                    var pool = Living(team).Where(u => !u.IsObjective).ToList();
+                    if (pool.Count == 0)
+                        continue;
+                    var unit = pool[Rng.Next(pool.Count)];
+                    var cells = Cells(unit).ToList();
+                    var tile = cells[Rng.Next(cells.Count)];
+                    if (_stormMarks.Contains(tile))
+                        continue;
+                    _stormMarks.Add(tile);
+                    events.Add(new FieldEvent(Battlefield.Storm, unit, new[] { tile }));
+                }
+            }
+
+            if (Field == Battlefield.FortunesFavored)
+            {
+                foreach (var u in _units)
+                    u.Favored = false;
+                foreach (var team in new[] { Team.Player, Team.Enemy })
+                {
+                    var pool = Living(team).Where(u => !u.IsObjective && u.Stats.Damage > 0).ToList();
+                    if (pool.Count == 0)
+                        continue;
+                    var unit = pool[Rng.Next(pool.Count)];
+                    unit.Favored = true;
+                    events.Add(new FieldEvent(Battlefield.FortunesFavored, unit, new GridPos[0]));
+                }
+            }
+        }
+
+        /// <summary>End of the enemy turn (Storm): lightning strikes each marked tile, hurting whoever stands there now.</summary>
+        private void StrikeStormMarks(List<BattleEvent> events)
+        {
+            foreach (var tile in _stormMarks.ToList())
+            {
+                if (IsOver)
+                    break;
+                var hits = new List<Hit>();
+                var after = new List<BattleEvent>();
+                var victim = UnitAt(tile);
+                if (victim != null)
+                    hits.Add(Damage(victim, Battlefields.StormDamage, null, DamageKind.Blast, after));
+                events.Add(new ExplosionEvent("lightning", null, tile, new[] { tile }, hits, 0));
+                events.AddRange(after);
+                CheckEnd();
+            }
+
+            _stormMarks.Clear();
+        }
+
+        /// <summary>Fortune's Favored doubles what a favored unit deals to the other side (attacks and blasts, not collisions).</summary>
+        private static int FavoredAmount(Unit source, Unit target, int amount, DamageKind kind) =>
+            source != null && source.Favored && source.Team != target.Team && (kind == DamageKind.Attack || kind == DamageKind.Blast)
+                ? amount * Battlefields.FavoredMultiplier
+                : amount;
+
         // ---------- Banners ----------
 
         private readonly HashSet<Banner> _banners = new HashSet<Banner>();
@@ -455,7 +585,7 @@ namespace ArmyRoguelike.Core
         private List<GridPos> ExplosionArea(string cause, GridPos center) => cause == "bomb" || cause == "mine" ? BombArea(center) : BlastArea(center);
 
         /// <summary>The orthogonal direction from one tile to another in the same row or column, else null.</summary>
-        private static GridPos? StraightDirection(GridPos from, GridPos to)
+        internal static GridPos? StraightDirection(GridPos from, GridPos to)
         {
             if (from == to)
                 return null;
@@ -612,6 +742,7 @@ namespace ArmyRoguelike.Core
                 // The opening shot only doubles the first strike.
                 if (i > 0 && attacker.Has(Ability.FirstShotDouble) && !attacker.HasStruck(target))
                     amount /= 2;
+                amount = FavoredAmount(attacker, target, amount, DamageKind.Attack);
                 if (IsShielded(target))
                     amount = Math.Max(1, amount - 1);
                 if (target.Has(Ability.Tough))
@@ -765,15 +896,24 @@ namespace ArmyRoguelike.Core
             return (cost, parent);
         }
 
-        /// <summary>Every anchor tile the unit can walk to with its remaining moves, with the move cost. Excludes its own tile.</summary>
+        /// <summary>
+        /// Every anchor tile the unit can walk to with its remaining moves, with the move cost. Excludes its own tile.
+        /// Enemies never stop on a storm mark.
+        /// </summary>
         public Dictionary<GridPos, int> GetReachable(Unit unit)
         {
             if (!CanMove(unit))
                 return new Dictionary<GridPos, int>();
             var routes = CheapestRoutes(unit, unit.Moves).cost;
             routes.Remove(unit.Pos);
+            if (unit.Team == Team.Enemy && _stormMarks.Count > 0)
+                foreach (var anchor in routes.Keys.Where(a => Footprint(a, unit.Size).Any(_stormMarks.Contains)).ToList())
+                    routes.Remove(anchor);
             return routes;
         }
+
+        /// <summary>The unit stands on a tile lightning will strike (Storm).</summary>
+        public bool OnStormMark(Unit unit) => _stormMarks.Count > 0 && Cells(unit).Any(_stormMarks.Contains);
 
         /// <summary>Cheapest path to an anchor tile within the unit's remaining moves, without the start tile. Null if unreachable.</summary>
         public List<GridPos> FindPath(Unit unit, GridPos target)
@@ -1167,6 +1307,14 @@ namespace ArmyRoguelike.Core
             {
                 var from = unit.Pos;
                 var to = from + dir;
+                if (EdgeKills && unit.Size == 1 && !Board.InBounds(to))
+                {
+                    if (from != start)
+                        events.Add(new PushEvent(unit, pusher, start, from, null));
+                    Fall(unit, pusher, from, dir, events);
+                    return;
+                }
+
                 if (!CanStand(unit, to))
                 {
                     if (from != start)
@@ -1464,6 +1612,10 @@ namespace ArmyRoguelike.Core
                 Phase = Phase.Victory;
                 return events;
             }
+
+            StrikeStormMarks(events);
+            if (IsOver)
+                return events;
 
             SpawnWaves(events);
 
@@ -1965,6 +2117,7 @@ namespace ArmyRoguelike.Core
         private Hit Damage(Unit target, int amount, Unit source, DamageKind kind, List<BattleEvent> after)
         {
             var hostile = source != null && source.Team != target.Team;
+            amount = FavoredAmount(source, target, amount, kind);
 
             if (kind == DamageKind.Attack && hostile)
             {
@@ -2261,7 +2414,10 @@ namespace ArmyRoguelike.Core
             }
 
             if (team == Team.Player)
+            {
                 ApplyOmens(events);
+                ApplyField(events);
+            }
 
             CheckEnd();
         }

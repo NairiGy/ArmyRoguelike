@@ -124,6 +124,9 @@ namespace ArmyRoguelike.Core
         /// <summary>A battle against a faction already beaten (every faction has been met), at normal strength.</summary>
         public bool IsRematch { get; internal set; }
 
+        /// <summary>The fight's battlefield rule, known from the start of the run. Null for scenario fights and other nodes.</summary>
+        public Battlefield? Field { get; internal set; }
+
         public MapNode(NodeKind kind, Encounter encounter = null)
         {
             Kind = kind;
@@ -270,6 +273,38 @@ namespace ArmyRoguelike.Core
             // Its own random source, so the map and events a seed gives stay the same.
             var bannerRng = new Random(seed ^ 0x5bd1e995);
             _startBanners.AddRange(Core.Banners.All.OrderBy(_ => bannerRng.Next()).Take(Core.Banners.StartChoices));
+            _fieldRng = new Random(seed ^ 0x2545f491);
+            AssignFields();
+        }
+
+        // ---------- Battlefields ----------
+
+        // Its own random source too, so adding battlefields didn't change the map a seed gives.
+        private readonly Random _fieldRng;
+
+        /// <summary>The battlefield of the fight being entered or fought, or null.</summary>
+        public Battlefield? CurrentField { get; private set; }
+
+        /// <summary>
+        /// Every battle, elite and boss node gets a random battlefield (scenario fights have their own rules). A step's
+        /// fights never repeat a battlefield from the step before, nor share one.
+        /// </summary>
+        private void AssignFields()
+        {
+            var last = new List<Battlefield>();
+            foreach (var step in _map)
+            {
+                var used = new List<Battlefield>();
+                foreach (var node in step.Where(n => n.Kind == NodeKind.Battle || n.Kind == NodeKind.Elite || n.Kind == NodeKind.Boss))
+                {
+                    var pool = Battlefields.All.Where(f => !last.Contains(f) && !used.Contains(f)).ToList();
+                    node.Field = pool[_fieldRng.Next(pool.Count)];
+                    used.Add(node.Field.Value);
+                }
+
+                if (used.Count > 0)
+                    last = used;
+            }
         }
 
         // ---------- Banners ----------
@@ -493,6 +528,7 @@ namespace ArmyRoguelike.Core
                 case NodeKind.Ritual:
                 case NodeKind.Elite:
                     CurrentEncounter = CurrentNode.Encounter;
+                    CurrentField = CurrentNode.Field;
                     EnterBattle();
                     break;
                 case NodeKind.Shop:
@@ -534,6 +570,7 @@ namespace ArmyRoguelike.Core
                 CurrentBattle.AddOmen(curse, Team.Enemy);
             foreach (var banner in _banners)
                 CurrentBattle.AddBanner(banner);
+            CurrentBattle.SetField(CurrentField);
             return CurrentBattle;
         }
 
@@ -935,6 +972,7 @@ namespace ArmyRoguelike.Core
             }
 
             CurrentEncounter = AmbushEncounter;
+            CurrentField = Battlefields.All[_fieldRng.Next(Battlefields.All.Count)];
             IsAmbush = true;
             EventOutcome = "Ambush!";
             EnterBattle();

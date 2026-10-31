@@ -128,6 +128,12 @@ namespace ArmyRoguelike.Core
         /// <summary>Left the board (a cutpurse that got away). No longer in the battle.</summary>
         public bool Escaped { get; internal set; }
 
+        /// <summary>Fell off the board (Edge of the World). Dead, with no bone pile.</summary>
+        public bool Fell { get; internal set; }
+
+        /// <summary>Fortune's Favored: deals double damage until the next player turn.</summary>
+        public bool Favored { get; internal set; }
+
         public Unit(int id, Team team, UnitStats stats, ArmyMember member = null, Unit summoner = null)
         {
             Id = id;

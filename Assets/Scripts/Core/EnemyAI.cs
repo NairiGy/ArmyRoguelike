@@ -301,6 +301,10 @@ namespace ArmyRoguelike.Core
                     return new Intent(IntentKind.Raise, remains);
             }
 
+            var edge = AsIfItsTurn(battle, enemy, 0, () => EdgeKill(battle, enemy));
+            if (edge.HasValue)
+                return new Intent(edge.Value.kind, edge.Value.target);
+
             var target = ChooseTarget(battle, enemy);
             if (target == null)
                 return new Intent(IntentKind.None, null);
@@ -358,6 +362,19 @@ namespace ArmyRoguelike.Core
 
         public static void TakeTurn(Battle battle, Unit enemy, List<BattleEvent> events)
         {
+            // Storm: first step off a marked tile, towards a spot to attack its target from if it can.
+            if (battle.OnStormMark(enemy))
+                StepOffStorm(battle, enemy, events);
+
+            // Edge of the World: a push that throws one of your units off the tower comes before anything else.
+            var edge = EdgeKill(battle, enemy);
+            if (edge.HasValue)
+                events.AddRange(edge.Value.kind == IntentKind.BullRush
+                    ? battle.DoBullRush(enemy, edge.Value.target)
+                    : battle.DoUpheaval(enemy, edge.Value.target));
+            if (battle.IsOver || !enemy.IsAlive)
+                return;
+
             switch (BehaviourOf(enemy.Stats))
             {
                 case EnemyBehaviour.Necromancer:
@@ -868,6 +885,49 @@ namespace ArmyRoguelike.Core
                 return false;
             events.AddRange(move);
             return true;
+        }
+
+        // ---------- Battlefields ----------
+
+        /// <summary>
+        /// Edge of the World: one of your units this enemy can push off the board right now, with Bull Rush (next to it)
+        /// or Upheaval. Null if there is none, or on any other battlefield.
+        /// </summary>
+        public static (IntentKind kind, Unit target)? EdgeKill(Battle battle, Unit enemy)
+        {
+            if (!battle.EdgeKills)
+                return null;
+            foreach (var u in Visible(battle).Where(u => !u.IsObjective).OrderBy(u => u.Id))
+            {
+                var dir = Battle.StraightDirection(enemy.Pos, u.Pos);
+                if (dir.HasValue && battle.CanBullRush(enemy, u) && battle.WouldFall(u, dir.Value, enemy))
+                    return (IntentKind.BullRush, u);
+                if (battle.CanUpheave(enemy, u) && battle.WouldFall(u, Battle.UpheavalDirection(enemy, u), enemy))
+                    return (IntentKind.Upheaval, u);
+            }
+
+            return null;
+        }
+
+        /// <summary>Storm: moves off the marked tile, to an attack spot for its target if one is in reach, else closer, else anywhere.</summary>
+        private static void StepOffStorm(Battle battle, Unit enemy, List<BattleEvent> events)
+        {
+            var target = ChooseTarget(battle, enemy);
+            var destination = target != null ? PickApproach(battle, enemy, target, Battle.AttackCost) : null;
+            if (destination == null)
+            {
+                var reachable = battle.GetReachable(enemy);
+                if (reachable.Count == 0)
+                    return;
+                destination = reachable
+                    .OrderBy(kv => target != null ? Battle.Distance(kv.Key, enemy.Size, target) : 0)
+                    .ThenBy(kv => kv.Value)
+                    .First().Key;
+            }
+
+            var move = battle.DoMove(enemy, destination.Value);
+            if (move != null)
+                events.AddRange(move);
         }
 
         // ---------- Movement helpers ----------
