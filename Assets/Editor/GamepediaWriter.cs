@@ -491,7 +491,14 @@ public static class GamepediaWriter
         html.Append("<table><tr><th>Banner</th><th>Rule</th></tr>");
         foreach (var banner in Banners.All)
             html.Append($"<tr><td>{Esc(Banners.Name(banner))}</td><td>{Esc(Banners.Describe(banner))}</td></tr>");
-        html.Append("</table></section>");
+        html.Append("</table><h3 id=\"battlefields\">Battlefields</h3><p>Every battle, elite and boss (and an ambush) has one battlefield rule, ");
+        html.Append("named on its map node from the start of the run, so you can route towards or around it. The scenario fights have none. ");
+        html.Append("A step's fights never share a battlefield or repeat one from the step before. Every rule works the same for both sides.</p>");
+        html.Append("<table><tr><th>Battlefield</th><th>Rule</th></tr>");
+        foreach (var field in Battlefields.All)
+            html.Append($"<tr><td>{Esc(Battlefields.Name(field))}</td><td>{Esc(Battlefields.Describe(field))}</td></tr>");
+        html.Append("</table><p>Enemy AI: on Edge of the World an enemy that can push one of your units off the board with Bull Rush or Upheaval does that first. ");
+        html.Append("In a Storm, enemies never stop on a marked tile and step off one before acting.</p></section>");
     }
 
     private static void Rules(StringBuilder html)
