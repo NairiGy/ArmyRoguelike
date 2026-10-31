@@ -92,7 +92,7 @@ public static class GamepediaWriter
             : $"<div class=\"noimg\">{Esc(unit.Label)}</div>");
         html.Append("<div class=\"body\">");
         html.Append($"<h4>{Esc(unit.Name)}</h4>");
-        html.Append($"<p class=\"stats\">HP {unit.MaxHp} · DMG {unit.Damage} · RNG {unit.Range} · AP {unit.MaxAp} · MV {unit.Moves}");
+        html.Append($"<p class=\"stats\">HP {unit.MaxHp} · DMG {unit.Damage} · RNG {unit.Range} · AP {unit.MaxAp} · MV {unit.Moves} · {unit.Weight}");
         if (unit.Size > 1)
             html.Append($" · {unit.Size}x{unit.Size}");
         html.Append("</p>");
@@ -143,7 +143,7 @@ public static class GamepediaWriter
             ? $"<img src=\"{image}\" alt=\"{Esc(unit.Name)}\">"
             : $"<div class=\"noimg\">{Esc(unit.Label)}</div>");
         html.Append($"<div class=\"body\"><h4>{Esc(unit.Name)}</h4>");
-        html.Append($"<p class=\"stats\">HP {unit.MaxHp} · DMG {unit.Damage} · RNG {unit.Range} · AP {unit.MaxAp} · MV {unit.Moves}");
+        html.Append($"<p class=\"stats\">HP {unit.MaxHp} · DMG {unit.Damage} · RNG {unit.Range} · AP {unit.MaxAp} · MV {unit.Moves} · {unit.Weight}");
         if (unit.Size > 1)
             html.Append($" · {unit.Size}x{unit.Size}");
         html.Append("</p>");
@@ -462,7 +462,7 @@ public static class GamepediaWriter
     private static void RunSection(StringBuilder html)
     {
         html.Append("<section id=\"run\"><h2>Run &amp; map</h2><ul>");
-        html.Append($"<li>Draft {Run.DraftSize} different base units. Army size up to {Run.MaxArmySize}.</li>");
+        html.Append($"<li>Pick 1 of {Banners.StartChoices} random <b>banners</b>, then draft {Run.DraftSize} different base units ({Banners.ThirdWheelArmySize} with Third Wheel). Army size up to {Run.MaxArmySize}.</li>");
         html.Append($"<li>Act 1 has {Run.Steps} steps; each step offers 2 nodes. At steps {string.Join(", ", Run.FightSteps.Select(s => s + 1))} both choices are fights, ");
         html.Append($"so every run has at least {Run.FightSteps.Count} fights before the boss. ");
         html.Append("Step 9 offers one more optional battle; the last step is a boss (Necromancer or Giant).</li>");
@@ -471,7 +471,7 @@ public static class GamepediaWriter
         html.Append("<li>The two scenario fights sit at steps 4 and 8, next to a battle: the Moon Shrine at one, Break the Ritual at the other. Shops and ? events fill the rest.</li>");
         html.Append($"<li>Won battle: {Run.BaseGold} gold + {Run.GoldPerSurvivor} per surviving unit (+{Run.AmbushBonusGold} for an ambush). Gold carried off by escaped cutpurses is lost.</li>");
         html.Append($"<li><b>Technique pick</b>: every won fight except the boss and the Moon Shrine offers {Run.RewardCount} techniques your units can learn; one unit learns one and goes up a level, or skip for {Run.SkipGold} gold.</li>");
-        html.Append($"<li><b>Shop</b>: {Run.ShopSize} techniques ({Technique.CommonPrice} gold common, {Technique.RarePrice} rare), {Run.ShopItemCount} items, forgetting a technique for {Run.ForgetPrice} gold, and a random base-unit recruit for {Run.RecruitPrice} gold (if the army has room).</li>");
+        html.Append($"<li><b>Shop</b>: {Run.ShopSize} techniques ({Technique.CommonPrice} gold common, {Technique.RarePrice} rare), {Run.ShopItemCount} items, forgetting a technique for {Run.ForgetPrice} gold, a random base-unit recruit for {Run.RecruitPrice} gold (if the army has room), and one banner you don't hold yet for {Banners.Price} gold.</li>");
         html.Append("<li>Every battle starts at full HP and dead units come back. Techniques, levels, items and shrine HP last the whole run.</li>");
         html.Append("</ul><h3>? events</h3><table><tr><th>Event</th><th>What happens</th></tr>");
         html.Append($"<tr><td>Wandering Recruit</td><td>A random base unit joins for free ({Run.FullArmyGold} gold instead if the army is full).</td></tr>");
@@ -485,6 +485,12 @@ public static class GamepediaWriter
         html.Append("<table><tr><th>Omen</th><th>Blessing</th><th>Curse</th></tr>");
         foreach (var omen in Omens.All)
             html.Append($"<tr><td>{omen}</td><td>{Esc(Omens.Describe(omen, true))}</td><td>{Esc(Omens.Describe(omen, false))}</td></tr>");
+        html.Append("</table><h3 id=\"banners\">Banners</h3><p>A banner bends a rule for the whole army for the rest of the run. You start with one (pick 1 of " + Banners.StartChoices + "), ");
+        html.Append($"shops sell one you don't hold for {Banners.Price} gold, and an elite offers one instead of its technique. No limit on how many you hold; each is held once. ");
+        html.Append("Taking Third Wheel with more units than it allows: choose who stays, the rest leave.</p>");
+        html.Append("<table><tr><th>Banner</th><th>Rule</th></tr>");
+        foreach (var banner in Banners.All)
+            html.Append($"<tr><td>{Esc(Banners.Name(banner))}</td><td>{Esc(Banners.Describe(banner))}</td></tr>");
         html.Append("</table></section>");
     }
 
@@ -497,7 +503,7 @@ public static class GamepediaWriter
         html.Append($"<li><b>Zone of control</b>: stepping out of a tile next to an enemy uses up all your remaining moves, for both sides. You can always back off one tile, but you can't slip past.</li>");
         html.Append("<li>Ranged attacks need line of sight (rocks block); Arcane Bolt ignores it. Bombs, boulders and fireballs are lobbed.</li>");
         html.Append($"<li>Mines: {Battle.MineDamage} damage ({Battle.BigMineDamage} with Big Mines) to whoever stands on its tile, set off when an enemy steps on one (or a blast, fling or fireball sets it off). Bombs explode at the start of the next enemy turn and hit only their own tile. Fireballs and Volley hit a plus: the tile and its 4 neighbours. Blasts set each other off.</li>");
-        html.Append($"<li>Push: a unit pushed into a rock, unit or the edge takes {Battle.CollisionDamage} damage. An enemy pushed onto a mine sets it off.</li>");
+        html.Append($"<li>Push: a unit pushed into a rock, unit or the edge stops there and takes {Battle.CollisionDamage} damage. An enemy pushed onto a mine sets it off. <b>Weight</b>: a push moves a medium unit 1 tile, a small one 2 and a huge one none (no collision damage either); Battering Ram adds 1 tile to your pushes.</li>");
         html.Append($"<li>Poison: {Battle.PoisonDamage} damage at the start of the target's turn, {Battle.PoisonTurns} times. Burning ground: {Battle.BurnDamage} damage at the start of the turn of whoever stands on it.</li>");
         html.Append("<li>Pinned units (Pinning Shot) and slowed units (Chill) can't move on their next turn.</li>");
         html.Append("<li>Vanished units (rogues) can't be targeted or attacked by enemies, though area blasts still hit them. Attacking reveals them.</li>");

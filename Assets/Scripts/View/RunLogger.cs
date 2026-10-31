@@ -62,7 +62,10 @@ namespace ArmyRoguelike.View
                 ritual = battle == null || battle.Totems.Count == 0 ? ""
                     : battle.TotemsBroken ? "broken" : battle.SummoningComplete ? "summoned" : battle.Phase == Phase.Victory ? "won" : "army lost",
                 totemsLeft = battle?.Totems.Count(t => t.IsAlive) ?? 0,
+                mercenary = _pendingMerc,
+                loserGains = _run.LastLoserGains.Select(m => m.Stats.Name).ToList(),
             });
+            _pendingMerc = null;
         }
 
         /// <summary>The blessing picked after holding the Moon Shrine, or a curse taken after losing a scenario fight.</summary>
@@ -84,7 +87,7 @@ namespace ArmyRoguelike.View
         /// A technique pick after a won fight (null technique: skipped for gold). Call after the pick, with the
         /// techniques that were offered.
         /// </summary>
-        public void RecordReward(IEnumerable<Technique> offered, Technique technique, ArmyMember member)
+        public void RecordReward(IEnumerable<Technique> offered, Technique technique, ArmyMember member, Banner? bannerOffered = null, bool tookBanner = false)
         {
             _log.techniquePicks.Add(new RewardPick
             {
@@ -93,12 +96,45 @@ namespace ArmyRoguelike.View
                 encounter = _run.CurrentEncounter?.Name ?? "",
                 offered = offered.Select(o => o.Name).ToList(),
                 offeredRare = offered.Count(o => o.Rarity == TechniqueRarity.Rare),
-                technique = technique?.Name ?? "skipped",
+                technique = tookBanner ? "banner" : technique?.Name ?? "skipped",
+                bannerOffered = bannerOffered.HasValue ? Banners.Name(bannerOffered.Value) : "",
                 unit = member?.Stats.Name ?? "",
                 levelAfter = member?.Level ?? 0,
                 goldAfter = _run.Gold,
             });
         }
+
+        /// <summary>A banner taken: at the start ("start", with the ones offered), bought ("shop") or from an elite ("elite").</summary>
+        public void RecordBanner(Banner banner, string source, IEnumerable<Banner> offered = null)
+        {
+            var step = source == "start" ? 0 : source == "elite" ? _run.StepIndex : Step;
+            _log.banners.Add(new BannerEntry
+            {
+                banner = Banners.Name(banner), source = source, step = step, goldAfter = _run.Gold,
+                offered = offered?.Select(Banners.Name).ToList() ?? new List<string>(),
+            });
+            if (source == "shop")
+                _shop?.purchases.Add(new Purchase { kind = "banner", item = Banners.Name(banner), price = Banners.Price });
+        }
+
+        /// <summary>Units sent away to fit the army limit (Third Wheel). Call before <see cref="Run.Dismiss"/>.</summary>
+        public void RecordDismiss(IEnumerable<ArmyMember> kept)
+        {
+            _log.dismissals.Add(new Dismissal
+            {
+                step = Step,
+                kept = kept.Select(m => m.Stats.Name).ToList(),
+                dismissed = _run.Army.Where(m => !kept.Contains(m)).Select(m => $"{m.Stats.Name} (level {m.Level})").ToList(),
+            });
+        }
+
+        /// <summary>The mercenary decision before a fight: the units offered and the one hired (null: none).</summary>
+        public void RecordMerc(IEnumerable<UnitStats> offered, UnitStats hired)
+        {
+            _pendingMerc = new MercHire { offered = offered.Select(o => o.Name).ToList(), hired = hired?.Name ?? "" };
+        }
+
+        private MercHire _pendingMerc;
 
         public void OpenShop()
         {
@@ -107,6 +143,7 @@ namespace ArmyRoguelike.View
                 step = Step,
                 goldBefore = _run.Gold,
                 recruitOffered = _run.ShopHasRecruit,
+                bannerOffered = _run.ShopBanner.HasValue ? Banners.Name(_run.ShopBanner.Value) : "",
                 offers = _run.Offers.Select(o => new Offer { technique = o.Name, price = o.Price, rarity = o.Rarity.ToString() }).ToList(),
                 itemOffers = _run.ItemOffers.Select(o => new ItemOffer { item = o.Name, price = o.Price, effect = o.Effect }).ToList(),
             };
@@ -212,6 +249,10 @@ namespace ArmyRoguelike.View
             /// <summary>Curses taken by losing scenario fights, in order.</summary>
             public List<CurseEntry> curses = new List<CurseEntry>();
 
+            /// <summary>Banners taken, in order, and units sent away to fit Third Wheel's limit.</summary>
+            public List<BannerEntry> banners = new List<BannerEntry>();
+            public List<Dismissal> dismissals = new List<Dismissal>();
+
             /// <summary>Technique picks after won fights, in order.</summary>
             public List<RewardPick> techniquePicks = new List<RewardPick>();
             public List<MapStep> map = new List<MapStep>();
@@ -264,6 +305,10 @@ namespace ArmyRoguelike.View
             /// <summary>Break the Ritual only: "broken", "summoned" or "army lost", and totems still standing at the end.</summary>
             public string ritual;
             public int totemsLeft;
+
+            /// <summary>Mercenaries banner: who was for hire and who was hired (empty: none). Loser banner: units that fell and grew.</summary>
+            public MercHire mercenary;
+            public List<string> loserGains = new List<string>();
         }
 
         [Serializable]
@@ -283,8 +328,11 @@ namespace ArmyRoguelike.View
             /// <summary>How many of the offered techniques were rare.</summary>
             public int offeredRare;
 
-            /// <summary>The technique taken, or "skipped".</summary>
+            /// <summary>The technique taken, "skipped", or "banner" when the elite's banner was taken instead.</summary>
             public string technique;
+
+            /// <summary>After an elite: the banner offered instead of a technique (empty if none).</summary>
+            public string bannerOffered;
             public string unit;
             public int levelAfter;
             public int goldAfter;
@@ -297,6 +345,7 @@ namespace ArmyRoguelike.View
             public int goldBefore;
             public int goldAfter;
             public bool recruitOffered;
+            public string bannerOffered;
             public List<Offer> offers = new List<Offer>();
             public List<ItemOffer> itemOffers = new List<ItemOffer>();
             public List<Purchase> purchases = new List<Purchase>();
@@ -322,7 +371,7 @@ namespace ArmyRoguelike.View
         [Serializable]
         private sealed class Purchase
         {
-            /// <summary>"technique", "item" or "recruit".</summary>
+            /// <summary>"technique", "item", "recruit" or "banner".</summary>
             public string kind;
 
             /// <summary>The technique, item or recruited unit.</summary>
@@ -356,6 +405,35 @@ namespace ArmyRoguelike.View
             public string outcome;
             public int goldBefore;
             public int goldAfter;
+        }
+
+        [Serializable]
+        private sealed class BannerEntry
+        {
+            public string banner;
+
+            /// <summary>"start", "shop" or "elite".</summary>
+            public string source;
+            public int step;
+            public int goldAfter;
+
+            /// <summary>Start only: the banners offered.</summary>
+            public List<string> offered = new List<string>();
+        }
+
+        [Serializable]
+        private sealed class Dismissal
+        {
+            public int step;
+            public List<string> kept = new List<string>();
+            public List<string> dismissed = new List<string>();
+        }
+
+        [Serializable]
+        private sealed class MercHire
+        {
+            public List<string> offered = new List<string>();
+            public string hired = "";
         }
 
         [Serializable]

@@ -74,7 +74,9 @@ namespace ArmyRoguelike.View
             switch (_run.State)
             {
                 case RunState.Battle:
-                    StartBattle();
+                    // With Mercenaries, the hire screen comes first and starts the battle.
+                    if (!_run.MercPending)
+                        StartBattle();
                     break;
                 case RunState.Shop:
                     _runLog.OpenShop();
@@ -93,7 +95,7 @@ namespace ArmyRoguelike.View
         {
             if (_draftPicks.Contains(unit))
                 _draftPicks.Remove(unit);
-            else if (_draftPicks.Count < Run.DraftSize)
+            else if (_draftPicks.Count < _run.DraftCount)
                 _draftPicks.Add(unit);
         }
 
@@ -135,6 +137,9 @@ namespace ArmyRoguelike.View
                 : battle.Phase != Phase.Victory ? null
                 : _run.LastStolen > 0 ? $"Battle won: +{earned} gold, but cutpurses got away with {_run.LastStolen}."
                 : $"Battle won: +{earned} gold.";
+            if (_lastNote != null && _run.LastLoserGains.Count > 0)
+                _lastNote += $" Loser: {string.Join(", ", _run.LastLoserGains.Select(m => m.Stats.Name))} " +
+                             $"+{Banners.LoserHp} max HP, +{Banners.LoserDamage} damage.";
             if (_run.State == RunState.Won || _run.State == RunState.Lost)
                 _runLog.Save();
         }
@@ -144,8 +149,43 @@ namespace ArmyRoguelike.View
         {
             _runLog.RecordEvent(choice, _run.EventOutcome);
             _lastNote = _run.EventOutcome;
-            if (_run.State == RunState.Battle)
+            if (_run.State == RunState.Battle && !_run.MercPending)
                 StartBattle();
+        }
+
+        // ---------- Banners ----------
+
+        private static string BannerText(Banner banner) => $"{Banners.Name(banner)}\n{Banners.Describe(banner)}";
+
+        private void ChooseStartBanner(Banner banner)
+        {
+            if (_run.ChooseStartBanner(banner))
+                _runLog.RecordBanner(banner, "start", _run.StartBanners);
+            _draftPicks.Clear();
+        }
+
+        private void HireMerc(UnitStats unit)
+        {
+            var offered = _run.MercOffers.ToList();
+            if (unit != null && !_run.HireMerc(unit))
+                return;
+            if (unit == null)
+                _run.DeclineMerc();
+            _runLog.RecordMerc(offered, unit);
+            StartBattle();
+        }
+
+        private readonly System.Collections.Generic.List<ArmyMember> _keepPicks = new System.Collections.Generic.List<ArmyMember>();
+
+        private void ConfirmDismiss()
+        {
+            var keep = _keepPicks.ToList();
+            _runLog.RecordDismiss(keep);
+            var gone = _run.Army.Where(m => !keep.Contains(m)).Select(m => m.Stats.Name).ToList();
+            if (!_run.Dismiss(keep))
+                return;
+            _keepPicks.Clear();
+            _lastNote = $"{string.Join(" and ", gone)} {(gone.Count == 1 ? "leaves" : "leave")} the army.";
         }
 
         // ---------- Test mode ----------
@@ -166,6 +206,10 @@ namespace ArmyRoguelike.View
         // Null for no omen; otherwise the omen and whether it's a blessing (true) or a curse.
         private (Omen omen, bool blessing)? _testOmen;
 
+        // Banners that change the battle itself (Loser and Mercenaries work between fights, so they aren't here).
+        private static readonly Banner[] TestableBanners = { Banner.Vampiric, Banner.ThirdWheel, Banner.BatteringRam };
+        private readonly System.Collections.Generic.HashSet<Banner> _testBanners = new System.Collections.Generic.HashSet<Banner>();
+
         private void EnterTestMode()
         {
             _testMode = true;
@@ -182,6 +226,8 @@ namespace ArmyRoguelike.View
             var battle = _testEncounter.CreateBattle(army, new System.Random(seed), _testFought.ToList());
             if (_testOmen.HasValue)
                 battle.AddOmen(_testOmen.Value.omen, _testOmen.Value.blessing ? Team.Player : Team.Enemy);
+            foreach (var banner in _testBanners)
+                battle.AddBanner(banner);
 
             _battleRoot = new GameObject("Test battle");
             _battleRoot.transform.SetParent(transform, false);
@@ -223,7 +269,7 @@ namespace ArmyRoguelike.View
             const float w = 860;
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 10, w, 700), GUI.skin.box);
             GUILayout.Label("Test battle", Title);
-            GUILayout.Label("For testing only: any army with any techniques, any encounter, any blessing or curse. Normal battle rules; no run, gold or map.");
+            GUILayout.Label("For testing only: any army with any techniques, any encounter, any blessing or curse, any battle banners. Normal battle rules; no run, gold or map.");
             GUILayout.BeginHorizontal();
 
             // Left: every unit type, click to add (up to the army limit); below, the chosen unit's techniques.
@@ -331,6 +377,19 @@ namespace ArmyRoguelike.View
                     Do(() => _testOmen = pick);
             }
 
+            GUILayout.Space(10);
+            GUILayout.Label("Banners:");
+            foreach (var banner in TestableBanners)
+            {
+                var pick = banner;
+                if (GUILayout.Button(new GUIContent((_testBanners.Contains(banner) ? "[X] " : "[  ] ") + Banners.Name(banner), Banners.Describe(banner))))
+                    Do(() =>
+                    {
+                        if (!_testBanners.Remove(pick))
+                            _testBanners.Add(pick);
+                    });
+            }
+
             GUILayout.Label(GUI.tooltip, new GUIStyle(GUI.skin.label) { wordWrap = true });
             GUILayout.EndVertical();
             GUILayout.EndHorizontal();
@@ -398,6 +457,13 @@ namespace ArmyRoguelike.View
                     break;
                 case RunState.Reward:
                     DrawReward(width);
+                    break;
+                case RunState.Battle:
+                    if (_run.MercPending)
+                        DrawMercs(width);
+                    break;
+                case RunState.Dismiss:
+                    DrawDismiss(width);
                     break;
                 case RunState.Blessing:
                     DrawBlessing(width);
@@ -474,12 +540,41 @@ namespace ArmyRoguelike.View
 
         private Vector2 _scroll;
 
-        private void DrawDraft(float screenWidth)
+        private void DrawStartBanner(float screenWidth)
         {
             const float w = 600;
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 20, w, 680), GUI.skin.box);
+            GUILayout.Label("Raise a banner", Title);
+            GUILayout.Label("A banner bends a rule for your whole army, for the whole run. Pick one to start with; shops sell more, and elites offer one.");
+            GUILayout.Space(6);
+            var style = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.UpperLeft, wordWrap = true };
+            foreach (var banner in _run.StartBanners)
+            {
+                var pick = banner;
+                if (GUILayout.Button(BannerText(banner), style, GUILayout.MinHeight(64)))
+                    Do(() => ChooseStartBanner(pick));
+            }
+
+            GUILayout.FlexibleSpace();
+            if (TestModeAvailable && GUILayout.Button("Test battle (testing only: any army, encounter and omen)"))
+                Do(EnterTestMode);
+            GUILayout.EndArea();
+        }
+
+        private void DrawDraft(float screenWidth)
+        {
+            if (!_run.StartBannerChosen)
+            {
+                DrawStartBanner(screenWidth);
+                return;
+            }
+
+            const float w = 600;
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 20, w, 680), GUI.skin.box);
             GUILayout.Label("Choose your army", Title);
-            GUILayout.Label($"Pick {Run.DraftSize} different units. Each won fight lets one of them learn a technique (and go up a level).");
+            if (_run.Banners.Count > 0)
+                GUILayout.Label($"Banner: {string.Join(", ", _run.Banners.Select(Banners.Name))}");
+            GUILayout.Label($"Pick {_run.DraftCount} different units. Each won fight lets one of them learn a technique (and go up a level).");
             _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(540));
             foreach (var unit in _run.DraftPool)
             {
@@ -490,8 +585,8 @@ namespace ArmyRoguelike.View
             }
 
             GUILayout.EndScrollView();
-            GUI.enabled = _draftPicks.Count == Run.DraftSize;
-            if (GUILayout.Button($"Start the run ({_draftPicks.Count}/{Run.DraftSize})", GUILayout.Height(34)))
+            GUI.enabled = _draftPicks.Count == _run.DraftCount;
+            if (GUILayout.Button($"Start the run ({_draftPicks.Count}/{_run.DraftCount})", GUILayout.Height(34)))
                 Do(ConfirmDraft);
             GUI.enabled = true;
             if (TestModeAvailable && GUILayout.Button("Test battle (testing only: any army, encounter and omen)"))
@@ -509,6 +604,8 @@ namespace ArmyRoguelike.View
                 GUILayout.Label(Omens.Name(_run.Blessing.Value, true));
             foreach (var curse in _run.Curses)
                 GUILayout.Label(Omens.Name(curse, false));
+            foreach (var banner in _run.Banners)
+                GUILayout.Label($"Banner: {Banners.Name(banner)}. {Banners.Describe(banner)}");
             if (!string.IsNullOrEmpty(_lastNote))
                 GUILayout.Label(_lastNote);
             GUILayout.Space(6);
@@ -712,6 +809,20 @@ namespace ArmyRoguelike.View
                         _selectedOffer = null;
                     }));
 
+            if (_run.ShopBanner.HasValue)
+            {
+                GUILayout.Space(10);
+                Section("Banner", GoldColor);
+                var banner = _run.ShopBanner.Value;
+                var text = Banners.Describe(banner);
+                OfferRow(new[] { banner }, scrollInner, (b, cw) => OfferHeight("Banner, for the whole army", text, cw),
+                    (r, b) => DrawOffer(r, Banners.Name(b), "Banner, for the whole army", text, Banners.Price, false, () =>
+                    {
+                        if (_run.BuyBanner())
+                            _runLog.RecordBanner(b, "shop");
+                    }));
+            }
+
             var forgetters = _run.Army.Where(m => m.Techniques.Count > 0).ToList();
             if (_run.ShopHasRecruit || forgetters.Count > 0)
             {
@@ -769,7 +880,7 @@ namespace ArmyRoguelike.View
             var inner = r.xMax - 10 - x;
             Label(new Rect(x, r.y + 8, inner, 22), $"Recruit a {recruit.Name}", _cardName, Color.white);
             Label(new Rect(x, r.y + 30, inner, r.height - 60), recruit.Role, _cardText, TextColor);
-            if (_run.Army.Count >= Run.MaxArmySize)
+            if (_run.Army.Count >= _run.ArmyLimit)
                 Label(new Rect(x, r.yMax - 26, inner, 20), "Army is full", _cardText, TooDearColor);
             Price(r, Run.RecruitPrice);
             GUI.color = old;
@@ -897,7 +1008,7 @@ namespace ArmyRoguelike.View
                 case EventKind.WanderingRecruit:
                     GUILayout.Label($"A Wandering {_run.EventRecruit.Name}", Title);
                     GUILayout.Label("A dusty statue offers to join you.\n" + Describe(_run.EventRecruit));
-                    if (_run.Army.Count < Run.MaxArmySize)
+                    if (_run.Army.Count < _run.ArmyLimit)
                     {
                         if (GUILayout.Button($"Welcome aboard (the {_run.EventRecruit.Name} joins)", GUILayout.Height(32)))
                             Do(() =>
@@ -1073,9 +1184,10 @@ namespace ArmyRoguelike.View
                 DrawLearners(pick, m => _run.CanTakeReward(pick, m), taker =>
                 {
                     var offered = _run.RewardOffers.ToList();
+                    var banner = _run.RewardBanner;
                     if (!_run.TakeReward(pick, taker))
                         return;
-                    _runLog.RecordReward(offered, pick, taker);
+                    _runLog.RecordReward(offered, pick, taker, banner);
                     _lastNote = $"The {taker.Stats.Name} learns {pick.Name} (level {taker.Level}).";
                     _selectedReward = null;
                 });
@@ -1086,15 +1198,93 @@ namespace ArmyRoguelike.View
             }
 
             GUILayout.FlexibleSpace();
+            if (_run.RewardBanner.HasValue)
+            {
+                var banner = _run.RewardBanner.Value;
+                GUILayout.Label("Or take this banner instead of a technique:");
+                if (GUILayout.Button(BannerText(banner), style, GUILayout.MinHeight(56)))
+                    Do(() =>
+                    {
+                        var offered = _run.RewardOffers.ToList();
+                        if (!_run.TakeRewardBanner())
+                            return;
+                        _runLog.RecordReward(offered, null, null, banner, true);
+                        _runLog.RecordBanner(banner, "elite");
+                        _lastNote = $"Banner raised: {Banners.Name(banner)}.";
+                        _selectedReward = null;
+                    });
+                GUILayout.Space(6);
+            }
+
             if (GUILayout.Button($"Skip (+{Run.SkipGold} gold)", GUILayout.Height(32)))
                 Do(() =>
                 {
                     var offered = _run.RewardOffers.ToList();
+                    var banner = _run.RewardBanner;
                     _run.SkipReward();
-                    _runLog.RecordReward(offered, null, null);
+                    _runLog.RecordReward(offered, null, null, banner);
                     _lastNote = $"Skipped the pick: +{Run.SkipGold} gold.";
                     _selectedReward = null;
                 });
+            GUILayout.EndArea();
+        }
+
+        /// <summary>Mercenaries banner: before a fight, hire one of the offered units for it, or go without.</summary>
+        private void DrawMercs(float screenWidth)
+        {
+            const float w = 560;
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 40, w, 640), GUI.skin.box);
+            GUILayout.Label("Mercenaries for hire", Title);
+            if (!string.IsNullOrEmpty(_lastNote))
+                GUILayout.Label(_lastNote);
+            GUILayout.Label($"Next: {_run.CurrentEncounter.Name}. Hire one for {Banners.MercPrice} gold: it fights this battle only and doesn't count " +
+                            $"as a survivor for gold. You have {_run.Gold} gold.");
+            GUILayout.Space(6);
+            var style = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.UpperLeft, wordWrap = true };
+            foreach (var unit in _run.MercOffers)
+            {
+                var pick = unit;
+                GUI.enabled = _run.CanHire(unit);
+                if (GUILayout.Button($"Hire: {Describe(unit)}", style))
+                    Do(() => HireMerc(pick));
+                GUI.enabled = true;
+            }
+
+            GUILayout.FlexibleSpace();
+            DrawArmy();
+            if (GUILayout.Button("Fight without one", GUILayout.Height(32)))
+                Do(() => HireMerc(null));
+            GUILayout.EndArea();
+        }
+
+        /// <summary>Third Wheel taken with too many units: choose who stays.</summary>
+        private void DrawDismiss(float screenWidth)
+        {
+            const float w = 560;
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 40, w, 640), GUI.skin.box);
+            GUILayout.Label("Too many for the banner", Title);
+            GUILayout.Label($"Your army can hold {_run.ArmyLimit} units now. Choose who stays; the others leave for good, with their techniques and items.");
+            GUILayout.Space(6);
+            var style = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.UpperLeft, wordWrap = true };
+            foreach (var member in _run.Army)
+            {
+                var m = member;
+                var kept = _keepPicks.Contains(member);
+                var techniques = m.Techniques.Count > 0 ? string.Join(", ", m.Techniques.Select(t => t.Name)) : "no techniques";
+                var item = m.Equipment != null ? $" [{m.Equipment.Name}]" : "";
+                if (GUILayout.Button($"{(kept ? "[X] " : "[  ] ")}{m.Stats.Name} (level {m.Level}){item}: {techniques}", style))
+                    Do(() =>
+                    {
+                        if (!_keepPicks.Remove(m) && _keepPicks.Count < _run.ArmyLimit)
+                            _keepPicks.Add(m);
+                    });
+            }
+
+            GUILayout.FlexibleSpace();
+            GUI.enabled = _keepPicks.Count == _run.ArmyLimit;
+            if (GUILayout.Button($"Keep these ({_keepPicks.Count}/{_run.ArmyLimit})", GUILayout.Height(34)))
+                Do(ConfirmDismiss);
+            GUI.enabled = true;
             GUILayout.EndArea();
         }
 

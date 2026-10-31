@@ -382,10 +382,25 @@ Decided with the user and built 2026-10-30 (branch `feature/techniques`, merged 
 
 Ideas from the same discussion, parked for after techniques (suggested order): battlefield modifiers shown on the map node (Broken Parapet where pushes off the edge kill, Ice Floor, Fog, Mud, High Ground, Crumbling Floor, Braziers, Ley Line); Banners as army-wide rules (see "Later / maybe"); a first choice at run start (pick 1 of 3: a bonus technique, gold, a curse for a strong banner), then Commanders that set the draft pool, a starting banner and a rule twist; unlocks between runs; a branching map; ? events with trade-offs.
 
+## Banners and weight (built 2026-10-31, not playtested)
+
+A banner bends a rule for the whole army for the rest of the run (like Balatro jokers). The user wants
+builds and synergies from them, so there's no limit on how many you hold; each is held once.
+
+- **Getting them** (not final, the user's first take): pick 1 of 3 random banners at the start of a run, before the draft. Every shop sells one you don't hold (20 gold). An elite's reward screen offers one you don't hold, taken instead of its technique.
+- **Vampiric:** every attack of yours that deals damage heals the attacker 1 (attacks only, not blasts or collisions; not above max HP). Cost: the Curse of the Sun in every fight (once, even if you also carry that curse). The user's idea was +2; +1 because units have 4-12 HP.
+- **Third Wheel:** your units get +1 AP and +1 move (a mercenary too). Cost: the army holds 2 units. Taken at the start, you draft 2. Taken later with more units, you choose who stays and the rest leave with their techniques and items. Move first still holds: move up to 2, then 2 actions.
+- **Loser:** an army unit that dies in a fight gets +1 max HP and +1 damage for the rest of the run, stacking. Also after a lost scenario fight. Dying still costs gold (rewards scale with survivors).
+- **Mercenaries:** before each fight, hire 1 of 2 random base units (level 0) for 8 gold, or go without. It fights that battle only, doesn't count as a survivor for gold, and can't keep a fight going alone: the fight is lost once the real army is down.
+- **Battering Ram:** your units' pushes go 1 tile further and deal 2 damage at the end (whether the unit moved or not). No cost for now (user's call). Enemy pushes are unchanged.
+- **Weight** (every unit, not a banner): a push moves a medium unit 1 tile, a small one 2, a huge one 0 (no move and no collision damage). Pushes now move tile by tile and stop with collision damage at whatever blocks them. Small: Rogue, Mage Apprentice, Wolf, Skeleton, Goblin, Goblin Bomber, Cutpurse, Shard. Huge: Pack Leader, Bandit Brute, Elemental, Giant (Colossus stays unpushable). Everyone else medium, the Warrior included (huge would have made it immune to Bull Rush, Upheaval and Slam). Raised and harvested copies keep their weight.
+- **Ideas not built:** Lady Death (enemies get +1 unit; after X wins she gives powerful abilities; needs its reward designed), Run Rabbit Run (2 holes per fight that act as teleports), and Claude's suggestions: Stone Skin, Glass Banner, Shieldwall, Zealots, Scholar, Last Stand.
+- **Logs:** battle logs list `banners` and each placed unit's `weight` and `mercenary`; ram damage is a `tick` with note `ram`, Vampiric heals are `heal` effects. Run logs have `banners` (source start / shop / elite, start offers), `dismissals`, each battle's `mercenary` (offered, hired) and `loserGains`, the shop's `bannerOffered` and banner purchases, and each technique pick's `bannerOffered` (technique "banner" when it was taken).
+
 ## Test mode (for testing only)
 
 - Editor and dev builds only: a "Test battle" button on the draft screen opens a setup screen.
-- Pick any 1–4 base units (repeats allowed) and tick each one's techniques (its level follows), any encounter (factions, bosses, Moon Shrine, Break the Ritual; for the Necromancer, which factions count as beaten) and optionally any blessing or curse. No items for now.
+- Pick any 1–4 base units (repeats allowed) and tick each one's techniques (its level follows), any encounter (factions, bosses, Moon Shrine, Break the Ritual; for the Necromancer, which factions count as beaten) and optionally any blessing or curse. No items for now. Battle banners (Vampiric, Third Wheel, Battering Ram) can be ticked too; Loser and Mercenaries work between fights, so they aren't there.
 - The battle uses the normal rules; afterwards it returns to the setup screen. No run, gold or map, and no run log; battle logs are marked `test: true`.
 
 ## Later / maybe
@@ -393,7 +408,7 @@ Ideas from the same discussion, parked for after techniques (suggested order): b
 - Drawn spell cards during battle.
 - Other win conditions.
 - Difficulty modifiers (for example, HP carrying over between fights).
-- **Banners:** an army-wide rule layer (like Balatro jokers, but every banner bends a rule and has a cost, e.g. Lone Wolf: army limit 1 but big upside). Parked: "hard topic".
+- **Banners:** built 2026-10-31, see "Banners and weight". More to come (Lady Death and others are listed there).
 - **More acts** after Act 1; terrain features (river, bushes, crumbling floor) for layouts; post-battle reward choices; elite nodes.
 
 ## Open questions

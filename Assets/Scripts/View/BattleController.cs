@@ -1429,15 +1429,16 @@ namespace ArmyRoguelike.View
             }
         }
 
-        /// <summary>The blessing or curse in play, if any.</summary>
+        /// <summary>The blessings, curses and banners in play, one per line.</summary>
         private string OmenLine =>
-            string.Concat(Battle.Omens.Select(o => $"\n{Omens.Name(o.omen, o.side == Team.Player)}"));
+            string.Concat(Battle.Omens.Select(o => $"\n{Omens.Name(o.omen, o.side == Team.Player)}")) +
+            string.Concat(Battle.Banners.Select(b => $"\nBanner: {Banners.Name(b)}"));
 
         private void DrawPlacementHud()
         {
             var army = Battle.Units.Where(u => u.Team == Team.Player && !u.IsObjective).ToList();
             var omens = OmenLine.Trim();
-            var h = 110 + army.Count * (ButtonHeight + 2) + 10 + (omens.Length > 0 ? 20 * Battle.Omens.Count : 0);
+            var h = 110 + army.Count * (ButtonHeight + 2) + 10 + (omens.Length > 0 ? 20 * (Battle.Omens.Count + Battle.Banners.Count) : 0);
             GUILayout.BeginArea(Panel(Margin, Margin, PanelWidth, h), GUI.skin.box);
             GUILayout.Label(Header);
             GUILayout.Label("Place your army in the blue tiles. Click a placed statue to move it.", TextStyle);

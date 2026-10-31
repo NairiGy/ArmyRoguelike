@@ -35,6 +35,7 @@ namespace ArmyRoguelike.View
             _log.goldAtStart = context.Gold;
             _goldIfWon = context.GoldIfWon;
             _log.omens = battle.Omens.Select(o => Omens.Name(o.omen, o.side == Team.Player)).ToList();
+            _log.banners = battle.Banners.Select(Banners.Name).ToList();
             _log.ritualTurns = battle.RitualTurns;
             _log.summonTurn = battle.SummonTurn;
         }
@@ -65,6 +66,7 @@ namespace ArmyRoguelike.View
                     unit = Name(u), x = u.Pos.X, y = u.Pos.Y, equipment = u.Equipment?.Name ?? "", maxHp = u.MaxHp,
                     damage = u.BaseDamage, range = u.Range, maxAp = u.MaxAp, maxMoves = u.MaxMoves, line = u.Stats.Name,
                     level = u.Member?.Level ?? 0, techniques = u.Member?.Techniques.Select(t => t.Name).ToList() ?? new List<string>(),
+                    weight = u.Stats.Weight.ToString().ToLowerInvariant(), mercenary = u.IsMercenary,
                 });
         }
 
@@ -569,6 +571,9 @@ namespace ArmyRoguelike.View
             public int goldAtStart;
             public int goldEarned;
 
+            /// <summary>The army's banners in play this battle.</summary>
+            public List<string> banners = new List<string>();
+
             /// <summary>Blessings and curses in play this battle.</summary>
             public List<string> omens = new List<string>();
 
@@ -615,6 +620,10 @@ namespace ArmyRoguelike.View
             public int level;
             public List<string> techniques = new List<string>();
             public string line;
+
+            /// <summary>"small", "medium" or "huge" (push distance), and whether it was hired for this fight only.</summary>
+            public string weight;
+            public bool mercenary;
         }
 
         [Serializable]
