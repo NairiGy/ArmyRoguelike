@@ -148,7 +148,7 @@ namespace ArmyRoguelike.View
             public bool Void;
             public float FadeFrom, FadeTo;
             public Vector3 Hole;
-            // Daylight over farmland: Texture is the land far below, filling the screen behind the tower layer,
+            // Daylight over farmland: Texture is the land far below in full colour, filling the screen behind the tower layer,
             // whose walls fade into the haze from FadeFrom to FadeTo; cloud shadows and gusts sweep the fields.
             public bool Fields;
         }
@@ -160,7 +160,7 @@ namespace ArmyRoguelike.View
             [Setting.IsoGraveyard] = new IsoScene { Texture = "Backdrops/iso_graveyard", Top = new Vector2(840, 210), Left = new Vector2(325, 470), Bottom = new Vector2(905, 765), Right = new Vector2(1330, 490) },
             // The void painting is framed like the tower painting, so the tower layer fits it as it is.
             [Setting.IsoVoid] = new IsoScene { Texture = "Backdrops/void_backdrop", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", Void = true, FadeFrom = 640, FadeTo = 770, Hole = new Vector3(415, 191, 57) },
-            [Setting.IsoFields] = new IsoScene { Texture = "Backdrops/wheat_backdrop", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", Fields = true, FadeFrom = 620, FadeTo = 800 },
+            [Setting.IsoFields] = new IsoScene { Texture = "Backdrops/wheat_backdrop_colour", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", Fields = true, FadeFrom = 620, FadeTo = 800 },
         };
 
         /// <summary>How bright the haze far below the tower is, over the fields.</summary>
@@ -177,8 +177,8 @@ namespace ArmyRoguelike.View
             new[] { "#0b0f18", "#16223a", "#25384f", "#3a5268", "#5c7486", "#c48d8c" },
             // Void: black through indigo and violet stone to the pale gold of the light around the hole.
             new[] { "#05040a", "#151129", "#2b2347", "#4a3f68", "#7a6e98", "#e6cf9a" },
-            // Harvest: daylight over ripe wheat, warm browns rising through gold to sunlit cream.
-            new[] { "#22170e", "#4e3820", "#86643a", "#bb9552", "#dfbd78", "#fff0c6" },
+            // Harvest: sunlit stone over coloured fields (the land keeps its own colours), warm greys up to near-white.
+            new[] { "#1e1a16", "#3e3832", "#6a6056", "#988a78", "#c8b89c", "#fff6e2" },
         };
 
         private const float WallDepth = 2f;
@@ -292,16 +292,18 @@ namespace ArmyRoguelike.View
                 }
                 else if (scene.Fields && tower != null && wispy != null)
                 {
-                    // The land far below fills the screen (it needn't line up with the tower); thin cloud drifts
-                    // between it and the tower, whose walls sink into the bright haze.
+                    // The land far below fills the screen (it needn't line up with the tower), in its own colours
+                    // rather than the palette: blue river, green hedges, white clouds. Thin cloud drifts between it
+                    // and the tower, whose walls sink into the bright haze.
                     var land = Resources.Load<Texture2D>(scene.Texture);
                     if (land != null)
                     {
-                        var aspect = (float)land.width / land.height;
-                        var w = Mathf.Max(viewW, viewH * aspect) * 1.04f;
-                        var h = w / aspect;
-                        var bl = centre - new Vector2(w, h) * 0.5f;
-                        Quad(root, "Land", NewMaterial(shader, land, ramp), BackdropOrder, bl, bl + new Vector2(w, 0f), bl + new Vector2(w, h), bl + new Vector2(0f, h), Value(1f));
+                        var w = Mathf.Max(viewW, viewH * land.width / land.height) * 1.04f;
+                        var sr = new GameObject("Land").AddComponent<SpriteRenderer>();
+                        sr.transform.SetParent(root, false);
+                        sr.transform.position = centre;
+                        sr.sprite = Sprite.Create(land, new Rect(0, 0, land.width, land.height), new Vector2(0.5f, 0.5f), land.width / w);
+                        sr.sortingOrder = BackdropOrder;
                     }
 
                     var screenBottom = centre.y - viewH * 0.5f;
