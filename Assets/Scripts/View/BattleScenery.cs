@@ -159,8 +159,11 @@ namespace ArmyRoguelike.View
             public float Haze;
             // No braziers lit.
             public bool Daylight;
-            // A FarBelow sea: its painting moves like water except where this mask (same framing) is dark.
+            // A FarBelow sea: its painting flows like water except where this mask (same framing) is dark, swirling
+            // around Swirls (painting pixels: x, y, radius, turn; turn 0 just keeps whitecaps off, e.g. a ship).
+            // Storm cloud drifts over it in layers, like the night sky's (the painting itself has none).
             public string WaterMask;
+            public Vector4[] Swirls;
         }
 
         private static readonly Dictionary<Setting, IsoScene> IsoScenes = new Dictionary<Setting, IsoScene>
@@ -171,7 +174,8 @@ namespace ArmyRoguelike.View
             // The void painting is framed like the tower painting, so the tower layer fits it as it is.
             [Setting.IsoVoid] = new IsoScene { Texture = "Backdrops/void_backdrop", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", Void = true, FadeFrom = 640, FadeTo = 770, Hole = new Vector3(415, 191, 57) },
             [Setting.IsoFields] = new IsoScene { Texture = "Backdrops/wheat_backdrop_colour", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", FarBelow = true, Daylight = true, Haze = 0.72f, FadeFrom = 620, FadeTo = 800 },
-            [Setting.IsoSea] = new IsoScene { Texture = "Backdrops/sea_backdrop", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", FarBelow = true, Haze = 0.55f, FadeFrom = 620, FadeTo = 800, WaterMask = "Backdrops/sea_backdrop_mask" },
+            [Setting.IsoSea] = new IsoScene { Texture = "Backdrops/sea_backdrop_clear", Top = new Vector2(838, 155), Left = new Vector2(410, 388), Bottom = new Vector2(842, 632), Right = new Vector2(1262, 380), ArtFolder = "Tower", TowerLayer = "Backdrops/iso_tower_layer", FarBelow = true, Haze = 0.55f, FadeFrom = 620, FadeTo = 800, WaterMask = "Backdrops/sea_backdrop_mask",
+                Swirls = new[] { new Vector4(930, 500, 150, 1.2f), new Vector4(115, 540, 90, -1f), new Vector4(750, 685, 40, 0f), new Vector4(1145, 440, 30, 0f) } },
         };
 
         /// <summary>The ring image's empty middle, as a fraction of its width: fitted over the painted hole.</summary>
@@ -321,11 +325,18 @@ namespace ArmyRoguelike.View
                         sr.sortingOrder = BackdropOrder;
                         var mask = scene.WaterMask != null ? Resources.Load<Texture2D>(scene.WaterMask) : null;
                         if (mask != null)
-                            SceneryWater.Attach(sr, mask);
+                            SceneryWater.Attach(sr, mask, scene.Swirls ?? new Vector4[0], BackdropOrder + 3);
                     }
 
                     var screenBottom = centre.y - viewH * 0.5f;
                     SceneryFields.Create(root, centre, viewW, viewH, stops[0], Sample(stops, 1f), BackdropOrder + 1);
+                    if (scene.WaterMask != null && puffy != null)
+                    {
+                        // Storm cloud drifting over the sea on its own layers, the farther the slower.
+                        var screenTop = centre.y + viewH * 0.5f;
+                        CloudBand(root, "Storm wisps", NewMaterial(shader, wispy, ramp), BackCloudOrder + 1, centre.x, viewW, screenTop - 1.7f, 0.9f, 0.8f, 0.0016f, 0.7f);
+                        CloudBand(root, "Storm clouds", NewMaterial(shader, puffy, ramp), BackCloudOrder + 2, centre.x, viewW, screenTop - 3.2f, 1.2f, 0.82f, 0.0035f, 0.8f);
+                    }
                     CloudBand(root, "Wisps below", NewMaterial(shader, wispy, ramp), BackCloudOrder, centre.x, viewW, screenBottom - 0.2f, 1.6f, 1f, 0.003f, 0.55f);
                     BuildIsoScene(root, board, scene, NewMaterial(shader, tower, ramp), TowerLayerOrder,
                         (scene.FadeFrom, new Color(1f, 0f, scene.Haze, 1f)), (scene.FadeTo, new Color(1f, 1f, scene.Haze, 1f)));

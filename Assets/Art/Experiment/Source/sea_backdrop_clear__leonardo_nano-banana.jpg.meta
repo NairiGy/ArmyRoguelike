@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 85af4e3923a31f246963fdb0f65c01ca
+guid: d3a1d715172e21242b8bdc8a930d690b
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -5874257525668952919
-    second: sea_backdrop_0
+      213: -174340275539408781
+    second: sea_backdrop_clear__leonardo_nano-banana_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -113,7 +113,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: sea_backdrop_0
+      name: sea_backdrop_clear__leonardo_nano-banana_0
       rect:
         serializedVersion: 2
         x: 0
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 9a4465f47e17a7ea0800000000000000
-      internalID: -5874257525668952919
+      spriteID: 3780e6e617e949df0800000000000000
+      internalID: -174340275539408781
       vertices: []
       indices: 
       edges: []
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      sea_backdrop_0: -5874257525668952919
+      sea_backdrop_clear__leonardo_nano-banana_0: -174340275539408781
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
