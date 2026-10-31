@@ -18,7 +18,17 @@ namespace ArmyRoguelike.View
         // The debris disc looks flattened, as if seen at an angle.
         private const float DiscSquash = 0.75f;
 
+        /// <summary>The void in the current battle, if it has one: units pushed off fall into its hole.</summary>
+        public static SceneryVoid Active { get; private set; }
+
+        public Vector3 Hole => _hole;
+
+        /// <summary>Sorting order behind the tower and in front of the void, where the debris drifts.</summary>
+        public int BehindTowerOrder { get; private set; }
+
+        private SpriteRenderer _ringRenderer;
         private Transform _ring;
+        private float _flare;
         private Vector2 _hole;
         private float _holeRadius;
         private Vector2 _min;
@@ -69,6 +79,8 @@ namespace ArmyRoguelike.View
             v._corners = corners;
             v._boardCentre = (corners[0] + corners[1] + corners[2] + corners[3]) * 0.25f;
             v._fallOrder = fallOrder;
+            v.BehindTowerOrder = debrisOrder;
+            Active = v;
             v._nextFall = Random.Range(2f, 5f);
             if (ring != null)
                 v.BuildRing(ring, ringHole, glow, ringOrder);
@@ -92,6 +104,16 @@ namespace ArmyRoguelike.View
             sr.color = new Color(_light.r, _light.g, _light.b, RingAlpha);
             sr.sortingOrder = order;
             _ring = sr.transform;
+            _ringRenderer = sr;
+        }
+
+        /// <summary>The ring flares up and swells for a moment: something has just fallen into the hole.</summary>
+        public void Flare() => _flare = 1f;
+
+        private void OnDestroy()
+        {
+            if (Active == this)
+                Active = null;
         }
 
         // ---------- Debris ----------
@@ -261,7 +283,16 @@ namespace ArmyRoguelike.View
         {
             var dt = Time.deltaTime;
             if (_ring != null)
+            {
                 _ring.Rotate(0f, 0f, -RingSpin * dt);
+                if (_flare > 0f)
+                {
+                    _flare = Mathf.Max(0f, _flare - dt / 0.8f);
+                    var f = _flare * _flare;
+                    _ring.localScale = Vector3.one * (1f + 0.12f * f);
+                    _ringRenderer.sharedMaterial.SetFloat("_Intensity", 1f + 2f * f);
+                }
+            }
             if (_debris != null)
                 for (var i = 0; i < DebrisCount; i++)
                     PlaceDebris(i, dt);

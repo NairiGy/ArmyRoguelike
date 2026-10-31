@@ -1103,12 +1103,16 @@ namespace ArmyRoguelike.View
                 }
                 case FallEvent fall:
                 {
-                    // Placeholder: slides off the edge, crumbles and is gone.
+                    // Slides off the edge and falls into the void's black hole (or crumbles, with no void).
                     var view = _board.ViewOf(fall.Unit);
                     DamagePopup.Spawn(view.TopWorld + Vector3.up * 0.25f, "Fell!", DamagePopup.DamageColor, 48);
                     yield return view.Slide(fall.Edge, fall.Beyond, null);
                     ShowHit(fall.Hit);
-                    yield return view.Die();
+                    var abyss = SceneryVoid.Active;
+                    if (abyss != null)
+                        yield return view.FallIntoVoid(abyss.Hole, abyss.BehindTowerOrder, abyss.Flare);
+                    else
+                        yield return view.Die();
                     view.gameObject.SetActive(false);
                     break;
                 }

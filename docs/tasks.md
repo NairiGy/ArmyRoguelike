@@ -41,7 +41,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 | Banners | Mercenaries hire screen and a hired unit in battle; Third Wheel's choose-who-stays screen | Plain IMGUI lists (`DrawMercs`, `DrawDismiss`); a mercenary looks like any other unit in battle | Needed |
 | Banners | Vampiric heal on hit, Battering Ram's extra push and hit, a small unit flying 2 tiles | The normal heal popup, a "-2 ram" tick popup, the normal push slide over 2 tiles | Needed |
 | Battlefields | The battlefield on a map node (an icon per battlefield) and in the battle HUD | "· Storm" after the node's label, the rule as the map's hover text, "Battlefield: X" text in the HUD and the rule in the placement panel (`DrawMap` in `GameBootstrap`, `OmenLine` / `FieldRule` in `BattleController`) | Needed |
-| Battlefields | Edge of the World: a unit falling off the tower | A "Fell!" popup, the push slide one tile past the edge, the normal crumble, then hidden (`FallEvent` in `BattleController`) | Needed |
+| Battlefields | Edge of the World: a unit falling off the tower | A "Fell!" popup, the push slide one tile past the edge, the normal crumble, then hidden (`FallEvent` in `BattleController`) | Done 2026-10-31: it drops past the edge tumbling, then is pulled behind the tower into the void's black hole, spinning and shrinking, and the ring flares (`UnitView.FallIntoVoid`). Not playtested |
 | Battlefields | Storm: a tile marked for lightning; the strike (the painted `LightningStrike` is used) | Flat pale-blue tile tint (`StormMarkColor` in `BattleController`), "Storm mark" and "Lightning!" popups | Needed (mark only) |
 | Battlefields | Fortune's Favored: the favored unit (double damage this round) | An orange status pip (`FavoredColor` in `UnitView`), a "Favored!" popup | Needed |
 | Battlefields | What's On His Mind?: something that says intents are hidden | Nothing: hovering an enemy just shows no intent | Needed (maybe a "?" badge) |
@@ -62,7 +62,8 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [x] Lightning strike effect onto a tile (2026-10-27, `LightningStrike`): sky flickers, a painted bolt flickering between three shapes, the board flashes white-blue, sparks and a scorch. No rule uses it yet; in test battles press L to strike the hovered tile. Not playtested.
 - [ ] Lightning at night (ambient bolts around the tower, planned, later); can reuse the bolt art.
 - [x] Edge of the World looks like the void (2026-10-31, `SceneryVoid`, see "Battlefields change the scene" in the design note): void painting, walls dissolving, turning ring over the black hole, debris, falling stones, edge specks, void palette. Not playtested; motion only seen in code, not in game.
-- [ ] Void, next: a unit pushed off falls into the void (tumbles, pulled into the hole, shrinks, small flash) instead of today's crumble; the ring's light faintly on the tower walls (`FxLight`); tune the ring's size and gold after a playtest.
+- [x] A unit pushed off falls into the void (2026-10-31, `UnitView.FallIntoVoid`): drops tumbling, is pulled behind the tower into the hole, shrinks, the ring flares. Not seen in game yet. It still plays the crumble sound (`unit_die`); a "swallowed by the void" sound is for the sound chat.
+- [ ] Void, next: the ring's light faintly on the tower walls (`FxLight`); tune the ring's size and gold and the fall's timing after a playtest.
 - [ ] Scene looks for the other battlefields: Storm (heavy clouds, ambient lightning, rain, wet roof), Arcane Overflow (aurora, glowing rune joints), Fortune's Favored (amber dusk, stars), What's On His Mind? (fog over the enemy half, no moon). Ideas only, not agreed.
 - [ ] Platform built from pieces (painted slabs per tile plus edge and wall pieces along the outline) instead of one painting, so boards can be any size or shape (16x16 already works by zooming out; odd shapes need this). Later, when non-rectangular boards are planned.
 - [x] Highlights that fit the theme: smooth glowing tiles with a gentle pulse (2026-10-25). Not yet playtested; path markers not done.
@@ -124,6 +125,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [ ] Before release: ElevenLabs free-plan sounds (`sun_mark_1`, `_2`, `sun_charge_2`-`_12`, the `unit_*` sounds and any later ones) need "elevenlabs.io" in the game credits, or regenerate them on a paid plan. See `Assets/Audio/CREDITS.md`.
 - [ ] Unused ElevenLabs generations the user liked, for later effects: "warm golden glow" #1, #3, #4 and all four "heavy stone rune lighting up with heat" (in the ElevenLabs history, sharing to Explore is off).
 - [ ] Sound pass, still to do: ranged attacks, mines and bombs, the other effects, ambience (wind, braziers).
+- [ ] Void sounds (art chat, 2026-10-31): a unit falling into the void's black hole still plays the crumble (`unit_die` in `UnitView.FallIntoVoid`), and the void itself is silent (a low hum or pull?). Ask the user how they should feel first.
 - [ ] Wake sounds (art chat, 2026-10-30): the selected statue lifting is silent and its drop reuses `unit_step`; maybe a soft stone scrape on lifting. Ask the user how they should feel first.
 
 ## Marketing

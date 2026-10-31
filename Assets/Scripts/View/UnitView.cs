@@ -643,6 +643,54 @@ namespace ArmyRoguelike.View
             SetGridPosition(Unit.Pos);
         }
 
+        /// <summary>
+        /// Pushed off the roof over the void: it drops past the edge and starts to tumble, then, behind the
+        /// tower (<paramref name="behindOrder"/>), is pulled across to the black hole, spinning faster and
+        /// shrinking until it is gone. <paramref name="onSwallowed"/> runs as it vanishes.
+        /// </summary>
+        public IEnumerator FallIntoVoid(Vector3 hole, int behindOrder, System.Action onSwallowed)
+        {
+            SetSelected(false);
+            SetBarsVisible(false);
+            _shadow.enabled = false;
+            if (_base != null)
+                _base.enabled = false;
+            Fx.Dust(transform.position);
+            Sfx.Play("unit_die", transform.position);
+            var body = _body.transform;
+            var scale = transform.localScale;
+            var spin = transform.position.x < hole.x ? -1f : 1f;
+
+            var velocity = Vector3.zero;
+            for (var t = 0f; t < 1f; t += Time.deltaTime / 0.45f)
+            {
+                velocity += Vector3.down * 5f * Time.deltaTime;
+                transform.position += velocity * Time.deltaTime;
+                body.Rotate(0f, 0f, spin * 150f * Time.deltaTime);
+                yield return null;
+            }
+
+            // Swept sideways first, then up into the hole, faster and faster.
+            _body.sortingOrder = behindOrder;
+            var from = transform.position;
+            var bend = new Vector3(Mathf.Lerp(from.x, hole.x, 0.35f), from.y - 0.4f, from.z);
+            var start = _body.color;
+            for (var t = 0f; t < 1f; t += Time.deltaTime / 1.1f)
+            {
+                var e = t * t;
+                transform.position = Vector3.Lerp(Vector3.Lerp(from, bend, e), Vector3.Lerp(bend, hole, e), e);
+                body.Rotate(0f, 0f, spin * (150f + 650f * t) * Time.deltaTime);
+                transform.localScale = scale * Mathf.Lerp(1f, 0.06f, e);
+                _body.color = new Color(start.r, start.g, start.b, 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.7f, 1f, t)));
+                yield return null;
+            }
+
+            onSwallowed?.Invoke();
+            body.localRotation = Quaternion.identity;
+            transform.localScale = scale;
+            _body.color = start;
+        }
+
         /// <summary>A bone pile pulls itself back up into a statue.</summary>
         public IEnumerator Raise()
         {
