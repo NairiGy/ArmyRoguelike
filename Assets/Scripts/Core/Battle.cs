@@ -642,6 +642,11 @@ namespace ArmyRoguelike.Core
             return true;
         }
 
+        /// <summary>Whether the unit can walk over this anchor on its way: as standing, but allied units don't block it (objectives do).</summary>
+        private bool CanPass(Unit unit, GridPos anchor) =>
+            Footprint(anchor, unit.Size).All(c => Board.InBounds(c) && !Board.IsObstacle(c) &&
+                                                  (UnitAt(c) is not Unit occupant || occupant == unit || (occupant.Team == unit.Team && !occupant.IsObjective)));
+
         /// <summary>Where the player may deploy: the back two rows, or the ritual's zone around the objective.</summary>
         public bool IsPlayerZone(GridPos p) => Board.InBounds(p) && (_deployZone != null ? _deployZone.Contains(p) : p.Y < PlayerZoneRows);
 
@@ -884,7 +889,7 @@ namespace ArmyRoguelike.Core
 
                 foreach (var n in p.Neighbours())
                 {
-                    if (closed.Contains(n) || !CanStand(unit, n))
+                    if (closed.Contains(n) || !CanPass(unit, n))
                         continue;
                     var c = cost[p] + StepCost(unit, p, cost[p]);
                     if (c > budget || (cost.TryGetValue(n, out var old) && old <= c))
@@ -907,6 +912,8 @@ namespace ArmyRoguelike.Core
             if (!CanMove(unit))
                 return new Dictionary<GridPos, int>();
             var routes = CheapestRoutes(unit, unit.Moves).cost;
+            foreach (var anchor in routes.Keys.Where(a => !CanStand(unit, a)).ToList())
+                routes.Remove(anchor);
             routes.Remove(unit.Pos);
             if (unit.Team == Team.Enemy && _stormMarks.Count > 0)
                 foreach (var anchor in routes.Keys.Where(a => Footprint(a, unit.Size).Any(_stormMarks.Contains)).ToList())
@@ -921,7 +928,7 @@ namespace ArmyRoguelike.Core
         public List<GridPos> FindPath(Unit unit, GridPos target)
         {
             var (cost, parent) = CheapestRoutes(unit, unit.Moves);
-            if (!cost.ContainsKey(target) || target == unit.Pos)
+            if (!cost.ContainsKey(target) || target == unit.Pos || !CanStand(unit, target))
                 return null;
             var path = new List<GridPos>();
             for (var c = target; c != unit.Pos; c = parent[c])
@@ -1646,6 +1653,8 @@ namespace ArmyRoguelike.Core
             {
                 for (var i = 0; i < path.Count; i++)
                 {
+                    if (!CanStand(unit, path[i]))
+                        continue;
                     triggered = Footprint(path[i], unit.Size).Select(MineAt).FirstOrDefault(m => m != null);
                     if (triggered == null)
                         continue;
@@ -1661,6 +1670,8 @@ namespace ArmyRoguelike.Core
             {
                 for (var i = 0; i < path.Count; i++)
                 {
+                    if (!CanStand(unit, path[i]))
+                        continue;
                     caltrop = _caltrops.Contains(path[i]);
                     watcher = WatcherOf(path[i], unit);
                     if (!caltrop && watcher == null)

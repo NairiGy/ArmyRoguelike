@@ -265,6 +265,35 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void Walking_PassesThroughAllies_ButNotEnemies()
+        {
+            var b = Setup(new[] { M(UnitStats.Rogue), M(UnitStats.Warrior) }, new[] { P(3, 1), P(3, 2) }, new[] { Far });
+            var rogue = Player(b, 0);
+            Assert.IsFalse(b.GetReachable(rogue).ContainsKey(P(3, 2)), "can't stop on the ally");
+            Assert.IsNull(b.PlayerMove(rogue, P(3, 2)));
+            Assert.IsNotNull(b.PlayerMove(rogue, P(3, 3)));
+            Assert.AreEqual(P(3, 3), rogue.Pos);
+            Assert.AreEqual(0, rogue.Moves);
+
+            var blocked = Setup(new[] { M(UnitStats.Rogue) }, new[] { P(3, 1) }, new[] { E(UnitStats.Brute, 3, 2), Far });
+            Assert.IsFalse(blocked.GetReachable(Player(blocked)).ContainsKey(P(3, 3)), "enemies still block");
+        }
+
+        [Test]
+        public void Walking_ThroughAnAlly_NeverStopsOnItsTile()
+        {
+            var b = Setup(new[] { M(UnitStats.Rogue), M(UnitStats.Warrior) }, new[] { P(3, 1), P(3, 2) }, new[] { E(UnitStats.Cutpurse, 4, 2) });
+            var rogue = Player(b, 0);
+            var thief = Enemy(b);
+            thief.Ap = 1;
+            b.DoCaltrops(thief, P(3, 2));
+            thief.Pos = P(5, 5);
+            b.PlayerMove(rogue, P(3, 3));
+            Assert.AreEqual(P(3, 3), rogue.Pos, "the caltrops under the ally don't stop it there");
+            Assert.AreEqual(rogue.MaxHp, rogue.Hp);
+        }
+
+        [Test]
         public void Volley_HitsPlus_FriendlyFireIncluded()
         {
             var b = Setup(new[] { M(UnitStats.Archer, Technique.Volley), M(UnitStats.Warrior) }, new[] { P(3, 1), P(4, 4) },

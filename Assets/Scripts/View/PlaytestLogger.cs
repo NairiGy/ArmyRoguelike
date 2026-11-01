@@ -85,6 +85,7 @@ namespace ArmyRoguelike.View
                         turn = turn, team = move.Unit.Team.ToString(), unit = Name(move.Unit), type = "move",
                         fromX = move.From.X, fromY = move.From.Y, toX = move.To.X, toY = move.To.Y, tiles = move.Path.Count,
                         apAfter = ApAfter(move.Unit), movesAfter = move.Unit.Moves, autoApproach = autoApproach, amount = move.Cost, zocSteps = move.ZocSteps,
+                        throughAllies = move.Path.Take(move.Path.Count - 1).Count(p => _battle.UnitAt(p) != null),
                     });
                     break;
                 case AttackEvent attack:
@@ -697,6 +698,7 @@ namespace ArmyRoguelike.View
 
             /// <summary>Move: steps that left an enemy's reach (zone of control: uses up the remaining moves). "amount" is the moves spent.</summary>
             public int zocSteps;
+            public int throughAllies;
 
             /// <summary>
             /// End turn prompt: "asked", "confirmed" or "cancelled" ("target" lists the units that could still act).

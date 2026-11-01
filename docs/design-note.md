@@ -337,6 +337,8 @@ Built 2026-10-29 as an idea test on `experiment/small-board`, playtested 2026-10
 
 **Move first** (2026-10-29, same branch, not playtested): once a unit spends AP (any attack or action) it can't move again that turn, for both sides. Each turn is "position, then commit"; no more hit-and-run. Swift units can still move 2 and then attack, and Blink (an action) is the mage's escape. The Necromancer now backs off before raising or shooting.
 
+**Walking through allies** (2026-11-01, not playtested): any unit, on both sides, can walk through its allies but not stop on them; never through enemies or objectives. It only matters with 2 or more moves. Why allies only: fewer traffic jams on the small board, while your front line still protects your back line from Swift enemies. Mines, caltrops and overwatch only stop a unit on a tile it can stand on, so it never ends up on an ally's tile. Battle logs count the allies passed per move (`throughAllies`).
+
 **Step 3: unit kits** (2026-10-29, same branch, not playtested). Every unit should feel unique through its **passives** and its **actions**. The basic attack counts as an action too and has its own name (Wolf Bite, Strike, Shot, Bolt, Smash, Long Strike, Stab). Wolves are the first faction designed this way; the rest of the enemies and the player's units follow.
 
 - **Wolf** (6 HP, Swift). Passive **Blood Scent**: goes for the lowest-HP unit it can reach and attack this turn, instead of the nearest. Action **Wolf Bite**: 2 damage, +1 for every wolf bite earlier in the same turn (any wolf, any target, the Pack Leader's included; resets every turn).
