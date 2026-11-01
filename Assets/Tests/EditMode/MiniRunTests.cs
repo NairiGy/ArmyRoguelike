@@ -809,6 +809,7 @@ namespace ArmyRoguelike.Tests
             Assert.IsFalse(b.CanStillAct(warrior));
             rogue.Ap = 0;
             Assert.IsTrue(b.CanStillAct(rogue), "it can still walk");
+            b.PlayerUseAction(rogue, ActionKind.Vanish, rogue.Pos); // free, so it counted as something left to do
             rogue.Moves = 0;
             Assert.IsFalse(b.CanStillAct(rogue));
         }

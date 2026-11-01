@@ -1832,7 +1832,7 @@ namespace ArmyRoguelike.View
                     : $"   <color={LossColor}><b>-{loss}</b></color>";
             }
 
-            rows.Add(($"<color=white><b>HP {u.Hp} / {u.MaxHp}</b></color>{preview}   <color={DimColor}>{u.MaxAp} AP  ·  {u.MaxMoves} {(u.MaxMoves == 1 ? "move" : "moves")}  ·  range {u.Range}</color>",
+            rows.Add(($"<color=white><b>HP {u.Hp} / {u.MaxHp}</b></color>{preview}   <color={DimColor}>{u.MaxAp} AP  ·  {u.MaxMoves} {(u.MaxMoves == 1 ? "move" : "moves")}  ·  range {u.Range}  ·  {u.Stats.Weight.ToString().ToLowerInvariant()} weight</color>",
                 stats, HpBarHeight + 4f));
 
             if (u.Team == Team.Enemy && !Battle.IntentsHidden)

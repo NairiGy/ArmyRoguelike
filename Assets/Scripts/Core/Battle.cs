@@ -142,7 +142,7 @@ namespace ArmyRoguelike.Core
         public const int VanishBonus = 2;
 
         /// <summary>Blink (mages): teleport range in steps.</summary>
-        public const int BlinkRange = 2;
+        public const int BlinkRange = 3;
 
         /// <summary>Fling (goblins): range in steps (at least 2), and the damage a landing goblin deals.</summary>
         public const int FlingRange = 4;
@@ -167,8 +167,9 @@ namespace ArmyRoguelike.Core
         public const int SunDamage = 3;
         public const int MoonShield = 4;
 
-        /// <summary>Every special action costs the unit's one AP.</summary>
-        public static int ActionCost(ActionKind action) => action == ActionKind.PlaceMine ? MineCost : AttackCost;
+        /// <summary>Special actions cost the unit's one AP, except Blink and Vanish: free, but only before it has acted.</summary>
+        public static int ActionCost(ActionKind action) =>
+            action == ActionKind.Blink || action == ActionKind.Vanish ? 0 : action == ActionKind.PlaceMine ? MineCost : AttackCost;
 
         /// <summary>
         /// Cooldown of every action in the unit's own turns *(placeholders)*: used now, ready again this many turns
@@ -206,7 +207,8 @@ namespace ArmyRoguelike.Core
         /// <summary>Pays for an action and puts it on cooldown.</summary>
         private void UseUp(Unit unit, ActionKind action)
         {
-            SpendAp(unit, ActionCost(action));
+            if (ActionCost(action) > 0)
+                SpendAp(unit, ActionCost(action));
             unit.StartCooldown(action, CooldownIn(action));
             unit.CountUse(action);
         }
@@ -1044,7 +1046,7 @@ namespace ArmyRoguelike.Core
 
         public bool CanUseAction(Unit unit, ActionKind action, GridPos tile)
         {
-            if (IsOver || !unit.IsAlive || !unit.HasAction(action) || unit.Ap < ActionCost(action) || !Ready(unit, action) || !Board.InBounds(tile))
+            if (IsOver || !unit.IsAlive || !unit.HasAction(action) || unit.Ap < ActionCost(action) || (ActionCost(action) == 0 && unit.ActedThisTurn) || !Ready(unit, action) || !Board.InBounds(tile))
                 return false;
             var target = UnitAt(tile);
             var steps = Distance(tile, 1, unit);

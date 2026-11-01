@@ -127,6 +127,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [ ] Before release: ElevenLabs free-plan sounds (`sun_mark_1`, `_2`, `sun_charge_2`-`_12`, the `unit_*` sounds and any later ones) need "elevenlabs.io" in the game credits, or regenerate them on a paid plan. See `Assets/Audio/CREDITS.md`.
 - [ ] Unused ElevenLabs generations the user liked, for later effects: "warm golden glow" #1, #3, #4 and all four "heavy stone rune lighting up with heat" (in the ElevenLabs history, sharing to Explore is off).
 - [ ] Sound pass, still to do: ranged attacks, mines and bombs, the other effects, ambience (wind, braziers).
+- [ ] Ambient sounds and music depending on the battlefield (user request, 2026-11-01). Ask the user how they should feel first.
 - [ ] Void sounds (art chat, 2026-10-31): a unit falling into the void's black hole still plays the crumble (`unit_die` in `UnitView.FallIntoVoid`), and the void itself is silent (a low hum or pull?). Ask the user how they should feel first.
 - [ ] Wake sounds (art chat, 2026-10-30): the selected statue lifting is silent and its drop reuses `unit_step`; maybe a soft stone scrape on lifting. Ask the user how they should feel first.
 

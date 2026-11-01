@@ -224,11 +224,44 @@ namespace ArmyRoguelike.Tests
             var b = Setup(new[] { M(UnitStats.Apprentice) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far }, P(2, 1));
             var mage = Player(b);
             Assert.IsTrue(b.CanUseAction(mage, ActionKind.Blink, P(1, 1)), "over the rock");
-            Assert.IsFalse(b.CanUseAction(mage, ActionKind.Blink, P(3, 4)), "3 steps is too far");
+            Assert.IsTrue(b.CanUseAction(mage, ActionKind.Blink, P(3, 4)), "3 steps is in range");
+            Assert.IsFalse(b.CanUseAction(mage, ActionKind.Blink, P(3, 5)), "4 steps is too far");
             Assert.IsFalse(b.CanUseAction(mage, ActionKind.Blink, P(3, 2)), "occupied");
             b.PlayerUseAction(mage, ActionKind.Blink, P(1, 1));
             Assert.AreEqual(P(1, 1), mage.Pos);
             Assert.AreEqual(1, mage.Moves, "its move is still there");
+        }
+
+        [Test]
+        public void Blink_IsFree_ButOnlyBeforeActing()
+        {
+            var b = Setup(new[] { M(UnitStats.Apprentice) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far });
+            var mage = Player(b);
+            b.PlayerUseAction(mage, ActionKind.Blink, P(3, 3));
+            Assert.AreEqual(mage.MaxAp, mage.Ap, "no AP spent");
+            Assert.IsTrue(b.CanMove(mage), "it can still move");
+            Assert.IsTrue(b.CanAttack(mage, Enemy(b)), "and attack");
+
+            var other = Setup(new[] { M(UnitStats.Apprentice) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far });
+            var attacker = Player(other);
+            other.PlayerAttack(attacker, Enemy(other));
+            Assert.IsFalse(other.CanUseAction(attacker, ActionKind.Blink, P(1, 1)), "no blinking away after attacking");
+        }
+
+        [Test]
+        public void Vanish_IsFree_ButOnlyBeforeActing()
+        {
+            var b = Setup(new[] { M(UnitStats.Rogue) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far });
+            var rogue = Player(b);
+            b.PlayerUseAction(rogue, ActionKind.Vanish, rogue.Pos);
+            Assert.AreEqual(rogue.MaxAp, rogue.Ap, "no AP spent");
+            Assert.IsTrue(b.CanMove(rogue), "it can still move");
+            Assert.IsTrue(b.CanAttack(rogue, Enemy(b)), "and attack");
+
+            var other = Setup(new[] { M(UnitStats.Rogue) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far });
+            var attacker = Player(other);
+            other.PlayerAttack(attacker, Enemy(other));
+            Assert.IsFalse(other.CanUseAction(attacker, ActionKind.Vanish, attacker.Pos), "no vanishing after attacking");
         }
 
         [Test]
