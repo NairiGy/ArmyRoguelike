@@ -96,7 +96,7 @@ namespace ArmyRoguelike.Core
                     break;
             }
 
-            var battle = new Battle(new Board(Size, Size, plan.Rocks), army, plan.Enemies) { Rng = new Random(rng.Next()) };
+            var battle = new Battle(new Board(Size, Size, plan.Rocks), army, plan.Enemies) { Rng = new SeededRng(rng.Next()) };
             if (plan.Objective.HasValue)
                 battle.SetupRitual(UnitStats.MoonShrine, plan.Objective.Value, plan.DeployZone, plan.RitualTurns, plan.Waves);
             if (plan.Totems.Count > 0)

@@ -23,7 +23,7 @@ A single-player roguelike army-builder. You lead a small squad of living statues
 
 - `Assets/Scripts/Core`: rules in pure C#, with no Unity references (`ArmyRoguelike.Core` assembly).
   - `UnitStats.cs`: every unit type (and its weight). `Techniques.cs`: the techniques units learn and the per-line growth per level. `Equipment.cs`: items, plus names and rule text for abilities and actions. `Banner.cs`: banners, their numbers and rule text. `Battlefield.cs`: battlefields (one rule per fight), their numbers and rule text.
-  - `Battle.cs`: board, AP, movement, attacks, special actions, statuses and tiles. All damage goes through one `Damage` method so abilities apply to every source. Actions return the events they caused, which the view animates.
+  - `Battle.cs`: board, AP, movement, attacks, special actions, statuses and tiles. All damage goes through one `Damage` method so abilities apply to every source. `Battle.Clone()` makes an exact copy for bots looking ahead (`SeededRng.cs` is its copyable random generator). Actions return the events they caused, which the view animates.
   - `EnemyAI.cs`: enemy behaviour and the intent shown on hover. `Run.cs`: draft, map, technique picks, shop and events. `Encounter.cs`: factions, bosses and their layout templates.
   - `AssemblyInfo.cs` lets the tests set internal state directly.
 - `Assets/Scripts/View`: Unity side (`ArmyRoguelike.View` assembly). It shows the battle and handles input, and only reads state and calls into Core. Screens are IMGUI; buttons that change the screen run deferred via `GameBootstrap.Do` to avoid IMGUI layout errors.
@@ -33,7 +33,7 @@ A single-player roguelike army-builder. You lead a small squad of living statues
 - Effects playground (`View/FxPlayground.cs`): F1 in a test battle plays any effect on the hovered tile or unit, plays each sound, sets the volumes and locks a sound to one variant. Try auditions a sound: its real effect on a unit with each variant in turn, Y / N verdicts saved to `Playtests/sound-review.txt`. `UnitView.Restore` stands a statue back up after the death demo.
 - `Assets/Tests/EditMode`: NUnit tests for Core.
 - `tools/dev.sh compile|test|wiki|sim`: compile, run the tests, write a text-only gamepedia and play bot battles for a balance report (`tools/balance/`, see "Balance" in the design note) with Unity's bundled compiler, with the Editor open or closed. See `tools/README.md`. The Pipeline package (`com.unity.pipeline`) lets `unity status` / `unity command` drive an open Editor.
-- `Playtests/` (git-ignored): a JSON log per battle (`PlaytestLogger`) and per run (`RunLogger`). F9 in game saves a marker with a board snapshot. Read these to summarize playtests instead of asking the user for numbers. Battles skipped with the debug Win button are marked `skipped`.
+- `Playtests/` (git-ignored): a JSON log per battle (`PlaytestLogger`) and per run (`RunLogger`), each stamped with its git commit and dirty flags; run logs also hold the player's `runTag` and `difficultyRating`. F9 in game saves a marker with a board snapshot. Read these to summarize playtests instead of asking the user for numbers. Battles skipped with the debug Win button are marked `skipped`.
 - The scene stays nearly empty. `GameBootstrap` builds the run at runtime, and placeholder art is generated in code (`PlaceholderArt`). Unit types with a painted statue sprite use it instead.
 
 ## Version control

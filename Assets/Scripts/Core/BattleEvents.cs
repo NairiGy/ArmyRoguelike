@@ -329,16 +329,20 @@ namespace ArmyRoguelike.Core
         public override Unit Actor => Source;
     }
 
-    /// <summary>Damage over time at the start of a turn: "poison" or "burn".</summary>
+    /// <summary>Damage outside an attack: "poison", "burn", "caltrops", "collision", "ram" or "leader lost".</summary>
     public sealed class TickEvent : BattleEvent
     {
         public readonly string Cause;
         public readonly Hit Hit;
 
-        public TickEvent(string cause, Hit hit)
+        /// <summary>Who caused it, for the playtest log (the poisoner, the fireball's caster, the pusher); null for "leader lost".</summary>
+        public readonly Unit Source;
+
+        public TickEvent(string cause, Hit hit, Unit source = null)
         {
             Cause = cause;
             Hit = hit;
+            Source = source;
         }
 
         public override Unit Actor => null;

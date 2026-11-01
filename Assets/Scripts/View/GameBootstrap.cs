@@ -456,6 +456,12 @@ namespace ArmyRoguelike.View
                 return;
             }
 
+            if (_abandoning)
+            {
+                DrawRunEnd(width);
+                return;
+            }
+
             switch (_run.State)
             {
                 case RunState.Draft:
@@ -529,7 +535,8 @@ namespace ArmyRoguelike.View
                 var why = WhyNot(technique, member);
                 GUI.enabled = can(member);
                 var m = member;
-                if (GUILayout.Button($"{member.Stats.Name} (level {member.Level} -> {member.Level + 1}){(why.Length > 0 ? $"  ({why})" : "")}"))
+                var level = member.WouldLevelUp(technique) ? $"level {member.Level} -> {member.Level + 1}" : $"level {member.Level}, relearning";
+                if (GUILayout.Button($"{member.Stats.Name} ({level}){(why.Length > 0 ? $"  ({why})" : "")}"))
                     Do(() => learn(m));
                 GUI.enabled = true;
             }
@@ -666,6 +673,9 @@ namespace ArmyRoguelike.View
             GUILayout.Label("Break the Ritual: smash 3 totems before enemy turn 4 to earn a technique pick. If the summoning completes, you take a curse.");
             GUILayout.Label("Battle: a faction you haven't beaten (a rematch once you've met them all). Elite: a harder rematch of a faction you beat; its pick has a rare technique. Battles and elites show their faction when you reach their step.");
             DrawArmy();
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Abandon run", GUILayout.Width(120)))
+                Do(() => _abandoning = true);
             GUILayout.EndArea();
         }
 
@@ -802,7 +812,7 @@ namespace ArmyRoguelike.View
             GUILayout.Label($"{_run.Gold} gold", _shopTitle);
             GUILayout.EndHorizontal();
             _cardText.normal.textColor = DimText;
-            GUILayout.Label("A unit that learns a technique goes up a level. Each unit has one item slot; a new item replaces the old.", _cardText);
+            GUILayout.Label("A unit that learns a new technique goes up a level; relearning a forgotten one doesn't. Each unit has one item slot; a new item replaces the old.", _cardText);
             GUILayout.Space(8);
 
             _scroll = GUILayout.BeginScrollView(_scroll, false, false, GUIStyle.none, GUI.skin.verticalScrollbar, GUIStyle.none, GUILayout.ExpandHeight(true));
@@ -916,7 +926,7 @@ namespace ArmyRoguelike.View
             var x = r.x + 10;
             var inner = r.width - 20;
             Label(new Rect(x, r.y + 8, inner, 22), "Forget a technique", _cardName, Color.white);
-            Label(new Rect(x, r.y + 30, inner, 18), "The level stays, and techniques that need it go too. Click one to forget it.", _cardText, DimText);
+            Label(new Rect(x, r.y + 30, inner, 18), "The level stays (relearning it adds none), and techniques that need it go too. Click one to forget it.", _cardText, DimText);
             var y = r.y + 52;
             foreach (var member in forgetters)
             {
@@ -971,8 +981,8 @@ namespace ArmyRoguelike.View
             var y = r.y + 8;
             Label(new Rect(x, y, inner, 22), m.Stats.Name, _cardName, Color.white);
             y += 22;
-            var levelUp = technique != null && can;
-            Label(new Rect(x, y, inner, 16), levelUp ? $"Level {m.Level} -> {m.Level + 1}" : $"Level {m.Level}", _cardText, levelUp ? HudArt.BuffColor : TextColor);
+            var levelUp = technique != null && can && m.WouldLevelUp(technique);
+            Label(new Rect(x, y, inner, 16), levelUp ?$"Level {m.Level} -> {m.Level + 1}" : $"Level {m.Level}", _cardText, levelUp ? HudArt.BuffColor : TextColor);
             y += 16;
             var replacing = item != null && can && m.Equipment != null;
             Label(new Rect(x, y, inner, 16), replacing ? $"Replaces {m.Equipment.Name}" : $"Item: {(m.Equipment != null ? m.Equipment.Name : "none")}",
@@ -1311,17 +1321,55 @@ namespace ArmyRoguelike.View
             GUILayout.EndArea();
         }
 
+        // The "Abandon run" screen is up: the run is still going until New run is clicked, which saves it as abandoned.
+        private bool _abandoning;
+
+        // The answers on the run-end screen; both can be skipped.
+        private string _runTag = "";
+        private int _difficulty;
+
+        private void SetRating(string tag, int difficulty)
+        {
+            _runTag = tag;
+            _difficulty = difficulty;
+            _runLog?.RecordRating(tag, difficulty);
+        }
+
+        /// <summary>The run-end screen (won, lost or abandoned): New run always works, the tag and the rating are optional.</summary>
         private void DrawRunEnd(float screenWidth)
         {
             const float w = 340;
-            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 140, w, 220), GUI.skin.box);
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 140, w, 310), GUI.skin.box);
             var centred = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter };
-            GUILayout.Label(_run.State == RunState.Won ? "Run won!" : "Run lost", Title);
-            GUILayout.Label(_run.State == RunState.Won
-                ? $"The ogre is rubble. Gold left: {_run.Gold}"
+            GUILayout.Label(_abandoning ? "Abandon this run?" : _run.State == RunState.Won ? "Run won!" : "Run lost", Title);
+            GUILayout.Label(_abandoning ? $"You are at step {_run.StepIndex + 1}."
+                : _run.State == RunState.Won ? $"The ogre is rubble. Gold left: {_run.Gold}"
                 : $"Defeated at step {_run.StepIndex + 1}: {_run.CurrentEncounter?.Name}", centred);
+
+            GUILayout.Space(8);
+            GUILayout.Label("Was this run... (optional)", centred);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button((_runTag == "serious" ? "> " : "") + "Serious run"))
+                Do(() => SetRating("serious", _difficulty));
+            if (GUILayout.Button((_runTag == "testing" ? "> " : "") + "Just testing"))
+                Do(() => SetRating("testing", _difficulty));
+            GUILayout.EndHorizontal();
+
+            GUILayout.Label("How hard was it? 1 easy, 5 brutal (optional)", centred);
+            GUILayout.BeginHorizontal();
+            for (var i = 1; i <= 5; i++)
+            {
+                var rating = i;
+                if (GUILayout.Button((_difficulty == i ? "> " : "") + i))
+                    Do(() => SetRating(_runTag, rating));
+            }
+
+            GUILayout.EndHorizontal();
+
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button("New run", GUILayout.Height(32)))
+            if (_abandoning && GUILayout.Button("Back to the run", GUILayout.Height(26)))
+                Do(() => _abandoning = false);
+            if (GUILayout.Button(_abandoning ? "Abandon and start a new run" : "New run", GUILayout.Height(32)))
                 Do(Restart);
             GUILayout.EndArea();
         }

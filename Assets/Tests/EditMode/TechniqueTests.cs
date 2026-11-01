@@ -59,6 +59,37 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void Forget_RelearningGivesNoNewLevel()
+        {
+            var mage = M(UnitStats.Apprentice, Technique.Fireball, Technique.Burning);
+            mage.Forget(Technique.Fireball);
+            Assert.IsTrue(Technique.LearnableBy(mage).Contains(Technique.Fireball), "forgotten techniques stay learnable");
+            Assert.IsFalse(mage.WouldLevelUp(Technique.Fireball));
+            Assert.IsTrue(mage.Learn(Technique.Fireball));
+            Assert.IsTrue(mage.Knows(Technique.Fireball));
+            Assert.AreEqual(2, mage.Level);
+
+            Assert.IsFalse(mage.WouldLevelUp(Technique.Burning), "dropped along with Fireball, but learned before");
+            Assert.IsTrue(mage.Learn(Technique.Burning));
+            Assert.AreEqual(2, mage.Level);
+
+            Assert.IsTrue(mage.WouldLevelUp(Technique.Ward));
+            Assert.IsTrue(mage.Learn(Technique.Ward));
+            Assert.AreEqual(3, mage.Level, "a new technique still levels up");
+        }
+
+        [Test]
+        public void Levels_ArcherReachesItsSecondDamageWithAllFiveTechniques()
+        {
+            var archer = M(UnitStats.Archer, Technique.SteadyAimPlus, Technique.Pierce, Technique.OpeningShot, Technique.Prey);
+            Assert.AreEqual(1, archer.LevelDamage);
+            archer.Learn(Technique.Volley);
+            Assert.AreEqual(5, archer.Level);
+            Assert.AreEqual(2, archer.LevelDamage, "+1 at levels 3 and 5");
+            CollectionAssert.AreEqual(new[] { 3, 6 }, Growth.DamageLevels(UnitStats.Apprentice).ToArray(), "the Mage keeps 3 and 6");
+        }
+
+        [Test]
         public void Catalog_EveryRequirementIsInTheSameLine()
         {
             Assert.AreEqual(33, Technique.All.Count);

@@ -22,6 +22,16 @@ namespace ArmyRoguelike.Core
                 _obstacles[p.X, p.Y] = true;
         }
 
+        private Board(Board other)
+        {
+            Width = other.Width;
+            Height = other.Height;
+            _obstacles = (bool[,])other._obstacles.Clone();
+        }
+
+        /// <summary>A separate board with the same rocks.</summary>
+        public Board Clone() => new Board(this);
+
         public bool InBounds(GridPos p) => p.X >= 0 && p.Y >= 0 && p.X < Width && p.Y < Height;
 
         public bool IsObstacle(GridPos p) => InBounds(p) && _obstacles[p.X, p.Y];

@@ -132,6 +132,34 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void Favored_ABossAloneMeansNoFavoredEnemy()
+        {
+            var b = Setup(Battlefield.FortunesFavored, new[] { UnitStats.Warrior }, null, (UnitStats.Ogre, P(4, 6)));
+            for (var round = 0; round < 5 && !b.IsOver; round++)
+            {
+                Assert.IsFalse(Enemy(b).Favored, "a boss is never favored");
+                Assert.IsTrue(Player(b).Favored, "your side still gets one");
+                Player(b).Hp = Player(b).MaxHp;
+                b.EndPlayerTurn();
+            }
+        }
+
+        [Test]
+        public void Favored_TheNecromancersMinionsStayEligible()
+        {
+            for (var seed = 0; seed < 20; seed++)
+            {
+                var b = new Battle(new Board(8, 8), new[] { new ArmyMember(UnitStats.Warrior) },
+                    new[] { (UnitStats.Necromancer, P(0, 7)), (UnitStats.Skeleton, P(7, 7)) }) { Rng = new SeededRng(seed) };
+                b.SetField(Battlefield.FortunesFavored);
+                b.Place(Player(b), P(0, 0));
+                b.StartBattle();
+                Assert.IsFalse(b.Units.First(u => u.Stats == UnitStats.Necromancer).Favored);
+                Assert.IsTrue(b.Units.First(u => u.Stats == UnitStats.Skeleton).Favored);
+            }
+        }
+
+        [Test]
         public void Favored_DealsDoubleDamage()
         {
             var b = Setup(Battlefield.FortunesFavored, new[] { UnitStats.Warrior }, new[] { P(3, 3) },

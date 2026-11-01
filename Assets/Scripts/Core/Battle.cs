@@ -223,7 +223,10 @@ namespace ArmyRoguelike.Core
         private readonly Dictionary<GridPos, int> _barricadeHp = new Dictionary<GridPos, int>();
         private readonly Dictionary<GridPos, int> _ice = new Dictionary<GridPos, int>();
         private readonly Dictionary<GridPos, int> _burning = new Dictionary<GridPos, int>();
-        private readonly HashSet<GridPos> _caltrops = new HashSet<GridPos>();
+
+        // Who set each tile burning and who dropped each caltrop: only for crediting the damage in the playtest log.
+        private readonly Dictionary<GridPos, Unit> _burnOwners = new Dictionary<GridPos, Unit>();
+        private readonly Dictionary<GridPos, Unit> _caltrops = new Dictionary<GridPos, Unit>();
         private readonly Dictionary<Unit, HashSet<GridPos>> _overwatch = new Dictionary<Unit, HashSet<GridPos>>();
         private int _nextId;
 
@@ -237,7 +240,7 @@ namespace ArmyRoguelike.Core
         private readonly Dictionary<GridPos, Team> _shroud = new Dictionary<GridPos, Team>();
 
         /// <summary>Random picks during the battle (omen targets, where reinforcements arrive).</summary>
-        internal Random Rng { get; set; } = new Random(0);
+        internal SeededRng Rng { get; set; } = new SeededRng(0);
 
         public IReadOnlyList<Unit> Units => _units;
         public IReadOnlyList<Mine> Mines => _mines;
@@ -247,7 +250,7 @@ namespace ArmyRoguelike.Core
         public IReadOnlyDictionary<GridPos, int> BurningTiles => _burning;
 
         /// <summary>Bandit caltrops on the board: a unit of yours stepping on them takes 1 and stops.</summary>
-        public IReadOnlyCollection<GridPos> Caltrops => _caltrops;
+        public IReadOnlyCollection<GridPos> Caltrops => _caltrops.Keys;
 
         /// <summary>Tiles watched by a crossbowman on overwatch (your next unit walking onto one gets shot).</summary>
         public IEnumerable<GridPos> OverwatchTiles => _overwatch.Where(o => o.Key.IsAlive).SelectMany(o => o.Value).Distinct();
@@ -444,7 +447,8 @@ namespace ArmyRoguelike.Core
                     u.Favored = false;
                 foreach (var team in new[] { Team.Player, Team.Enemy })
                 {
-                    var pool = Living(team).Where(u => !u.IsObjective && u.Stats.Damage > 0).ToList();
+                    // A boss is never favored, so a boss fighting alone leaves its side without one.
+                    var pool = Living(team).Where(u => !u.IsObjective && !u.Stats.IsBoss && u.Stats.Damage > 0).ToList();
                     if (pool.Count == 0)
                         continue;
                     var unit = pool[Rng.Next(pool.Count)];
@@ -537,6 +541,79 @@ namespace ArmyRoguelike.Core
         {
         }
 
+        private Battle(Board board)
+        {
+            Board = board;
+        }
+
+        /// <summary>
+        /// A separate copy of this battle in its exact current state, random generator included: the same moves on both
+        /// give the same results, and nothing done to one touches the other (for a bot looking ahead). Army members and
+        /// unit types are shared, since nothing changes them during a battle; <see cref="OpeningEvents"/> starts empty,
+        /// since it describes the original's units. Any state added to Battle or Unit must be copied here too; a test
+        /// compares every field.
+        /// </summary>
+        public Battle Clone()
+        {
+            var map = new Dictionary<Unit, Unit>(_units.Count);
+            var copy = new Battle(Board.Clone());
+            foreach (var u in _units)
+            {
+                var c = u.CopyFor(map);
+                map[u] = c;
+                copy._units.Add(c);
+            }
+
+            foreach (var u in _units)
+                map[u].CopyLinks(u, map);
+
+            Unit Mapped(Unit u) => u == null ? null : map[u];
+
+            foreach (var m in _mines)
+                copy._mines.Add(new Mine(m.Tile, Mapped(m.Owner), m.Damage));
+            foreach (var b in _bombs)
+                copy._bombs.Add(new Bomb(b.Tile, Mapped(b.Owner), b.Damage));
+            foreach (var b in _barricades)
+                copy._barricades.Add((b.tile, Mapped(b.owner)));
+            foreach (var hp in _barricadeHp)
+                copy._barricadeHp.Add(hp.Key, hp.Value);
+            foreach (var ice in _ice)
+                copy._ice.Add(ice.Key, ice.Value);
+            foreach (var burn in _burning)
+                copy._burning.Add(burn.Key, burn.Value);
+            foreach (var owner in _burnOwners)
+                copy._burnOwners.Add(owner.Key, Mapped(owner.Value));
+            foreach (var caltrop in _caltrops)
+                copy._caltrops.Add(caltrop.Key, Mapped(caltrop.Value));
+            foreach (var watch in _overwatch)
+                copy._overwatch.Add(map[watch.Key], new HashSet<GridPos>(watch.Value));
+            foreach (var shroud in _shroud)
+                copy._shroud.Add(shroud.Key, shroud.Value);
+            foreach (var totem in _totems)
+                copy._totems.Add(map[totem]);
+            copy._waves.AddRange(_waves);
+            copy._omens.AddRange(_omens);
+            copy._sunMarks.AddRange(_sunMarks);
+            copy._stormMarks.AddRange(_stormMarks);
+            copy._banners.UnionWith(_banners);
+            copy._deployZone = _deployZone == null ? null : new HashSet<GridPos>(_deployZone);
+            copy._nextId = _nextId;
+            copy.Rng = Rng.Clone();
+            copy.Phase = Phase;
+            copy.ActiveUnit = Mapped(ActiveUnit);
+            copy.TurnNumber = TurnNumber;
+            copy.WasSkipped = WasSkipped;
+            copy.Objective = Mapped(Objective);
+            copy.RitualTurns = RitualTurns;
+            copy.RitualComplete = RitualComplete;
+            copy.SummonTurn = SummonTurn;
+            copy.SummoningComplete = SummoningComplete;
+            copy.Field = Field;
+            copy.BiteChain = BiteChain;
+            copy.StolenGold = StolenGold;
+            return copy;
+        }
+
         /// <summary>A standalone wolf fight with warrior, archer and rogue.</summary>
         public static Battle CreatePrototype() => Encounter.Wolves.CreateBattle(ArmyMember.StartingArmy());
 
@@ -626,7 +703,7 @@ namespace ArmyRoguelike.Core
         /// <summary>A tile with no rock and no living unit. Bone piles, mines and bombs don't block.</summary>
         public bool IsFree(GridPos p) => Board.InBounds(p) && !Board.IsObstacle(p) && UnitAt(p) == null;
 
-        private bool HasHazard(GridPos p) => MineAt(p) != null || BombAt(p) != null || _caltrops.Contains(p);
+        private bool HasHazard(GridPos p) => MineAt(p) != null || BombAt(p) != null || _caltrops.ContainsKey(p);
 
         /// <summary>Whether the unit could stand with its anchor on this tile.</summary>
         public bool CanStand(Unit unit, GridPos anchor)
@@ -1271,6 +1348,7 @@ namespace ArmyRoguelike.Core
                 foreach (var p in area.Where(p => !Board.IsObstacle(p)))
                 {
                     _burning[p] = BurnRounds;
+                    _burnOwners[p] = caster;
                     events.Add(new TileEvent("burn", p, true, caster));
                 }
             }
@@ -1384,7 +1462,7 @@ namespace ArmyRoguelike.Core
                     foreach (var blocker in blockers.Where(b => b.IsAlive))
                     {
                         var blockerAfter = new List<BattleEvent>();
-                        events.Add(new TickEvent("collision", Damage(blocker, CollisionDamage, pusher, DamageKind.Collision, blockerAfter)));
+                        events.Add(new TickEvent("collision", Damage(blocker, CollisionDamage, pusher, DamageKind.Collision, blockerAfter), pusher));
                         events.AddRange(blockerAfter);
                     }
 
@@ -1411,7 +1489,7 @@ namespace ArmyRoguelike.Core
             if (IsRamming(pusher) && unit.IsAlive)
             {
                 var after = new List<BattleEvent>();
-                events.Add(new TickEvent("ram", Damage(unit, Core.Banners.RamDamage, pusher, DamageKind.Collision, after)));
+                events.Add(new TickEvent("ram", Damage(unit, Core.Banners.RamDamage, pusher, DamageKind.Collision, after), pusher));
                 events.AddRange(after);
             }
         }
@@ -1715,7 +1793,7 @@ namespace ArmyRoguelike.Core
                 {
                     if (!CanStand(unit, path[i]))
                         continue;
-                    caltrop = _caltrops.Contains(path[i]);
+                    caltrop = _caltrops.ContainsKey(path[i]);
                     watcher = WatcherOf(path[i], unit);
                     if (!caltrop && watcher == null)
                         continue;
@@ -1736,11 +1814,12 @@ namespace ArmyRoguelike.Core
 
             if (caltrop)
             {
+                var dropper = _caltrops[unit.Pos];
                 _caltrops.Remove(unit.Pos);
                 unit.Moves = 0;
                 events.Add(new TileEvent("caltrops", unit.Pos, false, null));
                 var after = new List<BattleEvent>();
-                events.Add(new TickEvent("caltrops", Damage(unit, CaltropsDamage, null, DamageKind.Tick, after)));
+                events.Add(new TickEvent("caltrops", Damage(unit, CaltropsDamage, null, DamageKind.Tick, after), dropper));
                 events.AddRange(after);
             }
 
@@ -1894,6 +1973,7 @@ namespace ArmyRoguelike.Core
                 _mines.RemoveAll(m => m.Tile == rock.Value);
                 _bombs.RemoveAll(b => b.Tile == rock.Value);
                 _burning.Remove(rock.Value);
+                _burnOwners.Remove(rock.Value);
             }
 
             var events = new List<BattleEvent> { new BoulderEvent(thrower, hit, rock) };
@@ -1977,7 +2057,7 @@ namespace ArmyRoguelike.Core
         internal List<BattleEvent> DoCaltrops(Unit unit, GridPos tile)
         {
             UseUp(unit, ActionKind.Caltrops);
-            _caltrops.Add(tile);
+            _caltrops[tile] = unit;
             return new List<BattleEvent> { new TileEvent("caltrops", tile, true, unit) };
         }
 
@@ -2001,7 +2081,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>The watcher (alive, still on overwatch) that would shoot a unit stepping onto this tile, if any.</summary>
         private Unit WatcherOf(GridPos tile, Unit mover) =>
-            mover.IsHidden ? null : _overwatch.Where(o => o.Key.IsAlive && o.Key.Team != mover.Team && o.Value.Contains(tile)).Select(o => o.Key).FirstOrDefault();
+            mover.IsHidden ? null : _overwatch.Where(o => o.Key.IsAlive && o.Key.Team != mover.Team && o.Value.Contains(tile)).Select(o => o.Key).OrderBy(u => u.Id).FirstOrDefault();
 
         /// <summary>Bull Rush: a melee hit on an adjacent 1x1 unit that also pushes it 1 tile.</summary>
         public bool CanBullRush(Unit unit, Unit target) =>
@@ -2294,6 +2374,7 @@ namespace ArmyRoguelike.Core
                 if (source.Has(Ability.Poison))
                 {
                     target.PoisonTurns = PoisonTurns;
+                    target.PoisonSource = source;
                     after.Add(new StatusEvent(source, target, StatusKind.Poison, PoisonTurns));
                 }
 
@@ -2411,7 +2492,7 @@ namespace ArmyRoguelike.Core
                 if (_burning.ContainsKey(u.Pos) || Cells(u).Any(_burning.ContainsKey))
                 {
                     var after = new List<BattleEvent>();
-                    events.Add(new TickEvent("burn", Damage(u, BurnDamage, null, DamageKind.Tick, after)));
+                    events.Add(new TickEvent("burn", Damage(u, BurnDamage, null, DamageKind.Tick, after), _burnOwners[Cells(u).First(_burning.ContainsKey)]));
                     events.AddRange(after);
                 }
 
@@ -2419,22 +2500,24 @@ namespace ArmyRoguelike.Core
                 {
                     u.PoisonTurns--;
                     var after = new List<BattleEvent>();
-                    events.Add(new TickEvent("poison", Damage(u, PoisonDamage, null, DamageKind.Tick, after)));
+                    events.Add(new TickEvent("poison", Damage(u, PoisonDamage, null, DamageKind.Tick, after), u.PoisonSource));
                     events.AddRange(after);
                 }
             }
 
             if (team == Team.Player)
             {
-                foreach (var p in _burning.Keys.ToList())
+                // In tile order, so a copied battle reports them in the same order.
+                foreach (var p in _burning.Keys.OrderBy(p => p.Y).ThenBy(p => p.X).ToList())
                 {
                     if (--_burning[p] > 0)
                         continue;
                     _burning.Remove(p);
+                    _burnOwners.Remove(p);
                     events.Add(new TileEvent("burn", p, false, null));
                 }
 
-                foreach (var p in _ice.Keys.ToList())
+                foreach (var p in _ice.Keys.OrderBy(p => p.Y).ThenBy(p => p.X).ToList())
                 {
                     if (--_ice[p] > 0)
                         continue;

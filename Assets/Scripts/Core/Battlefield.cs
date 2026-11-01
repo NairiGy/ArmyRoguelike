@@ -17,7 +17,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Every action's cooldown is 1 shorter (1 at least).</summary>
         ArcaneOverflow,
 
-        /// <summary>Each round one unit of each side is favored: it deals double damage until the next round.</summary>
+        /// <summary>Each round one unit of each side (never a boss) is favored: it deals double damage until the next round.</summary>
         FortunesFavored,
 
         /// <summary>Enemy intents are hidden.</summary>
@@ -65,7 +65,7 @@ namespace ArmyRoguelike.Core
                     return $"Every action's cooldown is {CooldownCut} shorter (1 at least), for both sides.";
                 case Battlefield.FortunesFavored:
                     return "At the start of each round, one of your units and one enemy are favored: " +
-                           $"their attacks and blasts deal {FavoredMultiplier}x damage until the next round.";
+                           $"their attacks and blasts deal {FavoredMultiplier}x damage until the next round. A boss is never favored.";
                 case Battlefield.HiddenMinds:
                     return "You can't see what the enemies plan to do.";
                 default:

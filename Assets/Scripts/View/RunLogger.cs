@@ -226,12 +226,27 @@ namespace ArmyRoguelike.View
             _log.stepReached = _run.StepIndex + 1;
             _log.goldLeft = _run.Gold;
             _log.fought = _run.Fought.Select(f => f.Name).ToList();
+            (_log.gitCommit, _log.gitDirty, _log.gitDirtyCode) = GitStamp.Read();
             _log.finalArmy = _run.Army.Select(m => new ArmyEntry
             {
                 unit = m.Stats.Name, level = m.Level, techniques = m.Techniques.Select(t => t.Name).ToList(), equipment = m.Equipment?.Name ?? "",
                 levelHp = m.LevelHp, levelDamage = m.LevelDamage, bonusDamage = m.BonusDamage, bonusMaxHp = m.BonusMaxHp,
             }).ToList();
-            PlaytestFiles.Write($"run-{_created:yyyyMMdd-HHmmss}.json", JsonUtility.ToJson(_log, true));
+            WriteFile();
+        }
+
+        private void WriteFile() => PlaytestFiles.Write($"run-{_created:yyyyMMdd-HHmmss}.json", JsonUtility.ToJson(_log, true));
+
+        /// <summary>
+        /// The player's answers on the run-end screen: "serious" or "testing" ("" = no answer) and a difficulty from 1
+        /// to 5 (0 = no answer). Each click goes straight into the file if the run has already been saved.
+        /// </summary>
+        public void RecordRating(string tag, int difficulty)
+        {
+            _log.runTag = tag;
+            _log.difficultyRating = difficulty;
+            if (_saved)
+                WriteFile();
         }
 
         // ---------- JSON shape ----------
@@ -241,10 +256,19 @@ namespace ArmyRoguelike.View
         {
             public string startedAt;
             public string endedAt;
+
+            /// <summary>See <see cref="GitStamp"/>: the commit it was played on, and uncommitted changes (anywhere; in the scripts).</summary>
+            public string gitCommit;
+            public bool gitDirty;
+            public bool gitDirtyCode;
             public int seed;
             public string boss;
             public List<string> fought = new List<string>();
             public string result;
+
+            /// <summary>The player's answers on the run-end screen: "serious", "testing" or "" (skipped), and 1 to 5 or 0 (skipped).</summary>
+            public string runTag = "";
+            public int difficultyRating;
             public int stepReached;
             public int goldLeft;
             public List<string> draft = new List<string>();

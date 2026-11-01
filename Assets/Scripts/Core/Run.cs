@@ -23,18 +23,28 @@ namespace ArmyRoguelike.Core
         /// <summary>The techniques it knows, in the order learned.</summary>
         public IReadOnlyList<Technique> Techniques => _techniques;
 
-        /// <summary>One per technique ever learned; forgetting one keeps the level.</summary>
+        // Every technique it has ever learned, forgotten ones included.
+        private readonly HashSet<Technique> _everLearned = new HashSet<Technique>();
+
+        /// <summary>One per different technique ever learned; forgetting one keeps the level, relearning it adds none.</summary>
         public int Level { get; private set; }
 
         public bool Knows(Technique technique) => _techniques.Contains(technique);
 
-        /// <summary>Learns a technique and goes up a level. False if it can't learn it (line, requirement, known).</summary>
+        /// <summary>Learning this would give a level: it hasn't learned it before.</summary>
+        public bool WouldLevelUp(Technique technique) => !_everLearned.Contains(technique);
+
+        /// <summary>
+        /// Learns a technique, going up a level if it never knew it before. False if it can't learn it (line,
+        /// requirement, known).
+        /// </summary>
         public bool Learn(Technique technique)
         {
             if (!technique.CanLearn(this))
                 return false;
             _techniques.Add(technique);
-            Level++;
+            if (_everLearned.Add(technique))
+                Level++;
             return true;
         }
 

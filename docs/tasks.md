@@ -47,6 +47,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 | Battlefields | Storm: a tile marked for lightning; the strike (the painted `LightningStrike` is used) | Flat pale-blue tile tint (`StormMarkColor` in `BattleController`), "Storm mark" and "Lightning!" popups | Needed (mark only) |
 | Battlefields | Fortune's Favored: the favored unit (double damage this round) | An orange status pip (`FavoredColor` in `UnitView`), a "Favored!" popup | Needed |
 | Battlefields | What's On His Mind?: something that says intents are hidden | Nothing: hovering an enemy just shows no intent | Needed (maybe a "?" badge) |
+| Run end | The run-end screen with its "serious run / just testing" and 1-5 difficulty answers; the "Abandon run" button on the map | Plain IMGUI buttons with a "> " on the chosen answer (`DrawRunEnd`, `DrawMap` in `GameBootstrap`) | Needed |
 
 ### Other visual work
 
@@ -117,6 +118,10 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [ ] When merging `docs/enemy-ai-wiki`: the scenario targeting rules (Moon Shrine: go for the shrine unless a defender is adjacent; Break the Ritual: go for whoever is within 2 tiles of a totem; totems never act and have no intent) need documenting there. When adding enemy AI: add a value to `EnemyBehaviour` in `EnemyAI.cs` and its name and decision list in `GamepediaWriter.BehaviourSteps`; the export fails until the text exists.
 - [x] Crossbowman role text vs AI (2026-10-30, small-board branch): it now has Behind Cover and its AI prefers covered tiles. Still open on `main`.
 - [ ] Goblin Bomber hover intent only checks the nearest unit: it shows "attack" when it will bomb a farther unit, and ignores backing off. Decide whether the intent should match.
+
+- [x] **Balance support** (2026-11-01, asked for by the balance chat): a boss is never favored (Fortune's Favored); relearning a forgotten technique gives no new level; Archer +1 damage at levels 3 and 5; logs stamped with the git commit and dirty flags; negative `durationSeconds` fixed; tick damage credited to its source; a run tag and difficulty rating on the run-end screen, plus an "Abandon run" button on the map; `Battle.Clone()` with `SeededRng`. Tests pass; nothing here seen in game yet, including the new screen, the button and the git stamp (only compiled).
+- [ ] Run tag and rating: stopping Play or closing the window ends a run with no prompt (it can't be shown then), so those logs stay untagged. Mid-battle there is no "Abandon run" button, only on the map.
+- [ ] Logs from before 2026-11-01 keep their negative `durationSeconds` on abandoned battles (`endedAt` minus `startedAt` is a close stand-in) and have no credit for ticks.
 
 ### Playtest 2026-11-01
 

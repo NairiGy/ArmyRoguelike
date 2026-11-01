@@ -303,6 +303,9 @@ namespace ArmyRoguelike.Core
         /// <summary>The basic attack hits every enemy next to the unit, not just one.</summary>
         public bool AreaMelee { get; private set; }
 
+        /// <summary>The act's boss itself, not its minions: Fortune's Favored never picks it.</summary>
+        public bool IsBoss { get; private set; }
+
         /// <summary>A battle-only unit (turret): doesn't count for survival or defeat.</summary>
         public bool IsSummon { get; private set; }
 
@@ -450,7 +453,7 @@ namespace ArmyRoguelike.Core
         public static readonly UnitStats Necromancer =
             new UnitStats(UnitKind.Necromancer, "Necromancer", 14, 4, 3, 1)
             {
-                RaiseCost = 1, RaiseRange = 4, Abilities = A(Ability.SoulHarvest, Ability.CorpseBlast),
+                IsBoss = true, RaiseCost = 1, RaiseRange = 4, Abilities = A(Ability.SoulHarvest, Ability.CorpseBlast),
                 Role = "Boss. Brings raised versions of the factions you beat this act, and raises your fallen against you. One action a turn: blows up a bone pile " +
                        "your units stand on or next to, raises every bone pile within 4 tiles at once, or fires a bolt. Keeps 2 tiles away, walks up to bolt range and shoots (needs line of sight).",
             };
@@ -458,7 +461,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Act 1 boss (the ogre). Its basic attack is the club smash, which hits everyone adjacent.</summary>
         public static readonly UnitStats Ogre = new UnitStats(UnitKind.Ogre, "Giant", 36, 5, 1, 1)
         {
-            Size = 2, Weight = Weight.Huge, AreaMelee = true, ThrowCost = 1, ThrowDamage = 4, ThrowRange = 4, Slams = true, Abilities = A(Ability.Colossus, Ability.Wrath),
+            IsBoss = true, Size = 2, Weight = Weight.Huge, AreaMelee = true, ThrowCost = 1, ThrowDamage = 4, ThrowRange = 4, Slams = true, Abilities = A(Ability.Colossus, Ability.Wrath),
             Role = "Boss, 2x2. One action a turn, two at half HP. Slam: 3 damage to each of your units within 2 tiles, then shoves them 1 tile away. Smash hits every adjacent unit. " +
                    "Or throws a boulder 2-4 tiles away that stays as a rock. Nothing pins, slows or pushes it.",
         };

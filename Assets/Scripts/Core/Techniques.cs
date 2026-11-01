@@ -12,8 +12,8 @@ namespace ArmyRoguelike.Core
     /// <summary>
     /// A passive or action a unit learns during the run (from a reward pick, the shop or a cart). Each one belongs to
     /// a base line (a null line would mean any line, but none is shared for now: effects for any unit are items), and
-    /// some need another technique first. Learning one also levels the unit up (see <see cref="Growth"/>). Numbers are
-    /// placeholders.
+    /// some need another technique first. Learning a new one also levels the unit up (see <see cref="Growth"/>). Numbers
+    /// are placeholders.
     /// </summary>
     public sealed class Technique
     {
@@ -127,8 +127,9 @@ namespace ArmyRoguelike.Core
     }
 
     /// <summary>
-    /// What each level gives, by line. A unit's level is the number of techniques it has learned (forgetting one
-    /// keeps the level). Damage comes rarely on purpose: HP is 5-12 on a 6x6 board. Numbers are placeholders.
+    /// What each level gives, by line. A unit's level is the number of different techniques it has learned (forgetting
+    /// one keeps the level, relearning it adds none). Damage comes rarely on purpose: HP is 5-12 on a 6x6 board. Numbers
+    /// are placeholders.
     /// </summary>
     public static class Growth
     {
@@ -139,7 +140,10 @@ namespace ArmyRoguelike.Core
         {
             if (line == UnitStats.Rogue)
                 return new[] { 2, 4, 6 };
-            if (line == UnitStats.Archer || line == UnitStats.Apprentice)
+            // The Archer has only 5 techniques, so its second point comes at 5.
+            if (line == UnitStats.Archer)
+                return new[] { 3, 5 };
+            if (line == UnitStats.Apprentice)
                 return new[] { 3, 6 };
             return new int[0];
         }

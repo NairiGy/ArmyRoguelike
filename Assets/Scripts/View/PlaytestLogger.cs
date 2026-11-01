@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using ArmyRoguelike.Core;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace ArmyRoguelike.View
 {
@@ -17,7 +20,10 @@ namespace ArmyRoguelike.View
         private readonly Battle _battle;
         private readonly PlaytestLog _log = new PlaytestLog();
         private readonly DateTime _created = DateTime.Now;
-        private float _battleStartTime = -1f;
+
+        // A stopwatch, not Time.realtimeSinceStartup: Unity resets that when Play mode stops, which is when an
+        // abandoned battle gets saved, so its duration came out negative.
+        private readonly Stopwatch _clock = new Stopwatch();
         private bool _saved;
 
         public PlaytestLogger(Battle battle, BattleContext context)
@@ -54,13 +60,13 @@ namespace ArmyRoguelike.View
         /// <summary>For a battle skipped before it started: record the placements so it still gets a log.</summary>
         public void BattleStartedIfNeeded()
         {
-            if (_battleStartTime < 0f)
+            if (!_clock.IsRunning)
                 BattleStarted();
         }
 
         public void BattleStarted()
         {
-            _battleStartTime = Time.realtimeSinceStartup;
+            _clock.Restart();
             foreach (var u in _battle.Units.Where(u => u.Team == Team.Player && !u.IsObjective))
                 _log.placements.Add(new PlacementEntry
                 {
@@ -200,10 +206,13 @@ namespace ArmyRoguelike.View
                     });
                     break;
                 case TickEvent tick:
+                    // "unit" is who caused it (the poisoner, the fireball's caster, the pusher); empty for "leader lost".
                     _log.actions.Add(new ActionEntry
                     {
-                        turn = turn, team = "", unit = "", type = "tick", note = tick.Cause, target = Name(tick.Hit.Target),
+                        turn = turn, team = tick.Source?.Team.ToString() ?? "", unit = tick.Source != null ? Name(tick.Source) : "",
+                        type = "tick", note = tick.Cause, target = Name(tick.Hit.Target),
                         damage = tick.Hit.Damage, targetHpAfter = tick.Hit.HpAfter, killed = tick.Hit.Killed,
+                        friendlyFire = tick.Source != null && tick.Source.Team == tick.Hit.Target.Team,
                     });
                     break;
                 case BarricadeHitEvent barricade:
@@ -388,7 +397,7 @@ namespace ArmyRoguelike.View
             {
                 turn = _battle.TurnNumber,
                 phase = _battle.Phase.ToString(),
-                secondsIntoBattle = _battleStartTime < 0f ? 0f : Time.realtimeSinceStartup - _battleStartTime,
+                secondsIntoBattle = (float)_clock.Elapsed.TotalSeconds,
                 actionIndex = _log.actions.Count,
             };
             foreach (var u in _battle.Units.Where(u => u.IsPlaced))
@@ -407,12 +416,13 @@ namespace ArmyRoguelike.View
         /// <summary>Writes the file once. A battle left before it ended is saved as "abandoned".</summary>
         public string Save()
         {
-            if (_saved || (_battleStartTime < 0f && _log.markers.Count == 0))
+            if (_saved || (!_clock.IsRunning && _log.markers.Count == 0))
                 return null;
             _saved = true;
 
             _log.endedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            _log.durationSeconds = _battleStartTime < 0f ? 0f : Time.realtimeSinceStartup - _battleStartTime;
+            _log.durationSeconds = (float)_clock.Elapsed.TotalSeconds;
+            (_log.gitCommit, _log.gitDirty, _log.gitDirtyCode) = GitStamp.Read();
             _log.result = _battle.Phase == Phase.Victory ? "victory" : _battle.Phase == Phase.Defeat ? "defeat" : "abandoned";
             _log.turns = _battle.TurnNumber;
             _log.skipped = _battle.WasSkipped;
@@ -444,9 +454,10 @@ namespace ArmyRoguelike.View
 
         private List<UnitSummary> Summarise()
         {
-            var summaries = _battle.Units.Where(u => u.IsPlaced).ToDictionary(Name, u => new UnitSummary
+            // Escaped units have left the board, but what they did before that still counts.
+            var summaries = _battle.Units.Where(u => u.IsPlaced || u.Escaped).ToDictionary(Name, u => new UnitSummary
             {
-                unit = Name(u), team = u.Team.ToString(), equipment = u.Equipment?.Name ?? "", survived = u.IsAlive,
+                unit = Name(u), team = u.Team.ToString(), equipment = u.Equipment?.Name ?? "", survived = u.IsAlive, escaped = u.Escaped,
                 hpLeft = u.Hp, maxHp = u.MaxHp, level = u.Member?.Level ?? 0,
                 techniqueUses = TechniqueUses(u),
             });
@@ -454,12 +465,14 @@ namespace ArmyRoguelike.View
             {
                 if (a.unit == null || !summaries.TryGetValue(a.unit, out var s))
                 {
-                    // No source (poison, burning ground, sun beams): still count what the target took.
+                    // No unit behind it (a Pack Leader lost, sun beams, lightning): still count what the target took.
                     if ((a.type == "tick" || a.type == "explosion") && summaries.TryGetValue(a.target ?? "", out var ticked))
                     {
                         ticked.damageTaken += a.damage;
                         if (a.type == "tick")
                             ticked.tickDamageTaken += a.damage;
+                        else if (a.note == "lightning")
+                            ticked.lightningDamageTaken += a.damage;
                         else
                             ticked.sunDamageTaken += a.damage;
                         if (a.killed)
@@ -501,6 +514,7 @@ namespace ArmyRoguelike.View
                     case "volley":
                     case "long reach":
                     case "fireball":
+                    case "upheaval":
                     case "push":
                     case "fall":
                     case "tick":
@@ -516,6 +530,12 @@ namespace ArmyRoguelike.View
                         {
                             s.thornsDamage += a.damage;
                         }
+                        else if (a.type == "tick")
+                        {
+                            s.tickDamageDealt += a.damage;
+                            if (a.friendlyFire)
+                                s.friendlyFireDealt += a.damage;
+                        }
                         else
                         {
                             s.attacks++;
@@ -527,6 +547,8 @@ namespace ArmyRoguelike.View
                         if (summaries.TryGetValue(a.target, out var t))
                         {
                             t.damageTaken += a.damage;
+                            if (a.type == "tick")
+                                t.tickDamageTaken += a.damage;
                             if (a.friendlyFire)
                                 t.friendlyFireTaken += a.damage;
                             if (a.killed)
@@ -565,6 +587,11 @@ namespace ArmyRoguelike.View
         {
             public string startedAt;
             public string endedAt;
+
+            /// <summary>See <see cref="GitStamp"/>: the commit it was played on, and uncommitted changes (anywhere; in the scripts).</summary>
+            public string gitCommit;
+            public bool gitDirty;
+            public bool gitDirtyCode;
             public int runSeed;
             public int battleNumber;
             public string encounter;
@@ -767,6 +794,9 @@ namespace ArmyRoguelike.View
             public int level;
             public List<TechniqueUse> techniqueUses = new List<TechniqueUse>();
             public bool survived;
+
+            /// <summary>Left the board alive (a cutpurse with its loot).</summary>
+            public bool escaped;
             public int hpLeft;
             public int maxHp;
             public int damageDealt;
@@ -798,15 +828,75 @@ namespace ArmyRoguelike.View
             public int bloodthirstGained;
             public int lastStands;
 
-            /// <summary>Damage from poison and burning ground.</summary>
+            /// <summary>Damage from poison, burning ground, caltrops, a lost Pack Leader and being pushed (the ticks in the actions).</summary>
             public int tickDamageTaken;
 
-            /// <summary>Damage from sun beams (Sun blessing or curse).</summary>
+            /// <summary>Damage this unit's poison, burning ground, caltrops and pushes dealt; also in damageDealt.</summary>
+            public int tickDamageDealt;
+
+            /// <summary>Damage from sun beams (Sun blessing or curse) and lightning (Storm), which no unit gets the credit for.</summary>
             public int sunDamageTaken;
+
+            public int lightningDamageTaken;
 
             public int pushesDone;
             public int statusesApplied;
             public int actionsUsed;
+        }
+    }
+
+    /// <summary>
+    /// Which version of the game the logs came from. Asked of git once when Play mode starts, in the background so the
+    /// game doesn't wait for it: the code running is what was compiled then, whatever gets committed while playing.
+    /// Without git (a build, or no git on the machine) the commit is "unknown" and the dirty flags mean nothing.
+    /// </summary>
+    internal static class GitStamp
+    {
+        private const string Unknown = "unknown";
+        private static Task<(string commit, bool dirty, bool dirtyCode)> _reading;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void Begin()
+        {
+            _reading = null;
+            if (!Application.isEditor)
+                return;
+            var root = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            _reading = Task.Run(() => AskGit(root));
+        }
+
+        public static (string commit, bool dirty, bool dirtyCode) Read() =>
+            _reading != null && _reading.Wait(TimeSpan.FromSeconds(2)) ? _reading.Result : (Unknown, false, false);
+
+        private static (string, bool, bool) AskGit(string root)
+        {
+            try
+            {
+                var commit = Git(root, "rev-parse HEAD").Trim();
+                // --no-optional-locks: don't get in the way of a commit happening at the same time.
+                var changes = Git(root, "--no-optional-locks status --porcelain").Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                return (commit, changes.Length > 0, changes.Any(c => c.Contains("Assets/Scripts/")));
+            }
+            catch (Exception)
+            {
+                return (Unknown, false, false);
+            }
+        }
+
+        private static string Git(string root, string arguments)
+        {
+            var start = new ProcessStartInfo("git", arguments)
+            {
+                WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true,
+            };
+            using (var git = Process.Start(start))
+            {
+                var output = git.StandardOutput.ReadToEnd();
+                git.WaitForExit();
+                if (git.ExitCode != 0)
+                    throw new InvalidOperationException($"git {arguments} failed");
+                return output;
+            }
         }
     }
 

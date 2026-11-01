@@ -110,6 +110,9 @@ namespace ArmyRoguelike.Core
         /// <summary>Poison ticks left; each deals poison damage at the start of the unit's turn.</summary>
         public int PoisonTurns { get; internal set; }
 
+        /// <summary>Who poisoned it last, for the playtest log's credit. Not a source for rules: ticks have none.</summary>
+        public Unit PoisonSource { get; internal set; }
+
         /// <summary>Ward shield: absorbs this much damage before HP.</summary>
         public int Shield { get; internal set; }
 
@@ -143,6 +146,34 @@ namespace ArmyRoguelike.Core
             Summoner = summoner;
             Hp = MaxHp;
         }
+
+        /// <summary>
+        /// A copy for a copied battle. Other units it points to come from <paramref name="map"/>, which must already hold
+        /// its summoner (summoners always come first in the battle's list); call <see cref="CopyLinks"/> once all exist.
+        /// </summary>
+        internal Unit CopyFor(IReadOnlyDictionary<Unit, Unit> map)
+        {
+            var c = new Unit(Id, Team, Stats, Member, Summoner == null ? null : map[Summoner])
+            {
+                Hp = Hp, Ap = Ap, Moves = Moves, Pos = Pos, IsPlaced = IsPlaced, IsDone = IsDone,
+                MovedThisTurn = MovedThisTurn, ActedThisTurn = ActedThisTurn, AttackedThisTurn = AttackedThisTurn,
+                CounterUsed = CounterUsed, DodgeUsed = DodgeUsed, HiddenTurns = HiddenTurns, SnareTurns = SnareTurns,
+                RootedThisTurn = RootedThisTurn, SlowNext = SlowNext, SlowedThisTurn = SlowedThisTurn, PoisonTurns = PoisonTurns,
+                Shield = Shield, MoonShield = MoonShield, LastStandUsed = LastStandUsed, CarryingLoot = CarryingLoot,
+                IsMercenary = IsMercenary, Escaped = Escaped, Fell = Fell, Favored = Favored, PackHp = PackHp,
+                BannerAp = BannerAp, BannerMoves = BannerMoves, LeftPile = LeftPile, PileGone = PileGone,
+            };
+            foreach (var cooldown in _cooldowns)
+                c._cooldowns.Add(cooldown.Key, cooldown.Value);
+            foreach (var use in _uses)
+                c._uses.Add(use.Key, use.Value);
+            c._struck.UnionWith(_struck);
+            return c;
+        }
+
+        /// <summary>Second step of <see cref="CopyFor"/>: points the copy at the copied units.</summary>
+        internal void CopyLinks(Unit original, IReadOnlyDictionary<Unit, Unit> map) =>
+            PoisonSource = original.PoisonSource == null ? null : map[original.PoisonSource];
 
         /// <summary>The item in this unit's single slot, or null.</summary>
         public Equipment Equipment => Member?.Equipment;
