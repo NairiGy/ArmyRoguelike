@@ -256,7 +256,7 @@ namespace ArmyRoguelike.Tests
                 Assert.AreEqual(2, Count(Encounter.EliteWolves, UnitStats.PackLeader), $"seed {seed}");
                 Assert.AreEqual(4, Count(Encounter.EliteWolves, UnitStats.Wolf), $"seed {seed}");
                 Assert.AreEqual(4, Count(Encounter.EliteGoblins, UnitStats.GoblinBomber));
-                Assert.AreEqual(3, Count(Encounter.EliteGoblins, UnitStats.Goblin));
+                Assert.AreEqual(4, Count(Encounter.EliteGoblins, UnitStats.Goblin));
                 Assert.AreEqual(3, Count(Encounter.EliteBandits, UnitStats.Crossbowman), $"seed {seed}");
                 Assert.AreEqual(2, Count(Encounter.EliteBandits, UnitStats.Cutpurse));
                 Assert.AreEqual(2, Count(Encounter.EliteBandits, UnitStats.Brute), $"seed {seed}");
