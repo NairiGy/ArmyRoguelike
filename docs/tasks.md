@@ -74,6 +74,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [x] Idle life (2026-10-30, `UnitView`): idle creaks were tried and removed (they drew the eye); the selected statue wakes (lifts, brighter rim via `_Wake` in `StatueRamp.shader`) and drops back with a thud when deselected; replaces the selection bob. Not playtested.
 - [ ] Tune the cloud layers' values once settled (live in the Inspector: Scenery → Scenery Clouds) and make them the defaults.
 - [x] Merge `experiment/art-style` into `main` (done 2026-10-28; the branch is deleted, art work now goes on `main`).
+- [ ] Elementals face the wrong direction (playtest 2026-11-01).
 
 ## Gameplay (mechanics chat)
 
@@ -116,6 +117,18 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [x] Crossbowman role text vs AI (2026-10-30, small-board branch): it now has Behind Cover and its AI prefers covered tiles. Still open on `main`.
 - [ ] Goblin Bomber hover intent only checks the nearest unit: it shows "attack" when it will bomb a farther unit, and ignores backing off. Decide whether the intent should match.
 
+### Playtest 2026-11-01
+
+- [ ] Bug: Momentum seems to end the turn. Logs: the AP does come back (`ap refund`, then `done` with 1 AP left), but the unit has acted so it can't move, and with nothing else in reach the game finishes its turn. It only chains when another enemy is already in range. Proposed: a kill also gives 1 move back and lets it move. Needs the user's OK.
+- [ ] Bug: two bone piles on one tile raise two units on one tile. Piles don't block, so a unit dying on a pile leaves a second one, and `DoRaise` checks the tile before raising any of them. Proposed: the newer pile replaces the older one.
+- [ ] AI: should enemies hit shielded units, or lower their priority? Logs: 10 enemy attacks did 0 damage across 9 battles, most on the Rogue (some could be Dodge rather than a shield; check before tuning). Proposed: prefer an unshielded target when one is in reach, still hit a shield otherwise.
+- [ ] Goblin Bombers feel weak. Logs: bombs deal 2-3 per hit, and several explosions hit nobody. Discuss before tuning.
+- [ ] Cutpurse may be too hard to catch. Logs: in both Bandit Camp fights one was killed and one escaped with 5 gold, by turn 2-3. Discuss before tuning.
+- [ ] Shrouded curse covers too much: 3x3 (`BlastArea`) is 9 of the 36 tiles. Discuss the size.
+- [ ] UI: Storm should show clearly where lightning will hit. A pale highlight exists (`StormMarkColor`) but didn't read in play.
+- [ ] UI: summoning scenario needs a clearer sign of when it completes (today only a HUD text line).
+- [ ] UI: icon over a unit when the current action would kill it (today only "-N kills" on the hover card).
+
 ## Sound (sound chat, branch `feature/sound`, worktree `../ArmyRoguelike-sound`)
 
 - [x] Sound setup (2026-10-27): `Sfx` (View) plays clips from `Assets/Audio/Resources/Sfx`, numbered variants picked at random, saved master and effects volume; `SfxImport` (Editor) sets import settings. Calls added to `SunMark`, `MoonShieldView` and `LightningStrike` (one line per moment). Compiles, tests pass; no clips yet, so it is silent.
@@ -129,6 +142,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [ ] Unused ElevenLabs generations the user liked, for later effects: "warm golden glow" #1, #3, #4 and all four "heavy stone rune lighting up with heat" (in the ElevenLabs history, sharing to Explore is off).
 - [ ] Sound pass, still to do: ranged attacks, mines and bombs, the other effects, ambience (wind, braziers).
 - [ ] Ambient sounds and music depending on the battlefield (user request, 2026-11-01). Ask the user how they should feel first.
+- [ ] Sun beam too loud (playtest 2026-11-01); should effects sit at a similar volume? `sun_impact` plays at full volume with `sun_sizzle` on top. Do a loudness pass across the effects.
 - [ ] Void sounds (art chat, 2026-10-31): a unit falling into the void's black hole still plays the crumble (`unit_die` in `UnitView.FallIntoVoid`), and the void itself is silent (a low hum or pull?). Ask the user how they should feel first.
 - [ ] Wake sounds (art chat, 2026-10-30): the selected statue lifting is silent and its drop reuses `unit_step`; maybe a soft stone scrape on lifting. Ask the user how they should feel first.
 
