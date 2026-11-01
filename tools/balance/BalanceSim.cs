@@ -368,6 +368,14 @@ public static class BalanceSim
             return 0;
         }
 
+        if (args.Length > 2 && args[2] == "runs")
+        {
+            using (var report = new StreamWriter(outPath))
+                RunSim.Report(report, AllDrafts(), seeds);
+            Console.WriteLine($"wrote {outPath} in {clock.Elapsed.TotalSeconds:F0}s");
+            return 0;
+        }
+
         if (args.Length > 2 && args[2] == "fights")
         {
             // Quick check of chosen fights, for trying a number change: tools/dev.sh sim 10 fights "Elementals,Giant"

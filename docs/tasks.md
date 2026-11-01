@@ -143,7 +143,9 @@ Targets and working rules: "Balance" in the design note. Report: `tools/dev.sh s
 
 - [x] Simulator v1 (2026-11-01, `tools/balance/BalanceSim.cs`): random and greedy bots that only move and basic-attack; fights, drafts, battlefields, timeouts and hits-to-kill tables.
 - [x] Smart bot (2026-11-01, `tools/balance/SmartBot.cs`): uses every action, sees one enemy turn ahead through `Battle.Clone()`. It may stall in long fights (timeouts at Bandit Camp and Elementals).
-- [ ] Run simulator: whole runs with picks, shops and banners, for the gold, level and difficulty curves.
+- [x] Run simulator (2026-11-01, `tools/balance/RunSim.cs`, `tools/dev.sh sim 20 runs`). First result, 1,000 runs without banners: bot wins 83%. 15% of runs die by step 6; of those alive at step 7, 99% win. Bosses 100%, elites 96-100%. Won runs end with 4 units and 12.6 total levels. Sapper drafts are at the bottom (72-85%, against 95% for the best).
+- [ ] Late game has no tension: test recruit price (15 gold for a whole unit; suspect), technique prices and level growth, and boss and elite strength, against whole runs. Compare with the next playtest before applying.
+- [ ] Technique and banner power test: whole runs can't show it, because they're decided before most techniques and banners matter (all 37 techniques and items within -4 to +1 points, all 5 banners 82-86%). Test each on its own in hard fights at a fixed level.
 - [x] First number pass (2026-11-01, see "Balance" in the design note): Elementals, Crossbowman, Goblins and Elite Goblins, Break the Ritual. Not playtested.
 - [ ] Compare the next playtest with the bot: Moon Shrine (bot 95% at level 1, players 1 of 3 and all test battles lost), first fights, Goblins now that they hit harder. Bosses may be too easy late (bot 94-95% at level 2): decide after the run simulator.
 - [ ] Battlefields help the player more than the enemy (bot at level 1: Storm and Fortune's Favored mostly +8 to +15 points, Giant 87 to 97 and 96), partly because the bot sees the dice. Measure again with players before changing.

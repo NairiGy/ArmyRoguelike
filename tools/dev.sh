@@ -80,6 +80,7 @@ case "${1:-}" in
     runtimeconfig "$OUT/BalanceSim.runtimeconfig.json"
     case "${3:-}" in
       smart) "$DOTNET" "$OUT/BalanceSim.exe" "$OUT/balance-smart.md" "${2:-5}" smart ;;
+      runs) "$DOTNET" "$OUT/BalanceSim.exe" "$OUT/balance-runs.md" "${2:-20}" runs ;;
       fights) "$DOTNET" "$OUT/BalanceSim.exe" "$OUT/balance-fights.md" "${2:-10}" fights ${4:+"$4"} ;;
       *) "$DOTNET" "$OUT/BalanceSim.exe" "$OUT/balance-report.md" "${2:-50}" ;;
     esac
