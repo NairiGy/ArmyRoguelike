@@ -419,6 +419,18 @@ same for both sides. The user listed nine ideas; five were picked for the first 
 - **Not built, from the same list:** Misty (hide the enemy's start; on 6x6 it does little unless it's real fog, which is big view work), Chaos (swap one unit with the enemy at the start; open questions: does your unit come back, what if it dies), Keeper of Balance (a third side attacking whoever has more units; simpler as a fixed statue in the middle), Portals (two linked tiles rather than a split board). Claude's ideas: Gale (wind pushes small units each round), Crumbling Roof (marked tiles become holes), Ice, High Ground, Ley Line.
 - **Logs:** battle logs have `battlefield`, actions `fall` (pusher, unit, killed), `storm mark` and `favored` (the unit picked), explosions with note `lightning`, and `favored` on hits a favored unit dealt. Run logs have each battle's `battlefield` and each map choice's `chosenField` / `otherField`.
 
+## Balance
+
+Decided with the user 2026-11-01. A balance chat owns the numbers: it changes them freely and reports afterwards, and asks before changing rules, kits or AI behaviour. Gameplay fixes and game features it needs go to a gameplay session.
+
+- **Win rate targets:** new player 10-20% per run, experienced player 50-60% on the base difficulty. Harder modes come later.
+- **Power:** late builds may break the game in the last third of a run, but not by step 4, and no build should win without the player playing.
+- **Luck:** it may decide what you face, but shouldn't kill a unit with no warning.
+- **Drafts:** all 10 should be winnable in theory; win rates can differ. Kits are far from final, so draft gaps are a design question as much as a balance one.
+- **Run length:** not a concern for now.
+- **Loser banner stays uncapped** (user's call, 2026-11-01), even though a death's +1 HP and +1 damage costs only 5 gold.
+- **Simulator:** `tools/dev.sh sim` plays battles with bots and writes `tools/out/balance-report.md`. Compare fights with each other; the current bots only move and basic-attack, so these aren't real win rates.
+
 ## Test mode (for testing only)
 
 - Editor and dev builds only: a "Test battle" button on the draft screen opens a setup screen.

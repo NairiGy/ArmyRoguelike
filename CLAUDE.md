@@ -32,7 +32,7 @@ A single-player roguelike army-builder. You lead a small squad of living statues
 - `Assets/Audio`: sound (see "Sound" in the design note). `Resources/Sfx/<name>.wav` are the clips, numbered variants (`name_1`, `name_2`) picked at random; `CREDITS.md` lists every source, licence and prompt. `View/Sfx.cs` plays them (`Sfx.Play("name")` on the line where the visual moment happens) and `Editor/SfxImport.cs` sets their import settings. Raw downloads live outside the repo in `Desktop/sound sources/`; `tools/make_sfx.sh` cuts them into the clips.
 - Effects playground (`View/FxPlayground.cs`): F1 in a test battle plays any effect on the hovered tile or unit, plays each sound, sets the volumes and locks a sound to one variant. Try auditions a sound: its real effect on a unit with each variant in turn, Y / N verdicts saved to `Playtests/sound-review.txt`. `UnitView.Restore` stands a statue back up after the death demo.
 - `Assets/Tests/EditMode`: NUnit tests for Core.
-- `tools/dev.sh compile|test|wiki`: compile, run the tests and write a text-only gamepedia with Unity's bundled compiler, with the Editor open or closed. See `tools/README.md`. The Pipeline package (`com.unity.pipeline`) lets `unity status` / `unity command` drive an open Editor.
+- `tools/dev.sh compile|test|wiki|sim`: compile, run the tests, write a text-only gamepedia and play bot battles for a balance report (`tools/balance/`, see "Balance" in the design note) with Unity's bundled compiler, with the Editor open or closed. See `tools/README.md`. The Pipeline package (`com.unity.pipeline`) lets `unity status` / `unity command` drive an open Editor.
 - `Playtests/` (git-ignored): a JSON log per battle (`PlaytestLogger`) and per run (`RunLogger`). F9 in game saves a marker with a board snapshot. Read these to summarize playtests instead of asking the user for numbers. Battles skipped with the debug Win button are marked `skipped`.
 - The scene stays nearly empty. `GameBootstrap` builds the run at runtime, and placeholder art is generated in code (`PlaceholderArt`). Unit types with a painted statue sprite use it instead.
 
@@ -71,6 +71,7 @@ The user's first message in a chat names its role. Stay inside it; put work for 
 |---|---|---|
 | Gameplay and mechanics | `Assets/Scripts/Core`, the tests, gameplay logic in `Assets/Scripts/View` (rules, HUD text, screens' flow), `PlaytestLogger` / `RunLogger`, `GamepediaWriter`, the design note's rules sections | Placeholder visuals → the "Art needed" table |
 | Visuals and art | `Assets/Art`, `BattleScenery` and the scenery scripts, statues and `PlaceholderArt` look, highlight and effect styling, the UI look, the design note's "Visual direction" | Gameplay questions or bugs → the Gameplay section of `docs/tasks.md` |
+| Balance | The numbers (changed freely, reported afterwards), `tools/balance/`, the design note's "Balance" section | Rules, kits and AI behaviour need the user's OK; fixes and features → a gameplay session |
 | Sound, marketing (later) | Their own folders once started | Work for others → their sections of `docs/tasks.md` |
 
 Some files are shared (`BattleController`, `UnitView`, `PlaceholderArt`): gameplay adds the placeholder, art restyles it. Don't edit one while another chat is working in it.

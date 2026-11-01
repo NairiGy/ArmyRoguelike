@@ -5,6 +5,7 @@
 #   tools/dev.sh test      build Core + EditMode tests into one exe and run them on Unity's .NET
 #   tools/dev.sh wiki      write docs/gamepedia.html without statue images (use the Unity menu
 #                          Tools > Export Gamepedia for the illustrated version)
+#   tools/dev.sh sim [N]   play N seeds per draft and fight with bots (default 50); writes tools/out/balance-report.md
 #
 # Output goes to tools/out/ (git-ignored). Needs Git Bash on Windows and the project's Unity version.
 set -u
@@ -70,8 +71,16 @@ case "${1:-}" in
     runtimeconfig "$OUT/Wiki.runtimeconfig.json"
     "$DOTNET" "$OUT/Wiki.exe" "$R/docs/gamepedia.html" && echo "wrote docs/gamepedia.html (text only)"
     ;;
+  sim)
+    { echo "-nologo -nostdlib -noconfig -optimize+ -t:exe -out:\"$OUT/BalanceSim.exe\""
+      runtime_refs
+      for f in "$R"/Assets/Scripts/Core/*.cs "$R/tools/balance/BalanceSim.cs"; do echo "\"$f\""; done; } > "$OUT/sim.rsp"
+    csc "$OUT/sim.rsp" || { echo "BUILD FAILED"; exit 2; }
+    runtimeconfig "$OUT/BalanceSim.runtimeconfig.json"
+    "$DOTNET" "$OUT/BalanceSim.exe" "$OUT/balance-report.md" "${2:-50}"
+    ;;
   *)
-    sed -n '2,10p' "$0"
+    sed -n '2,11p' "$0"
     exit 1
     ;;
 esac

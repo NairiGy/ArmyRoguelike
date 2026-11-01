@@ -130,6 +130,19 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [x] UI: summoning scenario needs a clearer sign of when it completes (today only a HUD text line). Done: a top-centre countdown panel with a pip per turn, red on the last one.
 - [x] UI: icon over a unit when the current action would kill it (today only "-N kills" on the hover card). Done: a red skull for the basic attack (including walk-and-attack), Pinning Shot and Fireball; other actions show none yet.
 
+## Balance (balance chat)
+
+Targets and working rules: "Balance" in the design note. Report: `tools/dev.sh sim` writes `tools/out/balance-report.md`.
+
+- [x] Simulator v1 (2026-11-01, `tools/balance/BalanceSim.cs`): random and greedy bots that only move and basic-attack; fights, drafts, battlefields, timeouts and hits-to-kill tables.
+- [ ] Smart bot: use actions and look ahead with the `Battle` copy (needs the balance-support session's work), step off storm marks, and push. Don't tune fights on the crude bots alone.
+- [ ] Run simulator: whole runs with picks, shops and banners, for the gold, level and difficulty curves.
+- [ ] First tuning pass once the smart bot exists. Suspects: Goblin Bombers far too weak (bot 70% at level 0, against 1-9% for the other factions), Elite Goblins easier than normal fights, the first fight too hard, Break the Ritual (bot 4% at level 2), Moon Shrine.
+- [ ] Re-check Fortune's Favored after the "bosses can't be favored" fix. The crude bot showed no harder Giant fight on it before the fix (about 31% against 33%), and the fix may make it a pure bonus for the player.
+- [ ] Battering Ram with Edge of the World: a small enemy can be pushed off from any tile, a medium one from 32 of 36. Measure with the smart bot.
+- [ ] Draft gaps (bot at level 2: 34-84%; every top draft has the Warrior). Treat as kit design as well as numbers.
+- [ ] Get 3-5 outside playtesters on a dev build (user).
+
 ## Sound (sound chat, branch `feature/sound`, worktree `../ArmyRoguelike-sound`)
 
 - [x] Sound setup (2026-10-27): `Sfx` (View) plays clips from `Assets/Audio/Resources/Sfx`, numbered variants picked at random, saved master and effects volume; `SfxImport` (Editor) sets import settings. Calls added to `SunMark`, `MoonShieldView` and `LightningStrike` (one line per moment). Compiles, tests pass; no clips yet, so it is silent.
