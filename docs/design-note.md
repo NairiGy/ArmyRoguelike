@@ -273,7 +273,7 @@ Built 2026-10-26 on branch `feature/moon-shrine`, not yet playtested. Other scen
 | Omen | Blessing | Curse |
 |---|---|---|
 | Sun | Start of your turn: the tile under a random enemy is marked; at the start of the enemy turn a sun beam hits it for 3 (tile-based: pushing the enemy off makes it miss) | The mark goes under one of your units; step off before the enemy turn |
-| Night | Start of your turn: a random unit of yours and the 3x3 around it are shrouded until your next turn; enemies can't hit units there from range (point blank still works) | The shroud covers an enemy; your ranged attacks, fireballs and bombs can't reach it |
+| Night | Start of your turn: a random unit of yours and the plus around it (5 tiles; 3x3 until 2026-11-01, too big on a 6x6 board) are shrouded until your next turn; enemies can't hit units there from range (point blank still works) | The shroud covers an enemy; your ranged attacks, fireballs and bombs can't reach it |
 | Moon | Start of your turn: a random unit of yours gets a 4-point shield until your next turn | The shield goes to an enemy |
 
 ## Break the Ritual: the second scenario
@@ -322,7 +322,7 @@ Built 2026-10-29 as an idea test on `experiment/small-board`, playtested 2026-10
 - **Swift** (new keyword): 2 moves. Rogue line, Wolf, Pack Leader, Goblin, Cutpurse (and their raised versions).
 - **Zone of control:** stepping out of an enemy's reach uses up all remaining moves. A 1-move unit can always back off one tile; a Swift unit can't slip past.
 - **Ranges** scaled to the board: Archer and the Trapper line 4 → 3, Marksman/Sniper/Deadeye 5 → 4, Crossbowman 4 → 3, Turret 3 → 2, Mage bolt stays 3. Fireball and player bomb 4 → 3, Charge 4 → 3, Taunt 3 → 2, goblin bomb 2–4 → 2–3, Giant boulder 2–5 → 2–4, Necromancer raise 5 → 4 and keeps 2 tiles away instead of 3.
-- **Areas:** bombs (goblin and Bombardier) hit only their own tile, so one step dodges them; fireballs and Volley hit a plus (the tile and its 4 neighbours) instead of a 3x3. Barricade blasts and the Night shroud stay 3x3. **Mines hit only their own tile** too (2026-10-30, after the bundle playtest; were 3x3): only the enemy that steps on one is hurt, and a mine no longer sets off mines next to it (only a 3x3 blast does).
+- **Areas:** bombs (goblin and Bombardier) hit only their own tile, so one step dodges them; fireballs and Volley hit a plus (the tile and its 4 neighbours) instead of a 3x3. Barricade blasts stay 3x3 (the Night shroud too, until it became a plus on 2026-11-01). **Mines hit only their own tile** too (2026-10-30, after the bundle playtest; were 3x3): only the enemy that steps on one is hurt, and a mine no longer sets off mines next to it (only a 3x3 blast does).
 - **Abilities:** Spring Boots give +1 move (were "first tile free"). Chill: the target can't move on its next turn (was −2 AP). Big Mines max 5 → 4.
 - **Enemy AI:** no longer keeps AP back for walking. The Giant won't throw a boulder that would wall it off from its target (on 6x6 its rocks sealed it in).
 - **Layouts:** enemies start in rows 4–5, the shrine at (2,2) with spawns at least 3 steps from it, totems on rows 4–5. The Necromancer raises **1** of each beaten faction (was 2), topped up with skeletons to 4, so his army fits.
@@ -331,11 +331,15 @@ Built 2026-10-29 as an idea test on `experiment/small-board`, playtested 2026-10
 
 **Step 2: one AP** (2026-10-29, same branch, not playtested). Every unit, bosses included, has **1 AP**: one move and one attack or action per turn. Every attack and action costs 1, and unused AP doesn't carry over. Units no longer differ by AP pool (the old pools are gone from the data).
 
-- **Momentum** (Shadow): a kill gives the action back, so it can attack again and chain kills.
+- **Momentum** (Shadow): a kill gives the action back and, since 2026-11-01, 1 move, and lets the unit move again. Without that it only helped with another enemy already in range: the unit had acted, so it couldn't walk to one, and its turn finished with the AP unused.
 - **Opening Shot** (Deadeye): double damage the first time it hits each enemy in a battle (was "first attack each turn").
 - **Bosses get strong single actions** *(placeholders, "for now")*: the Giant's slam also deals 3 damage to each of your units within 2 tiles, and it picks smash or slam by whichever deals more in total (ties go to smash), else a boulder (now 4 damage); the Necromancer raises **every** bone pile within range in one action, and its bolt does 4.
 
 **Move first** (2026-10-29, same branch, not playtested): once a unit spends AP (any attack or action) it can't move again that turn, for both sides. Each turn is "position, then commit"; no more hit-and-run. Swift units can still move 2 and then attack, and Blink (an action) is the mage's escape. The Necromancer now backs off before raising or shooting.
+
+**Enemies and shields** (2026-11-01, not playtested): when an enemy's target has a shield (Ward or moon), it goes for an unshielded unit it can reach this turn instead, and hits the shield only if there is none. Shielded units also come last among adjacent blockers, totem threats and Blood Scent prey. Taunt still overrides this. Why: attacking a shield wasted their turns, and never attacking one would make a Ward total protection.
+
+**One tile, one bone pile** (2026-11-01): piles don't block, so a unit could die on one. The newer pile now replaces the older one, so a raise can't put two units on a tile.
 
 **Walking through allies** (2026-11-01, not playtested): any unit, on both sides, can walk through its allies but not stop on them; never through enemies or objectives. It only matters with 2 or more moves. Why allies only: fewer traffic jams on the small board, while your front line still protects your back line from Swift enemies. Mines, caltrops and overwatch only stop a unit on a tile it can stand on, so it never ends up on an ally's tile. Battle logs count the allies passed per move (`throughAllies`).
 

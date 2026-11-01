@@ -19,6 +19,8 @@ namespace ArmyRoguelike.View
             Eye,
             Hold,
             Push,
+            Bolt,
+            Skull,
         }
 
         public static readonly Color PanelColor = new Color(0.07f, 0.07f, 0.09f, 0.94f);
@@ -155,6 +157,19 @@ namespace ArmyRoguelike.View
                     Line(tex, 15, 6, 24, 16, 3.2f);
                     Line(tex, 24, 16, 15, 26, 3.2f);
                     break;
+                case Icon.Bolt:
+                    Line(tex, 20, 29, 10, 16, 4f);
+                    Line(tex, 10, 16, 21, 16, 4f);
+                    Line(tex, 21, 16, 11, 3, 4f);
+                    break;
+                case Icon.Skull:
+                    Ring(tex, 16, 19, 0f, 11f);
+                    Line(tex, 11, 7, 21, 7, 7f);
+                    Ring(tex, 12, 19, 0f, 3.2f, Color.clear);
+                    Ring(tex, 20, 19, 0f, 3.2f, Color.clear);
+                    Line(tex, 13, 3, 13, 9, 1.2f, Color.clear);
+                    Line(tex, 19, 3, 19, 9, 1.2f, Color.clear);
+                    break;
             }
 
             tex.Apply();
@@ -162,7 +177,7 @@ namespace ArmyRoguelike.View
             return tex;
         }
 
-        private static void Line(Texture2D tex, float x0, float y0, float x1, float y1, float thickness)
+        private static void Line(Texture2D tex, float x0, float y0, float x1, float y1, float thickness, Color? color = null)
         {
             var a = new Vector2(x0, y0);
             var b = new Vector2(x1, y1);
@@ -172,18 +187,18 @@ namespace ArmyRoguelike.View
                 var p = new Vector2(x, y);
                 var t = Mathf.Clamp01(Vector2.Dot(p - a, b - a) / (b - a).sqrMagnitude);
                 if (Vector2.Distance(p, a + t * (b - a)) <= thickness * 0.5f)
-                    tex.SetPixel(x, y, Color.white);
+                    tex.SetPixel(x, y, color ?? Color.white);
             }
         }
 
-        private static void Ring(Texture2D tex, float cx, float cy, float inner, float outer)
+        private static void Ring(Texture2D tex, float cx, float cy, float inner, float outer, Color? color = null)
         {
             for (var y = 0; y < tex.height; y++)
             for (var x = 0; x < tex.width; x++)
             {
                 var d = Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy));
                 if (d >= inner && d <= outer)
-                    tex.SetPixel(x, y, Color.white);
+                    tex.SetPixel(x, y, color ?? Color.white);
             }
         }
     }

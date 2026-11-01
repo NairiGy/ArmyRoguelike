@@ -63,7 +63,8 @@ namespace ArmyRoguelike.View
                 _baseColor = Color.white;
                 // Shown as drawn: the player's statues face down-right, towards the enemy rows, and enemy
                 // statues face down-left, towards the camera, so their faces show.
-                _body.flipX = false;
+                // The big Elemental was drawn turned slightly the other way, so it is mirrored.
+                _body.flipX = unit.Stats.Kind == UnitKind.Elemental;
             }
             _body.color = _baseColor;
             if (unit.IsPackLeader)

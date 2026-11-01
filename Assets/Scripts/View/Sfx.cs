@@ -155,6 +155,16 @@ namespace ArmyRoguelike.View
             return Mathf.Clamp((cam.WorldToViewportPoint(at.Value).x - 0.5f) * 0.6f, -0.4f, 0.4f);
         }
 
+        /// <summary>Loudness pass (2026-11-01): big moments brought down towards the unit sounds, about -20 LUFS. Others play as cut.</summary>
+        private static readonly Dictionary<string, float> Levels = new Dictionary<string, float>
+        {
+            ["sun_impact"] = 0.5f,
+            ["sun_charge"] = 0.6f,
+            ["sun_mark"] = 0.75f,
+            ["lightning_strike"] = 0.75f,
+            ["moon_cast"] = 0.8f,
+        };
+
         /// <summary>Plays a sound once. <paramref name="pitch"/> varies it a little each time so repeats don't sound identical.</summary>
         public static void Play(string name, Vector3? at = null, float volume = 1f, float pitch = 0.05f)
         {
@@ -165,7 +175,7 @@ namespace ArmyRoguelike.View
             var source = FreeVoice();
             source.clip = clip;
             source.loop = false;
-            source.volume = volume * Gain;
+            source.volume = volume * (Levels.TryGetValue(name, out var level) ? level : 1f) * Gain;
             source.pitch = 1f + Random.Range(-pitch, pitch);
             source.panStereo = Pan(at);
             source.Play();

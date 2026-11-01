@@ -156,7 +156,8 @@ namespace ArmyRoguelike.Core
             {
                 var blocker = Visible(battle)
                     .Where(u => u != objective && Battle.Distance(enemy, u) == 1)
-                    .OrderBy(u => u.Hp)
+                    .OrderBy(HasShield)
+                    .ThenBy(u => u.Hp)
                     .ThenBy(u => u.Id)
                     .FirstOrDefault();
                 return blocker ?? objective;
@@ -168,7 +169,8 @@ namespace ArmyRoguelike.Core
             {
                 var threat = Visible(battle)
                     .Where(u => totems.Any(t => Battle.Distance(t, u) <= TotemThreatRange))
-                    .OrderBy(u => Battle.Distance(enemy, u))
+                    .OrderBy(HasShield)
+                    .ThenBy(u => Battle.Distance(enemy, u))
                     .ThenBy(u => u.Hp)
                     .ThenBy(u => u.Id)
                     .FirstOrDefault();
@@ -181,7 +183,8 @@ namespace ArmyRoguelike.Core
             {
                 var prey = Visible(battle)
                     .Where(u => !u.IsObjective && CanReachToAttack(battle, enemy, u))
-                    .OrderBy(u => u.Hp)
+                    .OrderBy(HasShield)
+                    .ThenBy(u => u.Hp)
                     .ThenBy(u => Battle.Distance(enemy, u))
                     .ThenBy(u => u.Id)
                     .FirstOrDefault();
@@ -189,12 +192,18 @@ namespace ArmyRoguelike.Core
                     return prey;
             }
 
-            return Visible(battle)
+            var nearest = Visible(battle)
                 .OrderBy(u => Battle.Distance(enemy, u))
                 .ThenBy(u => u.Hp)
                 .ThenBy(u => u.Id)
-                .FirstOrDefault();
+                .ToList();
+            // A shield would soak the hit: if the nearest has one, go for an unshielded unit it can reach this turn.
+            if (nearest.Count > 0 && HasShield(nearest[0]))
+                return nearest.FirstOrDefault(u => !HasShield(u) && !u.IsObjective && CanReachToAttack(battle, enemy, u)) ?? nearest[0];
+            return nearest.FirstOrDefault();
         }
+
+        private static bool HasShield(Unit unit) => unit.Shield > 0 || unit.MoonShield > 0;
 
         /// <summary>
         /// Runs a check as if the unit's turn were about to happen: during the enemy turn with what it has

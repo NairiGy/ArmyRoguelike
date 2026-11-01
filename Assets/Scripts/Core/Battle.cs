@@ -109,6 +109,7 @@ namespace ArmyRoguelike.Core
         public const int PincerBonus = 3;
         public const int PreyBonus = 2;
         public const int KillRefundAp = 1;
+        public const int KillRefundMoves = 1;
         public const int PoisonDamage = 2;
         public const int PoisonTurns = 2;
         public const int CollisionDamage = 2;
@@ -771,6 +772,48 @@ namespace ArmyRoguelike.Core
             }
 
             return target.Hp - Math.Max(0, hp);
+        }
+
+        /// <summary>The enemies the unit's basic attack would kill, here or after walking to a spot it can reach.</summary>
+        public List<Unit> AttackKills(Unit unit) =>
+            Living(Team.Enemy).Where(e => FindAttackSpot(unit, e).HasValue && PredictHpLoss(unit, e, out _) is var loss && loss > 0 && loss >= e.Hp).ToList();
+
+        /// <summary>The units this action would kill if used on the tile now: Pinning Shot and Fireball, the actions that deal damage at once.</summary>
+        public List<Unit> ActionKills(Unit unit, ActionKind action, GridPos tile)
+        {
+            var kills = new List<Unit>();
+            if (!CanUseAction(unit, action, tile))
+                return kills;
+            if (action == ActionKind.PinningShot && FixedHitKills(UnitAt(tile), PinDamage, unit, DamageKind.Attack))
+                kills.Add(UnitAt(tile));
+            if (action == ActionKind.Fireball)
+            {
+                var area = PlusArea(tile);
+                kills.AddRange(_units.Where(u => u.IsPlaced && u.IsAlive && Cells(u).Any(area.Contains) && FixedHitKills(u, FireballDamage, unit, DamageKind.Blast)));
+            }
+
+            return kills;
+        }
+
+        /// <summary>Whether a hit of a set amount would kill the target, by the same steps as <see cref="Damage"/>.</summary>
+        private bool FixedHitKills(Unit target, int amount, Unit source, DamageKind kind)
+        {
+            if (kind == DamageKind.Attack && source.Team != target.Team)
+            {
+                if (target.Has(Ability.Dodge) && !target.DodgeUsed)
+                    return false;
+                if (_units.Any(g => g != target && g.Team == target.Team && g.IsPlaced && g.IsAlive && g.Has(Ability.Guard) && Distance(g, target) == 1))
+                    return false;
+            }
+
+            if ((target.Has(Ability.LuckyCharm) && !target.LastStandUsed) || (target.IsObjective && target.Team == Team.Enemy && source.Team == target.Team))
+                return false;
+            amount = FavoredAmount(source, target, amount, kind);
+            if (IsShielded(target))
+                amount = Math.Max(1, amount - 1);
+            if (target.Has(Ability.Tough))
+                amount = Math.Max(1, amount - 1);
+            return amount - target.Shield - target.MoonShield >= target.Hp;
         }
 
         /// <summary>An ally of the attacker stands on the far side of a 1x1 target.</summary>
@@ -2061,6 +2104,8 @@ namespace ArmyRoguelike.Core
             var events = new List<BattleEvent>();
             foreach (var pile in piles)
             {
+                if (UnitAt(pile.Pos) != null)
+                    continue;
                 if (pile.Team != raiser.Team)
                 {
                     pile.PileGone = true;
@@ -2209,6 +2254,8 @@ namespace ArmyRoguelike.Core
                 if (source.Has(Ability.KillRefund) && kind == DamageKind.Attack)
                 {
                     source.Ap += KillRefundAp;
+                    source.Moves += KillRefundMoves;
+                    source.ActedThisTurn = false;
                     after.Add(new EffectEvent(EffectKind.Refund, source, KillRefundAp, source.Hp, source));
                 }
             }
@@ -2220,6 +2267,14 @@ namespace ArmyRoguelike.Core
                 if (target.Team == Team.Player && !target.IsSummon && !target.IsObjective && !target.Stats.LeavesRemains &&
                     Living(Team.Enemy).Any(u => u.Has(Ability.SoulHarvest)))
                     target.LeftPile = true;
+                // One tile, one pile: the newer one replaces any older pile under it.
+                if (target.IsRemains)
+                    foreach (var old in _units.Where(u => u != target && u.IsRemains && u.Pos == target.Pos).ToList())
+                    {
+                        old.PileGone = true;
+                        after.Add(new PileReplacedEvent(old));
+                    }
+
                 if (target.Has(Ability.PowderKeg))
                     Explode(target.Pos, PowderKegDamage, "powder keg", target, after);
             }
@@ -2468,7 +2523,7 @@ namespace ArmyRoguelike.Core
                     }
                     case Omen.Night:
                     {
-                        var area = BlastArea(unit.Pos);
+                        var area = PlusArea(unit.Pos);
                         foreach (var p in area)
                             _shroud[p] = side;
                         events.Add(new OmenEvent(omen, blessing, unit, area));

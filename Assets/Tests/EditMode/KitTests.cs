@@ -326,6 +326,70 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void Momentum_LetsItWalkOnAfterAKill()
+        {
+            var b = Setup(new[] { M(UnitStats.Rogue, Technique.Pincer, Technique.Momentum) }, new[] { P(3, 2) }, new[] { E(UnitStats.Wolf, 3, 3), Far });
+            var shadow = Player(b);
+            shadow.Moves = 0;
+            Enemy(b).Hp = 1;
+            b.PlayerAttack(shadow, Enemy(b));
+            Assert.AreEqual(Battle.KillRefundMoves, shadow.Moves);
+            Assert.IsTrue(b.CanMove(shadow));
+            Assert.IsTrue(b.CanStillAct(shadow), "nothing else in reach, but it isn't finished");
+        }
+
+        [Test]
+        public void BonePile_ANewOneReplacesTheOldOne_SoOneUnitRises()
+        {
+            var b = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(3, 2) },
+                new[] { E(UnitStats.Skeleton, 3, 3), E(UnitStats.Skeleton, 3, 4), E(UnitStats.Necromancer, 5, 5) });
+            var warrior = Player(b);
+            var (first, second, necro) = (Enemy(b, 0), Enemy(b, 1), Enemy(b, 2));
+            first.Hp = 1;
+            b.PlayerAttack(warrior, first);
+            second.Pos = first.Pos;
+            second.Hp = 1;
+            warrior.Ap = warrior.MaxAp;
+            b.PlayerAttack(warrior, second);
+            Assert.AreEqual(second, b.RemainsAt(P(3, 3)));
+            Assert.IsFalse(first.IsRemains, "the older pile is gone");
+            var raises = b.DoRaise(necro, second).OfType<RaiseEvent>().ToList();
+            Assert.AreEqual(1, raises.Count);
+            Assert.AreEqual(second, b.UnitAt(P(3, 3)));
+            Assert.IsFalse(first.IsAlive);
+        }
+
+        [Test]
+        public void EnemiesPreferAnUnshieldedTarget_IfTheyCanReachOne()
+        {
+            var b = Setup(new[] { M(UnitStats.Warrior), M(UnitStats.Archer) }, new[] { P(3, 2), P(4, 2) }, new[] { E(UnitStats.Brute, 3, 3) });
+            var (warrior, archer) = (Player(b, 0), Player(b, 1));
+            var brute = Enemy(b);
+            Assert.AreEqual(warrior, EnemyAI.ChooseTarget(b, brute), "the nearest, with no shields around");
+            warrior.Shield = 2;
+            Assert.AreEqual(archer, EnemyAI.ChooseTarget(b, brute));
+            archer.Pos = P(0, 0);
+            Assert.AreEqual(warrior, EnemyAI.ChooseTarget(b, brute), "nobody else in reach: it hits the shield");
+        }
+
+        [Test]
+        public void KillPrediction_CoversAttacksAndAimedActions()
+        {
+            var b = Setup(new[] { M(UnitStats.Apprentice, Technique.Fireball) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Wolf, 3, 3), Far });
+            var mage = Player(b);
+            var (near, behind) = (Enemy(b, 0), Enemy(b, 1));
+            near.Hp = b.EffectiveDamage(mage);
+            CollectionAssert.AreEqual(new[] { near }, b.AttackKills(mage));
+            near.Hp = 20;
+            Assert.AreEqual(0, b.AttackKills(mage).Count);
+
+            behind.Hp = Battle.FireballDamage;
+            CollectionAssert.AreEqual(new[] { behind }, b.ActionKills(mage, ActionKind.Fireball, P(3, 3)));
+            behind.Shield = 1;
+            Assert.AreEqual(0, b.ActionKills(mage, ActionKind.Fireball, P(3, 3)).Count, "the shield saves it");
+        }
+
+        [Test]
         public void Poison_TicksOnEnemyTurns()
         {
             var b = Setup(new[] { M(UnitStats.Rogue, Technique.Pincer, Technique.Poison) }, new[] { P(0, 0) }, new[] { E(UnitStats.Ogre, 5, 5) });

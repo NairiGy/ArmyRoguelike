@@ -296,6 +296,7 @@ namespace ArmyRoguelike.Tests
             var crossbow = Enemy(b);
             Assert.IsTrue(b.IsShroudedFrom(archer.Pos, Team.Enemy));
             Assert.IsFalse(b.IsShroudedFrom(archer.Pos, Team.Player));
+            CollectionAssert.AreEquivalent(b.PlusArea(archer.Pos), b.Shroud.Keys, "a plus around the unit");
             Assert.IsFalse(b.CanHitFrom(crossbow, crossbow.Pos, archer), "no shot from range into the shroud");
             Assert.IsTrue(b.CanHitFrom(crossbow, new GridPos(3, 1), archer), "point blank still works");
             Assert.IsTrue(b.CanHitFrom(archer, archer.Pos, crossbow), "the shroud doesn't stop your own shots");

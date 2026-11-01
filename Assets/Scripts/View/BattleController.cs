@@ -73,7 +73,7 @@ namespace ArmyRoguelike.View
         private static readonly Color EngagedLinkColor = new Color(0.95f, 0.3f, 0.25f, 0.9f);
         private static readonly Color ShroudColor = new Color(0.25f, 0.2f, 0.55f, 0.45f);
         // Placeholder (see the "Art needed" table): a tile lightning will strike at the end of the enemy turn.
-        private static readonly Color StormMarkColor = new Color(0.75f, 0.85f, 1f, 0.5f);
+        private static readonly Color StormMarkColor = new Color(0.55f, 0.8f, 1f, 0.75f);
 
         // Wolf tints: warm while the leader's aura reaches them, pale and cold once the leader is dead.
         private static readonly Color BondedTint = new Color(1.25f, 0.8f, 0.75f);
@@ -882,6 +882,9 @@ namespace ArmyRoguelike.View
                     yield return new WaitForSeconds(0.45f);
                     break;
                 }
+                case PileReplacedEvent replaced:
+                    _board.ViewOf(replaced.Pile)?.gameObject.SetActive(false);
+                    break;
                 case RaiseEvent raise:
                 {
                     var raiser = _board.ViewOf(raise.Raiser);
@@ -1406,6 +1409,9 @@ namespace ArmyRoguelike.View
 
             // Under the panels, so a card or button is never hidden by a badge.
             DrawIntentBadges();
+            DrawStormBadges();
+            DrawKillBadges();
+            DrawSummonCountdown();
 
             switch (Battle.Phase)
             {
@@ -1456,6 +1462,76 @@ namespace ArmyRoguelike.View
                 word.normal.textColor = color;
                 GUI.Label(new Rect(rect.x + pad + iconSize + 4f, rect.y, w - iconSize - pad, height), text, word);
             }
+        }
+
+        /// <summary>A pulsing bolt on every tile lightning will strike, seen through move highlights and statues (Storm).</summary>
+        private void DrawStormBadges()
+        {
+            if (Event.current.type != EventType.Repaint || Battle.StormMarks.Count == 0)
+                return;
+            var scale = Screen.height / ReferenceHeight;
+            const float size = 30f;
+            var old = GUI.color;
+            foreach (var p in Battle.StormMarks)
+            {
+                var screen = _camera.WorldToScreenPoint(IsoMath.GridToWorld(p));
+                var rect = new Rect(screen.x / scale - size * 0.5f, (Screen.height - screen.y) / scale - size * 0.5f, size, size);
+                GUI.DrawTexture(rect, HudArt.Solid(HudArt.PanelColor));
+                GUI.color = Color.Lerp(new Color(0.55f, 0.8f, 1f), Color.white, 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 5f));
+                GUI.DrawTexture(rect, HudArt.IconTexture(HudArt.Icon.Bolt));
+                GUI.color = old;
+            }
+        }
+
+        /// <summary>A skull over every unit the selected unit's current action would kill: its attack, or the aimed action on the hovered tile.</summary>
+        private void DrawKillBadges()
+        {
+            if (Event.current.type != EventType.Repaint || _busy || _selected == null || !Battle.CanAct(_selected))
+                return;
+            List<Unit> kills;
+            if (!_action.HasValue)
+                kills = Battle.AttackKills(_selected);
+            else if (_hovered.HasValue)
+                kills = Battle.ActionKills(_selected, _action.Value, _hovered.Value);
+            else
+                return;
+            var scale = Screen.height / ReferenceHeight;
+            const float size = 26f, intentHeight = 28f;
+            var old = GUI.color;
+            foreach (var unit in kills)
+            {
+                var view = _board.ViewOf(unit);
+                if (view == null)
+                    continue;
+                var screen = _camera.WorldToScreenPoint(view.TopWorld + Vector3.up * 0.06f);
+                var y = (Screen.height - screen.y) / scale - size - (_intentBadges.Any(b => b.enemy == unit) ? intentHeight : 0f);
+                var rect = new Rect(screen.x / scale - size * 0.5f, y, size, size);
+                GUI.DrawTexture(rect, HudArt.Solid(HudArt.PanelColor));
+                GUI.color = new Color(1f, 0.35f, 0.3f);
+                GUI.DrawTexture(rect, HudArt.IconTexture(HudArt.Icon.Skull));
+                GUI.color = old;
+            }
+        }
+
+        /// <summary>Break the Ritual: top centre, a pip for each turn left before the summoning completes.</summary>
+        private void DrawSummonCountdown()
+        {
+            if (Event.current.type != EventType.Repaint || Battle.SummonTurn == 0 || Battle.SummoningComplete || Battle.IsOver)
+                return;
+            var left = Battle.SummonTurnsLeft;
+            var urgent = left <= 1;
+            var color = urgent ? new Color(1f, 0.35f, 0.3f) : HudArt.ControlColor;
+            const float width = 300f, height = 58f, pip = 14f, gap = 5f;
+            var rect = new Rect((GuiWidth - width) * 0.5f, Margin, width, height);
+            GUI.DrawTexture(rect, HudArt.Solid(HudArt.PanelColor));
+            GUI.DrawTexture(new Rect(rect.x, rect.yMax - 2f, rect.width, 2f), HudArt.Solid(color));
+            var style = new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            style.normal.textColor = color;
+            GUI.Label(new Rect(rect.x, rect.y + 4f, rect.width, 26f), urgent ? "Summoning completes after this turn!" : $"Summoning completes in {left} turns", style);
+            var total = Battle.SummonTurn;
+            var x = rect.center.x - (total * pip + (total - 1) * gap) * 0.5f;
+            for (var i = 0; i < total; i++)
+                GUI.DrawTexture(new Rect(x + i * (pip + gap), rect.y + 34f, pip, pip), HudArt.Solid(i < left ? color : new Color(0.25f, 0.25f, 0.28f)));
         }
 
         private string Header => _context.Test

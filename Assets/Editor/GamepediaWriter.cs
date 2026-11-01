@@ -223,7 +223,7 @@ public static class GamepediaWriter
         html.Append("<h3 id=\"ai-target\">Targeting</h3><ol>");
         html.Append($"<li>A unit with Taunt within {Battle.TauntRange} tiles: the nearest such unit.</li>");
         html.Append("<li>Blood Scent (wolves): the lowest-HP unit it can reach and attack this turn, walking up first if needed.</li>");
-        html.Append("<li>Otherwise the nearest of your units, counted in steps and ignoring rocks. Ties go to the one with the lowest HP, then to the one listed first in your army.</li></ol>");
+        html.Append("<li>Otherwise the nearest of your units, counted in steps and ignoring rocks. Ties go to the one with the lowest HP, then to the one listed first in your army. If that unit has a shield, it goes for the nearest unshielded unit it can reach this turn instead, and hits the shield only when there is none.</li></ol>");
         html.Append("<p>Every behaviour uses this target. Only the Bomber may bomb a different unit when its target can't be bombed, and the Necromancer raises bone piles before it looks for a target at all.</p>");
 
         html.Append("<h3 id=\"ai-approach\">Walking up</h3><ol>");

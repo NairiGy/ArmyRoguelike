@@ -422,6 +422,19 @@ namespace ArmyRoguelike.Core
         public override Unit Actor => Source;
     }
 
+    /// <summary>A unit died on a bone pile: its pile replaced this older one, which is gone.</summary>
+    public sealed class PileReplacedEvent : BattleEvent
+    {
+        public readonly Unit Pile;
+
+        public PileReplacedEvent(Unit pile)
+        {
+            Pile = pile;
+        }
+
+        public override Unit Actor => Pile;
+    }
+
     /// <summary>A necromancer raised a bone pile back into a full-HP skeleton.</summary>
     public sealed class RaiseEvent : BattleEvent
     {

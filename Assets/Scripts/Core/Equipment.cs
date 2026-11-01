@@ -115,7 +115,7 @@ namespace ArmyRoguelike.Core
                 case Ability.PreyOnSnared: return $"pinned enemies take +{Battle.PreyBonus} damage from everyone";
                 case Ability.Volley: return "shots hit the target and the 4 tiles next to it for 1 less damage, friend or foe";
                 case Ability.Pincer: return $"+{Battle.PincerBonus} damage if an ally stands on the far side of the target";
-                case Ability.KillRefund: return "a kill gives its action back: it can attack again";
+                case Ability.KillRefund: return "a kill gives its action back and 1 move: it can attack again or walk on";
                 case Ability.Poison: return $"hits poison: {Battle.PoisonDamage} damage at the start of the target's next {Battle.PoisonTurns} turns";
                 case Ability.Counter: return "counter-attacks the first melee hit each enemy turn";
                 case Ability.CounterAll: return "counter-attacks every melee hit";
