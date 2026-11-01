@@ -107,7 +107,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [ ] Next (new gameplay chat): tune units from the playtest. Weak spots seen: the Rogue dies first in every fight (5 HP on a 1-move board); Pinning Shot and Blink were never used; Fling and the bandit kits are unplayed; cooldowns are placeholders.
 - [ ] Re-export the illustrated gamepedia (Tools → Export Gamepedia): `docs/gamepedia.html` is the text-only version since the small-board work.
 - [ ] Next: playtest the 12-step Act 1 as a full run and summarise from the logs. Then decide on new node types and events, and the balance pass.
-- [ ] Later: split fights into difficulty pools (and add more fights); each map step draws from a pool.
+- [ ] Later: split fights into difficulty pools (and add more fights); each map step draws from a pool. First step done 2026-11-01: `Encounter.Pool` on the regular factions, Elementals in pool 2, and step 1 draws only pool 1. Not playtested.
 - [ ] Moon Shrine balance: 3 test battles with a tier-1 Warrior/Archer/Rogue were all lost (army wiped twice, shrine broken once); no blessing earned in play yet. Leave for the general balance pass (user's call).
 - [ ] More map events and node types: the user wants to think about what else to add. Ideas parked from the scenario list: assassinate the leader, rescue a captive, hold the ground, break through, crumbling tower.
 - [x] Moon Shrine scenario node with blessings and curses (2026-10-26), merged into `experiment/art-style`. Tested in test mode only.

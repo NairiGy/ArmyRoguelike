@@ -224,6 +224,46 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void Map_StepOneOnlyDrawsTheFirstPool()
+        {
+            var seen = new System.Collections.Generic.HashSet<Encounter>();
+            for (var seed = 0; seed < 1000; seed++)
+            {
+                var step = new Run(seed).Map[0];
+                Assert.AreEqual(2, step.Count);
+                Assert.AreNotEqual(step[0].Encounter, step[1].Encounter, $"seed {seed}");
+                foreach (var node in step)
+                {
+                    Assert.AreEqual(Encounter.FirstPool, node.Encounter.Pool, $"seed {seed}");
+                    Assert.AreNotEqual(Encounter.Elementals, node.Encounter, $"seed {seed}");
+                    seen.Add(node.Encounter);
+                }
+            }
+
+            CollectionAssert.AreEquivalent(new[] { Encounter.Wolves, Encounter.Goblins, Encounter.Bandits }, seen);
+        }
+
+        [Test]
+        public void Map_ElementalsCanComeFromTheNextBattleOn()
+        {
+            var appeared = false;
+            for (var seed = 0; seed < 40 && !appeared; seed++)
+            {
+                var run = NewRun(seed);
+                while (run.StepIndex < 2)
+                {
+                    var battle = run.CurrentChoices.ToList().FindIndex(n => n.Kind == NodeKind.Battle);
+                    run.ChooseNode(battle >= 0 ? battle : 0);
+                    PlayThroughNode(run);
+                }
+
+                appeared = run.CurrentChoices.Any(n => n.Kind == NodeKind.Battle && n.Encounter == Encounter.Elementals);
+            }
+
+            Assert.IsTrue(appeared, "step 3's battle can bring Elementals");
+        }
+
+        [Test]
         public void Elite_Won_PaysGoldAndAnItemPick()
         {
             var run = NewRun(2);

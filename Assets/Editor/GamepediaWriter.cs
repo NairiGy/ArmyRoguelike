@@ -467,6 +467,7 @@ public static class GamepediaWriter
         html.Append($"so every run has at least {Run.FightSteps.Count} fights before the boss. ");
         html.Append("Step 9 offers one more optional battle; the last step is a boss (Necromancer or Giant).</li>");
         html.Append("<li>A <b>Battle</b> brings a faction you haven't beaten yet; once you've met them all it's a normal-strength rematch. ");
+        html.Append($"Step 1 only brings the easier factions ({string.Join(", ", Encounter.Regular.Where(f => f.Pool == Encounter.FirstPool).Select(f => f.Name))}). ");
         html.Append("An <b>Elite</b> (steps 6 and 10) is a harder rematch of a faction you've beaten. Both show their faction when you reach their step.</li>");
         html.Append("<li>The two scenario fights sit at steps 4 and 8, next to a battle: the Moon Shrine at one, Break the Ritual at the other. Shops and ? events fill the rest.</li>");
         html.Append($"<li>Won battle: {Run.BaseGold} gold + {Run.GoldPerSurvivor} per surviving unit (+{Run.AmbushBonusGold} for an ambush). Gold carried off by escaped cutpurses is lost.</li>");

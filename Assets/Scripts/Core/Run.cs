@@ -477,7 +477,7 @@ namespace ArmyRoguelike.Core
         /// <summary>
         /// Picks the factions for the current step's battle and elite nodes, now that it's known who has been
         /// beaten. A battle takes a faction not beaten yet (a normal-strength rematch if every faction has been
-        /// met); an elite takes a beaten one. The two nodes of a step never share a faction.
+        /// met); an elite takes a beaten one. Step 1 only brings the first pool. The two nodes of a step never share a faction.
         /// </summary>
         private void ResolveStep()
         {
@@ -496,7 +496,7 @@ namespace ArmyRoguelike.Core
                 }
                 else if (node.Kind == NodeKind.Battle)
                 {
-                    var fresh = Encounter.Regular.Where(f => !Fought.Contains(f) && !taken.Contains(f)).ToList();
+                    var fresh = Encounter.Regular.Where(f => !Fought.Contains(f) && !taken.Contains(f) && (StepIndex > 0 || f.Pool == Encounter.FirstPool)).ToList();
                     node.IsRematch = fresh.Count == 0;
                     var pool = fresh.Count > 0 ? fresh : Encounter.Regular.Where(f => !taken.Contains(f)).ToList();
                     faction = pool[_rng.Next(pool.Count)];

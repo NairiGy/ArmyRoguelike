@@ -24,6 +24,12 @@ namespace ArmyRoguelike.Core
 
         public readonly bool IsBoss;
 
+        /// <summary>The pool the run's first battles draw from.</summary>
+        public const int FirstPool = 1;
+
+        /// <summary>A regular faction's difficulty pool: 1 is the easiest, so it can open a run. 0 for other encounters.</summary>
+        public int Pool { get; private set; }
+
         /// <summary>For a regular faction: the unit the Necromancer boss raises from it.</summary>
         public readonly UnitStats RaisedRepresentative;
 
@@ -211,7 +217,7 @@ namespace ArmyRoguelike.Core
                 foreach (var t in near)
                     plan.Enemies.Add((UnitStats.Wolf, t));
                 return plan;
-            });
+            }) { Pool = 1 };
 
         public static readonly Encounter Goblins = new Encounter("Goblin Bombers", "Ridge",
             "A broken ridge across the middle: three rocks with a gap between each; bombers lob over it from the back row.", false, UnitStats.GoblinBomber,
@@ -223,7 +229,7 @@ namespace ArmyRoguelike.Core
                 PlaceRandom(plan, rng, UnitStats.GoblinBomber, 2, 5, 5);
                 PlaceRandom(plan, rng, UnitStats.Goblin, 3, 4, 4);
                 return plan;
-            });
+            }) { Pool = 1 };
 
         public static readonly Encounter Bandits = new Encounter("Bandit Camp", "Camp",
             "Two rocks of cover in the middle with a crossbowman behind each; cutpurses start on the flanks.", false, UnitStats.Crossbowman,
@@ -247,7 +253,7 @@ namespace ArmyRoguelike.Core
                 foreach (var t in centre)
                     plan.Enemies.Add((UnitStats.Brute, t));
                 return plan;
-            });
+            }) { Pool = 1 };
 
         public static readonly Encounter Elementals = new Encounter("Elementals", "Crystal Cave",
             "A mirrored pair of crystals; three elementals spread across the back.", false, UnitStats.Shard,
@@ -268,7 +274,7 @@ namespace ArmyRoguelike.Core
                 foreach (var t in picked)
                     plan.Enemies.Add((UnitStats.Elemental, t));
                 return plan;
-            });
+            }) { Pool = 2 };
 
         // ---------- Ritual ----------
 
