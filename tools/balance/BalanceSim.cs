@@ -11,7 +11,7 @@ using ArmyRoguelike.Core;
 
 public static class BalanceSim
 {
-    private enum Bot { Random, Greedy }
+    private enum Bot { Random, Greedy, Smart, Smart2 }
 
     private sealed class Result
     {
@@ -71,16 +71,28 @@ public static class BalanceSim
                     member.Learn(options[rng.Next(options.Count)]);
             }
 
-        var battle = fight.CreateBattle(army, new Random(seed + 1));
+        // As if every faction was beaten: the Necromancer raises one of each, as it does late in a real run.
+        var battle = fight.CreateBattle(army, new Random(seed + 1), Encounter.Regular);
         if (field.HasValue)
             battle.SetField(field);
-        Deploy(battle);
+        var botRng = new Random(seed + 2);
+        if (bot == Bot.Smart || bot == Bot.Smart2)
+            SmartBot.Deploy(battle, botRng);
+        else
+            Deploy(battle);
         if (!battle.StartBattle())
             throw new InvalidOperationException("couldn't start " + fight.Name);
 
-        var botRng = new Random(seed + 2);
         while (!battle.IsOver && battle.TurnNumber <= TurnCap)
         {
+            if (bot == Bot.Smart || bot == Bot.Smart2)
+            {
+                SmartBot.TakeTurn(battle, bot == Bot.Smart ? 1 : 2);
+                if (!battle.IsOver)
+                    battle.EndPlayerTurn();
+                continue;
+            }
+
             foreach (var unit in battle.Living(Team.Player).Where(u => !u.IsObjective).ToList())
             {
                 if (battle.IsOver)
@@ -134,7 +146,7 @@ public static class BalanceSim
     }
 
     /// <summary>Takes a kill if it can, otherwise hits the weakest target in reach, otherwise walks closer.</summary>
-    private static void GreedyTurn(Battle battle, Unit unit)
+    internal static void GreedyTurn(Battle battle, Unit unit)
     {
         var foes = battle.Living(Team.Enemy).Where(e => !e.IsHidden).ToList();
         if (foes.Count == 0)
@@ -203,20 +215,97 @@ public static class BalanceSim
 
     private static Tally Sweep(IEnumerable<UnitStats[]> drafts, IEnumerable<Encounter> fights, int seeds, Bot bot, int level, Battlefield? field, Dictionary<string, int> stuck = null)
     {
+        var jobs = (from draft in drafts from fight in fights from s in Enumerable.Range(0, seeds) select (draft, fight, s)).ToList();
+        var results = new Result[jobs.Count];
+        System.Threading.Tasks.Parallel.For(0, jobs.Count, i =>
+            results[i] = Play(jobs[i].draft, jobs[i].fight, jobs[i].s * 13 + 5, bot, level, field));
+
         var tally = new Tally();
-        foreach (var draft in drafts)
-            foreach (var fight in fights)
-                for (var s = 0; s < seeds; s++)
-                {
-                    var result = Play(draft, fight, s * 13 + 5, bot, level, field);
-                    tally.Add(result);
-                    if (result.Stuck != null && stuck != null)
-                    {
-                        var key = fight.Name + ": " + result.Stuck;
-                        stuck[key] = stuck.TryGetValue(key, out var n) ? n + 1 : 1;
-                    }
-                }
+        for (var i = 0; i < jobs.Count; i++)
+        {
+            tally.Add(results[i]);
+            if (results[i].Stuck != null && stuck != null)
+            {
+                var key = jobs[i].fight.Name + ": " + results[i].Stuck;
+                stuck[key] = stuck.TryGetValue(key, out var n) ? n + 1 : 1;
+            }
+        }
         return tally;
+    }
+
+    /// <summary>The look-ahead bot: the numbers to tune against. Report with its strength check against a deeper search.</summary>
+    private static void SmartReport(TextWriter o, int seeds)
+    {
+        var drafts = AllDrafts();
+        var factions = Fights.Take(4).ToArray();
+        var levels = new[] { 0, 1, 2, 3 };
+        var stuck = new Dictionary<string, int>();
+
+        o.WriteLine("# Balance report: smart bot");
+        o.WriteLine();
+        o.WriteLine($"The bot uses every action and sees the enemy's next turn, with random techniques and no items, banners or omens. {seeds} seeds per draft and fight.");
+        o.WriteLine();
+
+        o.WriteLine("## Fights: win rate (timeouts, average turns)");
+        o.WriteLine();
+        o.WriteLine("| Fight | " + string.Join(" | ", levels.Select(l => "L" + l)) + " |");
+        o.WriteLine("|---|" + string.Concat(levels.Select(_ => "---|")));
+        foreach (var fight in Fights)
+        {
+            o.WriteLine($"| {fight.Name} | " + string.Join(" | ", levels.Select(l =>
+            {
+                var t = Sweep(drafts, new[] { fight }, seeds, Bot.Smart, l, null, stuck);
+                return $"{t.WinRate} ({t.Timeouts}, {t.AvgTurns})";
+            })) + " |");
+            o.Flush();
+        }
+        o.WriteLine();
+
+        o.WriteLine("## Timeouts: who was left");
+        o.WriteLine();
+        foreach (var kv in stuck.OrderByDescending(kv => kv.Value).Take(12))
+            o.WriteLine($"- {kv.Value}x {kv.Key}");
+        if (stuck.Count == 0)
+            o.WriteLine("- none");
+        o.WriteLine();
+
+        o.WriteLine("## Drafts: win rate over the four factions");
+        o.WriteLine();
+        o.WriteLine("| Draft | L0 | L1 | L2 |");
+        o.WriteLine("|---|---|---|---|");
+        foreach (var draft in drafts)
+        {
+            o.WriteLine($"| {DraftName(draft)} | " + string.Join(" | ", new[] { 0, 1, 2 }.Select(l =>
+                Sweep(new[] { draft }, factions, seeds, Bot.Smart, l, null).WinRate)) + " |");
+            o.Flush();
+        }
+        o.WriteLine();
+
+        var fields = new Battlefield?[] { null }.Concat(Enum.GetValues(typeof(Battlefield)).Cast<Battlefield>().Select(f => (Battlefield?)f)).ToArray();
+        var fieldFights = factions.Concat(new[] { Encounter.Giant, Encounter.Necromancer }).ToArray();
+        o.WriteLine("## Battlefields: win rate at L1");
+        o.WriteLine();
+        o.WriteLine("| Fight | " + string.Join(" | ", fields.Select(f => f?.ToString() ?? "none")) + " |");
+        o.WriteLine("|---|" + string.Concat(fields.Select(_ => "---|")));
+        foreach (var fight in fieldFights)
+        {
+            o.WriteLine($"| {fight.Name} | " + string.Join(" | ", fields.Select(f =>
+                Sweep(drafts, new[] { fight }, seeds, Bot.Smart, 1, f).WinRate)) + " |");
+            o.Flush();
+        }
+        o.WriteLine();
+
+        o.WriteLine("## Strength check: one round of look-ahead against two, L0");
+        o.WriteLine();
+        o.WriteLine("| Fight | Greedy | Smart | Smart, two rounds |");
+        o.WriteLine("|---|---|---|---|");
+        foreach (var fight in factions)
+        {
+            var few = Math.Max(1, seeds / 2);
+            o.WriteLine($"| {fight.Name} | " + string.Join(" | ", new[] { Bot.Greedy, Bot.Smart, Bot.Smart2 }.Select(b =>
+                Sweep(drafts, new[] { fight }, few, b, 0, null).WinRate)) + " |");
+            o.Flush();
+        }
     }
 
     /// <summary>Hits needed for each attacker's plain attack to kill each target. Ignores passives and bonuses.</summary>
@@ -264,7 +353,34 @@ public static class BalanceSim
         var outPath = args.Length > 0 ? args[0] : "balance-report.md";
         var seeds = args.Length > 1 ? int.Parse(args[1]) : 50;
 
+        // Fill Core's Raised and Harvested caches now: they aren't safe to write to from several threads.
+        foreach (var faction in Encounter.Regular)
+            UnitStats.Raised(faction.RaisedRepresentative);
+        foreach (var unit in UnitStats.BaseUnits)
+            UnitStats.Harvested(unit);
+
         var clock = System.Diagnostics.Stopwatch.StartNew();
+        if (args.Length > 2 && args[2] == "smart")
+        {
+            using (var report = new StreamWriter(outPath))
+                SmartReport(report, seeds);
+            Console.WriteLine($"wrote {outPath} in {clock.Elapsed.TotalSeconds:F0}s");
+            return 0;
+        }
+
+        if (args.Length > 2 && args[2] == "fights")
+        {
+            // Quick check of chosen fights, for trying a number change: tools/dev.sh sim 10 fights "Elementals,Giant"
+            var chosen = args.Length > 3 ? Fights.Where(f => args[3].Split(',').Contains(f.Name)).ToArray() : Fights;
+            foreach (var fight in chosen)
+                Console.WriteLine($"{fight.Name,-22}" + string.Join("  ", new[] { 0, 1, 2, 3 }.Select(l =>
+                {
+                    var t = Sweep(AllDrafts(), new[] { fight }, seeds, Bot.Smart, l, null);
+                    return $"L{l} {t.WinRate,4} ({t.Timeouts,2} to, {t.AvgTurns,4}t)";
+                })));
+            return 0;
+        }
+
         var drafts = AllDrafts();
         var factions = Fights.Take(4).ToArray();
         using (var o = new StreamWriter(outPath))

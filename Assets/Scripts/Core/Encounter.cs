@@ -317,10 +317,10 @@ namespace ArmyRoguelike.Core
         /// <summary>Break the Ritual: how many totems, and the enemy turn the summoning completes on.</summary>
         public const int TotemCount = 3;
 
-        public const int SummonTurn = 4;
+        public const int SummonTurn = 6;
 
         public static readonly Encounter BreakRitual = new Encounter("Break the Ritual", "Totem Grounds",
-            "Three goblin totems stand on the far half. Smash them all before the summoning completes at the start of enemy turn 4.",
+            "Three goblin totems stand on the far half. Smash them all before the summoning completes at the start of enemy turn 6.",
             false, null,
             (rng, _) =>
             {
@@ -399,7 +399,7 @@ namespace ArmyRoguelike.Core
                 foreach (var x in AlternateColumns(rng))
                     plan.Rocks.Add(P(x, 3));
                 PlaceRandom(plan, rng, UnitStats.GoblinBomber, 4, 5, 5);
-                PlaceRandom(plan, rng, UnitStats.Goblin, 3, 4, 4);
+                PlaceRandom(plan, rng, UnitStats.Goblin, 4, 4, 4);
                 return plan;
             });
 

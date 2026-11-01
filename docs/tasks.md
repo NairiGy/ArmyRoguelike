@@ -140,10 +140,11 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 Targets and working rules: "Balance" in the design note. Report: `tools/dev.sh sim` writes `tools/out/balance-report.md`.
 
 - [x] Simulator v1 (2026-11-01, `tools/balance/BalanceSim.cs`): random and greedy bots that only move and basic-attack; fights, drafts, battlefields, timeouts and hits-to-kill tables.
-- [ ] Smart bot: use actions and look ahead with the `Battle` copy (needs the balance-support session's work), step off storm marks, and push. Don't tune fights on the crude bots alone.
+- [x] Smart bot (2026-11-01, `tools/balance/SmartBot.cs`): uses every action, sees one enemy turn ahead through `Battle.Clone()`. It may stall in long fights (timeouts at Bandit Camp and Elementals).
 - [ ] Run simulator: whole runs with picks, shops and banners, for the gold, level and difficulty curves.
-- [ ] First tuning pass once the smart bot exists. Suspects: Goblin Bombers far too weak (bot 70% at level 0, against 1-9% for the other factions), Elite Goblins easier than normal fights, the first fight too hard, Break the Ritual (bot 4% at level 2), Moon Shrine.
-- [ ] Re-check Fortune's Favored after the "bosses can't be favored" fix. The crude bot showed no harder Giant fight on it before the fix (about 31% against 33%), and the fix may make it a pure bonus for the player.
+- [x] First number pass (2026-11-01, see "Balance" in the design note): Elementals, Crossbowman, Goblins and Elite Goblins, Break the Ritual. Not playtested.
+- [ ] Compare the next playtest with the bot: Moon Shrine (bot 95% at level 1, players 1 of 3 and all test battles lost), first fights, Goblins now that they hit harder. Bosses may be too easy late (bot 94-95% at level 2): decide after the run simulator.
+- [ ] Battlefields help the player more than the enemy (bot at level 1: Storm and Fortune's Favored mostly +8 to +15 points, Giant 87 to 97 and 96), partly because the bot sees the dice. Measure again with players before changing.
 - [ ] Battering Ram with Edge of the World: a small enemy can be pushed off from any tile, a medium one from 32 of 36. Measure with the smart bot.
 - [ ] Draft gaps (bot at level 2: 34-84%; every top draft has the Warrior). Treat as kit design as well as numbers.
 - [ ] Get 3-5 outside playtesters on a dev build (user).

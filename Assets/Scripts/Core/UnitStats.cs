@@ -474,7 +474,7 @@ namespace ArmyRoguelike.Core
             Role = "Stabs, grabs 5 gold and runs in the same turn, dropping caltrops behind it. Kill it before it gets away.",
         };
 
-        public static readonly UnitStats Crossbowman = new UnitStats(UnitKind.Crossbowman, "Crossbowman", 6, 3, 3, 1)
+        public static readonly UnitStats Crossbowman = new UnitStats(UnitKind.Crossbowman, "Crossbowman", 6, 2, 3, 1)
         {
             Abilities = A(Ability.BehindCover, Ability.Overwatch), Role = "Shoots from behind a rock, and covers the approach when nobody is in range.",
         };
@@ -486,12 +486,12 @@ namespace ArmyRoguelike.Core
 
         // ---------- Elementals ----------
 
-        public static readonly UnitStats Shard = new UnitStats(UnitKind.Shard, "Shard", 5, 2, 1, 1)
+        public static readonly UnitStats Shard = new UnitStats(UnitKind.Shard, "Shard", 4, 2, 1, 1)
         {
             Weight = Weight.Small, Role = "Half of an Elemental.",
         };
 
-        public static readonly UnitStats Elemental = new UnitStats(UnitKind.Elemental, "Elemental", 10, 3, 1, 1)
+        public static readonly UnitStats Elemental = new UnitStats(UnitKind.Elemental, "Elemental", 8, 3, 1, 1)
         {
             Weight = Weight.Huge, SplitsInto = Shard, Abilities = A(Ability.Upheaval),
             Role = "Throws your units out of line with the ground beneath them. When it dies it splits into 2 Shards (5 HP each).",
@@ -537,7 +537,7 @@ namespace ArmyRoguelike.Core
             return r;
         }
 
-        public static readonly UnitStats Goblin = new UnitStats(UnitKind.Goblin, "Goblin", 5, 2, 1, 1)
+        public static readonly UnitStats Goblin = new UnitStats(UnitKind.Goblin, "Goblin", 6, 3, 1, 1)
         {
             Weight = Weight.Small, Abilities = A(Ability.Swift, Ability.Slippery, Ability.Fling),
             Role = "Slips past your line and flings its friends, and your own explosives, at you.",

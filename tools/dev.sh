@@ -74,10 +74,15 @@ case "${1:-}" in
   sim)
     { echo "-nologo -nostdlib -noconfig -optimize+ -t:exe -out:\"$OUT/BalanceSim.exe\""
       runtime_refs
-      for f in "$R"/Assets/Scripts/Core/*.cs "$R/tools/balance/BalanceSim.cs"; do echo "\"$f\""; done; } > "$OUT/sim.rsp"
+      # SIM_CORE: a patched copy of Core, to try a number change without touching the game.
+      for f in "${SIM_CORE:-$R/Assets/Scripts/Core}"/*.cs "$R"/tools/balance/*.cs; do echo "\"$f\""; done; } > "$OUT/sim.rsp"
     csc "$OUT/sim.rsp" || { echo "BUILD FAILED"; exit 2; }
     runtimeconfig "$OUT/BalanceSim.runtimeconfig.json"
-    "$DOTNET" "$OUT/BalanceSim.exe" "$OUT/balance-report.md" "${2:-50}"
+    case "${3:-}" in
+      smart) "$DOTNET" "$OUT/BalanceSim.exe" "$OUT/balance-smart.md" "${2:-5}" smart ;;
+      fights) "$DOTNET" "$OUT/BalanceSim.exe" "$OUT/balance-fights.md" "${2:-10}" fights ${4:+"$4"} ;;
+      *) "$DOTNET" "$OUT/BalanceSim.exe" "$OUT/balance-report.md" "${2:-50}" ;;
+    esac
     ;;
   *)
     sed -n '2,11p' "$0"
