@@ -66,14 +66,50 @@ namespace ArmyRoguelike.View
                 poleRenderer.color = new Color(1f, 0f, 0f, 1f);
 
                 var clothRenderer = AddSprite(root, $"Banner {Banners.Name(banners[i])}", foot, cloth, !isLeft);
-                var material = new Material(shader) { mainTexture = clothTexture };
-                material.SetTexture("_Ramp", BattleScenery.MakeRamp(BattleScenery.ParseStops(Ramps[banners[i]])));
-                material.SetFloat("_Light", clothLight);
-                // Each moves to its own time, so they don't sway in step.
-                material.SetFloat("_Phase", i * 1.9f);
-                clothRenderer.sharedMaterial = material;
+                clothRenderer.sharedMaterial = ClothMaterial(shader, clothTexture, banners[i], clothLight);
                 clothRenderer.sortingOrder = poleRenderer.sortingOrder + 1;
             }
+        }
+
+        // The banner's part of the painting (with room for the cloth to move), as a share of the image from its bottom left.
+        private static readonly Rect CardCrop = new Rect(0.156f, 0.2f, 0.6f, 0.69f);
+
+        // The crop's width over its height, in pixels of the 768 x 1376 painting.
+        private const float CardCropAspect = 0.6f * 768f / (0.69f * 1376f);
+
+        // The shader's pass for screens, which stays inside scroll views.
+        private const int GuiPass = 1;
+
+        private static readonly Dictionary<Banner, Material> CardMaterials = new Dictionary<Banner, Material>();
+
+        /// <summary>The banner, swaying, fitted into the area on a screen. Call from OnGUI.</summary>
+        public static void DrawCardArt(Rect area, Banner banner)
+        {
+            if (Event.current.type != EventType.Repaint)
+                return;
+            var poleTexture = Resources.Load<Texture2D>("Banners/pole");
+            var clothTexture = Resources.Load<Texture2D>("Banners/cloth");
+            var shader = Resources.Load<Shader>("Shaders/BannerCloth");
+            if (poleTexture == null || clothTexture == null || shader == null)
+                return;
+            if (!CardMaterials.TryGetValue(banner, out var material) || material == null)
+                CardMaterials[banner] = material = ClothMaterial(shader, clothTexture, banner, 1f);
+
+            var height = Mathf.Min(area.height, area.width / CardCropAspect);
+            var width = height * CardCropAspect;
+            var rect = new Rect(area.center.x - width * 0.5f, area.center.y - height * 0.5f, width, height);
+            GUI.DrawTextureWithTexCoords(rect, poleTexture, CardCrop);
+            Graphics.DrawTexture(rect, clothTexture, CardCrop, 0, 0, 0, 0, new Color(1f, 1f, 1f, GUI.color.a), material, GuiPass);
+        }
+
+        private static Material ClothMaterial(Shader shader, Texture2D texture, Banner banner, float light)
+        {
+            var material = new Material(shader) { mainTexture = texture };
+            material.SetTexture("_Ramp", BattleScenery.MakeRamp(BattleScenery.ParseStops(Ramps[banner])));
+            material.SetFloat("_Light", light);
+            // Each moves to its own time, so they don't sway in step.
+            material.SetFloat("_Phase", (int)banner * 1.9f);
+            return material;
         }
 
         // The full rectangle, not a tight outline: the cloth moves outside its painted shape.

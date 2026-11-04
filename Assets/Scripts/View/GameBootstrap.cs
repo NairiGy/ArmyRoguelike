@@ -155,8 +155,6 @@ namespace ArmyRoguelike.View
 
         // ---------- Banners ----------
 
-        private static string BannerText(Banner banner) => $"{Banners.Name(banner)}\n{Banners.Describe(banner)}";
-
         private void ChooseStartBanner(Banner banner)
         {
             if (_run.ChooseStartBanner(banner))
@@ -564,17 +562,19 @@ namespace ArmyRoguelike.View
 
         private void DrawStartBanner(float screenWidth)
         {
-            const float w = 600;
+            EnsureShopStyles();
+            var w = Mathf.Min(900f, screenWidth - 20f);
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 20, w, 680), GUI.skin.box);
             GUILayout.Label("Raise a banner", Title);
             GUILayout.Label("A banner bends a rule for your whole army, for the whole run. Pick one to start with; shops sell more, and elites offer one.");
             GUILayout.Space(6);
-            var style = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.UpperLeft, wordWrap = true };
-            foreach (var banner in _run.StartBanners)
+            var row = GUILayoutUtility.GetRect(w - 12, 540f, GUILayout.ExpandWidth(true));
+            var banners = _run.StartBanners.ToList();
+            var cardWidth = (row.width - CardGap * (banners.Count - 1)) / banners.Count;
+            for (var i = 0; i < banners.Count; i++)
             {
-                var pick = banner;
-                if (GUILayout.Button(BannerText(banner), style, GUILayout.MinHeight(64)))
-                    Do(() => ChooseStartBanner(pick));
+                var pick = banners[i];
+                DrawTallBannerCard(new Rect(row.x + i * (cardWidth + CardGap), row.y, cardWidth, row.height), pick, () => ChooseStartBanner(pick));
             }
 
             GUILayout.FlexibleSpace();
@@ -694,7 +694,7 @@ namespace ArmyRoguelike.View
         private static readonly Color DimText = new Color(0.62f, 0.62f, 0.67f);
         private static readonly Color Faded = new Color(1f, 1f, 1f, 0.5f);
 
-        private GUIStyle _shopTitle, _cardName, _cardText, _cardTag, _section, _price, _chip;
+        private GUIStyle _shopTitle, _cardName, _cardText, _cardTag, _section, _price, _chip, _bannerName, _bannerRule;
 
         private void EnsureShopStyles()
         {
@@ -707,6 +707,8 @@ namespace ArmyRoguelike.View
             _section = new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold };
             _price = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
             _chip = new GUIStyle(GUI.skin.button) { fontSize = 11, fixedHeight = 20, padding = new RectOffset(8, 8, 2, 2) };
+            _bannerName = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            _bannerRule = new GUIStyle(GUI.skin.label) { fontSize = 15, wordWrap = true, padding = new RectOffset() };
         }
 
         private static void Label(Rect rect, string text, GUIStyle style, Color color)
@@ -786,6 +788,56 @@ namespace ArmyRoguelike.View
             GUI.color = old;
         }
 
+        private const string BannerTag = "Banner, for the whole army";
+        private const float BannerArtWidth = 62f;
+
+        /// <summary>Height of a wide banner card: its rule text beside the painted banner, at least tall enough to show it.</summary>
+        private float BannerCardHeight(Banner banner, int? price, float width)
+        {
+            var textWidth = width - 20 - BannerArtWidth - 10;
+            var text = 8 + 22 + _cardTag.CalcHeight(new GUIContent(BannerTag), textWidth) + 4 +
+                       _cardText.CalcHeight(new GUIContent(Banners.Describe(banner)), textWidth) + (price.HasValue ? 30 : 8);
+            return Mathf.Max(126f, text);
+        }
+
+        /// <summary>A wide banner card: the painted banner on the left, then its name, what it is, its rule and any price.</summary>
+        private void DrawBannerCard(Rect r, Banner banner, int? price, Action select)
+        {
+            var old = GUI.color;
+            var affordable = !price.HasValue || _run.Gold >= price.Value;
+            if (!affordable)
+                GUI.color = Faded;
+            if (Card(r, false, affordable))
+                Do(select);
+            BannerView.DrawCardArt(new Rect(r.x + 10, r.y + 8, BannerArtWidth, r.height - 16), banner);
+            var x = r.x + 10 + BannerArtWidth + 10;
+            var inner = r.xMax - 10 - x;
+            var y = r.y + 8;
+            Label(new Rect(x, y, inner, 22), Banners.Name(banner), _cardName, Color.white);
+            y += 22;
+            var tagHeight = _cardTag.CalcHeight(new GUIContent(BannerTag), inner);
+            Label(new Rect(x, y, inner, tagHeight), BannerTag, _cardTag, DimText);
+            y += tagHeight + 4;
+            Label(new Rect(x, y, inner, r.yMax - (price.HasValue ? 28 : 8) - y), Banners.Describe(banner), _cardText, TextColor);
+            if (price.HasValue)
+                Price(r, price.Value);
+            GUI.color = old;
+        }
+
+        /// <summary>A tall banner card for the start pick: the painted banner large, with its name and rule below.</summary>
+        private void DrawTallBannerCard(Rect r, Banner banner, Action select)
+        {
+            if (Card(r, false, true))
+                Do(select);
+            const float pad = 14f;
+            const float textHeight = 190f;
+            BannerView.DrawCardArt(new Rect(r.x + pad, r.y + pad, r.width - pad * 2, r.height - pad * 2 - textHeight), banner);
+            var y = r.yMax - pad - textHeight + 8;
+            Label(new Rect(r.x + pad, y, r.width - pad * 2, 30), Banners.Name(banner), _bannerName, Color.white);
+            y += 34;
+            Label(new Rect(r.x + pad, y, r.width - pad * 2, r.yMax - pad - y), Banners.Describe(banner), _bannerRule, TextColor);
+        }
+
         /// <summary>A row of offer cards, three to a row's width so cards keep their size as they sell.</summary>
         private void OfferRow<T>(System.Collections.Generic.IReadOnlyList<T> offers, float width, Func<T, float, float> height, Action<Rect, T> draw)
         {
@@ -847,9 +899,8 @@ namespace ArmyRoguelike.View
                 GUILayout.Space(10);
                 Section("Banner", GoldColor);
                 var banner = _run.ShopBanner.Value;
-                var text = Banners.Describe(banner);
-                OfferRow(new[] { banner }, scrollInner, (b, cw) => OfferHeight("Banner, for the whole army", text, cw),
-                    (r, b) => DrawOffer(r, Banners.Name(b), "Banner, for the whole army", text, Banners.Price, false, () =>
+                OfferRow(new[] { banner }, scrollInner, (b, cw) => BannerCardHeight(b, Banners.Price, cw),
+                    (r, b) => DrawBannerCard(r, b, Banners.Price, () =>
                     {
                         if (_run.BuyBanner())
                             _runLog.RecordBanner(b, "shop");
@@ -1235,17 +1286,18 @@ namespace ArmyRoguelike.View
             {
                 var banner = _run.RewardBanner.Value;
                 GUILayout.Label("Or take this banner instead of a technique:");
-                if (GUILayout.Button(BannerText(banner), style, GUILayout.MinHeight(56)))
-                    Do(() =>
-                    {
-                        var offered = _run.RewardOffers.ToList();
-                        if (!_run.TakeRewardBanner())
-                            return;
-                        _runLog.RecordReward(offered, null, null, banner, true);
-                        _runLog.RecordBanner(banner, "elite");
-                        _lastNote = $"Banner raised: {Banners.Name(banner)}.";
-                        _selectedReward = null;
-                    });
+                EnsureShopStyles();
+                var card = GUILayoutUtility.GetRect(w - 12, BannerCardHeight(banner, null, w - 12), GUILayout.ExpandWidth(true));
+                DrawBannerCard(card, banner, null, () =>
+                {
+                    var offered = _run.RewardOffers.ToList();
+                    if (!_run.TakeRewardBanner())
+                        return;
+                    _runLog.RecordReward(offered, null, null, banner, true);
+                    _runLog.RecordBanner(banner, "elite");
+                    _lastNote = $"Banner raised: {Banners.Name(banner)}.";
+                    _selectedReward = null;
+                });
                 GUILayout.Space(6);
             }
 
