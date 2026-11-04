@@ -537,7 +537,7 @@ namespace ArmyRoguelike.Core
             return r;
         }
 
-        public static readonly UnitStats Goblin = new UnitStats(UnitKind.Goblin, "Goblin", 6, 3, 1, 1)
+        public static readonly UnitStats Goblin = new UnitStats(UnitKind.Goblin, "Goblin", 6, 2, 1, 1)
         {
             Weight = Weight.Small, Abilities = A(Ability.Swift, Ability.Slippery, Ability.Fling),
             Role = "Slips past your line and flings its friends, and your own explosives, at you.",
