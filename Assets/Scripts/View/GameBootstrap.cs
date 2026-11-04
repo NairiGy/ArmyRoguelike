@@ -616,6 +616,24 @@ namespace ArmyRoguelike.View
             GUILayout.EndArea();
         }
 
+        /// <summary>
+        /// The banners held, side by side in the panel's top right corner beside the title, where they take no room from
+        /// the map's list; hovering one puts its name and rule in the map's tooltip line.
+        /// </summary>
+        private void DrawBannerRow(float panelWidth)
+        {
+            const float height = 42f, cell = 26f, gap = 3f, inset = 6f;
+            var x = panelWidth - inset - _run.Banners.Count * (cell + gap) + gap;
+            foreach (var banner in Banners.All.Where(_run.Banners.Contains))
+            {
+                var rect = new Rect(x, inset, cell, height);
+                GUI.DrawTexture(rect, HudArt.Solid(rect.Contains(Event.current.mousePosition) ? HudArt.CardHoverColor : HudArt.CardColor));
+                BannerView.DrawCardArt(new Rect(rect.x + 2, rect.y + 2, rect.width - 4, rect.height - 4), banner);
+                GUI.Button(rect, new GUIContent("", $"{Banners.Name(banner)}: {Banners.Describe(banner)}"), GUIStyle.none);
+                x += cell + gap;
+            }
+        }
+
         private void DrawMap(float screenWidth)
         {
             const float w = 560;
@@ -626,8 +644,7 @@ namespace ArmyRoguelike.View
                 GUILayout.Label(Omens.Name(_run.Blessing.Value, true));
             foreach (var curse in _run.Curses)
                 GUILayout.Label(Omens.Name(curse, false));
-            foreach (var banner in _run.Banners)
-                GUILayout.Label($"Banner: {Banners.Name(banner)}. {Banners.Describe(banner)}");
+            DrawBannerRow(w);
             if (!string.IsNullOrEmpty(_lastNote))
                 GUILayout.Label(_lastNote);
             GUILayout.Space(6);
@@ -665,7 +682,7 @@ namespace ArmyRoguelike.View
                 GUILayout.EndHorizontal();
             }
 
-            GUILayout.Label(string.IsNullOrEmpty(GUI.tooltip) ? "Every battle, elite and boss has a battlefield rule, named on its node. Hover one to read it." : GUI.tooltip,
+            GUILayout.Label(string.IsNullOrEmpty(GUI.tooltip) ? "Every battle, elite and boss has a battlefield rule, named on its node. Hover one, or a banner, to read it." : GUI.tooltip,
                 new GUIStyle(GUI.skin.label) { wordWrap = true });
             GUILayout.Space(8);
             GUILayout.Label("? = something unexpected. Shops sell techniques, items, a recruit, and help forgetting a technique. Every won fight offers a technique pick.");

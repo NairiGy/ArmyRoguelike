@@ -35,6 +35,7 @@ namespace ArmyRoguelike.View
         /// <param name="clothLight">Brightness of the cloth in this scene (dimmer at night).</param>
         public static void Create(Transform root, IEnumerable<Banner> held, Vector2 top, Vector2 left, Vector2 right, Material poleMaterial, float clothLight)
         {
+            Placed.Clear();
             // Always the same order, so a banner keeps its place from fight to fight.
             var banners = Banners.All.Where(held.Contains).ToList();
             if (banners.Count == 0)
@@ -68,7 +69,28 @@ namespace ArmyRoguelike.View
                 var clothRenderer = AddSprite(root, $"Banner {Banners.Name(banners[i])}", foot, cloth, !isLeft);
                 clothRenderer.sharedMaterial = ClothMaterial(shader, clothTexture, banners[i], clothLight);
                 clothRenderer.sortingOrder = poleRenderer.sortingOrder + 1;
+                Placed.Add((banners[i], foot, !isLeft));
             }
+        }
+
+        private static readonly List<(Banner banner, Vector2 foot, bool mirrored)> Placed = new List<(Banner, Vector2, bool)>();
+
+        // The painted banner's reach from the post's foot, in world units: up to its top, out along the crossbar, and
+        // a little past the post on its other side.
+        private const float ReachUp = 1.4f, ReachAlong = 0.53f, ReachBehind = 0.09f;
+
+        /// <summary>The banner standing at this world position on the roof, if any.</summary>
+        public static Banner? At(Vector2 world)
+        {
+            foreach (var (banner, foot, mirrored) in Placed)
+            {
+                var along = mirrored ? world.x - foot.x : foot.x - world.x;
+                var up = world.y - foot.y;
+                if (up >= 0f && up <= ReachUp && along >= -ReachBehind && along <= ReachAlong)
+                    return banner;
+            }
+
+            return null;
         }
 
         // The banner's part of the painting (with room for the cloth to move), as a share of the image from its bottom left.

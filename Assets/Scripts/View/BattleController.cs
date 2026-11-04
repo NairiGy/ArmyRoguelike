@@ -1427,6 +1427,8 @@ namespace ArmyRoguelike.View
                     break;
             }
 
+            DrawBannerHover();
+
             if (_markerNote != null && Time.unscaledTime < _markerNoteUntil)
                 GUI.Box(new Rect(Margin, ReferenceHeight - 80, 180, 30), _markerNote);
         }
@@ -1562,11 +1564,35 @@ namespace ArmyRoguelike.View
             }
         }
 
-        /// <summary>The battlefield, blessings, curses and banners in play, one per line.</summary>
+        /// <summary>The battlefield, blessings and curses in play, one per line. Banners stand on the roof instead.</summary>
         private string OmenLine =>
             (Battle.Field.HasValue ? $"\nBattlefield: {Battlefields.Name(Battle.Field.Value)}" : "") +
-            string.Concat(Battle.Omens.Select(o => $"\n{Omens.Name(o.omen, o.side == Team.Player)}")) +
-            string.Concat(Battle.Banners.Select(b => $"\nBanner: {Banners.Name(b)}"));
+            string.Concat(Battle.Omens.Select(o => $"\n{Omens.Name(o.omen, o.side == Team.Player)}"));
+
+        /// <summary>Hovering a banner on the roof shows its name and rule beside the mouse. Tiles and panels come first.</summary>
+        private void DrawBannerHover()
+        {
+            if (Event.current.type != EventType.Repaint || _hovered.HasValue)
+                return;
+            var screen = Mouse.current.position.ReadValue();
+            if (IsOverHud(screen))
+                return;
+            var banner = BannerView.At(_camera.ScreenToWorldPoint(new Vector3(screen.x, screen.y, -_camera.transform.position.z)));
+            if (!banner.HasValue)
+                return;
+
+            const float width = 300f, pad = 10f, nameHeight = 24f;
+            var nameStyle = new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold };
+            var ruleStyle = new GUIStyle(GUI.skin.label) { fontSize = 13, wordWrap = true, padding = new RectOffset() };
+            var rule = Banners.Describe(banner.Value);
+            var height = pad * 2 + nameHeight + ruleStyle.CalcHeight(new GUIContent(rule), width - pad * 2);
+            var scale = Screen.height / ReferenceHeight;
+            var x = Mathf.Min(screen.x / scale + 16f, GuiWidth - width - Margin);
+            var y = Mathf.Min((Screen.height - screen.y) / scale + 16f, ReferenceHeight - height - Margin);
+            GUI.Box(new Rect(x, y, width, height), GUIContent.none, HudArt.PanelStyle(HudArt.PanelColor, 0));
+            GUI.Label(new Rect(x + pad, y + pad, width - pad * 2, nameHeight), Banners.Name(banner.Value), nameStyle);
+            GUI.Label(new Rect(x + pad, y + pad + nameHeight, width - pad * 2, height - pad * 2 - nameHeight), rule, ruleStyle);
+        }
 
         /// <summary>The battlefield's rule in full, for the placement panel. Empty without one.</summary>
         private string FieldRule => Battle.Field.HasValue
