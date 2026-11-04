@@ -634,6 +634,8 @@ namespace ArmyRoguelike.View
             }
         }
 
+        private Vector2 _mapScroll;
+
         private void DrawMap(float screenWidth)
         {
             const float w = 560;
@@ -685,12 +687,16 @@ namespace ArmyRoguelike.View
             GUILayout.Label(string.IsNullOrEmpty(GUI.tooltip) ? "Every battle, elite and boss has a battlefield rule, named on its node. Hover one, or a banner, to read it." : GUI.tooltip,
                 new GUIStyle(GUI.skin.label) { wordWrap = true });
             GUILayout.Space(8);
+            // The army and the help scroll, so a big army can't push the button below off the panel.
+            _mapScroll = GUILayout.BeginScrollView(_mapScroll, GUILayout.ExpandHeight(true));
+            DrawArmy();
+            GUILayout.Space(8);
             GUILayout.Label("? = something unexpected. Shops sell techniques, items, a recruit, and help forgetting a technique. Every won fight offers a technique pick.");
             GUILayout.Label("Moon Shrine: defend it for 5 enemy turns to earn a blessing. If it breaks, you take a curse.");
             GUILayout.Label("Break the Ritual: smash 3 totems before enemy turn 4 to earn a technique pick. If the summoning completes, you take a curse.");
             GUILayout.Label("Battle: a faction you haven't beaten (a rematch once you've met them all). Elite: a harder rematch of a faction you beat; its pick has a rare technique. Battles and elites show their faction when you reach their step.");
-            DrawArmy();
-            GUILayout.FlexibleSpace();
+            GUILayout.EndScrollView();
+            GUILayout.Space(4);
             if (GUILayout.Button("Abandon run", GUILayout.Width(120)))
                 Do(() => _abandoning = true);
             GUILayout.EndArea();

@@ -51,7 +51,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 
 ### Other visual work
 
-- [ ] Map screen overflows (seen 2026-11-04): with 2 units the "Abandon run" button is already cut off at the panel's bottom, and a bigger army pushes it and the last units out of reach. Older than the banner row, which now takes no room. Needs less help text or a scrolling list.
+- [x] Map screen overflow (2026-11-04): "Abandon run" is pinned to the bottom of the panel; the army and the help text sit above it in a scrolling list, army first. Compiled, not yet seen in game.
 
 - [ ] Painted aurora: ChatGPT's free image limit was hit on 2026-10-25; retry the prompt saved in the ChatGPT chat "Generate Crescent Moon Image". Then replace the code aurora with it (maybe for another setting).
 - [x] Decide how statues meet the ground (2026-10-28): figures drawn standing on nothing, straight on the floor, no base (see "Bases and size" in the design note). The warrior is redrawn that way; not playtested.
