@@ -66,6 +66,11 @@ public static class PreviewCapture
         var fieldArg = System.Array.IndexOf(args, "-previewField");
         if (fieldArg >= 0 && fieldArg + 1 < args.Length && System.Enum.TryParse(args[fieldArg + 1], out Battlefield field))
             battle.SetField(field);
+        // -previewBanners 3: the fight is under the first 3 banners.
+        var bannersArg = System.Array.IndexOf(args, "-previewBanners");
+        if (bannersArg >= 0 && bannersArg + 1 < args.Length && int.TryParse(args[bannersArg + 1], out var bannerCount))
+            foreach (var banner in Banners.All.Take(bannerCount))
+                battle.AddBanner(banner);
         if (placeArmy)
         {
             var i = 0;

@@ -386,6 +386,8 @@ namespace ArmyRoguelike.View
                     // No fires lit in daylight.
                     if (Braziers && brazier != null && !scene.Daylight)
                         BuildBraziers(root, board, brazier, spriteMaterial);
+                    var (roofTop, roofLeft, _, roofRight) = BoardCorners(board);
+                    BannerView.Create(root, board.Battle.Banners, roofTop, roofLeft, roofRight, spriteMaterial, scene.Daylight ? 1f : 0.8f);
                     return;
                 }
 
