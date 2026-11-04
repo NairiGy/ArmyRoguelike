@@ -387,7 +387,7 @@ namespace ArmyRoguelike.View
                     if (Braziers && brazier != null && !scene.Daylight)
                         BuildBraziers(root, board, brazier, spriteMaterial);
                     var (roofTop, roofLeft, _, roofRight) = BoardCorners(board);
-                    BannerView.Create(root, board.Battle.Banners, roofTop, roofLeft, roofRight, spriteMaterial, scene.Daylight ? 1f : 0.8f);
+                    BannerView.Create(root, board.Battle.Banners, roofTop, roofLeft, roofRight, spriteMaterial, scene.Daylight ? 1f : 0.85f);
                     return;
                 }
 
@@ -666,7 +666,7 @@ namespace ArmyRoguelike.View
             return m;
         }
 
-        private static Color[] ParseStops(string[] hex)
+        internal static Color[] ParseStops(string[] hex)
         {
             var stops = new Color[hex.Length];
             for (var i = 0; i < hex.Length; i++)
@@ -681,7 +681,7 @@ namespace ArmyRoguelike.View
             return Color.Lerp(stops[i], stops[i + 1], f - i);
         }
 
-        private static Texture2D MakeRamp(Color[] stops)
+        internal static Texture2D MakeRamp(Color[] stops)
         {
             var tex = new Texture2D(256, 1, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
             for (var x = 0; x < 256; x++)

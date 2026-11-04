@@ -43,6 +43,16 @@ public static class PreviewCapture
         EditorApplication.Exit(0);
     }
 
+    /// <summary>How many banners the next capture's fight is under. An open Editor can set it through `unity command eval`.</summary>
+    public static int PreviewBanners;
+
+    /// <summary>A capture with the army placed, callable through `unity command eval` while the Editor is open.</summary>
+    public static void CaptureOpenEditor(string output, int banners, int encounter = 0)
+    {
+        PreviewBanners = banners;
+        Capture(output, true, encounter);
+    }
+
     internal static void Capture(string output, bool placeArmy, int encounter = 0, int palette = BattleScenery.MainPalette, bool pixelate = false,
         BattleScenery.Setting setting = BattleScenery.MainSetting, System.Action<BoardView> decorate = null)
     {
@@ -69,8 +79,9 @@ public static class PreviewCapture
         // -previewBanners 3: the fight is under the first 3 banners.
         var bannersArg = System.Array.IndexOf(args, "-previewBanners");
         if (bannersArg >= 0 && bannersArg + 1 < args.Length && int.TryParse(args[bannersArg + 1], out var bannerCount))
-            foreach (var banner in Banners.All.Take(bannerCount))
-                battle.AddBanner(banner);
+            PreviewBanners = bannerCount;
+        foreach (var banner in Banners.All.Take(PreviewBanners))
+            battle.AddBanner(banner);
         if (placeArmy)
         {
             var i = 0;

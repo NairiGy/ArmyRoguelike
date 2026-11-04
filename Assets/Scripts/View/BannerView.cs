@@ -6,30 +6,32 @@ using UnityEngine;
 namespace ArmyRoguelike.View
 {
     /// <summary>
-    /// The army's banners, standing along the back edges of the roof behind the player's side. One painted pole and
-    /// cloth serve every banner; each has its own cloth colour, and the cloth moves in the wind (BannerCloth.shader).
+    /// The army's banners, standing along the back edges of the roof behind the player's side. One painted post and
+    /// cloth serve every banner: the crossbar runs along the edge it stands on (mirrored on the right edge), each
+    /// banner has its own colour ramp, and the cloth moves in the wind (BannerCloth.shader).
     /// </summary>
     public static class BannerView
     {
-        /// <summary>A banner's height on screen, in world units (a tile is 1 wide).</summary>
-        private const float Height = 1.5f;
+        /// <summary>The painting's full height in world units (a tile is 1 wide); the post itself is two thirds of it.</summary>
+        private const float ImageHeight = 2.1f;
 
-        /// <summary>How far outside the board's edge the poles stand.</summary>
+        /// <summary>How far outside the board's edge the posts stand.</summary>
         private const float Outside = 0.14f;
 
-        // Where the pole's foot is in the painting.
-        private static readonly Vector2 Foot = new Vector2(0.5f, 0.033f);
+        // Where the post's foot is in the painting.
+        private static readonly Vector2 Foot = new Vector2(0.645f, 0.215f);
 
-        private static readonly Dictionary<Banner, Color> Colours = new Dictionary<Banner, Color>
+        // Dark to light. The shadows lean cool and dark like the statues', so the cloth sits in the scene.
+        private static readonly Dictionary<Banner, string[]> Ramps = new Dictionary<Banner, string[]>
         {
-            [Banner.Vampiric] = new Color32(0x7E, 0x14, 0x18, 0xFF),
-            [Banner.ThirdWheel] = new Color32(0x2B, 0x4F, 0x7A, 0xFF),
-            [Banner.Loser] = new Color32(0x5C, 0x5C, 0x60, 0xFF),
-            [Banner.Mercenaries] = new Color32(0x1F, 0x5A, 0x3A, 0xFF),
-            [Banner.BatteringRam] = new Color32(0xA5, 0x50, 0x1C, 0xFF),
+            [Banner.Vampiric] = new[] { "#1c0a14", "#4a0f1a", "#7e1a20", "#a8322e", "#c85a48" },
+            [Banner.ThirdWheel] = new[] { "#0e1626", "#1c3050", "#2f5480", "#4f7aa4", "#86a8c4" },
+            [Banner.Loser] = new[] { "#16161c", "#32343c", "#56585e", "#7e8084", "#a8a8a6" },
+            [Banner.Mercenaries] = new[] { "#0c1a18", "#163a2c", "#25603f", "#428556", "#76aa78" },
+            [Banner.BatteringRam] = new[] { "#1e100e", "#4e2414", "#8c481c", "#b86c2c", "#dc9a52" },
         };
 
-        /// <param name="poleMaterial">The scenery's palette material, so the pole's stone matches the roof.</param>
+        /// <param name="poleMaterial">The scenery's palette material, so the post's stone matches the roof.</param>
         /// <param name="clothLight">Brightness of the cloth in this scene (dimmer at night).</param>
         public static void Create(Transform root, IEnumerable<Banner> held, Vector2 top, Vector2 left, Vector2 right, Material poleMaterial, float clothLight)
         {
@@ -59,13 +61,14 @@ namespace ArmyRoguelike.View
                 var outward = ((top + end) * 0.5f - centre).normalized * Outside;
                 var foot = Vector2.Lerp(top, end, share) + outward;
 
-                var poleRenderer = AddSprite(root, "Banner pole", foot, pole);
+                var poleRenderer = AddSprite(root, "Banner post", foot, pole, !isLeft);
                 poleRenderer.sharedMaterial = BattleScenery.PerTexture(poleMaterial, poleTexture);
                 poleRenderer.color = new Color(1f, 0f, 0f, 1f);
 
-                var clothRenderer = AddSprite(root, $"Banner {Banners.Name(banners[i])}", foot, cloth);
+                var clothRenderer = AddSprite(root, $"Banner {Banners.Name(banners[i])}", foot, cloth, !isLeft);
                 var material = new Material(shader) { mainTexture = clothTexture };
-                material.SetColor("_Tint", Colours[banners[i]] * clothLight);
+                material.SetTexture("_Ramp", BattleScenery.MakeRamp(BattleScenery.ParseStops(Ramps[banners[i]])));
+                material.SetFloat("_Light", clothLight);
                 // Each moves to its own time, so they don't sway in step.
                 material.SetFloat("_Phase", i * 1.9f);
                 clothRenderer.sharedMaterial = material;
@@ -75,14 +78,15 @@ namespace ArmyRoguelike.View
 
         // The full rectangle, not a tight outline: the cloth moves outside its painted shape.
         private static Sprite MakeSprite(Texture2D texture) =>
-            Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), Foot, texture.height / Height, 0, SpriteMeshType.FullRect);
+            Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), Foot, texture.height / ImageHeight, 0, SpriteMeshType.FullRect);
 
-        private static SpriteRenderer AddSprite(Transform root, string name, Vector2 position, Sprite sprite)
+        private static SpriteRenderer AddSprite(Transform root, string name, Vector2 position, Sprite sprite, bool mirrored)
         {
             var sr = new GameObject(name).AddComponent<SpriteRenderer>();
             sr.transform.SetParent(root, false);
             sr.transform.position = position;
             sr.sprite = sprite;
+            sr.flipX = mirrored;
             sr.sortingOrder = IsoMath.SortingOrder(sr.transform.position) + 5;
             return sr;
         }

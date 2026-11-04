@@ -1,14 +1,21 @@
-// A banner's cloth in the wind: pinned at the crossbar, moving more towards the hem. The texture holds its
-// folds as grey around 0.5, which tint colours, so one painted cloth serves every banner.
+// A banner's cloth in the wind. It hangs from a slanted crossbar beside its post: pinned along the crossbar, and
+// moving more towards the hem and away from the post. The texture holds its light and shade, which pick a colour
+// from the banner's ramp (dark to light), as the statues do, so one painted cloth serves every banner.
 Shader "ArmyRoguelike/BannerCloth"
 {
     Properties
     {
-        [PerRendererData] _MainTex ("Folds", 2D) = "grey" {}
-        _Tint ("Cloth colour", Color) = (1, 1, 1, 1)
+        [PerRendererData] _MainTex ("Shade", 2D) = "grey" {}
+        _Ramp ("Colour ramp", 2D) = "white" {}
+        _Light ("Brightness in this scene", Float) = 1
         _Phase ("Offset in the wind", Float) = 0
-        _Top ("Where the cloth hangs free, from the image's top", Float) = 0.195
-        _Hem ("Where the hem is, from the image's top", Float) = 0.8
+        // The cloth's top edge in the image: the height from the image's top at _BarU across, and its slope.
+        _BarDown ("Top edge height", Float) = 0.398
+        _BarU ("Top edge reference", Float) = 0.28
+        _BarSlope ("Top edge slope", Float) = -0.357
+        _Length ("Cloth length", Float) = 0.31
+        _PostU ("Post side of the cloth", Float) = 0.62
+        _Width ("Cloth width", Float) = 0.35
     }
     SubShader
     {
@@ -26,10 +33,15 @@ Shader "ArmyRoguelike/BannerCloth"
             #include "ArtShared.cginc"
 
             sampler2D _MainTex;
-            float4 _Tint;
+            sampler2D _Ramp;
+            float _Light;
             float _Phase;
-            float _Top;
-            float _Hem;
+            float _BarDown;
+            float _BarU;
+            float _BarSlope;
+            float _Length;
+            float _PostU;
+            float _Width;
 
             struct appdata { float4 vertex : POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; };
             struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; float2 wpos : TEXCOORD1; };
@@ -47,25 +59,31 @@ Shader "ArmyRoguelike/BannerCloth"
             float4 frag(v2f i) : SV_Target
             {
                 float down = 1 - i.uv.y;
+                float bar = _BarDown + (i.uv.x - _BarU) * _BarSlope;
                 // 0 at the crossbar (pinned), 1 at the hem (moves most).
-                float t = saturate((down - _Top) / (_Hem - _Top));
+                float t = saturate((down - bar) / _Length);
+                // 0 beside the post (moves least), 1 at the free edge.
+                float free = saturate((_PostU - i.uv.x) / _Width);
                 float time = _Time.y + _Phase;
                 float gust = 0.72 + 0.28 * sin(time * 0.47);
 
-                // The whole cloth swings, with waves running down it.
+                // The cloth swings, with waves running down it.
                 float swing = 0.7 * sin(time * 1.7 - t * 3.6) + 0.3 * sin(time * 2.9 - t * 8 + 1.3);
-                float dx = 0.024 * pow(t, 1.6) * swing * gust;
+                float dx = 0.03 * pow(t, 1.6) * lerp(0.3, 1, free) * swing * gust;
                 // The edges and hem ripple a little on their own.
-                dx += 0.0045 * t * sin(i.uv.x * 26 + time * 2.3 - t * 6) * gust;
-                float dy = 0.0035 * t * t * sin(i.uv.x * 19 + time * 2.1);
+                dx += 0.004 * t * sin(i.uv.x * 26 + time * 2.3 - t * 6) * gust;
+                // It moves in its own slanted plane: towards the post is also up the crossbar's slope.
+                float dv = -_BarSlope * dx + 0.003 * t * t * sin(i.uv.x * 19 + time * 2.1);
 
-                float4 c = tex2D(_MainTex, i.uv - float2(dx, -dy));
+                float4 c = tex2D(_MainTex, i.uv - float2(dx, dv));
 
                 // Folds of light travel across the cloth, so it reads as fabric and not a sliding picture.
-                float shimmer = 1 + 0.2 * pow(t, 0.7) * gust *
+                float shimmer = 0.14 * pow(t, 0.7) * gust *
                     sin((i.uv.x - 0.5) * 30 + time * 1.9 - t * 4.5 + 1.4 * sin(t * 5 + time * 0.8));
 
-                float3 col = _Tint.rgb * c.rgb * 2 * shimmer * i.color.rgb;
+                // The middle of the ramp, so the painted folds stay folds and don't turn into stripes.
+                float shade = lerp(0.25, 0.8, c.r);
+                float3 col = tex2D(_Ramp, float2(saturate(shade + shimmer), 0.5)).rgb * _Light * i.color.rgb;
                 // Light from nearby effects falls on the cloth too.
                 float3 light = fxLight(i.wpos, 2);
                 col = col * (1 + light * 3) + light * 0.03;
