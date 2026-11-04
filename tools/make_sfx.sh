@@ -10,11 +10,14 @@ ON="silenceremove=start_periods=1:start_threshold=-40dB"
 # peak_of FILE : the file's peak level in dB
 peak_of() { ffmpeg -hide_banner -i "$1" -af volumedetect -f null - 2>&1 | sed -n 's/.*max_volume: \(-\?[0-9.]*\) dB/\1/p'; }
 
-# loud NAME LUFS : rescale the clip to an integrated loudness (so variants sound equally loud), peaks limited to -1 dB
+# loud NAME LUFS : rescale the clip to an integrated loudness (so variants sound equally loud), peaks limited to -1 dB; repeated because limiting a peaky clip pulls it back under the target
 loud() {
-  local f="$OUT/$1.wav" lufs
-  lufs=$(ffmpeg -hide_banner -i "$f" -af ebur128 -f null - 2>&1 | grep -E '^\s+I:' | tail -1 | awk '{print $2}')
-  ffmpeg -v error -y -i "$f" -af "volume=$(awk "BEGIN{print $2 - ($lufs)}")dB,alimiter=limit=0.89:level=false" $FMT "$TMP" && mv "$TMP" "$f"
+  local f="$OUT/$1.wav" lufs i
+  for i in 1 2 3 4; do
+    lufs=$(ffmpeg -hide_banner -i "$f" -af ebur128 -f null - 2>&1 | grep -E '^\s+I:' | tail -1 | awk '{print $2}')
+    if awk "BEGIN{d=$2 - ($lufs); exit !(d < 0.3 && d > -0.3)}"; then break; fi
+    ffmpeg -v error -y -i "$f" -af "volume=$(awk "BEGIN{print $2 - ($lufs)}")dB,alimiter=limit=0.89:level=false" $FMT "$TMP" && mv "$TMP" "$f"
+  done
 }
 
 # norm NAME PEAK_DB : rescale the clip so its peak sits at PEAK_DB
@@ -27,15 +30,15 @@ norm() {
 cut() { ffmpeg -v error -y "$@"; }
 
 # Sun: mark appears, two variants generated with ElevenLabs Sound Effects (A2 stone sigil, B2 golden glow)
-cut -i elevenlabs_sun_mark_A2_stone_sigil.wav -af "silenceremove=start_periods=1:start_threshold=-50dB,afade=t=out:st=1.4:d=0.5" $FMT "$OUT/sun_mark_1.wav"; norm sun_mark_1 -6
-cut -i elevenlabs_sun_mark_B2_golden_glow.wav -af "afade=t=in:d=0.03,afade=t=out:st=1.3:d=0.7" $FMT "$OUT/sun_mark_2.wav"; norm sun_mark_2 -6
+cut -i elevenlabs_sun_mark_A2_stone_sigil.wav -af "silenceremove=start_periods=1:start_threshold=-50dB,afade=t=out:st=1.4:d=0.5" $FMT "$OUT/sun_mark_1.wav"; loud sun_mark_1 -21
+cut -i elevenlabs_sun_mark_B2_golden_glow.wav -af "afade=t=in:d=0.03,afade=t=out:st=1.3:d=0.7" $FMT "$OUT/sun_mark_2.wav"; loud sun_mark_2 -21
 # Sun: charge, 12 variants played at random. Each is 0.5 s and ends on its loudest point.
 # 1 is the reverse cymbal (lower); 2-12 are ElevenLabs generations E1-E4, F1-F4, G1, G3, G4 (prompts in CREDITS.md).
 rm -f "$OUT"/sun_charge_*.wav
-cut -ss 1.82 -t 0.40 -i 130387*.aiff -af "aresample=44100,asetrate=35280,aresample=44100,afade=t=in:d=0.1" $FMT "$OUT/sun_charge_1.wav"; norm sun_charge_1 -4
+cut -ss 1.82 -t 0.40 -i 130387*.aiff -af "aresample=44100,asetrate=35280,aresample=44100,afade=t=in:d=0.1" $FMT "$OUT/sun_charge_1.wav"; loud sun_charge_1 -21
 n=2
 for c in E1:0 E2:0 E3:0 E4:0 F1:0 F2:0 F3:0 F4:0 G1:0.15 G3:0.05 G4:0.1; do   # G2 dropped in the audition
-  cut -ss "${c#*:}" -t 0.5 -i "elevenlabs_sun_charge_${c%%:*}.wav" -af "afade=t=in:d=0.03,afade=t=out:st=0.49:d=0.01" $FMT "$OUT/sun_charge_$n.wav"; norm "sun_charge_$n" -4
+  cut -ss "${c#*:}" -t 0.5 -i "elevenlabs_sun_charge_${c%%:*}.wav" -af "afade=t=in:d=0.03,afade=t=out:st=0.49:d=0.01" $FMT "$OUT/sun_charge_$n.wav"; loud "sun_charge_$n" -21
   n=$((n+1))
 done
 # Sun: impact (powerful hit, a little lower, over the sub-bass drop and a roaring burst of flame)
@@ -78,7 +81,7 @@ unit() {
     n=$((n+1))
   done
 }
-unit attack 0.5 0.25 -20 "A2 A3 A4 B3 C2"       # the blow landing (melee); kept in the audition
-unit hurt 0.4 0.2 -24 "G2 G3 G4 H1 H4 I1 I3"   # a short, simple knock on the unit that takes damage, smaller than dying; kept in the audition (crumbling rounds A-F rejected)
-unit die 2.0 1.2 -21 "A3 B3 C1 C2"           # the statue crumbling into rubble; kept in the audition
+unit attack 0.5 0.25 -25 "A2 A3 A4 B3 C2"       # the blow landing (melee); kept in the audition
+unit hurt 0.4 0.2 -25 "G2 G3 G4 H1 H4 I1 I3"   # a short, simple knock on the unit that takes damage, smaller than dying; kept in the audition (crumbling rounds A-F rejected)
+unit die 2.0 1.2 -22.5 "A3 B3 C1 C2"           # the statue crumbling into rubble; kept in the audition
 unit step 0.4 0.15 -30 "A4 C1 D E1 E2 E4"   # one heavy step, at each tile; kept in the audition (A1 kept aside for other ground)
