@@ -26,7 +26,7 @@ namespace ArmyRoguelike.Tests
         /// <summary>All five lines, with the techniques that leave state on the board or on units.</summary>
         private static List<ArmyMember> FullArmy() => new List<ArmyMember>
         {
-            new ArmyMember(UnitStats.Warrior, null, Technique.Sweep, Technique.Guard),
+            new ArmyMember(UnitStats.Warrior, null, Technique.Sweep, Technique.Guard, Technique.ShieldUp, Technique.Battlecry, Technique.Taunt, Technique.ThrowShield, Technique.ZocStrike),
             new ArmyMember(UnitStats.Archer, null, Technique.OpeningShot),
             new ArmyMember(UnitStats.Rogue, null, Technique.Poison, Technique.Riposte, Technique.Dodge),
             new ArmyMember(UnitStats.Apprentice, null, Technique.Fireball, Technique.Burning, Technique.Chill, Technique.Ward, Technique.IceWall),

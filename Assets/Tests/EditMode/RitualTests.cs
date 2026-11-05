@@ -124,15 +124,6 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Ritual_ShieldWallProtectsTheShrine()
-        {
-            var b = Ritual(new[] { UnitStats.Warrior }, new[] { (UnitStats.Elemental, new GridPos(3, 4)) });
-            Start(b, new GridPos(2, 3));
-            b.EndPlayerTurn();
-            Assert.AreEqual(UnitStats.MoonShrine.MaxHp - (UnitStats.Elemental.Damage - 1), b.Objective.Hp);
-        }
-
-        [Test]
         public void MoonShrineEncounter_ShrineInTheMiddle_EnemiesOnTheEdgesAwayFromIt()
         {
             for (var seed = 0; seed < 30; seed++)

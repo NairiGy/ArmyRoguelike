@@ -58,7 +58,7 @@ public static class GamepediaWriter
             html.Append("<table><tr><th>Technique</th><th>Kind</th><th>Rarity</th><th>Needs</th><th>Effect</th></tr>");
             foreach (var t in Technique.All.Where(t => t.Line == unit))
             {
-                var kind = t.Action.HasValue ? $"action ({Battle.ActionCost(t.Action.Value)} AP, cooldown {Battle.Cooldown(t.Action.Value)})" : "passive";
+                var kind = t.Action.HasValue ? $"action ({Battle.ActionCost(t.Action.Value)} AP, {(Battle.Cooldown(t.Action.Value) == 0 ? "once per battle" : $"cooldown {Battle.Cooldown(t.Action.Value)}")})" : "passive";
                 var rarity = $"{(t.Rarity == TechniqueRarity.Rare ? "rare" : "common")}, {t.Price} gold";
                 html.Append($"<tr id=\"t-{Id(t.Name)}\"><td><b>{Esc(t.Name)}</b></td><td>{kind}</td><td>{rarity}</td><td>{(t.Requires != null ? TechniqueLink(t.Requires) : "")}</td><td>{Esc(t.Description)}</td></tr>");
             }
@@ -221,7 +221,7 @@ public static class GamepediaWriter
         html.Append("<li>Enemies can't see mines, except a goblin standing next to one, which can fling it. One that steps on a mine stops there and sets it off.</li></ul>");
 
         html.Append("<h3 id=\"ai-target\">Targeting</h3><ol>");
-        html.Append($"<li>A unit with Taunt within {Battle.TauntRange} tiles: the nearest such unit.</li>");
+        html.Append($"<li>A unit that used Taunt within {Battle.TauntRange} tiles: the nearest such unit. It is then the only unit this enemy aims attacks or abilities at (area hits like the Giant's Smash and Slam still hit everyone in them).</li>");
         html.Append("<li>Blood Scent (wolves): the lowest-HP unit it can reach and attack this turn, walking up first if needed.</li>");
         html.Append("<li>Otherwise the nearest of your units, counted in steps and ignoring rocks. Ties go to the one with the lowest HP, then to the one listed first in your army. If that unit has a shield, it goes for the nearest unshielded unit it can reach this turn instead, and hits the shield only when there is none.</li></ol>");
         html.Append("<p>Every behaviour uses this target. Only the Bomber may bomb a different unit when its target can't be bombed, and the Necromancer raises bone piles before it looks for a target at all.</p>");
@@ -399,7 +399,7 @@ public static class GamepediaWriter
         html.Append($"Survive {Encounter.RitualTurns} enemy turns and the ritual completes: you win and pick a blessing. If the shrine breaks, ");
         html.Append("the fight is lost (no gold) and you take a random curse, but the run goes on. Losing the whole army still ends the run. ");
         html.Append("Enemies go for the shrine unless one of your units is next to them (Taunt still wins). The shrine counts as your ally for ");
-        html.Append($"Shield Wall and Guard; your own blasts and volleys hurt it. Reinforcements arrive on edge tiles at least {Battle.RitualSpawnDistance} steps from it.</p>");
+        html.Append($"Guard; your own blasts and volleys hurt it. Reinforcements arrive on edge tiles at least {Battle.RitualSpawnDistance} steps from it.</p>");
         html.Append($"<p><b>Break the Ritual</b>: {Encounter.TotemCount} totems ({UnitStats.Totem.MaxHp} HP) stand on the far half, guarded by goblins. ");
         html.Append($"Smash them all before the summoning completes at the start of enemy turn {Encounter.SummonTurn}: you win, the guards flee, ");
         html.Append($"and you get the usual technique pick. If the summoning completes, the fight is lost (no gold) and you take a random curse; ");

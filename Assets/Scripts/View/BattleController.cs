@@ -245,7 +245,7 @@ namespace ArmyRoguelike.View
 
             _board.ClearHighlights();
             foreach (var p in Battle.Board.AllTiles())
-                if (Battle.IsPlayerZone(p) && !Battle.Board.IsObstacle(p))
+                if ((Battle.IsPlayerZone(p) || (_toPlace != null && Battle.IsDeployTile(_toPlace, p))) && !Battle.Board.IsObstacle(p))
                     _board.SetHighlight(p, ZoneColor);
             if (_hovered.HasValue && _toPlace != null && Battle.CanPlace(_toPlace, _hovered.Value))
                 _board.SetHighlight(_hovered.Value, HoverColor);
@@ -1055,6 +1055,19 @@ namespace ArmyRoguelike.View
                         case StatusKind.Slow:
                             DamagePopup.Spawn(at, "Slowed: no move", DamagePopup.AbilityColor, 40);
                             break;
+                        case StatusKind.ShieldUp:
+                            DamagePopup.Spawn(at, "Shield Up!", DamagePopup.AbilityColor, 44);
+                            break;
+                        case StatusKind.Battlecry:
+                            DamagePopup.Spawn(at, $"+1 move, +{status.Amount} HP", DamagePopup.HealColor, 40);
+                            break;
+                        case StatusKind.Taunt:
+                            DamagePopup.Spawn(at, "Taunt!", DamagePopup.AbilityColor, 48);
+                            break;
+                        case StatusKind.ThrowShield:
+                            DamagePopup.Spawn(at, "Shield thrown!", DamagePopup.DamageColor, 44);
+                            target.RefreshHp(status.Target.Hp);
+                            break;
                         case StatusKind.Poison:
                             DamagePopup.Spawn(at, "Poisoned", DamagePopup.AbilityColor, 44);
                             break;
@@ -1248,6 +1261,9 @@ namespace ArmyRoguelike.View
                     break;
                 case EffectKind.Guard:
                     DamagePopup.Spawn(at, "Guard!", DamagePopup.AbilityColor, 48);
+                    break;
+                case EffectKind.ZocStrike:
+                    DamagePopup.Spawn(at, "Placeholder!", DamagePopup.AbilityColor, 44);
                     break;
                 case EffectKind.Steal:
                     DamagePopup.Spawn(at, $"Stole {effect.Amount} gold!", DamagePopup.DamageColor, 44);
@@ -1757,6 +1773,7 @@ namespace ArmyRoguelike.View
                 var status = aiming ? $"<color={ActionColor}>Aiming: click a yellow tile</color>"
                     : cooldown > 0 ? $"<color={NextColor}>Ready in {cooldown} turn{(cooldown == 1 ? "" : "s")}</color>"
                     : !usable ? $"<color={DimColor}>No target in reach</color>"
+                    : Battle.CooldownIn(action) == 0 ? $"<color={ActionColor}>{Battle.ActionCost(action)} AP  ·  once per battle</color>"
                     : $"<color={ActionColor}>{Battle.ActionCost(action)} AP  ·  cooldown {Battle.CooldownIn(action)}</color>";
                 GUILayout.Label(status, cost);
                 GUILayout.Label($"<color={TextColor}>{Capitalise(Abilities.Describe(action))}</color>", text);
@@ -2069,6 +2086,14 @@ namespace ArmyRoguelike.View
                 lines.Add($"Shield {u.Shield}");
             if (u.MoonShield > 0)
                 lines.Add($"Moon shield {u.MoonShield}");
+            if (u.TempHp > 0)
+                lines.Add($"Temporary HP {u.TempHp}: gone at your next turn");
+            if (u.ShieldUpTurns > 0)
+                lines.Add($"Shield Up: {Battle.ShieldUpReduction} less damage ({u.ShieldUpTurns} enemy turn(s) left)");
+            if (u.IsTaunting)
+                lines.Add($"Taunting: enemies within {Battle.TauntRange} tiles can only target it");
+            if (u.ShieldThrown)
+                lines.Add($"Shield thrown: +{Battle.ThrowShieldDamage} damage, +{Battle.ThrowShieldMoves} move");
             if (u.Favored)
                 lines.Add($"Favored by fortune: {Battlefields.FavoredMultiplier}x damage this round");
             if (Battle.OnStormMark(u))
@@ -2165,6 +2190,14 @@ namespace ArmyRoguelike.View
             var status = new List<string>();
             if (u.Shield > 0)
                 status.Add($"shield {u.Shield}");
+            if (u.TempHp > 0)
+                status.Add($"temporary HP {u.TempHp}");
+            if (u.ShieldUpTurns > 0)
+                status.Add("shield up");
+            if (u.IsTaunting)
+                status.Add("taunting");
+            if (u.ShieldThrown)
+                status.Add("shield thrown");
             if (u.IsSnared)
                 status.Add("pinned (can't move)");
             if (u.IsHidden)

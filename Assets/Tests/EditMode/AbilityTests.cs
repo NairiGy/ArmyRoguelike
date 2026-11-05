@@ -28,7 +28,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void ShieldWall_AdjacentAllyTakesOneLess()
         {
-            var b = Started(new[] { M(UnitStats.Warrior), M(UnitStats.Archer) }, new[] { P(3, 1), P(4, 1) },
+            var b = Started(new[] { new ArmyMember(UnitStats.Warrior, null, Technique.ShieldWall), M(UnitStats.Archer) }, new[] { P(3, 1), P(4, 1) },
                 new[] { (UnitStats.Wolf, P(4, 2)) });
             var archer = Player(b, 1);
             Assert.IsTrue(b.IsShielded(archer));

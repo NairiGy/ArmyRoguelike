@@ -35,15 +35,6 @@ namespace ArmyRoguelike.Tests
         // ---------- Warrior techniques ----------
 
         [Test]
-        public void Sweep_HitsBothSides()
-        {
-            var b = Setup(new[] { M(UnitStats.Warrior, Technique.Sweep) }, new[] { P(3, 2) },
-                new[] { E(UnitStats.Wolf, 2, 3), E(UnitStats.Wolf, 3, 3), E(UnitStats.Wolf, 4, 3), Far });
-            b.PlayerAttack(Player(b), Enemy(b, 1));
-            Assert.IsTrue(Enumerable.Range(0, 3).All(i => Enemy(b, i).Hp == UnitStats.Wolf.MaxHp - Player(b).BaseDamage));
-        }
-
-        [Test]
         public void LongReach_HitsTwoTilesInALine()
         {
             var b = Setup(new[] { M(UnitStats.Warrior, Technique.LongReach) }, new[] { P(3, 2) },
@@ -76,36 +67,11 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Taunt_AndTough()
+        public void Tough_TakesOneLess()
         {
-            var b = Setup(new[] { M(UnitStats.Warrior, Technique.Guard, Technique.Taunt, Technique.Tough), M(UnitStats.Archer) }, new[] { P(4, 3), P(5, 3) },
-                new[] { E(UnitStats.Wolf, 5, 4) });
-            Assert.AreEqual(Player(b, 0), EnemyAI.ChooseTarget(b, Enemy(b)), "taunt beats the nearer archer");
-            var lone = Setup(new[] { M(UnitStats.Warrior, Technique.Guard, Technique.Taunt, Technique.Tough) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2) });
+            var lone = Setup(new[] { M(UnitStats.Warrior, Technique.Tough) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2) });
             lone.EndPlayerTurn();
             Assert.AreEqual(Player(lone).MaxHp - 1, Player(lone).Hp, "one bite of 2, reduced to 1");
-        }
-
-        [Test]
-        public void Charge_MovesAndPushes()
-        {
-            var b = Setup(new[] { M(UnitStats.Warrior, Technique.Guard, Technique.Charge) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 4) });
-            var jug = Player(b);
-            var wolf = Enemy(b);
-            Assert.IsTrue(b.CanUseAction(jug, ActionKind.Charge, wolf.Pos));
-            b.PlayerUseAction(jug, ActionKind.Charge, wolf.Pos);
-            Assert.AreEqual(P(3, 3), jug.Pos);
-            Assert.AreEqual(P(3, 6), wolf.Pos, "a small unit: knocked back two tiles");
-        }
-
-        [Test]
-        public void Push_IntoRock_DealsCollisionDamage()
-        {
-            var b = Setup(new[] { M(UnitStats.Warrior, Technique.Guard, Technique.Charge) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 4) }, P(3, 5));
-            var wolf = Enemy(b);
-            b.PlayerUseAction(Player(b), ActionKind.Charge, wolf.Pos);
-            Assert.AreEqual(P(3, 4), wolf.Pos);
-            Assert.AreEqual(UnitStats.Wolf.MaxHp - Player(b).BaseDamage - Battle.CollisionDamage, wolf.Hp);
         }
 
         // ---------- Archer techniques ----------
@@ -160,26 +126,27 @@ namespace ArmyRoguelike.Tests
         // ---------- Base kits ----------
 
         [Test]
-        public void ShieldBash_PushesWithoutDamage_CollisionHurts()
+        public void ShieldBash_DamagesAndPushes_CollisionHurtsMore()
         {
             var b = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far });
             var wolf = Enemy(b);
             b.PlayerUseAction(Player(b), ActionKind.ShieldBash, wolf.Pos);
             Assert.AreEqual(P(3, 4), wolf.Pos, "a small unit goes two tiles");
-            Assert.AreEqual(UnitStats.Wolf.MaxHp, wolf.Hp, "no damage");
+            Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.BashDamage, wolf.Hp);
 
             var walled = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far }, P(3, 3));
             var stuck = Enemy(walled);
             walled.PlayerUseAction(Player(walled), ActionKind.ShieldBash, stuck.Pos);
             Assert.AreEqual(P(3, 2), stuck.Pos);
-            Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.CollisionDamage, stuck.Hp, "slammed into the rock");
+            Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.BashDamage - Battle.CollisionDamage, stuck.Hp, "slammed into the rock");
 
             var crowd = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Brute, 3, 3), Far });
             var front = Enemy(crowd, 0);
             var behind = Enemy(crowd, 1);
             crowd.PlayerUseAction(Player(crowd), ActionKind.ShieldBash, front.Pos);
+            // The Brute's Guard takes the bash itself, then the collision hurts both.
             Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.CollisionDamage, front.Hp);
-            Assert.AreEqual(UnitStats.Brute.MaxHp - Battle.CollisionDamage, behind.Hp, "the unit it slams into is hurt too");
+            Assert.AreEqual(UnitStats.Brute.MaxHp - Battle.BashDamage - Battle.CollisionDamage, behind.Hp, "the unit it slams into is hurt too");
         }
 
         [Test]

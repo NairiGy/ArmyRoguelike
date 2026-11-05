@@ -55,9 +55,6 @@ namespace ArmyRoguelike.Core
         /// <summary>Allies standing next to this unit take 1 less damage (minimum 1).</summary>
         ShieldWall,
 
-        /// <summary>Attacks also hit the enemies on both sides of the target.</summary>
-        Sweep,
-
         /// <summary>Melee reach 2 in a straight line; the attack hits both tiles.</summary>
         LongReach,
 
@@ -67,8 +64,11 @@ namespace ArmyRoguelike.Core
         /// <summary>When an adjacent ally is attacked, this unit takes the hit instead.</summary>
         Guard,
 
-        /// <summary>Enemies within 3 tiles must attack this unit.</summary>
-        Taunt,
+        /// <summary>Can be deployed one row further forward.</summary>
+        Vanguard,
+
+        /// <summary>Attacks an enemy that steps out of its reach, at most once a round.</summary>
+        ZocStrike,
 
         /// <summary>Takes 1 less damage from everything (minimum 1).</summary>
         Tough,
@@ -250,6 +250,11 @@ namespace ArmyRoguelike.Core
         ShieldBash,
         Vanish,
         Blink,
+        Sweep,
+        ShieldUp,
+        Battlecry,
+        Taunt,
+        ThrowShield,
 
         // Enemy actions: never in a unit's Actions list (the AI uses them), but they share the cooldown table.
         Slam,
@@ -386,7 +391,7 @@ namespace ArmyRoguelike.Core
         // ---------- The five base units (they grow by learning techniques, see Techniques.cs) ----------
 
         public static readonly UnitStats Warrior = Player(UnitKind.Warrior, "Warrior", "W", 12, 3, 1, 1,
-            "Sturdy front line that protects its neighbours.", A(Ability.ShieldWall), Do(ActionKind.ShieldBash));
+            "Sturdy front line.", A(), Do(ActionKind.ShieldBash));
 
         public static readonly UnitStats Archer = Player(UnitKind.Archer, "Archer", "A", 6, 2, 3, 1,
             "Fragile ranged damage that likes to stand still.", A(Ability.SteadyAim), Do(ActionKind.PinningShot));

@@ -133,6 +133,28 @@ namespace ArmyRoguelike.Core
         /// <summary>HP of a barricade: either side can attack it, and it breaks at 0.</summary>
         public const int BarricadeHp = 4;
         public const int ChargeRange = 3;
+        public const int ChargeDamage = 2;
+
+        /// <summary>Shield Bash: damage before the push (run-long damage bonuses add to it).</summary>
+        public const int BashDamage = 2;
+
+        /// <summary>Shield Up: damage taken off every hit, and how many enemy turns it lasts.</summary>
+        public const int ShieldUpReduction = 2;
+        public const int ShieldUpTurns = 2;
+
+        /// <summary>Taunt: how many enemy turns it lasts.</summary>
+        public const int TauntTurns = 1;
+
+        /// <summary>Battlecry: range, extra moves, temporary HP, and own turns it lasts (the current one counts).</summary>
+        public const int BattlecryRange = 2;
+        public const int BattlecryMoves = 1;
+        public const int BattlecryHp = 2;
+        public const int BattlecryTurns = 1;
+
+        /// <summary>Throw Shield, for the rest of the battle.</summary>
+        public const int ThrowShieldMoves = 1;
+        public const int ThrowShieldDamage = 2;
+        public const int ThrowShieldHpCost = 4;
 
         /// <summary>Pinning Shot (archers): damage, and the target can't move on its next turn.</summary>
         public const int PinDamage = 1;
@@ -170,7 +192,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Special actions cost the unit's one AP, except Blink and Vanish: free, but only before it has acted.</summary>
         public static int ActionCost(ActionKind action) =>
-            action == ActionKind.Blink || action == ActionKind.Vanish ? 0 : action == ActionKind.PlaceMine ? MineCost : AttackCost;
+            action == ActionKind.Blink || action == ActionKind.Vanish || action == ActionKind.ThrowShield ? 0 : action == ActionKind.PlaceMine ? MineCost : AttackCost;
 
         /// <summary>
         /// Cooldown of every action in the unit's own turns *(placeholders)*: used now, ready again this many turns
@@ -188,7 +210,13 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Vanish:
                 case ActionKind.Raise:
                 case ActionKind.Caltrops:
+                case ActionKind.ShieldUp:
+                case ActionKind.Battlecry:
+                case ActionKind.Taunt:
                     return 3;
+                // Once per battle instead.
+                case ActionKind.ThrowShield:
+                    return 0;
                 default:
                     return 2;
             }
@@ -203,7 +231,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>The action's cooldown in this battle: Arcane Overflow cuts it, down to 1.</summary>
         public int CooldownIn(ActionKind action) =>
-            Field == Battlefield.ArcaneOverflow ? Math.Max(1, Cooldown(action) - Battlefields.CooldownCut) : Cooldown(action);
+            Field == Battlefield.ArcaneOverflow && Cooldown(action) > 0 ? Math.Max(1, Cooldown(action) - Battlefields.CooldownCut) : Cooldown(action);
 
         /// <summary>Pays for an action and puts it on cooldown.</summary>
         private void UseUp(Unit unit, ActionKind action)
@@ -817,7 +845,7 @@ namespace ArmyRoguelike.Core
                 return 0;
 
             var hp = target.Hp;
-            var shield = target.Shield + target.MoonShield;
+            var shield = target.Shield + target.MoonShield + target.TempHp;
             var dodge = target.Has(Ability.Dodge) && !target.DodgeUsed;
             var lucky = target.Has(Ability.LuckyCharm) && !target.LastStandUsed;
             var strikes = attacker.Has(Ability.DoubleStrike) ? 2 : 1;
@@ -832,6 +860,8 @@ namespace ArmyRoguelike.Core
                     amount = Math.Max(1, amount - 1);
                 if (target.Has(Ability.Tough))
                     amount = Math.Max(1, amount - 1);
+                if (target.ShieldUpTurns > 0)
+                    amount = Math.Max(1, amount - ShieldUpReduction);
                 if (dodge)
                 {
                     dodge = false;
@@ -890,7 +920,9 @@ namespace ArmyRoguelike.Core
                 amount = Math.Max(1, amount - 1);
             if (target.Has(Ability.Tough))
                 amount = Math.Max(1, amount - 1);
-            return amount - target.Shield - target.MoonShield >= target.Hp;
+            if (target.ShieldUpTurns > 0)
+                amount = Math.Max(1, amount - ShieldUpReduction);
+            return amount - target.Shield - target.MoonShield - target.TempHp >= target.Hp;
         }
 
         /// <summary>An ally of the attacker stands on the far side of a 1x1 target.</summary>
@@ -1144,31 +1176,34 @@ namespace ArmyRoguelike.Core
 
         public List<BattleEvent> PlayerPlaceMine(Unit unit, GridPos tile) => PlayerUseAction(unit, ActionKind.PlaceMine, tile);
 
-        /// <summary>For Charge: the enemy the unit would run into along a straight line through this tile, and where it stops.</summary>
-        public (Unit target, GridPos stop, GridPos dir)? ChargeTarget(Unit unit, GridPos tile)
+        /// <summary>
+        /// For Charge: whether the unit can rush in a straight line to this tile, up to <see cref="ChargeRange"/> away.
+        /// Rocks and objectives of its own side block the way, it can't end on an ally, and at least one enemy must be
+        /// on the way.
+        /// </summary>
+        public bool CanChargeTo(Unit unit, GridPos tile)
         {
             var dir = StraightDirection(unit.Pos, tile);
-            if (dir == null || unit.Size != 1)
-                return null;
+            var steps = unit.Pos.StepsTo(tile);
+            if (dir == null || unit.Size != 1 || steps < 1 || steps > ChargeRange)
+                return false;
+            var enemies = 0;
             var p = unit.Pos;
-            for (var step = 1; step <= ChargeRange; step++)
+            for (var step = 1; step <= steps; step++)
             {
-                var next = p + dir.Value;
-                if (!Board.InBounds(next) || Board.IsObstacle(next))
-                    return null;
-                var occupant = UnitAt(next);
-                if (occupant != null)
-                {
-                    // The clicked tile must be the enemy itself, at least 2 tiles away (one step of run-up).
-                    if (occupant.Team == unit.Team || step < 2 || !Cells(occupant).Contains(tile))
-                        return null;
-                    return (occupant, p, dir.Value);
-                }
-
-                p = next;
+                p += dir.Value;
+                if (!Board.InBounds(p) || Board.IsObstacle(p))
+                    return false;
+                var occupant = UnitAt(p);
+                if (occupant == null)
+                    continue;
+                if (occupant.Team != unit.Team)
+                    enemies++;
+                else if (occupant.IsObjective || step == steps)
+                    return false;
             }
 
-            return null;
+            return enemies > 0;
         }
 
         public bool CanUseAction(Unit unit, ActionKind action, GridPos tile)
@@ -1187,7 +1222,15 @@ namespace ArmyRoguelike.Core
                 case ActionKind.PinningShot:
                     return target != null && target.Team != unit.Team && !target.IsObjective && CanHitFrom(unit, unit.Pos, target);
                 case ActionKind.ShieldBash:
-                    return target != null && target.Team != unit.Team && !target.IsObjective && !target.Has(Ability.Colossus) && unit.Size == 1 && Distance(unit, target) == 1;
+                    return target != null && target.Team != unit.Team && !target.IsObjective && unit.Size == 1 && Distance(unit, target) == 1;
+                case ActionKind.Sweep:
+                    return target != null && target.Team != unit.Team && unit.Size == 1 && Distance(unit, target) == 1;
+                case ActionKind.ShieldUp:
+                case ActionKind.Battlecry:
+                case ActionKind.Taunt:
+                    return tile == unit.Pos;
+                case ActionKind.ThrowShield:
+                    return tile == unit.Pos && !unit.ShieldThrown && unit.Hp > ThrowShieldHpCost;
                 case ActionKind.Vanish:
                     return tile == unit.Pos && !unit.IsHidden;
                 case ActionKind.Blink:
@@ -1207,7 +1250,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Detonate:
                     return tile == unit.Pos && _barricades.Any(b => b.owner == unit);
                 case ActionKind.Charge:
-                    return ChargeTarget(unit, tile).HasValue;
+                    return CanChargeTo(unit, tile);
                 default:
                     return false;
             }
@@ -1251,9 +1294,46 @@ namespace ArmyRoguelike.Core
                 case ActionKind.ShieldBash:
                 {
                     var target = UnitAt(tile);
-                    Push(target, StraightDirection(unit.Pos, Cells(target).First(c => c.StepsTo(unit.Pos) == 1)).Value, unit, events, hurtsBlocker: true);
+                    var dir = StraightDirection(unit.Pos, Cells(target).First(c => c.StepsTo(unit.Pos) == 1)).Value;
+                    var after = new List<BattleEvent>();
+                    var hit = Damage(target, ActionDamage(unit, target, BashDamage), unit, DamageKind.Attack, after);
+                    unit.AttackedThisTurn = true;
+                    unit.MarkStruck(target);
+                    events.Add(new AttackEvent(unit, hit.Target, hit.Damage, hit.HpAfter));
+                    events.AddRange(after);
+                    Push(target, dir, unit, events, hurtsBlocker: true);
                     break;
                 }
+                case ActionKind.Sweep:
+                    Sweep(unit, UnitAt(tile), events);
+                    break;
+                case ActionKind.ShieldUp:
+                    unit.ShieldUpTurns = ShieldUpTurns;
+                    events.Add(new StatusEvent(unit, unit, StatusKind.ShieldUp, ShieldUpReduction));
+                    break;
+                case ActionKind.Taunt:
+                    unit.TauntTurns = TauntTurns;
+                    events.Add(new StatusEvent(unit, unit, StatusKind.Taunt, TauntRange));
+                    break;
+                case ActionKind.Battlecry:
+                    foreach (var ally in Living(unit.Team).Where(u => !u.IsObjective && Distance(unit, u) <= BattlecryRange).ToList())
+                    {
+                        // A second shout refreshes the bonus rather than stacking it.
+                        if (ally.BattlecryTurns == 0 && !ally.SlowedThisTurn)
+                            ally.Moves += BattlecryMoves;
+                        ally.BattlecryTurns = BattlecryTurns;
+                        ally.TempHp = BattlecryHp;
+                        events.Add(new StatusEvent(unit, ally, StatusKind.Battlecry, BattlecryHp));
+                    }
+
+                    break;
+                case ActionKind.ThrowShield:
+                    unit.ShieldThrown = true;
+                    unit.Hp -= ThrowShieldHpCost;
+                    if (!unit.SlowedThisTurn)
+                        unit.Moves += ThrowShieldMoves;
+                    events.Add(new StatusEvent(unit, unit, StatusKind.ThrowShield, ThrowShieldHpCost));
+                    break;
                 case ActionKind.Vanish:
                     unit.HiddenTurns = VanishTurns;
                     events.Add(new StatusEvent(unit, unit, StatusKind.Vanish, VanishTurns));
@@ -1378,29 +1458,97 @@ namespace ArmyRoguelike.Core
             }
         }
 
+        /// <summary>An action's own base damage in place of the unit's attack damage; bonuses to its damage still count.</summary>
+        private int ActionDamage(Unit unit, Unit target, int baseDamage) =>
+            Math.Max(1, DamageAgainst(unit, target) - unit.Stats.Damage + baseDamage);
+
+        /// <summary>Sweep: the unit's attack damage to the target and the enemies on both sides of it.</summary>
+        private void Sweep(Unit unit, Unit target, List<BattleEvent> events)
+        {
+            var dir = StraightDirection(unit.Pos, Cells(target).First(c => c.StepsTo(unit.Pos) == 1)).Value;
+            var side = new GridPos(dir.Y, dir.X);
+            var near = unit.Pos + dir;
+            var line = new List<GridPos> { near + side, near, new GridPos(near.X - side.X, near.Y - side.Y) };
+            var victims = line.Select(UnitAt).Where(u => u != null && u.Team != unit.Team).Distinct().ToList();
+            var after = new List<BattleEvent>();
+            var hits = victims.Select(v => Damage(v, DamageAgainst(unit, v), unit, DamageKind.Attack, after)).ToList();
+            unit.AttackedThisTurn = true;
+            foreach (var v in victims)
+                unit.MarkStruck(v);
+            events.Add(new AreaAttackEvent(unit, "sweep", target.Pos, line, hits));
+            events.AddRange(after);
+        }
+
+        /// <summary>
+        /// Charge: walks tile by tile to the chosen tile, past allies. Each enemy on the way takes the damage and is
+        /// pushed to a random side (the other side if that one is blocked; a collision if both are). An enemy still
+        /// in the way afterwards stops the charge in front of it.
+        /// </summary>
         private void Charge(Unit unit, GridPos tile, List<BattleEvent> events)
         {
-            var charge = ChargeTarget(unit, tile).Value;
-            var path = new List<GridPos>();
-            for (var p = unit.Pos; p != charge.stop;)
+            var dir = StraightDirection(unit.Pos, tile).Value;
+            var shownFrom = unit.Pos;
+            var walked = new List<GridPos>();
+            var pastAllies = new List<GridPos>();
+            unit.MovedThisTurn = true;
+
+            void ShowWalk()
             {
-                p += charge.dir;
-                path.Add(p);
+                if (walked.Count == 0)
+                    return;
+                events.Add(new MoveEvent(unit, shownFrom, walked.ToList()));
+                shownFrom = walked[walked.Count - 1];
+                walked.Clear();
             }
 
-            var from = unit.Pos;
-            unit.Pos = charge.stop;
-            unit.MovedThisTurn = true;
-            events.Add(new MoveEvent(unit, from, path));
+            for (var p = unit.Pos; p != tile && unit.IsAlive && !IsOver;)
+            {
+                p += dir;
+                var occupant = UnitAt(p);
+                if (occupant != null && occupant.Team == unit.Team)
+                {
+                    pastAllies.Add(p);
+                    continue;
+                }
 
-            var after = new List<BattleEvent>();
-            var hit = Damage(charge.target, DamageAgainst(unit, charge.target), unit, DamageKind.Attack, after);
-            unit.AttackedThisTurn = true;
-            unit.MarkStruck(charge.target);
-            events.Add(new AttackEvent(unit, hit.Target, hit.Damage, hit.HpAfter));
-            events.AddRange(after);
-            if (hit.Target.IsAlive)
-                Push(hit.Target, charge.dir, unit, events);
+                if (occupant != null)
+                {
+                    ShowWalk();
+                    var after = new List<BattleEvent>();
+                    var hit = Damage(occupant, ActionDamage(unit, occupant, ChargeDamage), unit, DamageKind.Attack, after);
+                    unit.AttackedThisTurn = true;
+                    unit.MarkStruck(occupant);
+                    events.Add(new AttackEvent(unit, hit.Target, hit.Damage, hit.HpAfter));
+                    events.AddRange(after);
+                    if (occupant.IsAlive)
+                        Push(occupant, ChargeSide(occupant, dir), unit, events);
+                    if (UnitAt(p) != null || !unit.IsAlive)
+                        break;
+                }
+
+                walked.AddRange(pastAllies);
+                pastAllies.Clear();
+                walked.Add(p);
+                unit.Pos = p;
+            }
+
+            ShowWalk();
+        }
+
+        /// <summary>The side Charge pushes a unit to: random, but the other one if only this one is blocked.</summary>
+        private GridPos ChargeSide(Unit unit, GridPos dir)
+        {
+            var first = new GridPos(dir.Y, dir.X);
+            var second = new GridPos(-dir.Y, -dir.X);
+            if (Rng.Next(2) == 0)
+                (first, second) = (second, first);
+            bool Open(GridPos side)
+            {
+                var to = unit.Pos + side;
+                return unit.Size == 1 && !Board.InBounds(to) ? EdgeKills : CanStand(unit, to);
+            }
+
+            return !Open(first) && Open(second) ? second : first;
         }
 
         /// <summary>
@@ -1572,9 +1720,13 @@ namespace ArmyRoguelike.Core
 
         // ---------- Placement ----------
 
+        /// <summary>Your deployment zone; with Vanguard also the row in front of it (not in fights with their own zone).</summary>
+        public bool IsDeployTile(Unit unit, GridPos p) =>
+            IsPlayerZone(p) || (Board.InBounds(p) && _deployZone == null && unit.Has(Ability.Vanguard) && p.Y == PlayerZoneRows);
+
         public bool CanPlace(Unit unit, GridPos p)
         {
-            if (Phase != Phase.Placement || unit.Team != Team.Player || unit.IsObjective || !IsPlayerZone(p) || Board.IsObstacle(p))
+            if (Phase != Phase.Placement || unit.Team != Team.Player || unit.IsObjective || !IsDeployTile(unit, p) || Board.IsObstacle(p))
                 return false;
             var occupant = UnitAt(p);
             return occupant == null || occupant == unit;
@@ -1805,10 +1957,22 @@ namespace ArmyRoguelike.Core
             var from = unit.Pos;
             var cost = PathCost(unit, path);
             var zoc = ZocSteps(unit, path);
+            var strikers = ZocStrikers(unit, from, path);
             unit.Moves -= cost;
             unit.MovedThisTurn = true;
             unit.Pos = path[path.Count - 1];
             var events = new List<BattleEvent> { new MoveEvent(unit, from, path, cost, zoc) };
+            foreach (var striker in strikers.Where(s => unit.IsAlive && s.IsAlive))
+            {
+                striker.ZocStrikeUsed = true;
+                var strikeAfter = new List<BattleEvent>();
+                var strike = Damage(unit, DamageAgainst(striker, unit), striker, DamageKind.Attack, strikeAfter);
+                striker.MarkStruck(unit);
+                events.Add(new EffectEvent(EffectKind.ZocStrike, striker, 0, striker.Hp, striker));
+                events.Add(new AttackEvent(striker, strike.Target, strike.Damage, strike.HpAfter));
+                events.AddRange(strikeAfter);
+            }
+
             if (triggered != null)
                 Explode(triggered.Tile, triggered.Damage, "mine", triggered.Owner, events);
 
@@ -1835,6 +1999,23 @@ namespace ArmyRoguelike.Core
 
             CheckEnd();
             return events;
+        }
+
+        /// <summary>
+        /// Who attacks a unit for walking this path: each enemy with the zone-of-control passive, not used yet this
+        /// round, whose reach the path leaves. Slippery units ignore it, as they ignore zone of control.
+        /// </summary>
+        private List<Unit> ZocStrikers(Unit unit, GridPos from, IReadOnlyList<GridPos> path)
+        {
+            var strikers = new List<Unit>();
+            var previous = from;
+            foreach (var next in path)
+            {
+                strikers.AddRange(EngagedBy(unit, previous).Where(s => s.Has(Ability.ZocStrike) && !s.ZocStrikeUsed && Distance(next, unit.Size, s) != 1 && !strikers.Contains(s)).ToList());
+                previous = next;
+            }
+
+            return strikers;
         }
 
         internal List<BattleEvent> DoAttack(Unit attacker, Unit target)
@@ -1908,15 +2089,6 @@ namespace ArmyRoguelike.Core
                     if (Board.IsObstacle(p))
                         break;
                 }
-            }
-            else if (attacker.Has(Ability.Sweep) && dir != null)
-            {
-                kind = "sweep";
-                var side = new GridPos(dir.Value.Y, dir.Value.X);
-                var near = attacker.Pos + dir.Value;
-                line.Add(near + side);
-                line.Add(near);
-                line.Add(new GridPos(near.X - side.X, near.Y - side.Y));
             }
 
             if (line.Count > 0)
@@ -2272,6 +2444,8 @@ namespace ArmyRoguelike.Core
                 amount = Math.Max(1, amount - 1);
             if (target.Has(Ability.Tough))
                 amount = Math.Max(1, amount - 1);
+            if (target.ShieldUpTurns > 0)
+                amount = Math.Max(1, amount - ShieldUpReduction);
 
             if (kind == DamageKind.Attack && hostile && target.Has(Ability.Dodge) && !target.DodgeUsed)
             {
@@ -2283,6 +2457,14 @@ namespace ArmyRoguelike.Core
             // Totems are warded against their own side: goblin bombs landing around them don't hurt them.
             if (target.IsObjective && target.Team == Team.Enemy && source != null && source.Team == target.Team)
                 amount = 0;
+
+            if (target.TempHp > 0 && amount > 0)
+            {
+                var absorbed = Math.Min(target.TempHp, amount);
+                target.TempHp -= absorbed;
+                amount -= absorbed;
+                after.Add(new EffectEvent(EffectKind.Absorb, target, absorbed, target.Hp, target));
+            }
 
             if (target.MoonShield > 0 && amount > 0)
             {
@@ -2535,6 +2717,16 @@ namespace ArmyRoguelike.Core
             // Overwatch lasts until the watcher's own next turn.
             foreach (var u in Living(team))
                 _overwatch.Remove(u);
+
+            // The Warrior's timed effects count down at the start of its side's turn.
+            foreach (var u in Living(team))
+            {
+                u.ZocStrikeUsed = false;
+                u.ShieldUpTurns = Math.Max(0, u.ShieldUpTurns - 1);
+                u.TauntTurns = Math.Max(0, u.TauntTurns - 1);
+                if (u.BattlecryTurns > 0 && --u.BattlecryTurns == 0)
+                    u.TempHp = 0;
+            }
 
             foreach (var u in Living(team))
             {

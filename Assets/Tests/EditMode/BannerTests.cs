@@ -39,7 +39,7 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(0, b.PushDistance(brute, Player(b)));
             b.PlayerUseAction(Player(b), ActionKind.ShieldBash, brute.Pos);
             Assert.AreEqual(P(3, 2), brute.Pos, "doesn't budge");
-            Assert.AreEqual(UnitStats.Brute.MaxHp, brute.Hp, "and takes no collision damage");
+            Assert.AreEqual(UnitStats.Brute.MaxHp - Battle.BashDamage, brute.Hp, "only the bash: no collision damage");
         }
 
         [Test]
@@ -49,7 +49,7 @@ namespace ArmyRoguelike.Tests
             var wolf = Enemy(b);
             b.PlayerUseAction(Player(b), ActionKind.ShieldBash, wolf.Pos);
             Assert.AreEqual(P(3, 3), wolf.Pos, "one tile, then slams into the crossbowman");
-            Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.CollisionDamage, wolf.Hp);
+            Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.BashDamage - Battle.CollisionDamage, wolf.Hp);
         }
 
         // ---------- Battering Ram ----------
@@ -62,14 +62,14 @@ namespace ArmyRoguelike.Tests
             var crossbow = Enemy(b);
             b.PlayerUseAction(Player(b), ActionKind.ShieldBash, crossbow.Pos);
             Assert.AreEqual(P(3, 4), crossbow.Pos, "medium: two tiles");
-            Assert.AreEqual(UnitStats.Crossbowman.MaxHp - Banners.RamDamage, crossbow.Hp);
+            Assert.AreEqual(UnitStats.Crossbowman.MaxHp - Battle.BashDamage - Banners.RamDamage, crossbow.Hp);
 
             var huge = Setup(new[] { Banner.BatteringRam }, new[] { UnitStats.Warrior }, new[] { P(3, 1) },
                 (UnitStats.Brute, P(3, 2)), (UnitStats.Wolf, P(7, 7)));
             var brute = Enemy(huge);
             huge.PlayerUseAction(Player(huge), ActionKind.ShieldBash, brute.Pos);
             Assert.AreEqual(P(3, 3), brute.Pos, "huge: one tile");
-            Assert.AreEqual(UnitStats.Brute.MaxHp - Banners.RamDamage, brute.Hp);
+            Assert.AreEqual(UnitStats.Brute.MaxHp - Battle.BashDamage - Banners.RamDamage, brute.Hp);
         }
 
         [Test]

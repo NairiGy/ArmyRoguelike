@@ -194,6 +194,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>A cutpurse (<see cref="EffectEvent.Unit"/>) grabbed <see cref="EffectEvent.Amount"/> gold.</summary>
         Steal,
+
+        /// <summary>The Warrior's zone-of-control passive: <see cref="EffectEvent.Unit"/> struck an enemy stepping out of its reach.</summary>
+        ZocStrike,
     }
 
     /// <summary>A unit left the board, e.g. a cutpurse escaping with stolen gold.</summary>
@@ -308,6 +311,18 @@ namespace ArmyRoguelike.Core
 
         /// <summary>A vanished unit became visible again.</summary>
         Reveal,
+
+        /// <summary>Shield Up: takes less damage for a few enemy turns (Source and Target are the same unit).</summary>
+        ShieldUp,
+
+        /// <summary>Battlecry: +1 move and <see cref="StatusEvent.Amount"/> temporary HP.</summary>
+        Battlecry,
+
+        /// <summary>Taunt: enemies in range can only target this unit (Source and Target are the same unit).</summary>
+        Taunt,
+
+        /// <summary>Throw Shield: stronger and faster for the battle, <see cref="StatusEvent.Amount"/> HP lost.</summary>
+        ThrowShield,
     }
 
     /// <summary>A status or support effect was put on a unit by an action or a hit.</summary>

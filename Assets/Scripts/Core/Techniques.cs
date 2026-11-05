@@ -67,12 +67,20 @@ namespace ArmyRoguelike.Core
 
         // ---------- Warrior ----------
 
-        public static readonly Technique Sweep = P(UnitStats.Warrior, Ability.Sweep);
+        public static readonly Technique Sweep = Act(UnitStats.Warrior, ActionKind.Sweep);
+        public static readonly Technique ShieldUp = Act(UnitStats.Warrior, ActionKind.ShieldUp);
+        public static readonly Technique ThrowShield = Act(UnitStats.Warrior, ActionKind.ThrowShield);
+        public static readonly Technique Vanguard = P(UnitStats.Warrior, Ability.Vanguard);
+        public static readonly Technique Charge = Act(UnitStats.Warrior, ActionKind.Charge, Rare);
+        public static readonly Technique Battlecry = Act(UnitStats.Warrior, ActionKind.Battlecry, Rare);
+        public static readonly Technique Taunt = Act(UnitStats.Warrior, ActionKind.Taunt, Rare);
+        public static readonly Technique ZocStrike = P(UnitStats.Warrior, Ability.ZocStrike, Rare);
+
+        // Parked Warrior skills: their rules still work, but they aren't in All, so no run offers them.
+        public static readonly Technique ShieldWall = P(UnitStats.Warrior, Ability.ShieldWall);
         public static readonly Technique Guard = P(UnitStats.Warrior, Ability.Guard);
         public static readonly Technique LongReach = P(UnitStats.Warrior, Ability.LongReach, Rare);
         public static readonly Technique DoubleStrike = P(UnitStats.Warrior, Ability.DoubleStrike, Rare);
-        public static readonly Technique Charge = Act(UnitStats.Warrior, ActionKind.Charge, Rare);
-        public static readonly Technique Taunt = P(UnitStats.Warrior, Ability.Taunt, Rare);
         public static readonly Technique Tough = P(UnitStats.Warrior, Ability.Tough, Rare);
 
         // ---------- Archer ----------
@@ -115,7 +123,7 @@ namespace ArmyRoguelike.Core
 
         public static readonly IReadOnlyList<Technique> All = new[]
         {
-            Sweep, Guard, LongReach, DoubleStrike, Charge, Taunt, Tough,
+            Sweep, ShieldUp, ThrowShield, Vanguard, Charge, Battlecry, Taunt, ZocStrike,
             SteadyAimPlus, Pierce, OpeningShot, Prey, Volley,
             Pincer, Riposte, Momentum, Poison, RipostePlus, Dodge,
             Fireball, Chill, Ward, Burning, Concussive, IceWall, Shatter, WideWard, Mend,

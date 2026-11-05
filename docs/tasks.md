@@ -47,6 +47,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 | Battlefields | Storm: a tile marked for lightning; the strike (the painted `LightningStrike` is used) | Flat pale-blue tile tint (`StormMarkColor` in `BattleController`), "Storm mark" and "Lightning!" popups | Needed (mark only) |
 | Battlefields | Fortune's Favored: the favored unit (double damage this round) | An orange status pip (`FavoredColor` in `UnitView`), a "Favored!" popup | Needed |
 | Battlefields | What's On His Mind?: something that says intents are hidden | Nothing: hovering an enemy just shows no intent | Needed (maybe a "?" badge) |
+| Warrior redesign | Shield Up, Battlecry, Taunt and Throw Shield on the statue; temporary HP on the HP bar; Sweep; Charge with enemies knocked aside; the Placeholder attack; the extra Vanguard row | Text popups and hover-card lines, no status pips. Sweep uses the normal area attack, Charge the normal walk, hit and push; the Vanguard row uses the zone highlight | Needed |
 | Run end | The run-end screen with its "serious run / just testing" and 1-5 difficulty answers; the "Abandon run" button on the map | Plain IMGUI buttons with a "> " on the chosen answer (`DrawRunEnd`, `DrawMap` in `GameBootstrap`) | Needed |
 
 ### Other visual work
@@ -104,7 +105,9 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [x] Boss kits (2026-10-30, on `main`): Giant gets Colossus and Wrath, Necromancer gets Soul Harvest and Corpse Blast (see the design note). Not playtested.
 - [x] Bundle playtest fixes (2026-10-30): Upheaval no longer leaves a rock, Shards lost Reform, mines hit only their own tile. Not playtested.- [ ] Design later with the user: what Upheaval should do to the board instead of a lasting rock (it felt like too many rocks), and a new passive for the Shard.
 - [ ] Design later with the user: what Upheaval should do to the board instead of a lasting rock (too many rocks in play), and a new passive for the Shard.
-- [ ] Unit kits still to design: the player's units, one line at a time with the user. Since 2026-10-30 that means the 5 base kits plus the technique pool. Next: the Rogue (5 HP problem).
+- [ ] Unit kits still to design: the player's units, one line at a time with the user. Since 2026-10-30 that means the 5 base kits plus the technique pool. The Warrior is first (see below); next line is the user's call (the Rogue has its 5 HP problem).
+- [x] **Warrior redesign, first version** (2026-11-05, see the design note): no base passive, Shield Bash deals 2, active Sweep, Taunt and new Charge, new Shield Up, Battlecry, Throw Shield, Vanguard and Placeholder; Shield Wall, Guard, Long Reach, Double Strike and Tough parked. Tests pass; not played or seen in game.
+- [ ] Warrior, next, with the user: more skills (8 now, the goal is many more, and only 2 are passives); offers that lean towards a unit's build; rarities; cooldowns; final numbers; a name for Placeholder; whether it gets a base passive after all. Enemies don't avoid Placeholder yet. The bot sims don't tell us how good these skills feel.
 - [x] Playtest the small-board version (2026-10-30): felt ok; 3 finished fights (2 wins, 1 loss), 5-6 turns each. Merged into `main` the same day.
 - [ ] Next (new gameplay chat): tune units from the playtest. Weak spots seen: the Rogue dies first in every fight (5 HP on a 1-move board); Pinning Shot and Blink were never used; Fling and the bandit kits are unplayed; cooldowns are placeholders.
 - [ ] Re-export the illustrated gamepedia (Tools → Export Gamepedia): `docs/gamepedia.html` is the text-only version since the small-board work.

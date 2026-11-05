@@ -928,7 +928,7 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Colossus_GiantCantBePinnedOrBashed()
+        public void Colossus_GiantCantBePinnedOrPushed()
         {
             var b = Started(Army(UnitStats.Archer, UnitStats.Warrior), new[] { new GridPos(3, 1), new GridPos(0, 0) },
                 new[] { (UnitStats.Ogre, new GridPos(3, 4)) });
@@ -939,7 +939,13 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(giant.MaxHp - Battle.PinDamage, giant.Hp, "the shot still hurts");
             Assert.IsFalse(giant.IsSnared);
             warrior.Pos = new GridPos(3, 3);
-            Assert.IsFalse(b.CanUseAction(warrior, ActionKind.ShieldBash, giant.Pos));
+            Assert.IsTrue(b.CanUseAction(warrior, ActionKind.ShieldBash, giant.Pos), "a bash still hurts it");
+            b.EndUnitTurn(archer);
+            var pos = giant.Pos;
+            var hp = giant.Hp;
+            Assert.IsNotNull(b.PlayerUseAction(warrior, ActionKind.ShieldBash, pos));
+            Assert.AreEqual(hp - Battle.BashDamage, giant.Hp);
+            Assert.AreEqual(pos, giant.Pos, "but it does not move");
         }
 
         [Test]

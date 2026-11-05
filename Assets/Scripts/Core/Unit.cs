@@ -125,6 +125,26 @@ namespace ArmyRoguelike.Core
         /// <summary>Gold a cutpurse is carrying after a hit. It flees with it; killing it gets it back.</summary>
         public int CarryingLoot { get; internal set; }
 
+        /// <summary>Shield Up: enemy turns left of taking less damage.</summary>
+        public int ShieldUpTurns { get; internal set; }
+
+        /// <summary>Taunt: enemy turns left of forcing nearby enemies to target it.</summary>
+        public int TauntTurns { get; internal set; }
+
+        public bool IsTaunting => TauntTurns > 0;
+
+        /// <summary>Battlecry: own turns left of its extra move (the one it was shouted in counts).</summary>
+        public int BattlecryTurns { get; internal set; }
+
+        /// <summary>Battlecry's temporary HP: lost before anything else, gone when the battlecry ends.</summary>
+        public int TempHp { get; internal set; }
+
+        /// <summary>Throw Shield was used in this battle: more damage and a move for good.</summary>
+        public bool ShieldThrown { get; internal set; }
+
+        /// <summary>The zone-of-control attack was already used this round.</summary>
+        public bool ZocStrikeUsed { get; internal set; }
+
         /// <summary>Hired for this battle only (Mercenaries banner): fights, but doesn't count as a survivor or keep the fight going alone.</summary>
         public bool IsMercenary { get; internal set; }
 
@@ -162,6 +182,8 @@ namespace ArmyRoguelike.Core
                 Shield = Shield, MoonShield = MoonShield, LastStandUsed = LastStandUsed, CarryingLoot = CarryingLoot,
                 IsMercenary = IsMercenary, Escaped = Escaped, Fell = Fell, Favored = Favored, PackHp = PackHp,
                 BannerAp = BannerAp, BannerMoves = BannerMoves, LeftPile = LeftPile, PileGone = PileGone,
+                ShieldUpTurns = ShieldUpTurns, TauntTurns = TauntTurns, BattlecryTurns = BattlecryTurns, TempHp = TempHp,
+                ShieldThrown = ShieldThrown, ZocStrikeUsed = ZocStrikeUsed,
             };
             foreach (var cooldown in _cooldowns)
                 c._cooldowns.Add(cooldown.Key, cooldown.Value);
@@ -183,7 +205,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Max HP from a Pack Leader's Pack Bond: +1 while one lives, -1 once the last one dies.</summary>
         public int PackHp { get; internal set; }
-        public int BaseDamage => Math.Max(1, Stats.Damage + (Member?.BonusDamage ?? 0) + (Member?.LevelDamage ?? 0));
+        public int BaseDamage => Math.Max(1, Stats.Damage + (Member?.BonusDamage ?? 0) + (Member?.LevelDamage ?? 0) + (ShieldThrown ? Battle.ThrowShieldDamage : 0));
 
         /// <summary>Attack range in steps. Long Reach makes it 2 (still melee).</summary>
         public int Range => Math.Max(Has(Ability.LongReach) ? 2 : 1, Stats.Range);
@@ -198,7 +220,7 @@ namespace ArmyRoguelike.Core
         public bool InWrath => Has(Ability.Wrath) && IsAlive && Hp * 2 <= MaxHp;
 
         /// <summary>Tiles per turn: the type's moves (1, or 2 with Swift), plus 1 for Spring Boots and 1 for Third Wheel.</summary>
-        public int MaxMoves => Stats.Moves + (Stats.Moves > 0 ? (Has(Ability.SpringBoots) ? 1 : 0) + BannerMoves : 0);
+        public int MaxMoves => Stats.Moves + (Stats.Moves > 0 ? (Has(Ability.SpringBoots) ? 1 : 0) + BannerMoves + (BattlecryTurns > 0 ? Battle.BattlecryMoves : 0) + (ShieldThrown ? Battle.ThrowShieldMoves : 0) : 0);
 
         public int Size => Stats.Size;
 

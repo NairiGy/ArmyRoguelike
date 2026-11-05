@@ -42,11 +42,11 @@ namespace ArmyRoguelike.Core
             switch (ability)
             {
                 case Ability.ShieldWall: return "Shield Wall";
-                case Ability.Sweep: return "Sweep";
                 case Ability.LongReach: return "Long Reach";
                 case Ability.DoubleStrike: return "Double Strike";
                 case Ability.Guard: return "Guard";
-                case Ability.Taunt: return "Taunt";
+                case Ability.Vanguard: return "Vanguard";
+                case Ability.ZocStrike: return "Placeholder";
                 case Ability.Tough: return "Tough";
                 case Ability.SteadyAim: return "Steady Aim";
                 case Ability.SteadyAimPlus: return "Steady Aim+";
@@ -102,11 +102,11 @@ namespace ArmyRoguelike.Core
             switch (ability)
             {
                 case Ability.ShieldWall: return "allies next to it take 1 less damage";
-                case Ability.Sweep: return "attacks also hit the enemies on both sides of the target";
                 case Ability.LongReach: return "melee reach 2 in a straight line, hitting both tiles";
                 case Ability.DoubleStrike: return "every attack strikes twice";
                 case Ability.Guard: return "takes the hit when an adjacent ally is attacked";
-                case Ability.Taunt: return $"enemies within {Battle.TauntRange} tiles must attack it";
+                case Ability.Vanguard: return "can be deployed 1 row further forward";
+                case Ability.ZocStrike: return "attacks any unit that steps out of its reach, at most once a round";
                 case Ability.Tough: return "takes 1 less damage from everything";
                 case Ability.SteadyAim: return "+1 damage if it hasn't moved this turn";
                 case Ability.SteadyAimPlus: return "+2 damage if it hasn't moved this turn";
@@ -187,6 +187,11 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Turret: return "Build Turret";
                 case ActionKind.Detonate: return "Detonate";
                 case ActionKind.Charge: return "Charge";
+                case ActionKind.Sweep: return "Sweep";
+                case ActionKind.ShieldUp: return "Shield Up";
+                case ActionKind.Battlecry: return "Battlecry";
+                case ActionKind.Taunt: return "Taunt";
+                case ActionKind.ThrowShield: return "Throw Shield";
                 default: return action.ToString();
             }
         }
@@ -200,7 +205,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.ThrowBomb:
                     return $"lob a bomb 2-{Battle.PlayerBombRange} tiles away; it explodes for {Battle.PlayerBombDamage} on that tile at the start of the next enemy turn";
                 case ActionKind.PinningShot: return $"{Battle.PinDamage} damage to an enemy in shot range (needs line of sight), and it can't move on its next turn";
-                case ActionKind.ShieldBash: return $"push an enemy next to it 1 tile away; no damage, but {Battle.CollisionDamage} if it slams into a rock, unit or the edge, and the unit it slams into takes {Battle.CollisionDamage} too";
+                case ActionKind.ShieldBash: return $"{Battle.BashDamage} damage to an enemy next to it and push it 1 tile; {Battle.CollisionDamage} more if it slams into a rock, unit or the edge, and the unit it slams into takes {Battle.CollisionDamage} too";
                 case ActionKind.Vanish: return $"go invisible: enemies can't target or attack it (area blasts still hit) until it attacks, for {Battle.VanishTurns} enemy turns at most; the attack that reveals it deals +{Battle.VanishBonus}. Free, before it acts: it can still move and attack";
                 case ActionKind.Blink: return $"teleport to a free tile within {Battle.BlinkRange}, ignoring rocks and zone of control. Free, before it acts: it can still move and attack";
                 case ActionKind.Fireball: return $"{Battle.FireballDamage} damage to everyone on the tile and the 4 next to it, up to {Battle.FireballRange} tiles away";
@@ -210,7 +215,12 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Barricade: return $"build a barricade on a free tile next to it (max {Battle.MaxBarricades}): blocks paths and shots, {Battle.BarricadeHp} HP, either side can break it";
                 case ActionKind.Turret: return "build a turret next to it (one at a time); it acts on your turn but can't move";
                 case ActionKind.Detonate: return $"blow up all its barricades: {Battle.BarricadeBlastDamage} damage in a 3x3 around each";
-                case ActionKind.Charge: return $"rush 2-{Battle.ChargeRange} tiles in a straight line into an enemy, hit it and push it back 1";
+                case ActionKind.Charge: return $"rush up to {Battle.ChargeRange} tiles in a straight line, past allies: {Battle.ChargeDamage} damage to every enemy on the way, each pushed to a random side. One that doesn't move stops the charge";
+                case ActionKind.Sweep: return "hit an enemy next to it and the enemies on both sides of it";
+                case ActionKind.ShieldUp: return $"takes {Battle.ShieldUpReduction} less damage from every source (at least 1) for {Battle.ShieldUpTurns} enemy turns";
+                case ActionKind.Battlecry: return $"every ally within {Battle.BattlecryRange} tiles, itself included, gets +{Battle.BattlecryMoves} move and {Battle.BattlecryHp} temporary HP until your next turn";
+                case ActionKind.Taunt: return $"until your next turn, enemies within {Battle.TauntRange} tiles can only attack or use offensive abilities on this unit";
+                case ActionKind.ThrowShield: return $"for the rest of the battle: +{Battle.ThrowShieldMoves} move and +{Battle.ThrowShieldDamage} damage, for {Battle.ThrowShieldHpCost} HP. Once per battle. Free, before it acts: it can still move and attack";
                 default: return "";
             }
         }

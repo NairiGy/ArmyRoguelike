@@ -51,7 +51,7 @@ namespace ArmyRoguelike.Tests
             var crossbow = Enemy(b);
             b.PlayerUseAction(Player(b), ActionKind.ShieldBash, crossbow.Pos);
             Assert.AreEqual(P(3, 7), crossbow.Pos);
-            Assert.AreEqual(UnitStats.Crossbowman.MaxHp - Battle.CollisionDamage, crossbow.Hp);
+            Assert.AreEqual(UnitStats.Crossbowman.MaxHp - Battle.BashDamage - Battle.CollisionDamage, crossbow.Hp);
         }
 
         [Test]

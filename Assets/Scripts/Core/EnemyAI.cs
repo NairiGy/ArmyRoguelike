@@ -133,6 +133,21 @@ namespace ArmyRoguelike.Core
         /// <summary>Your units enemies can see: everyone except vanished rogues.</summary>
         private static IEnumerable<Unit> Visible(Battle battle) => battle.Living(Team.Player).Where(u => !u.IsHidden);
 
+        /// <summary>The nearest visible unit taunting this enemy, or null.</summary>
+        private static Unit Taunter(Battle battle, Unit enemy) =>
+            Visible(battle)
+                .Where(u => u.IsTaunting && Battle.Distance(enemy, u) <= Battle.TauntRange)
+                .OrderBy(u => Battle.Distance(enemy, u))
+                .ThenBy(u => u.Id)
+                .FirstOrDefault();
+
+        /// <summary>The units this enemy may aim an attack or ability at: only its taunter if it has one.</summary>
+        private static IEnumerable<Unit> Aimable(Battle battle, Unit enemy)
+        {
+            var taunter = Taunter(battle, enemy);
+            return taunter != null ? new[] { taunter } : Visible(battle);
+        }
+
         /// <summary>
         /// The player unit this enemy wants to attack, among those it can see: a taunter in range first; in a
         /// ritual fight a defender next to it, else the objective; in Break the Ritual the nearest unit
@@ -142,11 +157,7 @@ namespace ArmyRoguelike.Core
         public static Unit ChooseTarget(Battle battle, Unit enemy)
         {
             // A taunting unit within range overrides everything.
-            var taunter = Visible(battle)
-                .Where(u => u.Has(Ability.Taunt) && Battle.Distance(enemy, u) <= Battle.TauntRange)
-                .OrderBy(u => Battle.Distance(enemy, u))
-                .ThenBy(u => u.Id)
-                .FirstOrDefault();
+            var taunter = Taunter(battle, enemy);
             if (taunter != null)
                 return taunter;
 
@@ -499,7 +510,7 @@ namespace ArmyRoguelike.Core
                 {
                     if (elemental.Moves > 0 && Approach(battle, elemental, target, Battle.AttackCost, events))
                         continue;
-                    var victim = new[] { target }.Concat(Visible(battle).OrderBy(u => Battle.Distance(elemental, u)).ThenBy(u => u.Id))
+                    var victim = new[] { target }.Concat(Aimable(battle, elemental).OrderBy(u => Battle.Distance(elemental, u)).ThenBy(u => u.Id))
                         .FirstOrDefault(u => battle.CanUpheave(elemental, u));
                     if (victim == null)
                         return;
@@ -554,7 +565,7 @@ namespace ArmyRoguelike.Core
         {
             if (thrower.Ap < Battle.AttackCost)
                 return null;
-            foreach (var u in new[] { target }.Concat(Visible(battle).OrderBy(u => Battle.Distance(thrower, u)).ThenBy(u => u.Id)))
+            foreach (var u in new[] { target }.Concat(Aimable(battle, thrower).OrderBy(u => Battle.Distance(thrower, u)).ThenBy(u => u.Id)))
                 if (battle.FlingOption(thrower, u) is var option && option.HasValue)
                     return (u, option.Value.goblin, option.Value.to);
             return null;
@@ -826,7 +837,7 @@ namespace ArmyRoguelike.Core
                     // Prefer the nearest unit, but any unit in range without a bomb on it will do.
                     var bombTarget = battle.CanBomb(bomber, target)
                         ? target
-                        : battle.Living(Team.Player).Where(u => battle.CanBomb(bomber, u)).OrderBy(u => Battle.Distance(bomber, u)).FirstOrDefault();
+                        : Aimable(battle, bomber).Where(u => battle.CanBomb(bomber, u)).OrderBy(u => Battle.Distance(bomber, u)).FirstOrDefault();
                     if (bombTarget != null)
                     {
                         events.AddRange(battle.DoBomb(bomber, bombTarget));
@@ -906,7 +917,7 @@ namespace ArmyRoguelike.Core
         {
             if (!battle.EdgeKills)
                 return null;
-            foreach (var u in Visible(battle).Where(u => !u.IsObjective).OrderBy(u => u.Id))
+            foreach (var u in Aimable(battle, enemy).Where(u => !u.IsObjective).OrderBy(u => u.Id))
             {
                 var dir = Battle.StraightDirection(enemy.Pos, u.Pos);
                 if (dir.HasValue && battle.CanBullRush(enemy, u) && battle.WouldFall(u, dir.Value, enemy))
