@@ -99,7 +99,7 @@ namespace ArmyRoguelike.View
                     break;
                 case AttackEvent attack:
                 {
-                    var entry = HitEntry(turn, attack.Attacker, "attack", new Hit(attack.Target, attack.Damage, attack.TargetHpAfter));
+                    var entry = HitEntry(turn, attack.Attacker, attack.Kind, new Hit(attack.Target, attack.Damage, attack.TargetHpAfter));
                     entry.autoApproach = autoApproach;
                     _log.actions.Add(entry);
                     break;
@@ -365,7 +365,7 @@ namespace ArmyRoguelike.View
         {
             turn = turn, team = attacker.Team.ToString(), unit = Name(attacker), type = type, target = Name(hit.Target),
             damage = hit.Damage, targetHpAfter = hit.HpAfter, killed = hit.Killed, apAfter = ApAfter(attacker),
-            ranged = attacker.IsRanged && Battle.Distance(attacker, hit.Target) > 1, favored = attacker.Favored,
+            ranged = attacker.IsRanged && Battle.Distance(attacker, hit.Target) > 1, favored = attacker.Favored, fury = attacker.Fury,
         };
 
         private static int ApAfter(Unit u) => u.Team == Team.Player ? u.Ap : -1;
@@ -726,6 +726,9 @@ namespace ArmyRoguelike.View
 
             /// <summary>Hits and explosions: dealt by a unit favored by fortune (Fortune's Favored), so at double damage.</summary>
             public bool favored;
+
+            /// <summary>Hits: the attacker's Fury (demons, +1 damage each) when it struck; type "rending blow" marks a Rending Blow.</summary>
+            public int fury;
 
             /// <summary>Smash: how many units the one swing hit.</summary>
             public int smashTargets;

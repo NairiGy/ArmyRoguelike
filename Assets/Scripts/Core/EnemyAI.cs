@@ -68,12 +68,16 @@ namespace ArmyRoguelike.Core
         /// <summary>For a fling: the goblin it will throw, or null for a bomb or mine.</summary>
         public readonly Unit Thrown;
 
-        public Intent(IntentKind kind, Unit target, GridPos? tile = null, Unit thrown = null)
+        /// <summary>For Rending Blow and Fire Breath: the damage it will deal before the target's reductions (Fury and Favored included). 0 otherwise.</summary>
+        public readonly int Amount;
+
+        public Intent(IntentKind kind, Unit target, GridPos? tile = null, Unit thrown = null, int amount = 0)
         {
             Kind = kind;
             Target = target;
             Tile = tile;
             Thrown = thrown;
+            Amount = amount;
         }
     }
 
@@ -359,15 +363,16 @@ namespace ArmyRoguelike.Core
                 return new Intent(IntentKind.Howl, enemy);
 
             // Demons.
-            if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Imp && AsIfItsTurn(battle, enemy, 0, () => ChooseHellswap(battle, enemy)) is var swap && swap.HasValue)
+            if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Imp && AsIfFreshTurn(battle, enemy, () => ChooseHellswap(battle, enemy)) is var swap && swap.HasValue)
                 return new Intent(IntentKind.Hellswap, swap.Value.target, swap.Value.from);
-            if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Devil && AsIfItsTurn(battle, enemy, 0, () => ChooseContract(battle, enemy)) is Unit signee)
+            if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Devil && PredictContract(battle, enemy) is Unit signee)
                 return new Intent(IntentKind.SoulContract, signee);
-            if (enemy.Has(Ability.FireBreath) && AsIfItsTurn(battle, enemy, 0, () => ChooseBreath(battle, enemy)) is var breath && breath.HasValue)
-                return new Intent(IntentKind.FireBreath, breath.Value.target, breath.Value.from);
+            if (enemy.Has(Ability.FireBreath) && AsIfFreshTurn(battle, enemy, () => ChooseBreath(battle, enemy)) is var breath && breath.HasValue)
+                return new Intent(IntentKind.FireBreath, breath.Value.target, breath.Value.from,
+                    amount: Favored(enemy, Battle.FireBreathDamage + enemy.Fury));
             if (enemy.Has(Ability.RendingBlow) && battle.Ready(enemy, ActionKind.RendingBlow) && enemy.Hp > Battle.RendingBlowCost &&
                 CanReachToAttack(battle, enemy, target))
-                return new Intent(IntentKind.RendingBlow, target);
+                return new Intent(IntentKind.RendingBlow, target, amount: Favored(enemy, battle.DamageAgainst(enemy, target) + Battle.RendingBlowBonus));
 
             if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Shooter && !CanReachToAttack(battle, enemy, target) &&
                 battle.Ready(enemy, ActionKind.Overwatch))
@@ -633,7 +638,7 @@ namespace ArmyRoguelike.Core
                 if (allies == 0)
                     continue;
                 foreach (var u in AsIfStandingAt(imp, tile, () => Aimable(battle, imp)
-                             .Where(u => battle.CanHellswap(imp, u) && !battle.EngagedBy(u, u.Pos).Any()).ToList()))
+                             .Where(u => battle.CanHellswap(imp, u) && !InEnemyReach(battle, imp.Team, u)).ToList()))
                 {
                     var score = (u.IsRanged ? 0 : 1, -allies, u.Hp, cost, u.Id);
                     if (best == null || score.CompareTo(bestScore) < 0)
@@ -688,18 +693,80 @@ namespace ArmyRoguelike.Core
             return best;
         }
 
-        /// <summary>Hellswap first if it has a good one (walking to the tile it swaps from), then like Walk up and hit.</summary>
+        /// <summary>
+        /// Hellswap first if it has a good one (walking to the tile it swaps from), then like Walk up and hit. A walk cut
+        /// short (a mine, a zone-of-control strike) replans from where it stopped and swaps only if that tile is still a good one.
+        /// </summary>
         private static void ImpTurn(Battle battle, Unit imp, List<BattleEvent> events)
         {
             if (ChooseHellswap(battle, imp) is var swap && swap.HasValue)
             {
                 if (swap.Value.from != imp.Pos && battle.DoMove(imp, swap.Value.from) is var walk && walk != null)
                     events.AddRange(walk);
-                if (!battle.IsOver && imp.IsAlive && battle.CanHellswap(imp, swap.Value.target))
+                if (imp.Pos != swap.Value.from && !battle.IsOver && imp.IsAlive)
+                    swap = ChooseHellswap(battle, imp) is var again && again.HasValue && again.Value.from == imp.Pos ? again : null;
+                if (swap.HasValue && !battle.IsOver && imp.IsAlive && imp.Pos == swap.Value.from && battle.CanHellswap(imp, swap.Value.target))
                     events.AddRange(battle.DoHellswap(imp, swap.Value.target));
             }
 
             MeleeTurn(battle, imp, events);
+        }
+
+        /// <summary>
+        /// One of your units already stands next to a fighting unit of this side. Checked directly rather than with zone of
+        /// control, which ignores Slippery units.
+        /// </summary>
+        private static bool InEnemyReach(Battle battle, Team side, Unit u) =>
+            battle.Living(side).Any(e => !e.IsObjective && Battle.Distance(e, u) == 1);
+
+        /// <summary>Fortune's Favored doubles a favored unit's damage (it stays favored through the enemy turn).</summary>
+        private static int Favored(Unit unit, int amount) => unit.Favored ? amount * Battlefields.FavoredMultiplier : amount;
+
+        /// <summary>
+        /// Like <see cref="AsIfItsTurn{T}"/>, but outside the enemy turn it also clears last turn's "has acted/moved" flags
+        /// and applies the pin or slow that will hold it, so a hover intent sees the walk-ups its turn will really have.
+        /// </summary>
+        private static T AsIfFreshTurn<T>(Battle battle, Unit unit, System.Func<T> check)
+        {
+            if (battle.Phase == Phase.EnemyTurn)
+                return check();
+            var saved = (unit.Moves, unit.Ap, unit.ActedThisTurn, unit.MovedThisTurn, unit.RootedThisTurn);
+            unit.Ap = unit.MaxAp;
+            unit.Moves = unit.SlowNext > 0 ? 0 : unit.MaxMoves;
+            unit.ActedThisTurn = false;
+            unit.MovedThisTurn = false;
+            unit.RootedThisTurn = unit.SnareTurns > 0;
+            try
+            {
+                return check();
+            }
+            finally
+            {
+                (unit.Moves, unit.Ap, unit.ActedThisTurn, unit.MovedThisTurn, unit.RootedThisTurn) = saved;
+            }
+        }
+
+        /// <summary>
+        /// Who the devil would sign a contract on in its coming turn, retreat and walk-up included: plays its turn on a
+        /// copy of the battle and reads the contract off it. Null if it wouldn't sign one.
+        /// </summary>
+        public static Unit PredictContract(Battle battle, Unit devil)
+        {
+            if (!devil.Has(Ability.SoulContract) || !battle.Ready(devil, ActionKind.SoulContract))
+                return null;
+            if (battle.Phase == Phase.EnemyTurn)
+                return ChooseContract(battle, devil);
+            var copy = battle.Clone();
+            var me = copy.Units.First(u => u.Id == devil.Id);
+            me.Ap = me.MaxAp;
+            me.Moves = me.SlowNext > 0 ? 0 : me.MaxMoves;
+            me.ActedThisTurn = false;
+            me.MovedThisTurn = false;
+            me.RootedThisTurn = me.SnareTurns > 0;
+            var events = new List<BattleEvent>();
+            DevilTurn(copy, me, events);
+            var signed = events.OfType<StatusEvent>().FirstOrDefault(s => s.Kind == StatusKind.Contract);
+            return signed == null ? null : battle.Units.FirstOrDefault(u => u.Id == signed.Target.Id);
         }
 
         /// <summary>
