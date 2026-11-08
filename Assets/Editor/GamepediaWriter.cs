@@ -498,14 +498,21 @@ public static class GamepediaWriter
         html.Append("<li>The two scenario fights sit at steps 4 and 8, next to a battle: the Moon Shrine at one, Break the Ritual at the other. Shops and ? events fill the rest.</li>");
         html.Append($"<li>Won battle: {Run.BaseGold} gold + {Run.GoldPerSurvivor} per surviving unit (+{Run.AmbushBonusGold} for an ambush). Gold carried off by escaped cutpurses is lost.</li>");
         html.Append($"<li><b>Technique pick</b>: every won fight except the boss and the Moon Shrine offers {Run.RewardCount} techniques your units can learn; one unit learns one and goes up a level (not when relearning a forgotten one), or skip for {Run.SkipGold} gold.</li>");
-        html.Append($"<li><b>Shop</b>: {Run.ShopSize} techniques ({Technique.CommonPrice} gold common, {Technique.RarePrice} rare), {Run.ShopItemCount} items, forgetting a technique for {Run.ForgetPrice} gold, a random base-unit recruit for {Run.RecruitPrice} gold (if the army has room), and one banner you don't hold yet for {Banners.Price} gold.</li>");
+        html.Append($"<li><b>Shop</b>: {Run.ShopSize} techniques ({Technique.CommonPrice} gold common, {Technique.RarePrice} rare), {Run.ShopItemCount} items, forgetting a technique for {Run.ForgetPrice} gold, a random base-unit recruit for {Run.RecruitPrice} gold (if the army has room), and one banner you don't hold yet for {Banners.Price} gold. Also: mend a crack for {Run.MendPrice} gold, and <b>hone</b> an action (cooldown 1 turn shorter for that unit, for the run; actions with cooldown 2 or more, once each) for {Run.HonePrice} gold.</li>");
         html.Append("<li>Every battle starts at full HP and dead units come back. Techniques, levels, items and shrine HP last the whole run.</li>");
+        html.Append($"<li><b>Cracks</b>: an army unit that falls in a fight you win (or a lost scenario) is cracked: -{Run.CrackHp} max HP until mended at a shop. The {Run.CracksToShatter}rd crack shatters it, and it leaves the army for good. Scars (from the Cracked Altar) are cracks that can't be mended.</li>");
+        html.Append($"<li><b>Champions</b>: from step {Champions.FirstStep + 1}, every battle and elite has a champion, its affix named on the node: the toughest enemy gets +{Champions.ExtraHp} max HP and one rule below. Winning pays +{Champions.BonusGold} gold.</li>");
+        html.Append($"<li><b>Bosses</b> have Stone Heart (see Abilities) and +{Battle.BossHpPerLevel} max HP for every level in your army. They never fall off the board or into a hole.</li>");
         html.Append("</ul><h3>? events</h3><table><tr><th>Event</th><th>What happens</th></tr>");
         html.Append($"<tr><td>Wandering Recruit</td><td>A random base unit joins for free ({Run.FullArmyGold} gold instead if the army is full).</td></tr>");
         html.Append("<tr><td>Abandoned Cart</td><td>A random technique one of your units can learn (a new one gives a level) or a random item, or leave it.</td></tr>");
         html.Append($"<tr><td>Gambler</td><td>Pay {Run.GambleCost} gold for a 50% chance at {Run.GambleWin}.</td></tr>");
         html.Append($"<tr><td>Ambush</td><td>A fight against a faction you haven't met (and won't meet later on the map) that pays +{Run.AmbushBonusGold} gold. If none is left, they flee and drop gold.</td></tr>");
         html.Append($"<tr><td>Shrine</td><td>One unit gets +{Run.ShrineHp} max HP for the run.</td></tr>");
+        html.Append($"<tr><td>Stonemason</td><td>Mends every crack in the army for free (not scars). With none to mend, one unit gets +{Run.MasonHp} max HP.</td></tr>");
+        html.Append($"<tr><td>Cracked Altar</td><td>From step {Run.LateEventStep + 1}: one unit learns a random rare technique and takes a scar.</td></tr>");
+        html.Append($"<tr><td>Sculptor</td><td>From step {Run.LateEventStep + 1}: one unit gives up a technique you choose for a random rare one of its line (no level).</td></tr>");
+        html.Append($"<tr><td>Hooded Stranger</td><td>{Run.BargainGold} gold for a random curse.</td></tr>");
         html.Append("</table><h3>Blessings and curses</h3><p>Hold the Moon Shrine and pick a blessing. Lose a scenario fight and take a random curse ");
         html.Append("(losing both gives two different curses). ");
         html.Append("Either lasts the rest of the run and works every turn of every battle. Omens never pick the shrine itself.</p>");
@@ -518,6 +525,9 @@ public static class GamepediaWriter
         html.Append("<table><tr><th>Banner</th><th>Rule</th></tr>");
         foreach (var banner in Banners.All)
             html.Append($"<tr><td>{Esc(Banners.Name(banner))}</td><td>{Esc(Banners.Describe(banner))}</td></tr>");
+        html.Append("</table><h3 id=\"champions\">Champion affixes</h3><table><tr><th>Affix</th><th>Rule</th></tr>");
+        foreach (var affix in Champions.All)
+            html.Append($"<tr><td>{Esc(Champions.Name(affix))}</td><td>{Esc(Champions.Describe(affix))}</td></tr>");
         html.Append("</table><h3 id=\"battlefields\">Battlefields</h3><p>Every battle, elite and boss (and an ambush) has one battlefield rule, ");
         html.Append("named on its map node from the start of the run, so you can route towards or around it. The scenario fights have none. ");
         html.Append("A step's fights never share a battlefield or repeat one from the step before. Every rule works the same for both sides.</p>");
