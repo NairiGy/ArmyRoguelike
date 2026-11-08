@@ -54,6 +54,12 @@ namespace ArmyRoguelike.Core
                 case Ability.FirstShotDouble: return "Opening Shot";
                 case Ability.PreyOnSnared: return "Prey";
                 case Ability.Volley: return "Volley";
+                case Ability.LongShot: return "Long Shot";
+                case Ability.Vantage: return "Vantage";
+                case Ability.SpikedSnares: return "Spiked Snares";
+                case Ability.CheapShot: return "Cheap Shot";
+                case Ability.Elusive: return "Elusive";
+                case Ability.IntoShadows: return "Into the Shadows";
                 case Ability.Pincer: return "Pincer";
                 case Ability.KillRefund: return "Momentum";
                 case Ability.Poison: return "Poison";
@@ -114,6 +120,12 @@ namespace ArmyRoguelike.Core
                 case Ability.FirstShotDouble: return "double damage the first time it hits each enemy in a battle";
                 case Ability.PreyOnSnared: return $"pinned enemies take +{Battle.PreyBonus} damage from everyone";
                 case Ability.Volley: return "shots hit the target and the 4 tiles next to it for 1 less damage, friend or foe";
+                case Ability.LongShot: return $"+{Battle.LongShotBonus} damage to targets {Battle.LongShotRange} or more tiles away";
+                case Ability.Vantage: return $"while next to a rock, ice or barricade: +{Battle.VantageRange} range, and its shots ignore Behind Cover";
+                case Ability.SpikedSnares: return $"its snares deal {Battle.SpikedSnareDamage} damage instead of {Battle.SnareDamage}";
+                case Ability.CheapShot: return $"+{Battle.CheapShotBonus} damage to enemies that can't move (pinned or slowed)";
+                case Ability.Elusive: return "ignores zone of control: leaving an enemy's reach doesn't use up its moves";
+                case Ability.IntoShadows: return "a kill hides it until your next turn: enemies can't target or attack it (area blasts still hit)";
                 case Ability.Pincer: return $"+{Battle.PincerBonus} damage if an ally stands on the far side of the target";
                 case Ability.KillRefund: return "a kill gives its action back and 1 move: it can attack again or walk on";
                 case Ability.Poison: return $"hits poison: {Battle.PoisonDamage} damage at the start of the target's next {Battle.PoisonTurns} turns";
@@ -192,6 +204,15 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Battlecry: return "Battlecry";
                 case ActionKind.Taunt: return "Taunt";
                 case ActionKind.ThrowShield: return "Throw Shield";
+                case ActionKind.Kick: return "Kick";
+                case ActionKind.SnareTrap: return "Snare Trap";
+                case ActionKind.FireArrow: return "Fire Arrow";
+                case ActionKind.CoveringFire: return "Covering Fire";
+                case ActionKind.SuppressingFire: return "Suppressing Fire";
+                case ActionKind.ThrowingKnife: return "Throwing Knife";
+                case ActionKind.Shadowstep: return "Shadowstep";
+                case ActionKind.SmokeBomb: return "Smoke Bomb";
+                case ActionKind.Rupture: return "Rupture";
                 default: return action.ToString();
             }
         }
@@ -206,7 +227,16 @@ namespace ArmyRoguelike.Core
                     return $"lob a bomb 2-{Battle.PlayerBombRange} tiles away; it explodes for {Battle.PlayerBombDamage} on that tile at the start of the next enemy turn";
                 case ActionKind.PinningShot: return $"{Battle.PinDamage} damage to an enemy in shot range (needs line of sight), and it can't move on its next turn";
                 case ActionKind.ShieldBash: return $"{Battle.BashDamage} damage to an enemy next to it and push it 1 tile; {Battle.CollisionDamage} more if it slams into a rock, unit or the edge, and the unit it slams into takes {Battle.CollisionDamage} too";
-                case ActionKind.Vanish: return $"go invisible: enemies can't target or attack it (area blasts still hit) until it attacks, for {Battle.VanishTurns} enemy turns at most; the attack that reveals it deals +{Battle.VanishBonus}. Free, before it acts: it can still move and attack";
+                case ActionKind.Vanish: return $"go invisible until your next turn: enemies can't target or attack it (area blasts still hit). Attacking doesn't reveal it, and its first attack while hidden deals +{Battle.VanishBonus}. Free, before it acts: it can still move and attack";
+                case ActionKind.Kick: return $"{Battle.KickDamage} damage to an enemy next to it and push it 1 tile ({Battle.CollisionDamage} more if it slams into something)";
+                case ActionKind.SnareTrap: return $"hide a snare on a free tile within {Battle.SnareRange} (max {Battle.MaxSnares}); the first enemy to walk onto it stops, takes {Battle.SnareDamage} and is pinned: it can't move on its next turn. Enemies don't see snares";
+                case ActionKind.FireArrow: return $"shoot an enemy in shot range for its attack damage; the ground under it burns for {Battle.BurnRounds} rounds ({Battle.BurnDamage} damage at the start of each turn)";
+                case ActionKind.CoveringFire: return "aim instead of shooting: during the enemy turn, the first enemy that walks onto a tile it can shoot at is shot for its attack damage and stops there";
+                case ActionKind.SuppressingFire: return $"shoot along a row or column up to its range, stopped by rocks: every enemy on the line takes {Battle.PinDamage} and is pinned (can't move on its next turn)";
+                case ActionKind.ThrowingKnife: return $"{Battle.KnifeDamage} damage (plus its damage bonuses) to an enemy 2-{Battle.KnifeRange} tiles away, needs line of sight. Carries Poison, Cheap Shot and the Vanish bonus";
+                case ActionKind.Shadowstep: return $"teleport to a free tile next to an enemy within {Battle.ShadowstepRange}, ignoring rocks and zone of control. Free, before it acts, but it can't walk afterwards: it can still attack";
+                case ActionKind.SmokeBomb: return $"smoke the tile and the 4 next to it, up to {Battle.SmokeRange} tiles away: every ally there (itself too) is hidden until your next turn, as with Vanish (its first attack while hidden deals +{Battle.VanishBonus})";
+                case ActionKind.Rupture: return $"strike a poisoned enemy next to it: first its poison bursts, {Battle.PoisonDamage} damage for every turn of poison left, then the strike (which poisons again)";
                 case ActionKind.Blink: return $"teleport to a free tile within {Battle.BlinkRange}, ignoring rocks and zone of control. Free, before it acts: it can still move and attack";
                 case ActionKind.Fireball: return $"{Battle.FireballDamage} damage to everyone on the tile and the 4 next to it, up to {Battle.FireballRange} tiles away";
                 case ActionKind.IceWall: return $"turn a free tile within {Battle.ActionRange} into ice (blocks like a rock) for {Battle.IceRounds} rounds";

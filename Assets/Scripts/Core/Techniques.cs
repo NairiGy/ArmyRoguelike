@@ -86,19 +86,38 @@ namespace ArmyRoguelike.Core
         // ---------- Archer ----------
 
         public static readonly Technique SteadyAimPlus = P(UnitStats.Archer, Ability.SteadyAimPlus);
+        public static readonly Technique LongShot = P(UnitStats.Archer, Ability.LongShot);
+        public static readonly Technique Vantage = P(UnitStats.Archer, Ability.Vantage);
+        public static readonly Technique Kick = Act(UnitStats.Archer, ActionKind.Kick);
+        public static readonly Technique SnareTrap = Act(UnitStats.Archer, ActionKind.SnareTrap);
+        public static readonly Technique SpikedSnares = P(UnitStats.Archer, Ability.SpikedSnares, requires: SnareTrap);
+        public static readonly Technique FireArrow = Act(UnitStats.Archer, ActionKind.FireArrow);
         public static readonly Technique Pierce = P(UnitStats.Archer, Ability.Pierce, Rare);
         public static readonly Technique OpeningShot = P(UnitStats.Archer, Ability.FirstShotDouble, Rare);
         public static readonly Technique Prey = P(UnitStats.Archer, Ability.PreyOnSnared, Rare);
+        public static readonly Technique CoveringFire = Act(UnitStats.Archer, ActionKind.CoveringFire, Rare);
+        public static readonly Technique SuppressingFire = Act(UnitStats.Archer, ActionKind.SuppressingFire, Rare, Pierce);
+
+        // Parked Archer skill: its rule still works, but it isn't in All, so no run offers it.
         public static readonly Technique Volley = P(UnitStats.Archer, Ability.Volley, Rare);
 
         // ---------- Rogue ----------
 
         public static readonly Technique Pincer = P(UnitStats.Rogue, Ability.Pincer);
         public static readonly Technique Riposte = P(UnitStats.Rogue, Ability.Counter);
+        public static readonly Technique Poison = P(UnitStats.Rogue, Ability.Poison);
+        public static readonly Technique CheapShot = P(UnitStats.Rogue, Ability.CheapShot);
+        public static readonly Technique Elusive = P(UnitStats.Rogue, Ability.Elusive);
+        public static readonly Technique ThrowingKnife = Act(UnitStats.Rogue, ActionKind.ThrowingKnife);
+        public static readonly Technique Shadowstep = Act(UnitStats.Rogue, ActionKind.Shadowstep);
         public static readonly Technique Momentum = P(UnitStats.Rogue, Ability.KillRefund, Rare);
-        public static readonly Technique Poison = P(UnitStats.Rogue, Ability.Poison, Rare);
-        public static readonly Technique RipostePlus = P(UnitStats.Rogue, Ability.CounterAll, Rare, Riposte);
         public static readonly Technique Dodge = P(UnitStats.Rogue, Ability.Dodge, Rare);
+        public static readonly Technique SmokeBomb = Act(UnitStats.Rogue, ActionKind.SmokeBomb, Rare);
+        public static readonly Technique Rupture = Act(UnitStats.Rogue, ActionKind.Rupture, Rare, Poison);
+        public static readonly Technique IntoShadows = P(UnitStats.Rogue, Ability.IntoShadows, Rare);
+
+        // Parked Rogue skill: its rule still works, but it isn't in All, so no run offers it.
+        public static readonly Technique RipostePlus = P(UnitStats.Rogue, Ability.CounterAll, Rare, Riposte);
 
         // ---------- Mage ----------
 
@@ -124,8 +143,8 @@ namespace ArmyRoguelike.Core
         public static readonly IReadOnlyList<Technique> All = new[]
         {
             Sweep, ShieldUp, ThrowShield, Vanguard, Charge, Battlecry, Taunt, ZocStrike,
-            SteadyAimPlus, Pierce, OpeningShot, Prey, Volley,
-            Pincer, Riposte, Momentum, Poison, RipostePlus, Dodge,
+            SteadyAimPlus, LongShot, Vantage, Kick, SnareTrap, SpikedSnares, FireArrow, Pierce, OpeningShot, Prey, CoveringFire, SuppressingFire,
+            Pincer, Riposte, Poison, CheapShot, Elusive, ThrowingKnife, Shadowstep, Momentum, Dodge, SmokeBomb, Rupture, IntoShadows,
             Fireball, Chill, Ward, Burning, Concussive, IceWall, Shatter, WideWard, Mend,
             BigMines, Barricade, ThrowBomb, BlastProof, Turret, Detonate,
         };
@@ -148,9 +167,9 @@ namespace ArmyRoguelike.Core
         {
             if (line == UnitStats.Rogue)
                 return new[] { 2, 4, 6 };
-            // The Archer has only 5 techniques, so its second point comes at 5.
+            // The Archer's pool grew to 12 (2026-11-08), so its second point moved from 5 to 6 like the Mage's.
             if (line == UnitStats.Archer)
-                return new[] { 3, 5 };
+                return new[] { 3, 6 };
             if (line == UnitStats.Apprentice)
                 return new[] { 3, 6 };
             return new int[0];

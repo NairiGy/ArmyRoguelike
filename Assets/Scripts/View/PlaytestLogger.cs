@@ -342,6 +342,7 @@ namespace ArmyRoguelike.View
                 case EffectKind.Absorb: return "shield absorb";
                 case EffectKind.Refund: return "ap refund";
                 case EffectKind.ZocStrike: return "zoc strike";
+                case EffectKind.CoveringFire: return "covering fire";
                 default: return "guard";
             }
         }

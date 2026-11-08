@@ -89,8 +89,11 @@ namespace ArmyRoguelike.Core
 
         // ---------- Statuses ----------
 
-        /// <summary>Vanished (rogue): enemy turns left before it shows again. Its next attack reveals it.</summary>
+        /// <summary>Vanished (rogue, Smoke Bomb, Into the Shadows): enemy turns left before it shows again. Attacking doesn't reveal it.</summary>
         public int HiddenTurns { get; internal set; }
+
+        /// <summary>The +2 of its first attack while hidden is spent (set again by each Vanish or Smoke Bomb).</summary>
+        public bool AmbushUsed { get; internal set; }
 
         /// <summary>Invisible: enemies can't target or attack it, though area blasts still hit it.</summary>
         public bool IsHidden => HiddenTurns > 0;
@@ -183,7 +186,7 @@ namespace ArmyRoguelike.Core
                 IsMercenary = IsMercenary, Escaped = Escaped, Fell = Fell, Favored = Favored, PackHp = PackHp,
                 BannerAp = BannerAp, BannerMoves = BannerMoves, LeftPile = LeftPile, PileGone = PileGone,
                 ShieldUpTurns = ShieldUpTurns, TauntTurns = TauntTurns, BattlecryTurns = BattlecryTurns, TempHp = TempHp,
-                ShieldThrown = ShieldThrown, ZocStrikeUsed = ZocStrikeUsed,
+                ShieldThrown = ShieldThrown, ZocStrikeUsed = ZocStrikeUsed, AmbushUsed = AmbushUsed,
             };
             foreach (var cooldown in _cooldowns)
                 c._cooldowns.Add(cooldown.Key, cooldown.Value);

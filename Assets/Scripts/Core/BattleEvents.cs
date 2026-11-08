@@ -197,6 +197,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>The Warrior's zone-of-control passive: <see cref="EffectEvent.Unit"/> struck an enemy stepping out of its reach.</summary>
         ZocStrike,
+
+        /// <summary>The Archer's Covering Fire: <see cref="EffectEvent.Unit"/> shoots an enemy walking into its sight.</summary>
+        CoveringFire,
     }
 
     /// <summary>A unit left the board, e.g. a cutpurse escaping with stolen gold.</summary>
