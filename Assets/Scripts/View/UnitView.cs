@@ -37,7 +37,10 @@ namespace ArmyRoguelike.View
         private SpriteRenderer _labelPlate;
         private SpriteRenderer _barBack;
         private SpriteRenderer _barFill;
+        private SpriteRenderer _barLoss;
         private int _shownHp;
+        private int _previewLoss;
+        private bool _barsVisible = true;
 
         public static UnitView Create(Unit unit, Transform parent)
         {
@@ -126,6 +129,8 @@ namespace ArmyRoguelike.View
 
             _barBack = MakeBar("HpBack", new Color(0.1f, 0.1f, 0.1f, 0.85f), top + 0.08f);
             _barFill = MakeBar("HpFill", unit.Team == Team.Player ? new Color(0.35f, 0.8f, 0.4f) : new Color(0.85f, 0.3f, 0.25f), top + 0.08f);
+            _barLoss = MakeBar("HpLoss", LossPreviewColor, top + 0.08f);
+            _barLoss.enabled = false;
 
             transform.localScale = Vector3.one * BattleScenery.UnitScale;
             SetGridPosition(unit.Pos);
@@ -167,16 +172,40 @@ namespace ArmyRoguelike.View
                 _labelRenderer.sortingOrder = order + 2;
             _barBack.sortingOrder = order + 3;
             _barFill.sortingOrder = order + 4;
+            _barLoss.sortingOrder = order + 4;
         }
 
         public void RefreshHp(int hp)
         {
             _shownHp = Mathf.Max(0, hp);
             var frac = (float)_shownHp / Unit.MaxHp;
+            var loss = Mathf.Min(_previewLoss, _shownHp);
+            var left = (float)(_shownHp - loss) / Unit.MaxHp;
+            var width = BarWidth * BarScale;
+            var y = _barBack.transform.localPosition.y;
             var t = _barFill.transform;
-            t.localScale = new Vector3(BarWidth * frac * BarScale, BarHeight, 1f);
-            t.localPosition = new Vector3(-BarWidth * BarScale * (1f - frac) * 0.5f, _barBack.transform.localPosition.y, 0f);
+            t.localScale = new Vector3(width * left, BarHeight, 1f);
+            t.localPosition = new Vector3(-width * (1f - left) * 0.5f, y, 0f);
+            // The HP a planned attack would take off: a pale chunk at the end of the fill.
+            _barLoss.enabled = _barsVisible && loss > 0;
+            _barLoss.transform.localScale = new Vector3(width * (frac - left), BarHeight, 1f);
+            _barLoss.transform.localPosition = new Vector3(-width * 0.5f + width * (left + frac) * 0.5f, y, 0f);
             ShowCracks(1f - frac);
+        }
+
+        private static readonly Color LossPreviewColor = new Color(1f, 0.85f, 0.75f, 0.8f);
+
+        /// <summary>
+        /// Shows the HP the selected unit's attack would take off as a pale, pulsing chunk at the end of the
+        /// HP bar (0 clears it).
+        /// </summary>
+        public void ShowLossPreview(int loss)
+        {
+            loss = Mathf.Max(0, loss);
+            if (loss == _previewLoss)
+                return;
+            _previewLoss = loss;
+            RefreshHp(_shownHp);
         }
 
         private MaterialPropertyBlock _crackBlock;
@@ -344,6 +373,9 @@ namespace ArmyRoguelike.View
         /// <summary>Top of the statue in world space, for pop-ups.</summary>
         public Vector3 TopWorld => _barBack.transform.position;
 
+        /// <summary>The left end of the HP bar in world space, for labels beside it.</summary>
+        public Vector3 BarLeftWorld => new Vector3(_barBack.bounds.min.x, _barBack.bounds.center.y, _barBack.transform.position.z);
+
         public void SetSelected(bool selected)
         {
             if (selected && !_selected && _wake <= 0f && IsLivingStatue)
@@ -404,6 +436,8 @@ namespace ArmyRoguelike.View
             transform.localScale = Vector3.one * BattleScenery.UnitScale;
             ShedDust();
             UpdateWake();
+            if (_barLoss.enabled)
+                _barLoss.color = new Color(LossPreviewColor.r, LossPreviewColor.g, LossPreviewColor.b, 0.55f + 0.35f * Mathf.Sin(Time.unscaledTime * 6f));
         }
 
         // ---------- Idle life ----------
@@ -746,8 +780,10 @@ namespace ArmyRoguelike.View
 
         private void SetBarsVisible(bool visible)
         {
+            _barsVisible = visible;
             _barBack.enabled = visible;
             _barFill.enabled = visible;
+            _barLoss.enabled = visible && _previewLoss > 0;
             if (!visible)
             {
                 HideAp();

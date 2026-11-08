@@ -151,6 +151,7 @@ namespace ArmyRoguelike.View
 
             _hovered = HoveredTile();
             _hoveredUnit = _hovered.HasValue ? Battle.UnitAt(_hovered.Value) : null;
+            UpdateCardInput(keyboard);
 
             // Test battles only: L strikes the hovered tile with lightning, to try the effect (visual only).
             if (_context.Test && keyboard != null && keyboard.lKey.wasPressedThisFrame && _hovered.HasValue)
@@ -175,6 +176,7 @@ namespace ArmyRoguelike.View
             }
 
             RefreshApPips();
+            UpdateLossPreview();
         }
 
         /// <summary>
@@ -1489,15 +1491,22 @@ namespace ArmyRoguelike.View
             return r;
         }
 
-        /// <summary>A word-wrapped text box sized to its content (capped), at a corner.</summary>
-        private void TextPanel(string text, bool right, bool bottom, float maxHeight)
+        /// <summary>Top right: the open unit card, and under it whatever tile or objective is under the mouse.</summary>
+        private void DrawHoverPanels()
+        {
+            var cardBottom = DrawUnitCard();
+            TextPanel(HoverText(), true, false, 280f, cardBottom > 0f ? cardBottom + Margin : (float?)null);
+        }
+
+        /// <summary>A word-wrapped text box sized to its content (capped), at a corner, or at <paramref name="top"/>.</summary>
+        private void TextPanel(string text, bool right, bool bottom, float maxHeight, float? top = null)
         {
             if (string.IsNullOrEmpty(text))
                 return;
             var style = TextStyle;
             var h = Mathf.Min(maxHeight, style.CalcHeight(new GUIContent(text), PanelWidth - 12f) + 12f);
             var x = right ? GuiWidth - PanelWidth - Margin : Margin;
-            var y = bottom ? ReferenceHeight - h - Margin : Margin;
+            var y = top ?? (bottom ? ReferenceHeight - h - Margin : Margin);
             GUILayout.BeginArea(Panel(x, y, PanelWidth, h), GUI.skin.box);
             GUILayout.Label(text, style);
             GUILayout.EndArea();
@@ -1516,6 +1525,7 @@ namespace ArmyRoguelike.View
             DrawIntentBadges();
             DrawStormBadges();
             DrawKillBadges();
+            DrawAttackPreview();
             DrawSummonCountdown();
 
             switch (Battle.Phase)
@@ -1533,6 +1543,7 @@ namespace ArmyRoguelike.View
             }
 
             DrawBannerHover();
+            DrawCardTooltip();
 
             if (_markerNote != null && Time.unscaledTime < _markerNoteUntil)
                 GUI.Box(new Rect(Margin, ReferenceHeight - 80, 180, 30), _markerNote);
@@ -1740,8 +1751,7 @@ namespace ArmyRoguelike.View
             DrawDebugButton();
             GUILayout.EndArea();
 
-            if (!DrawUnitCard())
-                TextPanel(HoverText(), true, false, 280f);
+            DrawHoverPanels();
         }
 
         private void DrawTurnHud()
@@ -1778,9 +1788,7 @@ namespace ArmyRoguelike.View
             GUILayout.Label(info, style);
             GUILayout.EndArea();
 
-            // Top-right: whatever is under the mouse.
-            if (!DrawUnitCard())
-                TextPanel(HoverText(), true, false, 280f);
+            DrawHoverPanels();
 
             // Bottom-left: the current hint.
             if (playerTurn && !_confirmEndTurn)
@@ -1998,11 +2006,12 @@ namespace ArmyRoguelike.View
             return null;
         }
 
-        // ---------- Unit card (hovering a unit) ----------
+        // ---------- Unit card (right-click a unit) ----------
 
-        private const float CardWidth = 400f;
-        private const float CardPadding = 14f;
-        private const float HpBarHeight = 8f;
+        private const float CardWidth = 300f;
+        private const float CardPadding = 12f;
+        private const float CardHpBarHeight = 16f;
+        private const float TooltipWidth = 280f;
         private const string EnemyHeader = "#ff8f7a";
         private const string PlayerHeader = "#8cc8ff";
         private const string NextColor = "#ffb347";
@@ -2011,51 +2020,91 @@ namespace ArmyRoguelike.View
         private const string DimColor = "#b8b8b8";
         private const string TextColor = "#e6e2da";
 
-        /// <summary>The HP a planned attack would take off (hover preview).</summary>
+        /// <summary>The HP a planned attack would take off (shown over the target's statue).</summary>
         private const string LossColor = "#ff8a6a";
 
-        /// <summary>
-        /// While hovering a unit (not the selected one, not an objective): a card at the top-right with its
-        /// name and HP, what it does next (enemies), its passives, its actions and its current state.
-        /// False if there is no such unit, so the plain hover text shows instead.
-        /// </summary>
-        private bool DrawUnitCard()
+        // Keyword chip backgrounds on the card (placeholders for the art chat).
+        private static readonly Color PassiveChip = new Color(0.14f, 0.24f, 0.14f);
+        private static readonly Color ActionChip = new Color(0.28f, 0.23f, 0.08f);
+        private static readonly Color GoodChip = new Color(0.1f, 0.24f, 0.3f);
+        private static readonly Color BadChip = new Color(0.38f, 0.13f, 0.1f);
+        private static readonly Color PlainChip = new Color(0.22f, 0.22f, 0.25f);
+
+        /// <summary>The unit whose card is open: right-click a unit; right-click the ground or Esc closes it.</summary>
+        private Unit _cardUnit;
+
+        /// <summary>The description of the keyword under the pointer on the card, drawn last, beside it.</summary>
+        private string _cardTooltip;
+        private Rect _cardTooltipAnchor;
+
+        /// <summary>Opens, switches or closes the unit card on a right-click; Esc closes it.</summary>
+        private void UpdateCardInput(Keyboard keyboard)
         {
-            var u = _hoveredUnit;
-            if (u == null || u == _selected || u.IsObjective)
-                return false;
-
-            // Each row: its text, its style and the gap above it. The HP bar sits under the header.
-            var rows = new List<(string text, GUIStyle style, float gap)>();
-            var header = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 20, fontStyle = FontStyle.Bold };
-            var stats = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 14 };
-            var name = new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true, fontSize = 15 };
-            var body = new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true, fontSize = 14 };
-            var section = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 12, fontStyle = FontStyle.Bold };
-
-            var team = u.Team == Team.Enemy ? EnemyHeader : PlayerHeader;
-            var item = u.Equipment != null ? $"   <color={DimColor}><size=14>[{u.Equipment.Name}]</size></color>" : "";
-            var level = u.Member != null ? $"   <color={DimColor}><size=14>level {u.Member.Level}</size></color>" : "";
-            rows.Add(($"<color={team}>{u.Stats.Name}</color>{level}{item}", header, 0f));
-
-            // What the selected unit's attack would take off, shown on the HP bar and as "-3" by the HP.
-            var loss = 0;
-            var preview = "";
-            if (_selected != null && _selected.Team == Team.Player && u.Team == Team.Enemy && Battle.CanAttack(_selected, u))
+            if (Mouse.current.rightButton.wasPressedThisFrame && !IsOverHud(Mouse.current.position.ReadValue()))
             {
-                loss = Battle.PredictHpLoss(_selected, u, out var guard);
-                preview = guard != null ? $"   <color={LossColor}>the {guard.Stats.Name} guards it</color>"
-                    : loss >= u.Hp ? $"   <color={LossColor}><b>-{loss}  kills</b></color>"
-                    : $"   <color={LossColor}><b>-{loss}</b></color>";
+                var target = _hoveredUnit != null && !_hoveredUnit.IsObjective ? _hoveredUnit : null;
+                _cardUnit = target == _cardUnit ? null : target;
             }
 
-            rows.Add(($"<color=white><b>HP {u.Hp} / {u.MaxHp}</b></color>{preview}   <color={DimColor}>{u.MaxAp} AP  ·  {u.MaxMoves} {(u.MaxMoves == 1 ? "move" : "moves")}  ·  range {u.Range}  ·  {u.Stats.Weight.ToString().ToLowerInvariant()} weight</color>",
-                stats, HpBarHeight + 4f));
+            if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
+                _cardUnit = null;
+            if (_cardUnit != null && !_cardUnit.IsAlive)
+                _cardUnit = null;
+        }
+
+        /// <summary>
+        /// The open unit card at the top right: name, HP, statuses, what it does next (enemies), passives and actions,
+        /// each as its name only; hovering a name shows what it does. Returns the card's bottom edge, or 0 if none.
+        /// </summary>
+        private float DrawUnitCard()
+        {
+            _cardTooltip = null;
+            var u = _cardUnit;
+            if (u == null || !u.IsAlive)
+                return 0f;
+
+            var styles = new CardStyles();
+            var mouse = Event.current.mousePosition;
+            var inner = CardWidth - 2 * CardPadding;
+            var height = Mathf.Min(PaintCard(u, new CardPainter(0f, 0f, inner, false, mouse, styles)) + 2 * CardPadding, ReferenceHeight - 2 * Margin);
+
+            var rect = Panel(GuiWidth - CardWidth - Margin, Margin, CardWidth, height);
+            GUI.Box(rect, GUIContent.none, HudArt.PanelStyle(HudArt.PanelColor, 0));
+            // A strip in the team's colour along the top.
+            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 3f), HudArt.Solid(u.Team == Team.Enemy ? HudArt.HarmColor : new Color(0.55f, 0.78f, 1f)));
+
+            var painter = new CardPainter(rect.x + CardPadding, rect.y + CardPadding, inner, true, mouse, styles);
+            PaintCard(u, painter);
+            _cardTooltip = painter.Tooltip;
+            _cardTooltipAnchor = painter.TooltipAnchor;
+            return rect.yMax;
+        }
+
+        /// <summary>Lays the card out top to bottom (measuring only, or drawing); returns its content height.</summary>
+        private float PaintCard(Unit u, CardPainter p)
+        {
+            var s = p.Styles;
+            var top = p.Top;
+
+            var team = u.Team == Team.Enemy ? EnemyHeader : PlayerHeader;
+            p.Text($"<color={team}>{u.Stats.Name}</color>" + (u.Member != null ? $"  <color={DimColor}><size=13>level {u.Member.Level}</size></color>" : ""), s.Header);
+            p.Space(2f);
+            p.HpBar(u);
+            p.Space(3f);
+            p.Text($"<color={DimColor}>{u.MaxAp} AP  ·  {u.MaxMoves} {(u.MaxMoves == 1 ? "move" : "moves")}  ·  range {u.Range}  ·  {u.Stats.Weight.ToString().ToLowerInvariant()}</color>", s.Small);
+
+            var states = StateChips(u);
+            if (states.Count > 0)
+            {
+                p.Space(6f);
+                foreach (var (name, text, good) in states)
+                    p.Chip(name, good == true ? GoodChip : good == false ? BadChip : PlainChip, text, s.Chip);
+            }
 
             if (u.Team == Team.Enemy && !Battle.IntentsHidden)
             {
-                rows.Add(($"<color={NextColor}>NEXT TURN</color>", section, 10f));
-                rows.Add(($"<color={NextColor}>{Capitalise(IntentText(EnemyAI.PredictIntent(Battle, u)))}</color>", body, 0f));
+                p.Space(8f);
+                p.Text($"<color={NextColor}>Next: {IntentText(EnemyAI.PredictIntent(Battle, u))}</color>", s.Body);
             }
 
             var passives = Abilities.PassivesOf(u.Stats);
@@ -2063,106 +2112,256 @@ namespace ArmyRoguelike.View
                 passives.Add((technique.Name, technique.Description));
             var itemAbility = u.Equipment?.Ability ?? Ability.None;
             if (itemAbility != Ability.None)
-                passives.Add(($"{Abilities.Name(itemAbility)} ({u.Equipment.Name})", Abilities.Describe(itemAbility)));
+                passives.Add((u.Equipment.Name, $"Item. {Capitalise(Abilities.Describe(itemAbility))}"));
             if (passives.Count > 0)
             {
-                rows.Add(($"<color={PassiveColor}>PASSIVE</color>", section, 10f));
+                p.Space(8f);
                 foreach (var (passive, text) in passives)
-                {
-                    rows.Add(($"<b><color=white>{passive}</color></b>", name, 2f));
-                    rows.Add(($"<color={TextColor}>{Capitalise(text)}</color>", body, 0f));
-                }
+                    p.Chip($"<color={PassiveColor}>{passive}</color>", PassiveChip, Capitalise(text), s.Chip);
             }
 
-            rows.Add(($"<color={ActionColor}>ACTIONS</color>", section, 10f));
             var actions = Abilities.ActionsOf(u.Stats, Battle.EffectiveDamage(u));
             foreach (var technique in TechniquesOf(u).Where(t => t.Action.HasValue))
                 actions.Add((technique.Name, CardCost(u, technique.Action.Value), technique.Action, technique.Description));
+            if (actions.Count > 0)
+                p.Space(8f);
             foreach (var (action, baseCost, kind, text) in actions)
             {
                 // The same cost the action card shows: Quick Fuse and an unused Twincast make it free.
                 var cost = kind.HasValue && u.HasAction(kind.Value) ? CardCost(u, kind.Value) : baseCost;
-                var cooldown = kind.HasValue ? $"  ·  cooldown {Battle.CooldownFor(u, kind.Value)}" : "";
+                var cooldown = kind.HasValue ? $" · cd {Battle.CooldownFor(u, kind.Value)}" : "";
                 var left = kind.HasValue ? u.CooldownLeft(kind.Value) : 0;
-                var ready = left > 0 ? $"   <color={NextColor}>ready in {left} turn{(left == 1 ? "" : "s")}</color>" : "";
-                rows.Add(($"<b><color=white>{action}</color></b>   <color={ActionColor}><size=13>{cost} AP{cooldown}</size></color>{ready}", name, 2f));
-                rows.Add(($"<color={TextColor}>{Capitalise(text)}</color>", body, 0f));
+                p.Chip($"<color={ActionColor}>{action}</color>", ActionChip, Capitalise(text), s.Chip);
+                p.Inline($"<color={DimColor}>{cost} AP{cooldown}</color>" + (left > 0 ? $"  <color={NextColor}>ready in {left}</color>" : ""), s.Small);
+                p.NewLine();
             }
 
-            var state = StateLines(u);
-            if (state.Count > 0)
+            return p.Bottom - top;
+        }
+
+        /// <summary>The text styles of the unit card.</summary>
+        private sealed class CardStyles
+        {
+            public readonly GUIStyle Header = new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true, fontSize = 18, fontStyle = FontStyle.Bold, padding = new RectOffset() };
+            public readonly GUIStyle Body = new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true, fontSize = 14, padding = new RectOffset() };
+            public readonly GUIStyle Small = new GUIStyle(GUI.skin.label) { richText = true, wordWrap = false, fontSize = 13, padding = new RectOffset() };
+            public readonly GUIStyle Chip = new GUIStyle(GUI.skin.label) { richText = true, wordWrap = false, fontSize = 14, padding = new RectOffset() };
+            public readonly GUIStyle BarText = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, padding = new RectOffset() };
+
+            public CardStyles()
             {
-                rows.Add(($"<color={DimColor}>NOW</color>", section, 10f));
-                foreach (var line in state)
-                    rows.Add(($"<color={TextColor}>{line}</color>", body, 0f));
+                foreach (var style in new[] { Header, Body, Small, Chip, BarText })
+                    style.normal.textColor = new Color(0.9f, 0.89f, 0.85f);
             }
+        }
 
-            if (_selected != null && u.Team == Team.Enemy && !Battle.CanAttack(_selected, u) &&
-                Battle.FindAttackSpot(_selected, u) is var spot && spot.HasValue)
-                rows.Add(($"<color={NextColor}>Click: walk {spot.Value.cost} tile(s) and attack ({Battle.AttackCost} AP)</color>", body, 10f));
+        /// <summary>
+        /// Places the card's pieces left to right, wrapping to the next row when one doesn't fit. When measuring it
+        /// only advances; when drawing it also remembers which keyword chip the pointer is on.
+        /// </summary>
+        private sealed class CardPainter
+        {
+            private const float ChipPad = 6f;
+            private const float Gap = 5f;
 
-            // Fit the whole card on screen: shrink the text a little at a time, then widen the card if still too tall.
-            var width = CardWidth;
-            float Height() => rows.Sum(r => r.style.CalcHeight(new GUIContent(r.text), width - 2 * CardPadding) + r.gap) + 2 * CardPadding;
-            var maxHeight = ReferenceHeight - 2 * Margin;
-            var styles = new[] { header, stats, name, body, section };
-            var sizes = styles.Select(s => s.fontSize).ToArray();
-            for (var step = 1; step <= 4 && Height() > maxHeight; step++)
-                for (var i = 0; i < styles.Length; i++)
-                    styles[i].fontSize = Mathf.RoundToInt(sizes[i] * (1f - 0.08f * step));
-            if (Height() > maxHeight)
-                width = CardWidth * 1.4f;
-            var inner = width - 2 * CardPadding;
-            var height = Mathf.Min(Height(), maxHeight);
+            public readonly CardStyles Styles;
+            private readonly float _left;
+            private readonly float _width;
+            private readonly bool _draw;
+            private readonly Vector2 _mouse;
+            private float _x;
+            private float _y;
+            private float _row;
 
-            // Top right, unless the pointer is under it: then top left, so it never hides the tile you're aiming at.
-            var x = GuiWidth - width - Margin;
-            var mouse = Event.current.mousePosition;
-            if (mouse.x >= x - Margin && mouse.y <= height + 2 * Margin)
-                x = Margin;
-            var rect = Panel(x, Margin, width, height);
-            GUI.Box(rect, GUIContent.none, HudArt.PanelStyle(HudArt.PanelColor, 0));
-            // A strip in the team's colour along the top.
-            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width, 3f), HudArt.Solid(u.Team == Team.Enemy ? HudArt.HarmColor : new Color(0.55f, 0.78f, 1f)));
+            public string Tooltip;
+            public Rect TooltipAnchor;
 
-            GUILayout.BeginArea(new Rect(rect.x + CardPadding, rect.y + CardPadding, inner, rect.height - 2 * CardPadding));
-            for (var i = 0; i < rows.Count; i++)
+            public CardPainter(float left, float top, float width, bool draw, Vector2 mouse, CardStyles styles)
             {
-                var (text, style, gap) = rows[i];
-                if (gap > 0f)
-                    GUILayout.Space(gap);
-                GUILayout.Label(text, style);
-                if (i == 0)
-                    DrawHpBar(GUILayoutUtility.GetLastRect(), u, loss);
+                _left = _x = left;
+                _y = Top = top;
+                _width = width;
+                _draw = draw;
+                _mouse = mouse;
+                Styles = styles;
             }
 
-            GUILayout.EndArea();
-            return true;
+            public float Top { get; }
+            public float Bottom => _y + _row;
+
+            /// <summary>Ends the current row.</summary>
+            public void NewLine()
+            {
+                _y += _row;
+                _row = 0f;
+                _x = _left;
+            }
+
+            /// <summary>Ends the current row and leaves a gap.</summary>
+            public void Space(float gap)
+            {
+                NewLine();
+                _y += gap;
+            }
+
+            /// <summary>Word-wrapped text on rows of its own.</summary>
+            public void Text(string text, GUIStyle style)
+            {
+                NewLine();
+                var h = style.CalcHeight(new GUIContent(text), _width);
+                if (_draw)
+                    GUI.Label(new Rect(_left, _y, _width, h), text, style);
+                _y += h;
+            }
+
+            /// <summary>A short piece of text in the current row.</summary>
+            public void Inline(string text, GUIStyle style) => Place(text, style, null, null);
+
+            /// <summary>A keyword on a coloured chip; hovering it shows <paramref name="tooltip"/>.</summary>
+            public void Chip(string text, Color color, string tooltip, GUIStyle style) => Place(text, style, color, tooltip);
+
+            private void Place(string text, GUIStyle style, Color? chip, string tooltip)
+            {
+                var size = style.CalcSize(new GUIContent(text));
+                var pad = chip.HasValue ? ChipPad : 0f;
+                var w = Mathf.Min(size.x + 2 * pad, _width);
+                var h = size.y + (chip.HasValue ? 4f : 0f);
+                if (_x > _left && _x + w > _left + _width)
+                    NewLine();
+                var rect = new Rect(_x, _y, w, h);
+                if (_draw)
+                {
+                    var hovered = tooltip != null && rect.Contains(_mouse);
+                    if (chip.HasValue)
+                        GUI.DrawTexture(rect, HudArt.Solid(hovered ? Color.Lerp(chip.Value, Color.white, 0.18f) : chip.Value));
+                    GUI.Label(new Rect(rect.x + pad, rect.y + (h - size.y) * 0.5f, w - 2 * pad, size.y), text, style);
+                    if (hovered)
+                    {
+                        Tooltip = tooltip;
+                        TooltipAnchor = rect;
+                    }
+                }
+
+                _x += w + Gap;
+                _row = Mathf.Max(_row, h + 4f);
+            }
+
+            /// <summary>The HP bar across the card, with "HP / max" written on it.</summary>
+            public void HpBar(Unit u)
+            {
+                NewLine();
+                if (_draw && Event.current.type == EventType.Repaint)
+                {
+                    var bar = new Rect(_left, _y, _width, CardHpBarHeight);
+                    GUI.DrawTexture(bar, HudArt.Solid(new Color(0.2f, 0.2f, 0.22f)));
+                    var frac = u.MaxHp > 0 ? Mathf.Clamp01((float)u.Hp / u.MaxHp) : 0f;
+                    var fill = u.Team == Team.Player ? new Color(0.3f, 0.62f, 0.34f) : new Color(0.7f, 0.25f, 0.21f);
+                    GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * frac, bar.height), HudArt.Solid(fill));
+                    GUI.Label(bar, $"{u.Hp} / {u.MaxHp}", Styles.BarText);
+                }
+
+                _y += CardHpBarHeight;
+            }
+        }
+
+        /// <summary>The hovered keyword's description, beside the card (on top of everything).</summary>
+        private void DrawCardTooltip()
+        {
+            if (string.IsNullOrEmpty(_cardTooltip))
+                return;
+            const float pad = 8f;
+            var style = new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true, fontSize = 14, padding = new RectOffset() };
+            style.normal.textColor = new Color(0.92f, 0.9f, 0.86f);
+            var height = style.CalcHeight(new GUIContent(_cardTooltip), TooltipWidth - 2 * pad) + 2 * pad;
+            // To the left of the card, level with the keyword.
+            var x = Mathf.Max(Margin, GuiWidth - CardWidth - Margin - TooltipWidth - 6f);
+            var y = Mathf.Clamp(_cardTooltipAnchor.y - pad, Margin, ReferenceHeight - height - Margin);
+            var rect = new Rect(x, y, TooltipWidth, height);
+            GUI.Box(rect, GUIContent.none, HudArt.PanelStyle(HudArt.CardColor, 0));
+            GUI.DrawTexture(new Rect(rect.xMax - 2f, rect.y, 2f, rect.height), HudArt.Solid(new Color(1f, 0.85f, 0.4f)));
+            GUI.Label(new Rect(rect.x + pad, rect.y + pad, rect.width - 2 * pad, rect.height - 2 * pad), _cardTooltip, style);
         }
 
         /// <summary>The techniques a unit has learned (none for enemies and summons).</summary>
         private static IEnumerable<Technique> TechniquesOf(Unit u) => u.Member?.Techniques ?? (IEnumerable<Technique>)new Technique[0];
 
+        // ---------- Attack preview (on the target's statue) ----------
+
+        /// <summary>The statue whose HP bar shows the hovered attack's damage.</summary>
+        private UnitView _lossView;
+
         /// <summary>
-        /// A health bar just under the card's header, in the space left for it. The HP a planned attack would take
-        /// off (<paramref name="loss"/>) shows as a pale, pulsing chunk at the end of the fill.
+        /// The HP the selected unit's attack would take off the hovered enemy: a pale, pulsing chunk on that enemy's
+        /// HP bar over the statue.
         /// </summary>
-        private static void DrawHpBar(Rect header, Unit u, int loss)
+        private void UpdateLossPreview()
         {
-            if (Event.current.type != EventType.Repaint)
-                return;
-            var bar = new Rect(header.x, header.yMax + 2f, header.width, HpBarHeight);
-            GUI.DrawTexture(bar, HudArt.Solid(new Color(0.2f, 0.2f, 0.22f)));
-            var frac = u.MaxHp > 0 ? Mathf.Clamp01((float)u.Hp / u.MaxHp) : 0f;
-            var left = u.MaxHp > 0 ? Mathf.Clamp01((float)(u.Hp - loss) / u.MaxHp) : 0f;
-            var fill = u.Team == Team.Player ? new Color(0.35f, 0.8f, 0.4f) : new Color(0.85f, 0.3f, 0.25f);
-            GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * left, bar.height), HudArt.Solid(fill));
-            if (loss > 0)
+            UnitView view = null;
+            var loss = 0;
+            if (AttackPreviewTarget() is Unit u)
             {
-                var pulse = 0.55f + 0.35f * Mathf.Sin(Time.unscaledTime * 6f);
-                GUI.DrawTexture(new Rect(bar.x + bar.width * left, bar.y, bar.width * (frac - left), bar.height),
-                    HudArt.Solid(new Color(1f, 0.85f, 0.75f, pulse)));
+                loss = Battle.PredictHpLoss(_selected, u, out _);
+                view = _board.ViewOf(u);
             }
+
+            if (_lossView != null && _lossView != view)
+                _lossView.ShowLossPreview(0);
+            _lossView = view;
+            if (view != null)
+                view.ShowLossPreview(loss);
+        }
+
+        /// <summary>The hovered enemy a click would attack (or walk to and attack) with the selected unit, or null.</summary>
+        private Unit AttackPreviewTarget()
+        {
+            var u = _hoveredUnit;
+            if (_busy || Battle.Phase != Phase.PlayerTurn || _selected == null || _selected.Team != Team.Player || _action.HasValue ||
+                u == null || u.Team != Team.Enemy)
+                return null;
+            return Battle.CanAttack(_selected, u) ? u : null;
+        }
+
+        /// <summary>
+        /// Over the hovered enemy's statue: "-3" (or who guards it) for the selected unit's attack; for an enemy it
+        /// would have to walk to, "walk 2, attack" by the pointer.
+        /// </summary>
+        private void DrawAttackPreview()
+        {
+            if (Event.current.type != EventType.Repaint || _busy || Battle.Phase != Phase.PlayerTurn || _selected == null ||
+                _selected.Team != Team.Player || _action.HasValue || _hoveredUnit == null || _hoveredUnit.Team != Team.Enemy)
+                return;
+            var u = _hoveredUnit;
+            var style = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 15, fontStyle = FontStyle.Bold, padding = new RectOffset(), alignment = TextAnchor.MiddleCenter };
+            string text;
+            Vector2 centre;
+            if (Battle.CanAttack(_selected, u))
+            {
+                var loss = Battle.PredictHpLoss(_selected, u, out var guard);
+                text = guard != null ? $"<color={LossColor}>the {guard.Stats.Name} guards it</color>" : $"<color={LossColor}>-{loss}</color>";
+                var view = _board.ViewOf(u);
+                if (view == null)
+                    return;
+                var scale = Screen.height / ReferenceHeight;
+                var screen = _camera.WorldToScreenPoint(view.BarLeftWorld);
+                // Left of the bar (statuses sit to its right).
+                var size = style.CalcSize(new GUIContent(text));
+                centre = new Vector2(screen.x / scale - 8f - size.x * 0.5f, (Screen.height - screen.y) / scale);
+            }
+            else if (Battle.FindAttackSpot(_selected, u) is var spot && spot.HasValue)
+            {
+                text = $"<color={NextColor}>walk {spot.Value.cost}, attack</color>";
+                var mouse = Event.current.mousePosition;
+                var size = style.CalcSize(new GUIContent(text));
+                centre = new Vector2(mouse.x + 18f + size.x * 0.5f, mouse.y + 22f);
+            }
+            else
+                return;
+
+            var content = new GUIContent(text);
+            var box = style.CalcSize(content) + new Vector2(10f, 4f);
+            var rect = new Rect(centre.x - box.x * 0.5f, centre.y - box.y * 0.5f, box.x, box.y);
+            GUI.DrawTexture(rect, HudArt.Solid(HudArt.PanelColor));
+            GUI.Label(rect, content, style);
         }
 
         /// <summary>The popup for a boss entering a Stone Heart phase.</summary>
@@ -2178,68 +2377,74 @@ namespace ArmyRoguelike.View
         private static string Capitalise(string text) =>
             string.IsNullOrEmpty(text) ? text : char.ToUpperInvariant(text[0]) + text.Substring(1);
 
-        /// <summary>What is true for the unit right now: statuses, pack state, run bonuses, zone of control.</summary>
-        private List<string> StateLines(Unit u)
+        /// <summary>
+        /// What is true for the unit right now, as chips: a short name, what it means, and whether it helps (true)
+        /// or hurts (false) the unit, or neither (null). Statuses, pack state, run bonuses, zone of control.
+        /// </summary>
+        private List<(string name, string text, bool? good)> StateChips(Unit u)
         {
-            var lines = new List<string>();
+            var chips = new List<(string, string, bool?)>();
             switch (Battle.GetPackState(u))
             {
                 case PackState.Bonded:
-                    lines.Add($"+{Battle.PackBondHp} max HP: the Pack Leader lives");
+                    chips.Add(($"Pack Bond +{Battle.PackBondHp}", $"+{Battle.PackBondHp} max HP while the Pack Leader lives.", true));
                     break;
                 case PackState.Leaderless:
-                    lines.Add($"-{Battle.PackBondHp} max HP: the Pack Leader is dead");
+                    chips.Add(($"Leaderless -{Battle.PackBondHp}", $"-{Battle.PackBondHp} max HP: the Pack Leader is dead.", false));
                     break;
             }
 
             if (u.Shield > 0)
-                lines.Add($"Shield {u.Shield}");
+                chips.Add(($"Shield {u.Shield}", $"Blocks the next {u.Shield} damage.", true));
             if (u.MoonShield > 0)
-                lines.Add($"Moon shield {u.MoonShield}");
+                chips.Add(($"Moon shield {u.MoonShield}", $"Blocks the next {u.MoonShield} damage.", true));
             if (u.TempHp > 0)
-                lines.Add($"Temporary HP {u.TempHp}: gone at your next turn");
+                chips.Add(($"Temp HP {u.TempHp}", $"{u.TempHp} extra HP, gone at your next turn.", true));
             if (u.ShieldUpTurns > 0)
-                lines.Add($"Shield Up: {Battle.ShieldUpReduction} less damage ({u.ShieldUpTurns} enemy turn(s) left)");
+                chips.Add(($"Shield Up {u.ShieldUpTurns}", $"Takes {Battle.ShieldUpReduction} less damage from each hit ({u.ShieldUpTurns} enemy turn(s) left).", true));
             if (u.IsTaunting)
-                lines.Add($"Taunting: enemies within {Battle.TauntRange} tiles can only target it");
+                chips.Add(("Taunting", $"Enemies within {Battle.TauntRange} tiles can only target it.", null));
             if (u.ShieldThrown)
-                lines.Add($"Shield thrown: +{Battle.ThrowShieldDamage} damage, +{Battle.ThrowShieldMoves} move");
+                chips.Add(("Shield thrown", $"+{Battle.ThrowShieldDamage} damage, +{Battle.ThrowShieldMoves} move.", true));
             if (u.Team == Team.Player && u.Has(Ability.Twincast) && !u.TwincastUsed)
-                lines.Add("Twincast ready: its next action this turn costs no AP");
+                chips.Add(("Twincast ready", "Its next action this turn costs no AP.", true));
             if (u.Favored)
-                lines.Add($"Favored by fortune: {Battlefields.FavoredMultiplier}x damage this round");
+                chips.Add(($"Favored x{Battlefields.FavoredMultiplier}", $"Favored by fortune: {Battlefields.FavoredMultiplier}x damage this round.", true));
             if (u.IsChampion)
-                lines.Add($"Champion ({Champions.Name(u.Affix)}): +{Champions.ExtraHp} max HP, {Champions.Describe(u.Affix)}");
+                chips.Add(($"Champion: {Champions.Name(u.Affix)}", $"+{Champions.ExtraHp} max HP, {Champions.Describe(u.Affix)}.", null));
             if (u.Has(Ability.StoneHeart))
-                lines.Add($"Stone Heart: phase {u.BossPhase} of {Battle.BossPhases}" + (Battle.NextPhaseHp(u) > 0 ? $"; can't drop below {Math.Max(u.PhaseFloor, Battle.NextPhaseHp(u))} HP this round" : "; last phase"));
+                chips.Add(($"Phase {u.BossPhase}/{Battle.BossPhases}", $"Stone Heart: phase {u.BossPhase} of {Battle.BossPhases}" +
+                    (Battle.NextPhaseHp(u) > 0 ? $"; can't drop below {Math.Max(u.PhaseFloor, Battle.NextPhaseHp(u))} HP this round." : "; last phase."), null));
             if (Battle.OnStormMark(u))
-                lines.Add(Battle.IsRockfallMark(u.Pos) ? $"Under falling rocks: {Battle.RockfallDamage} damage after the enemy turn unless it moves" : $"On a storm mark: lightning strikes for {Battlefields.StormDamage} after the enemy turn");
+                chips.Add(Battle.IsRockfallMark(u.Pos)
+                    ? ("Falling rocks", $"{Battle.RockfallDamage} damage after the enemy turn unless it moves.", false)
+                    : ("Storm mark", $"Lightning strikes it for {Battlefields.StormDamage} after the enemy turn.", false));
             if (Battle.FloorCracks.TryGetValue(u.Pos, out var cracksUnder))
-                lines.Add($"On a fractured tile ({cracksUnder} of {Battlefields.CracksToHole}): one more fracture and it falls in, taking this unit with it");
+                chips.Add(($"Fractured {cracksUnder}/{Battlefields.CracksToHole}", $"On a fractured tile ({cracksUnder} of {Battlefields.CracksToHole}): one more fracture and it falls in, taking this unit with it.", false));
             if (u.Team == Team.Player && Battle.Phase == Phase.PlayerTurn && u.ActedThisTurn && !u.IsDone)
-                lines.Add("Has acted: can't move again this turn");
+                chips.Add(("Acted", "Has acted: can't move again this turn.", null));
             if (u.IsSnared)
-                lines.Add("Pinned: can't move");
+                chips.Add(("Pinned", "Can't move.", false));
             if (u.InWrath)
-                lines.Add("Wrath: 2 actions a turn");
+                chips.Add(("Wrath", "2 actions a turn.", true));
             if (u.IsHidden)
-                lines.Add($"Hidden until your next turn: enemies can't target it" + (u.AmbushUsed ? "" : $" (+{Battle.VanishBonus} on its next attack)"));
+                chips.Add(("Hidden", "Until your next turn: enemies can't target it" + (u.AmbushUsed ? "." : $". +{Battle.VanishBonus} on its next attack."), true));
             if (u.IsSlowed)
-                lines.Add("Slowed: can't move");
+                chips.Add(("Slowed", "Can't move.", false));
             if (u.Marked)
-                lines.Add($"Marked: the next hit on it deals +{Battle.MarkBonus}");
+                chips.Add(($"Marked +{Battle.MarkBonus}", $"The next hit on it deals +{Battle.MarkBonus}.", false));
             if (u.PoisonTurns > 0)
-                lines.Add($"Poisoned ({u.PoisonTurns} more)");
+                chips.Add(($"Poisoned {u.PoisonTurns}", $"Poisoned ({u.PoisonTurns} more).", false));
             if (u.CarryingLoot > 0)
-                lines.Add($"Carrying {u.CarryingLoot} of your gold");
+                chips.Add(($"Loot {u.CarryingLoot}", $"Carrying {u.CarryingLoot} of your gold.", null));
             if (u.Fury > 0)
-                lines.Add($"Fury {u.Fury}: +{u.Fury} damage for the rest of the fight");
+                chips.Add(($"Fury +{u.Fury}", $"+{u.Fury} damage for the rest of the fight.", true));
             if (u.ContractBy != null)
-                lines.Add($"Soul Contract: takes {Battle.ContractDamage} damage at the start of the enemy turn, unless the {u.ContractBy.Stats.Name} takes damage first");
+                chips.Add(("Soul Contract", $"Takes {Battle.ContractDamage} damage at the start of the enemy turn, unless the {u.ContractBy.Stats.Name} takes damage first.", false));
             var engaged = EngagedLine(u);
             if (engaged.Length > 0)
-                lines.Add(engaged);
-            return lines;
+                chips.Add(("Engaged", engaged + ".", false));
+            return chips;
         }
 
         /// <summary>"Engaged by ..." for a unit standing in enemy reach (zone of control), or empty.</summary>
