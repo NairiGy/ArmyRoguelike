@@ -21,7 +21,7 @@ namespace ArmyRoguelike.Core
         LineOfSight,
         Fury,
         Swift,
-        TemporaryHp,
+        Shield,
         Free,
     }
 
@@ -32,7 +32,7 @@ namespace ArmyRoguelike.Core
         {
             Keyword.Pinned, Keyword.Slowed, Keyword.Marked, Keyword.Exposed, Keyword.Hidden, Keyword.Burning, Keyword.Rubble,
             Keyword.Poison, Keyword.Push, Keyword.ZoneOfControl, Keyword.LineOfSight, Keyword.Fury, Keyword.Swift,
-            Keyword.TemporaryHp, Keyword.Free,
+            Keyword.Shield, Keyword.Free,
         };
 
         public static string Name(Keyword k)
@@ -41,7 +41,7 @@ namespace ArmyRoguelike.Core
             {
                 case Keyword.ZoneOfControl: return "Zone of control";
                 case Keyword.LineOfSight: return "Line of sight";
-                case Keyword.TemporaryHp: return "Temporary HP";
+                case Keyword.Shield: return "Shield";
                 default: return k.ToString();
             }
         }
@@ -63,7 +63,7 @@ namespace ArmyRoguelike.Core
                 case Keyword.LineOfSight: return "Rocks block shots. Bombs, boulders and fireballs are lobbed over them.";
                 case Keyword.Fury: return $"+1 damage per Fury for the rest of the fight, {Battle.MaxFury} at most.";
                 case Keyword.Swift: return $"{Battle.BaseMoves + 1} moves a turn instead of {Battle.BaseMoves}.";
-                case Keyword.TemporaryHp: return "Extra HP that goes first and is gone at your next turn.";
+                case Keyword.Shield: return "Absorbs damage before HP. Enemies go for an unshielded unit they can reach first, and hit a shield only when there is none.";
                 case Keyword.Free: return "Costs no AP. Use it before the unit acts: it can still move and attack afterwards.";
                 default: return "";
             }
@@ -87,7 +87,7 @@ namespace ArmyRoguelike.Core
                 case Keyword.LineOfSight: return new[] { "line of sight" };
                 case Keyword.Fury: return new[] { "fury" };
                 case Keyword.Swift: return new[] { "swift" };
-                case Keyword.TemporaryHp: return new[] { "temporary hp" };
+                case Keyword.Shield: return new[] { "shielded", "shields", "shield" };
                 default: return new string[0];
             }
         }
@@ -148,11 +148,20 @@ namespace ArmyRoguelike.Core
 
                 foreach (var form in Forms(k))
                     if (at + form.Length <= lower.Length && string.CompareOrdinal(lower, at, form, 0, form.Length) == 0 &&
-                        IsWordEnd(lower, at + form.Length))
+                        IsWordEnd(lower, at + form.Length) && !(k == Keyword.Shield && InShieldName(lower, at, form.Length)))
                         best = Longer(best, (form.Length, k));
             }
 
             return best;
+        }
+
+        /// <summary>"Shield" inside an action's name (Shield Up, Shield Bash, Shield Wall, Throw Shield) is not the keyword.</summary>
+        private static bool InShieldName(string lower, int at, int length)
+        {
+            bool Before(string s) => at >= s.Length && string.CompareOrdinal(lower, at - s.Length, s, 0, s.Length) == 0;
+            bool After(string s) => at + length + s.Length <= lower.Length && string.CompareOrdinal(lower, at + length, s, 0, s.Length) == 0 &&
+                                    IsWordEnd(lower, at + length + s.Length);
+            return Before("throw ") || After(" up") || After(" bash") || After(" wall");
         }
 
         private static (int, Keyword)? Longer((int length, Keyword keyword)? best, (int length, Keyword keyword) candidate) =>

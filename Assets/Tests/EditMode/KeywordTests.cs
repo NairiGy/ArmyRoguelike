@@ -29,6 +29,13 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void ShieldInActionNamesIsNotTheKeyword()
+        {
+            Assert.IsEmpty(Keywords.Find("Shield Up, Shield Bash, Shield Wall and Throw Shield"));
+            Assert.AreEqual(new[] { Keyword.Shield, Keyword.Shield }, Keywords.Find("gets a shield; Ward shields the ally").Select(f => f.keyword).ToArray());
+        }
+
+        [Test]
         public void FreeCountsOnlyCapitalised()
         {
             Assert.IsEmpty(Keywords.Find("teleport to a free tile"));

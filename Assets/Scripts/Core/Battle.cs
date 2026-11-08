@@ -145,10 +145,10 @@ namespace ArmyRoguelike.Core
         /// <summary>Taunt: how many enemy turns it lasts.</summary>
         public const int TauntTurns = 1;
 
-        /// <summary>Battlecry: range, extra moves, temporary HP, and own turns it lasts (the current one counts).</summary>
+        /// <summary>Battlecry: range, extra moves, shield, and own turns it lasts (the current one counts).</summary>
         public const int BattlecryRange = 2;
         public const int BattlecryMoves = 1;
-        public const int BattlecryHp = 2;
+        public const int BattlecryShield = 2;
         public const int BattlecryTurns = 1;
 
         /// <summary>Throw Shield, for the rest of the battle.</summary>
@@ -1212,7 +1212,7 @@ namespace ArmyRoguelike.Core
                 return 0;
 
             var hp = target.Hp;
-            var shield = target.Shield + target.MoonShield + target.TempHp;
+            var shield = target.Shield + target.MoonShield + target.CryShield;
             var dodge = target.Has(Ability.Dodge) && !target.DodgeUsed;
             var lucky = target.Has(Ability.LuckyCharm) && !target.LastStandUsed;
             var strikes = attacker.Has(Ability.DoubleStrike) ? 2 : 1;
@@ -1307,7 +1307,7 @@ namespace ArmyRoguelike.Core
                 amount = Math.Max(1, amount - Champions.ArmoredReduction);
             if (target.ShieldUpTurns > 0)
                 amount = Math.Max(1, amount - ShieldUpReduction);
-            return amount - target.Shield - target.MoonShield - target.TempHp >= target.Hp;
+            return amount - target.Shield - target.MoonShield - target.CryShield >= target.Hp;
         }
 
         /// <summary>Exposed (the Rogue's keyword): no living unit of its own side stands next to it.</summary>
@@ -1801,8 +1801,8 @@ namespace ArmyRoguelike.Core
                         if (ally.BattlecryTurns == 0 && !(ally.SlowedThisTurn && ally.ActedThisTurn))
                             ally.Moves += BattlecryMoves;
                         ally.BattlecryTurns = BattlecryTurns;
-                        ally.TempHp = BattlecryHp;
-                        events.Add(new StatusEvent(unit, ally, StatusKind.Battlecry, BattlecryHp));
+                        ally.CryShield = BattlecryShield;
+                        events.Add(new StatusEvent(unit, ally, StatusKind.Battlecry, BattlecryShield));
                     }
 
                     break;
@@ -3497,10 +3497,10 @@ namespace ArmyRoguelike.Core
             if (target.IsObjective && target.Team == Team.Enemy && source != null && source.Team == target.Team)
                 amount = 0;
 
-            if (target.TempHp > 0 && amount > 0)
+            if (target.CryShield > 0 && amount > 0)
             {
-                var absorbed = Math.Min(target.TempHp, amount);
-                target.TempHp -= absorbed;
+                var absorbed = Math.Min(target.CryShield, amount);
+                target.CryShield -= absorbed;
                 amount -= absorbed;
                 after.Add(new EffectEvent(EffectKind.Absorb, target, absorbed, target.Hp, target));
             }
@@ -3840,7 +3840,7 @@ namespace ArmyRoguelike.Core
                 u.ShieldUpTurns = Math.Max(0, u.ShieldUpTurns - 1);
                 u.TauntTurns = Math.Max(0, u.TauntTurns - 1);
                 if (u.BattlecryTurns > 0 && --u.BattlecryTurns == 0)
-                    u.TempHp = 0;
+                    u.CryShield = 0;
             }
 
             foreach (var u in Living(team))

@@ -282,7 +282,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Barricade: return $"build a barricade next to it ({Battle.BarricadeHp} HP, blocks paths and shots); broken, it leaves rubble";
                 case ActionKind.Detonate: return $"blow up its barricades: {Battle.BarricadeBlastDamage} damage in a 3x3 around each";
                 case ActionKind.Charge: return $"rush up to {Battle.ChargeRange} tiles straight: {Battle.ChargeDamage} damage to each enemy on the way, pushed aside";
-                case ActionKind.Battlecry: return $"allies within {Battle.BattlecryRange} get +{Battle.BattlecryMoves} move and {Battle.BattlecryHp} temporary HP";
+                case ActionKind.Battlecry: return $"allies within {Battle.BattlecryRange} get +{Battle.BattlecryMoves} move and a {Battle.BattlecryShield}-point shield";
                 case ActionKind.Taunt: return $"enemies within {Battle.TauntRange} can only target it until your next turn";
                 case ActionKind.ThrowShield: return $"+{Battle.ThrowShieldMoves} move and +{Battle.ThrowShieldDamage} damage for the battle, costs {Battle.ThrowShieldHpCost} HP. Once. Free";
                 case ActionKind.Firewall: return $"3 tiles in a line, up to {Battle.FirewallRange} away, burn for {Battle.BurnRounds} rounds ({Battle.FirewallDamage} damage now)";
@@ -330,7 +330,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Blink: return $"teleport to a free tile within {Battle.BlinkRange}, ignoring rocks and zone of control. Free";
                 case ActionKind.Fireball: return $"{Battle.FireballDamage} damage to everyone on the tile and the 4 next to it, up to {Battle.FireballRange} tiles away";
                 case ActionKind.IceWall: return $"turn a free tile within {Battle.ActionRange} into ice (blocks like a rock) for {Battle.IceRounds} rounds";
-                case ActionKind.Ward: return $"an ally within {Battle.ActionRange} tiles gets a shield that absorbs {Battle.WardShield} damage";
+                case ActionKind.Ward: return $"an ally within {Battle.ActionRange} tiles gets a shield that absorbs {Battle.WardShield} damage and lasts until used up";
                 case ActionKind.Mend: return $"heal an ally within {Battle.ActionRange} tiles for {Battle.MendHeal}";
                 case ActionKind.Barricade: return $"build a barricade on a free tile next to it (max {Battle.MaxBarricades}): blocks paths and shots, {Battle.BarricadeHp} HP, either side can break it, and a broken one collapses into rubble";
                 case ActionKind.Turret: return "build a turret next to it (one at a time); it acts on your turn but can't move";
@@ -338,7 +338,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Charge: return $"rush up to {Battle.ChargeRange} tiles in a straight line, past allies: {Battle.ChargeDamage} damage to every enemy on the way, each pushed to a random side. One that doesn't move stops the charge";
                 case ActionKind.Sweep: return "hit an enemy next to it and the enemies on both sides of it";
                 case ActionKind.ShieldUp: return $"takes {Battle.ShieldUpReduction} less damage from every source (at least 1) for {Battle.ShieldUpTurns} enemy turns";
-                case ActionKind.Battlecry: return $"every ally within {Battle.BattlecryRange} tiles, itself included, gets +{Battle.BattlecryMoves} move and {Battle.BattlecryHp} temporary HP until your next turn";
+                case ActionKind.Battlecry: return $"every ally within {Battle.BattlecryRange} tiles, itself included, gets +{Battle.BattlecryMoves} move and a shield that absorbs {Battle.BattlecryShield} damage, both until your next turn";
                 case ActionKind.Taunt: return $"until your next turn, enemies within {Battle.TauntRange} tiles can only attack or use offensive abilities on this unit";
                 case ActionKind.ThrowShield: return $"for the rest of the battle: +{Battle.ThrowShieldMoves} move and +{Battle.ThrowShieldDamage} damage, for {Battle.ThrowShieldHpCost} HP. Once per battle. Free";
                 case ActionKind.FrostNova: return "every enemy next to it is slowed and pushed 1 tile away";

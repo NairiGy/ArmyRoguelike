@@ -148,8 +148,8 @@ namespace ArmyRoguelike.Core
         /// <summary>Battlecry: own turns left of its extra move (the one it was shouted in counts).</summary>
         public int BattlecryTurns { get; internal set; }
 
-        /// <summary>Battlecry's temporary HP: lost before anything else, gone when the battlecry ends.</summary>
-        public int TempHp { get; internal set; }
+        /// <summary>Battlecry's shield: absorbs damage before the other shields, gone at your next turn. Counts as a shield for enemy targeting.</summary>
+        public int CryShield { get; internal set; }
 
         /// <summary>Throw Shield was used in this battle: more damage and a move for good.</summary>
         public bool ShieldThrown { get; internal set; }
@@ -221,7 +221,7 @@ namespace ArmyRoguelike.Core
                 Shield = Shield, MoonShield = MoonShield, LastStandUsed = LastStandUsed, CarryingLoot = CarryingLoot,
                 IsMercenary = IsMercenary, Escaped = Escaped, Fell = Fell, Favored = Favored, PackHp = PackHp,
                 BannerAp = BannerAp, BannerMoves = BannerMoves, LeftPile = LeftPile, PileGone = PileGone,
-                ShieldUpTurns = ShieldUpTurns, TauntTurns = TauntTurns, BattlecryTurns = BattlecryTurns, TempHp = TempHp,
+                ShieldUpTurns = ShieldUpTurns, TauntTurns = TauntTurns, BattlecryTurns = BattlecryTurns, CryShield = CryShield,
                 ShieldThrown = ShieldThrown, ZocStrikeUsed = ZocStrikeUsed, AmbushUsed = AmbushUsed, ShadowsTurn = ShadowsTurn, Marked = Marked, MarkSpreads = MarkSpreads, TwincastUsed = TwincastUsed, Fury = Fury,
                 Affix = Affix, ExtraHp = ExtraHp, BossPhase = BossPhase, PhaseFloor = PhaseFloor, Enraged = Enraged,
             };

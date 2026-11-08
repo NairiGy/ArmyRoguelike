@@ -2456,11 +2456,11 @@ namespace ArmyRoguelike.View
             }
 
             if (u.Shield > 0)
-                chips.Add(($"Shield {u.Shield}", $"Blocks the next {u.Shield} damage.", true));
+                chips.Add(($"Shield {u.Shield}", $"Blocks the next {u.Shield} damage. Lasts until used up.", true));
             if (u.MoonShield > 0)
-                chips.Add(($"Moon shield {u.MoonShield}", $"Blocks the next {u.MoonShield} damage.", true));
-            if (u.TempHp > 0)
-                chips.Add(($"Temp HP {u.TempHp}", $"{u.TempHp} extra HP, gone at your next turn.", true));
+                chips.Add(($"Moon shield {u.MoonShield}", $"Blocks the next {u.MoonShield} damage, gone at your next turn.", true));
+            if (u.CryShield > 0)
+                chips.Add(($"Battlecry shield {u.CryShield}", $"Blocks the next {u.CryShield} damage, gone at your next turn.", true));
             if (u.ShieldUpTurns > 0)
                 chips.Add(($"Shield Up {u.ShieldUpTurns}", $"Takes {Battle.ShieldUpReduction} less damage from each hit ({u.ShieldUpTurns} enemy turn(s) left).", true));
             if (u.IsTaunting)

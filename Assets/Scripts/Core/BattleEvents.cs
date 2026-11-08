@@ -335,7 +335,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Shield Up: takes less damage for a few enemy turns (Source and Target are the same unit).</summary>
         ShieldUp,
 
-        /// <summary>Battlecry: +1 move and <see cref="StatusEvent.Amount"/> temporary HP.</summary>
+        /// <summary>Battlecry: +1 move and a shield of <see cref="StatusEvent.Amount"/>.</summary>
         Battlecry,
 
         /// <summary>Taunt: enemies in range can only target this unit (Source and Target are the same unit).</summary>

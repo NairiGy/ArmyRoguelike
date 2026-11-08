@@ -138,7 +138,7 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Battlecry_GivesNearbyAlliesAMoveAndTemporaryHp_ThatFade()
+        public void Battlecry_GivesNearbyAlliesAMoveAndAShield_ThatFade()
         {
             var b = Setup(new[] { M(UnitStats.Warrior, Technique.Battlecry), M(UnitStats.Archer), M(UnitStats.Sapper) },
                 new[] { P(3, 1), P(4, 2), P(7, 0) }, new[] { E(UnitStats.Wolf, 7, 7) });
@@ -148,22 +148,34 @@ namespace ArmyRoguelike.Tests
             var moves = archer.Moves;
             Assert.IsNotNull(b.PlayerUseAction(warrior, ActionKind.Battlecry, warrior.Pos));
             Assert.AreEqual(moves + Battle.BattlecryMoves, archer.Moves);
-            Assert.AreEqual(Battle.BattlecryHp, archer.TempHp);
-            Assert.AreEqual(Battle.BattlecryHp, warrior.TempHp, "itself too");
-            Assert.AreEqual(0, far.TempHp, "out of range");
+            Assert.AreEqual(Battle.BattlecryShield, archer.CryShield);
+            Assert.AreEqual(Battle.BattlecryShield, warrior.CryShield, "itself too");
+            Assert.AreEqual(0, far.CryShield, "out of range");
             b.EndPlayerTurn();
-            Assert.AreEqual(0, archer.TempHp);
+            Assert.AreEqual(0, archer.CryShield);
             Assert.AreEqual(1, archer.Moves, "back to one move next turn");
         }
 
         [Test]
-        public void TemporaryHp_IsLostBeforeRealHp()
+        public void BattlecryShield_IsLostBeforeRealHp()
         {
             var b = Setup(new[] { M(UnitStats.Warrior, Technique.Battlecry) }, new[] { P(3, 2) }, new[] { E(UnitStats.Brute, 3, 3) });
             var warrior = Player(b);
             b.PlayerUseAction(warrior, ActionKind.Battlecry, warrior.Pos);
             b.EndPlayerTurn();
-            Assert.AreEqual(warrior.MaxHp - (UnitStats.Brute.Damage - Battle.BattlecryHp), warrior.Hp);
+            Assert.AreEqual(warrior.MaxHp - (UnitStats.Brute.Damage - Battle.BattlecryShield), warrior.Hp);
+        }
+
+        [Test]
+        public void BattlecryShield_CountsAsAShieldForEnemyTargeting()
+        {
+            var b = Setup(new[] { M(UnitStats.Warrior, Technique.Battlecry), M(UnitStats.Archer) }, new[] { P(3, 2), P(0, 0) },
+                new[] { E(UnitStats.Brute, 3, 3), E(UnitStats.Wolf, 7, 7) });
+            var (warrior, archer) = (Player(b, 0), Player(b, 1));
+            archer.Pos = P(4, 2);
+            Assert.IsNotNull(b.PlayerUseAction(warrior, ActionKind.Battlecry, warrior.Pos));
+            archer.CryShield = 0;
+            Assert.AreEqual(archer, EnemyAI.ChooseTarget(b, Enemy(b)), "the shielded warrior is passed over");
         }
 
         [Test]

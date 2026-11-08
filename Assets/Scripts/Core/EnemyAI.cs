@@ -244,7 +244,7 @@ namespace ArmyRoguelike.Core
             return nearest.FirstOrDefault();
         }
 
-        private static bool HasShield(Unit unit) => unit.Shield > 0 || unit.MoonShield > 0;
+        private static bool HasShield(Unit unit) => unit.Shield > 0 || unit.MoonShield > 0 || unit.CryShield > 0;
 
         /// <summary>
         /// Runs a check as if the unit's turn were about to happen: during the enemy turn with what it has
