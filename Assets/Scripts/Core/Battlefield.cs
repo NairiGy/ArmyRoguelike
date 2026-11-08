@@ -76,8 +76,8 @@ namespace ArmyRoguelike.Core
                 case Battlefield.HiddenMinds:
                     return "You can't see what the enemies plan to do.";
                 case Battlefield.CrumblingRoof:
-                    return "The old roof gives way. A unit slammed into something, or a unit dying, cracks the tile it stands on; " +
-                           $"a tile cracked {CracksToHole} times falls in. Whoever stands on it, or is pushed into a hole, falls and dies. " +
+                    return "The old roof gives way. A unit slammed into something, or a unit dying, fractures the tile it stands on; " +
+                           $"a tile fractured {CracksToHole} times falls in. Whoever stands on it, or is pushed into a hole, falls and dies. " +
                            "Holes block walking but not shots. Huge units are too heavy to push in, and the Giant never falls.";
                 default:
                     return "";

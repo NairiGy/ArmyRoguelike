@@ -967,6 +967,14 @@ namespace ArmyRoguelike.View
                     DrawForgetCard(forgetRect, forgetters);
             }
 
+            var honers = _run.Army.Where(m => m.AllActions.Any(a => Battle.Cooldown(a) > 1 && !m.IsHoned(a))).ToList();
+            if (honers.Count > 0)
+            {
+                GUILayout.Space(CardGap);
+                var honeRect = GUILayoutUtility.GetRect(scrollInner, 8 + 22 + 20 + honers.Count * 24 + 30, GUILayout.ExpandWidth(false));
+                DrawHoneCard(honeRect, honers);
+            }
+
             var cracked = _run.Army.Where(m => m.Cracks > 0).ToList();
             if (cracked.Count > 0)
             {
@@ -1052,6 +1060,42 @@ namespace ArmyRoguelike.View
             }
 
             Price(r, Run.ForgetPrice);
+        }
+
+        // Honing: one action of one unit gets a cooldown 1 turn shorter for the run.
+        private void DrawHoneCard(Rect r, System.Collections.Generic.List<ArmyMember> honers)
+        {
+            Card(r, false, false);
+            var x = r.x + 10;
+            var inner = r.width - 20;
+            Label(new Rect(x, r.y + 8, inner, 22), "Hone an action", _cardName, Color.white);
+            Label(new Rect(x, r.y + 30, inner, 18), "Its cooldown is 1 turn shorter for this unit for the rest of the run (1 at least). Click one to hone it.", _cardText, DimText);
+            var y = r.y + 52;
+            foreach (var member in honers)
+            {
+                Label(new Rect(x, y + 2, 100, 18), member.Stats.Name, _cardText, TextColor);
+                var cx = x + 104;
+                foreach (var action in member.AllActions.Where(a => Battle.Cooldown(a) > 1 && !member.IsHoned(a)).ToList())
+                {
+                    var text = $"{Abilities.Name(action)} ({Battle.Cooldown(action)} -> {Battle.Cooldown(action) - 1})";
+                    var size = _chip.CalcSize(new GUIContent(text));
+                    GUI.enabled = _run.CanHone(member, action);
+                    var m = member;
+                    var a = action;
+                    if (GUI.Button(new Rect(cx, y, size.x, 20), text, _chip))
+                        Do(() =>
+                        {
+                            if (_run.Hone(m, a))
+                                _runLog.RecordHone(m, a);
+                        });
+                    GUI.enabled = true;
+                    cx += size.x + 6;
+                }
+
+                y += 24;
+            }
+
+            Price(r, Run.HonePrice);
         }
 
         // Mending: takes one crack off a unit.

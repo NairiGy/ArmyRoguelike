@@ -173,6 +173,12 @@ namespace ArmyRoguelike.View
             _shop?.purchases.Add(new Purchase { kind = "recruit", item = unit, price = price, unit = unit });
         }
 
+        /// <summary>An action honed at the shop (cooldown 1 shorter for that unit).</summary>
+        public void RecordHone(ArmyMember member, ActionKind action)
+        {
+            _shop?.purchases.Add(new Purchase { kind = "hone", item = Abilities.Name(action), price = Run.HonePrice, unit = member.Stats.Name, levelAfter = member.Level });
+        }
+
         /// <summary>A crack mended at the shop; levelAfter holds the cracks left.</summary>
         public void RecordMend(ArmyMember member)
         {
@@ -238,7 +244,7 @@ namespace ArmyRoguelike.View
             _log.finalArmy = _run.Army.Select(m => new ArmyEntry
             {
                 unit = m.Stats.Name, level = m.Level, techniques = m.Techniques.Select(t => t.Name).ToList(), equipment = m.Equipment?.Name ?? "",
-                levelHp = m.LevelHp, levelDamage = m.LevelDamage, bonusDamage = m.BonusDamage, bonusMaxHp = m.BonusMaxHp, cracks = m.Cracks,
+                levelHp = m.LevelHp, levelDamage = m.LevelDamage, bonusDamage = m.BonusDamage, bonusMaxHp = m.BonusMaxHp, cracks = m.Cracks, scars = m.Scars, honed = m.Honed.Select(a => Abilities.Name(a)).ToList(),
             }).ToList();
             WriteFile();
         }
@@ -422,7 +428,7 @@ namespace ArmyRoguelike.View
         [Serializable]
         private sealed class Purchase
         {
-            /// <summary>"technique", "item", "recruit", "banner" or "mend" (levelAfter = cracks left).</summary>
+            /// <summary>"technique", "item", "recruit", "banner", "hone" or "mend" (levelAfter = cracks left).</summary>
             public string kind;
 
             /// <summary>The technique, item or recruited unit.</summary>
@@ -499,6 +505,8 @@ namespace ArmyRoguelike.View
             public int bonusDamage;
             public int bonusMaxHp;
             public int cracks;
+            public int scars;
+            public List<string> honed = new List<string>();
         }
     }
 }

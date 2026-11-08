@@ -128,6 +128,43 @@ namespace ArmyRoguelike.Tests
             Assert.Fail("no seed with a shop at step 2");
         }
 
+        [Test]
+        public void Hone_ShortensOneActionsCooldownForThatUnit()
+        {
+            var member = new ArmyMember(UnitStats.Warrior);
+            var b = new Battle(new Board(6, 6), new[] { member }, new[] { (UnitStats.Wolf, new GridPos(5, 5)) });
+            var warrior = b.Units.First(u => u.Team == Team.Player);
+            Assert.AreEqual(Battle.Cooldown(ActionKind.ShieldBash), b.CooldownFor(warrior, ActionKind.ShieldBash));
+            member.Hone(ActionKind.ShieldBash);
+            Assert.AreEqual(Battle.Cooldown(ActionKind.ShieldBash) - 1, b.CooldownFor(warrior, ActionKind.ShieldBash));
+        }
+
+        [Test]
+        public void Hone_InTheShop_CostsGold_OncePerAction()
+        {
+            for (var seed = 0; seed < 500; seed++)
+            {
+                var run = NewRun(seed);
+                var shop = run.Map[1].ToList().FindIndex(n => n.Kind == NodeKind.Shop);
+                if (shop < 0)
+                    continue;
+                run.ChooseNode(0);
+                WinCurrentBattle(run, 3);
+                run.FinishBattle();
+                run.SkipReward();
+                run.ChooseNode(shop);
+                run.Gold = 50;
+                var warrior = run.Army[0];
+                Assert.IsTrue(run.Hone(warrior, ActionKind.ShieldBash));
+                Assert.AreEqual(50 - Run.HonePrice, run.Gold);
+                Assert.IsFalse(run.CanHone(warrior, ActionKind.ShieldBash), "already honed");
+                Assert.IsFalse(run.CanHone(warrior, ActionKind.Fireball), "not its action");
+                return;
+            }
+
+            Assert.Fail("no seed with a shop at step 2");
+        }
+
         // ---------- Events with a price ----------
 
         [Test]

@@ -306,8 +306,12 @@ namespace ArmyRoguelike.Core
             unit.Has(Ability.Twincast) && !unit.TwincastUsed && CostOf(unit, action) > 0;
 
         /// <summary>The action's cooldown for this unit in this battle: Quick Fuse makes Place Mine ready every turn.</summary>
-        public int CooldownFor(Unit unit, ActionKind action) =>
-            action == ActionKind.PlaceMine && unit.Has(Ability.QuickFuse) ? 1 : CooldownIn(action);
+        public int CooldownFor(Unit unit, ActionKind action)
+        {
+            var cooldown = action == ActionKind.PlaceMine && unit.Has(Ability.QuickFuse) ? 1 : CooldownIn(action);
+            // Hone (a shop service): one turn shorter for this unit, 1 at least; once-per-battle actions stay as they are.
+            return cooldown > 1 && unit.Member != null && unit.Member.IsHoned(action) ? cooldown - 1 : cooldown;
+        }
 
         /// <summary>
         /// Cooldown of every action in the unit's own turns *(placeholders)*: used now, ready again this many turns

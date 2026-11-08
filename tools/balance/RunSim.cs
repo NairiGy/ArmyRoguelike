@@ -207,6 +207,14 @@ public static class RunSim
             if (learner != null && run.Buy(technique, learner))
                 log.Bought++;
         }
+        // Hones one action when gold is plentiful.
+        if (run.Gold >= 30)
+        {
+            var hone = (from m in run.Army from a in m.AllActions where run.CanHone(m, a) select (m, a)).OrderBy(_ => rng.Next()).FirstOrDefault();
+            if (hone.m != null && run.Hone(hone.m, hone.a))
+                log.Bought++;
+        }
+
         foreach (var item in run.ItemOffers.OrderBy(_ => rng.Next()).ToList())
         {
             var wearer = run.Army.Where(m => m.Equipment == null && item.CanEquip(m.Stats)).OrderBy(_ => rng.Next()).FirstOrDefault();

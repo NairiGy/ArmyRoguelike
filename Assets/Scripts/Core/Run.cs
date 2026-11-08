@@ -24,6 +24,18 @@ namespace ArmyRoguelike.Core
         /// </summary>
         public int Cracks { get; internal set; }
 
+        private readonly HashSet<ActionKind> _honed = new HashSet<ActionKind>();
+
+        /// <summary>Actions honed at a shop: their cooldown is 1 turn shorter for this unit (1 at least).</summary>
+        public IReadOnlyCollection<ActionKind> Honed => _honed;
+
+        public bool IsHoned(ActionKind action) => _honed.Contains(action);
+
+        internal bool Hone(ActionKind action) => _honed.Add(action);
+
+        /// <summary>Every action it has: its type's and those from techniques.</summary>
+        public IEnumerable<ActionKind> AllActions => Stats.Actions.Concat(TechniqueActions).Distinct();
+
         /// <summary>Cracks that can't be mended (from the Cracked Altar); they count towards shattering like any other.</summary>
         public int Scars { get; internal set; }
 
@@ -248,6 +260,9 @@ namespace ArmyRoguelike.Core
         public const int CrackHp = 1;
         public const int CracksToShatter = 3;
         public const int MendPrice = 10;
+
+        /// <summary>Hone: a shop service that takes 1 turn off one of a unit's action cooldowns for the run.</summary>
+        public const int HonePrice = 12;
 
         /// <summary>Map steps (0-based) where both choices are fights, so every run has at least this many before the boss.</summary>
         public static readonly IReadOnlyList<int> FightSteps = new[] { 0, 3, 5, 7, 9 };
@@ -810,6 +825,20 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Army members whose last crack shattered them after the last battle; they left the army.</summary>
         public IReadOnlyList<ArmyMember> LastShattered => _lastShattered;
+
+        /// <summary>Hone: an action of the member with a cooldown of 2 or more that isn't honed yet.</summary>
+        public bool CanHone(ArmyMember member, ActionKind action) =>
+            State == RunState.Shop && Army.Contains(member) && member.AllActions.Contains(action) && !member.IsHoned(action) &&
+            Core.Battle.Cooldown(action) > 1 && Gold >= HonePrice;
+
+        public bool Hone(ArmyMember member, ActionKind action)
+        {
+            if (!CanHone(member, action))
+                return false;
+            Gold -= HonePrice;
+            member.Hone(action);
+            return true;
+        }
 
         public bool CanMend(ArmyMember member) => State == RunState.Shop && Army.Contains(member) && member.Cracks > member.Scars && Gold >= MendPrice;
 
