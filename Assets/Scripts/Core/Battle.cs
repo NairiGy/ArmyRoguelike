@@ -3139,7 +3139,7 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>
-        /// Upheaval: the ground bursts up under the target. It takes <see cref="UpheavalDamage"/> and is pushed 1 tile away
+        /// Upheaval: the ground bursts up under the target. It takes <see cref="UpheavalDamage"/> and is pushed away
         /// from the caster (collision damage if blocked). No rock is left behind (rocks were too much, 2026-10-30).
         /// </summary>
         internal List<BattleEvent> DoUpheaval(Unit unit, Unit target)

@@ -141,7 +141,7 @@ namespace ArmyRoguelike.Core
                 case Ability.Elusive: return "ignores zone of control";
                 case Ability.DeathMark: return "its marks spread: when a marked enemy dies, every enemy next to it is marked";
                 case Ability.Isolate: return $"+{Battle.IsolateBonus} damage to exposed enemies";
-                case Ability.IntoShadows: return $"a kill hides it until your next turn: enemies can't target or attack it (area blasts still hit). At most once every {Battle.IntoShadowsCooldown} turns";
+                case Ability.IntoShadows: return $"a kill hides it until your next turn: enemies can't target or attack it (area damage still hits). At most once every {Battle.IntoShadowsCooldown} turns";
                 case Ability.Pincer: return $"+{Battle.PincerBonus} damage if an ally stands on the far side of the target";
                 case Ability.KillRefund: return "a kill gives its action back and 1 move: it can attack again or walk on";
                 case Ability.Poison: return "its hits poison";
@@ -156,11 +156,11 @@ namespace ArmyRoguelike.Core
                 case Ability.WideWard: return "Ward also shields every ally next to the target";
                 case Ability.Mines: return "an enemy stepping on one of its mines sets it off: it hurts whoever stands on that tile";
                 case Ability.BigMines: return $"its mines deal {Battle.BigMineDamage} damage and it can have {Battle.BigMaxMines} out";
-                case Ability.BlastProof: return "its blasts don't hurt your units";
+                case Ability.BlastProof: return "its blasts (mines, bombs, Demolish, Detonate) don't hurt your units";
                 case Ability.SearingBolt: return $"its bolt sets the target's tile burning for {Battle.BurnRounds} rounds";
                 case Ability.Twincast: return "the first action it uses each turn costs no AP, so it can still attack or cast another (it can't move afterwards)";
                 case Ability.QuickFuse: return "Place Mine is free and ready every turn: use it before acting, then move and attack as usual";
-                case Ability.Incendiary: return $"its mines, bombs and blasts leave the ground they hit burning for {Battle.BurnRounds} rounds";
+                case Ability.Incendiary: return $"its blasts (mines, bombs, Demolish, Detonate) leave the ground they hit burning for {Battle.BurnRounds} rounds";
                 case Ability.SpikedBarricades: return $"an enemy starting its turn next to one of its barricades takes {Battle.SpikeDamage}";
                 case Ability.VampireFang: return $"heals {Battle.VampireHeal} HP on a kill";
                 case Ability.Thorns: return $"melee attackers take {Battle.ThornsDamage} damage";
@@ -176,10 +176,10 @@ namespace ArmyRoguelike.Core
                 case Ability.PowderKeg: return $"when it dies it explodes: {Battle.PowderKegDamage} damage to everyone around it, its own side included";
                 case Ability.LightFingers: return "the only unit that can still move after attacking: it stabs, grabs the gold and runs in the same turn";
                 case Ability.Caltrops: return $"drops caltrops on its tile or a free tile next to it; a unit of yours stepping on them takes {Battle.CaltropsDamage} and its movement ends";
-                case Ability.BehindCover: return "while next to a wall it can't be hit by ranged attacks; melee, bombs and blasts still reach it";
+                case Ability.BehindCover: return "while next to a wall it can't be hit by shots from range; melee and area damage still reach it";
                 case Ability.Overwatch: return "instead of shooting, it aims: during your next turn the first of your units that walks onto a tile it can see in range is shot and stops there";
-                case Ability.BullRush: return $"hit a unit next to it and push it 1 tile; if it slams into a unit, both take {Battle.CollisionDamage}";
-                case Ability.Upheaval: return $"the ground bursts up under one of your units within {Battle.UpheavalRange} tiles (no line of sight needed): {Battle.UpheavalDamage} damage, and it is thrown 1 tile away from the caster ({Battle.CollisionDamage} more if blocked)";
+                case Ability.BullRush: return $"hit a unit next to it and push it; if it slams into a unit, both take {Battle.CollisionDamage}";
+                case Ability.Upheaval: return $"the ground bursts up under one of your units within {Battle.UpheavalRange} tiles (no line of sight needed): {Battle.UpheavalDamage} damage, and it is pushed away from the caster ({Battle.CollisionDamage} more if it slams into something)";
                 case Ability.Grasp: return "grabs a unit next to it: no damage, but it is pinned";
                 case Ability.Colossus: return "can't be pushed, pinned, slowed or grasped";
                 case Ability.Wrath: return "from its second phase it gets 2 actions a turn instead of 1 (each still has its cooldown)";
@@ -311,9 +311,9 @@ namespace ArmyRoguelike.Core
                 case ActionKind.ThrowBomb:
                     return $"lob a bomb 2-{Battle.PlayerBombRange} tiles away; it explodes for {Battle.PlayerBombDamage} on that tile at the start of the next enemy turn";
                 case ActionKind.PinningShot: return $"{Battle.PinDamage} damage to an enemy in shot range (line of sight), and it is pinned";
-                case ActionKind.ShieldBash: return $"{Battle.BashDamage} damage to an enemy next to it and push it 1 tile; {Battle.CollisionDamage} more if it slams into a wall, unit or the edge, and the unit it slams into takes {Battle.CollisionDamage} too";
+                case ActionKind.ShieldBash: return $"{Battle.BashDamage} damage to an enemy next to it and push it; {Battle.CollisionDamage} more if it slams into a wall, unit or the edge, and the unit it slams into takes {Battle.CollisionDamage} too";
                 case ActionKind.Vanish: return $"becomes hidden until your next turn; its first attack while hidden deals +{Battle.VanishBonus}. Free";
-                case ActionKind.Kick: return $"{Battle.KickDamage} damage to an enemy next to it and push it 1 tile";
+                case ActionKind.Kick: return $"{Battle.KickDamage} damage to an enemy next to it and push it";
                 case ActionKind.SnareTrap: return $"hide a snare on a free tile within {Battle.SnareRange} (max {Battle.MaxSnares}); the first enemy to walk onto it stops, takes {Battle.SnareDamage} and is pinned. Enemies don't see snares";
                 case ActionKind.FireArrow: return $"shoot an enemy in shot range for its attack damage; the ground under it burns for {Battle.BurnRounds} rounds";
                 case ActionKind.CoveringFire: return "instead of shooting, it aims: during the enemy turn the first enemy that walks onto a tile it can see in range is shot and stops there";
@@ -337,12 +337,12 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Battlecry: return $"every ally within {Battle.BattlecryRange} tiles, itself included, gets +{Battle.BattlecryMoves} move and a shield that absorbs {Battle.BattlecryShield} damage, both until your next turn";
                 case ActionKind.Taunt: return $"until your next turn, enemies within {Battle.TauntRange} tiles can only attack or use offensive abilities on this unit";
                 case ActionKind.ThrowShield: return $"for the rest of the battle: +{Battle.ThrowShieldMoves} move and +{Battle.ThrowShieldDamage} damage, for {Battle.ThrowShieldHpCost} HP. Once per battle. Free";
-                case ActionKind.FrostNova: return "every enemy next to it is slowed and pushed 1 tile away";
+                case ActionKind.FrostNova: return "every enemy next to it is slowed and pushed away";
                 case ActionKind.Firewall: return $"set 3 tiles in a line across its aim, up to {Battle.FirewallRange} tiles away, burning for {Battle.BurnRounds} rounds; whoever stands there takes {Battle.FirewallDamage} now";
                 case ActionKind.Blizzard: return $"{Battle.BlizzardDamage} damage to every enemy on a tile up to {Battle.BlizzardRange} tiles away and the 4 next to it, and they are slowed. Spares your units";
                 case ActionKind.Transpose: return $"swap places with any unit within {Battle.TransposeRange} tiles, friend or foe (not the Giant or objectives). An enemy put down on a mine sets it off";
                 case ActionKind.CaveIn: return $"drop rubble on a free tile within {Battle.CaveInRange}";
-                case ActionKind.Hook: return $"pull an enemy 2-{Battle.HookRange} tiles away in a straight line (in sight) to the tile next to it; mines on the way go off, and it slams into whatever blocks it (not huge units)";
+                case ActionKind.Hook: return $"pull an enemy 2-{Battle.HookRange} tiles away in a straight line (in sight) to the tile next to it; mines on the way go off, and it slams into whatever blocks it (not huge units). A pull, not a push: weight and Battering Ram don't change it";
                 case ActionKind.Demolish: return $"blow up a wall or rubble within {Battle.DemolishRange}: {Battle.DemolishDamage} damage to everyone in the 3x3 around it. A rock or barricade collapses into rubble";
                 default: return "";
             }
@@ -398,7 +398,7 @@ namespace ArmyRoguelike.Core
                 list.Add((Name(action), Battle.ActionCost(action), action, Describe(action)));
             if (s.Slams)
                 list.Add(("Slam", Battle.AttackCost, ActionKind.Slam,
-                    $"{Battle.SlamDamage} damage to each of your units within 2 tiles, then shoves everyone within 2 tiles 1 tile away"));
+                    $"{Battle.SlamDamage} damage to each of your units within 2 tiles, then pushes everyone within 2 tiles away from it"));
             if (s.CanThrow)
                 list.Add(("Boulder", s.ThrowCost, ActionKind.Boulder, $"{s.ThrowDamage} damage to a unit 2-{s.ThrowRange} tiles away, over obstacles; the rock stays"));
             if (s.CanBomb)

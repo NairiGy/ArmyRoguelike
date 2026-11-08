@@ -16,6 +16,7 @@ namespace ArmyRoguelike.Core
         Burning,
         Wall,
         Rubble,
+        Blast,
         Poison,
         Push,
         ZoneOfControl,
@@ -31,7 +32,7 @@ namespace ArmyRoguelike.Core
     {
         public static readonly Keyword[] All =
         {
-            Keyword.Pinned, Keyword.Slowed, Keyword.Marked, Keyword.Exposed, Keyword.Hidden, Keyword.Burning, Keyword.Wall, Keyword.Rubble,
+            Keyword.Pinned, Keyword.Slowed, Keyword.Marked, Keyword.Exposed, Keyword.Hidden, Keyword.Burning, Keyword.Wall, Keyword.Rubble, Keyword.Blast,
             Keyword.Poison, Keyword.Push, Keyword.ZoneOfControl, Keyword.LineOfSight, Keyword.Fury, Keyword.Swift,
             Keyword.Shield, Keyword.Free,
         };
@@ -55,10 +56,11 @@ namespace ArmyRoguelike.Core
                 case Keyword.Slowed: return "On its next turn it can move or act, not both: walking costs it the attack, and acting ends its moves.";
                 case Keyword.Marked: return $"The next hit on it, by anyone and from anything but poison or fire, deals +{Battle.MarkBonus}. Then the mark is gone.";
                 case Keyword.Exposed: return "No ally of its own stands next to it.";
-                case Keyword.Hidden: return "Until your next turn, enemies can't target or attack it (area blasts still hit). Attacking doesn't reveal it.";
+                case Keyword.Hidden: return "Until your next turn, enemies can't target or attack it (area damage still hits). Attacking doesn't reveal it.";
                 case Keyword.Burning: return $"Burning ground: {Battle.BurnDamage} damage to whoever starts a turn on it. Enemies walk through it but never stop on it.";
                 case Keyword.Wall: return "A rock (crystals, tombstones and boulders too), ice or a barricade: blocks walking and shots, and gives cover. Rubble and holes are not walls.";
                 case Keyword.Rubble: return $"A low heap: blocks walking but not shots, and gives no cover. A unit pushed into it is crushed for {Battle.CollisionDamage + Battle.CrushDamage} and the rubble breaks. One hit clears it.";
+                case Keyword.Blast: return "An explosion: a mine, a bomb, Demolish, Detonate, a Powder Keg or a Corpse Blast. It hurts everyone in its area, either side, and sets off any mine or bomb inside it.";
                 case Keyword.Poison: return $"{Battle.PoisonDamage} damage at the start of the target's turn, {Battle.PoisonTurns} times.";
                 case Keyword.Push: return $"A medium unit moves 1 tile, a small one 2, a huge one not at all. If it slams into a wall, a unit or the edge, it stops and takes {Battle.CollisionDamage}. An enemy pushed onto a mine sets it off.";
                 case Keyword.ZoneOfControl: return "Stepping out of a tile next to an enemy uses up all remaining moves, for both sides.";
@@ -84,6 +86,7 @@ namespace ArmyRoguelike.Core
                 case Keyword.Burning: return new[] { "burning", "burns" };
                 case Keyword.Wall: return new[] { "walls", "wall" };
                 case Keyword.Rubble: return new[] { "rubble" };
+                case Keyword.Blast: return new[] { "blasts", "blast" };
                 case Keyword.Poison: return new[] { "poisoned", "poisons", "poison" };
                 case Keyword.Push: return new[] { "pushed", "pushes", "push" };
                 case Keyword.ZoneOfControl: return new[] { "zone of control" };
@@ -160,7 +163,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>
         /// The word is part of an action's name, not the keyword: "shield" in Shield Up, Shield Bash, Shield Wall and
-        /// Throw Shield; "wall" in Ice Wall and Shield Wall.
+        /// Throw Shield; "wall" in Ice Wall and Shield Wall; "blast" in Corpse Blast and Blast Proof.
         /// </summary>
         private static bool InActionName(Keyword k, string lower, int at, int length)
         {
@@ -171,6 +174,7 @@ namespace ArmyRoguelike.Core
             {
                 case Keyword.Shield: return Before("throw ") || After(" up") || After(" bash") || After(" wall");
                 case Keyword.Wall: return Before("ice ") || Before("shield ");
+                case Keyword.Blast: return Before("corpse ") || After(" proof");
                 default: return false;
             }
         }

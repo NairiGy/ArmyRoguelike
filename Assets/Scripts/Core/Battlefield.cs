@@ -72,7 +72,7 @@ namespace ArmyRoguelike.Core
                     return $"Every action's cooldown is {CooldownCut} shorter (1 at least), for both sides.";
                 case Battlefield.FortunesFavored:
                     return "At the start of each round, one of your units and one enemy are favored: " +
-                           $"their attacks and blasts deal {FavoredMultiplier}x damage until the next round. A boss is never favored.";
+                           $"their hits deal {FavoredMultiplier}x damage until the next round (not poison, burning ground or collisions). A boss is never favored.";
                 case Battlefield.HiddenMinds:
                     return "You can't see what the enemies plan to do.";
                 case Battlefield.CrumblingRoof:

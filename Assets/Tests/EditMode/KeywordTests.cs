@@ -44,6 +44,14 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void BlastInActionNamesIsNotTheKeyword()
+        {
+            Assert.IsEmpty(Keywords.Find("Corpse Blast and Blast Proof"));
+            CollectionAssert.Contains(Keywords.In(Abilities.Describe(Ability.BlastProof)), Keyword.Blast);
+            CollectionAssert.Contains(Keywords.In(Abilities.Describe(Ability.Incendiary)), Keyword.Blast);
+        }
+
+        [Test]
         public void OnlyTheArchersMarkIsMarked()
         {
             var texts = new[]

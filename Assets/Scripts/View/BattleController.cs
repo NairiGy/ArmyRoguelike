@@ -2538,7 +2538,7 @@ namespace ArmyRoguelike.View
                 case IntentKind.Flee:
                     return $"run off the far edge with {intent.Target.CarryingLoot} of your gold. Kill it first!";
                 case IntentKind.Slam:
-                    return $"slam: {Battle.SlamDamage} damage to everyone within 2 tiles (red area), then shove them 1 tile away";
+                    return $"slam: {Battle.SlamDamage} damage to everyone within 2 tiles (red area), then push them away";
                 case IntentKind.Fling:
                     return intent.Thrown != null
                         ? $"fling the {intent.Thrown.Stats.Name} at the {name}: {Battle.FlingDamage} damage, it lands on the dark tile and can still act"
@@ -2546,9 +2546,9 @@ namespace ArmyRoguelike.View
                 case IntentKind.Overwatch:
                     return "overwatch: no shot this turn, so it aims; the first of your units to walk into its sight next turn gets shot";
                 case IntentKind.BullRush:
-                    return $"bull rush the {name}: hit it and push it 1 tile";
+                    return $"bull rush the {name}: hit it and push it";
                 case IntentKind.Upheaval:
-                    return $"upheaval: walk closer, then burst the ground under the {name}: {Battle.UpheavalDamage} damage and it is thrown 1 tile away";
+                    return $"upheaval: walk closer, then burst the ground under the {name}: {Battle.UpheavalDamage} damage and it is pushed away";
                 case IntentKind.Grasp:
                     return $"grasp the {name}: no damage, but it can't move on your next turn";
                 case IntentKind.CorpseBlast:

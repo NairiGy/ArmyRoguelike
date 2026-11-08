@@ -181,7 +181,7 @@ public static class GamepediaWriter
         if (e.Has(Ability.Howl))
             lines.Add($"<b>Howl</b> ({cost} AP, cooldown {Battle.Cooldown(ActionKind.Howl)}): {Esc(Abilities.Describe(Ability.Howl))}. The leader acts before the other enemies, so the move reaches wolves that haven't acted.");
         if (e.Slams)
-            lines.Add($"<b>Slam</b> ({cost} AP, cooldown {Battle.Cooldown(ActionKind.Slam)}): {Battle.SlamDamage} damage to each of your units within 2 tiles, then shoves every other 1x1 unit within 2 tiles (yours and its own) 1 tile away from it. " +
+            lines.Add($"<b>Slam</b> ({cost} AP, cooldown {Battle.Cooldown(ActionKind.Slam)}): {Battle.SlamDamage} damage to each of your units within 2 tiles, then pushes every other 1x1 unit within 2 tiles (yours and its own) away from it. " +
                       $"A unit pushed into a wall, unit or the edge takes {Battle.CollisionDamage} damage.");
         if (e.CanThrow)
             lines.Add($"<b>Boulder</b> ({e.ThrowCost} AP, cooldown {Battle.Cooldown(ActionKind.Boulder)}): {e.ThrowDamage} damage to a unit 2-{e.ThrowRange} tiles away, ignoring line of sight. " +
@@ -426,7 +426,7 @@ public static class GamepediaWriter
         html.Append($"Survive {Encounter.RitualTurns} enemy turns and the ritual completes: you win and pick a blessing. If the shrine breaks, ");
         html.Append("the fight is lost (no gold) and you take a random curse, but the run goes on. Losing the whole army still ends the run. ");
         html.Append("Enemies go for the shrine unless one of your units is next to them (Taunt still wins). The shrine counts as your ally for ");
-        html.Append($"Guard; your own blasts and volleys hurt it. Reinforcements arrive on edge tiles at least {Battle.RitualSpawnDistance} steps from it.</p>");
+        html.Append($"Guard; your own blasts and area attacks hurt it. Reinforcements arrive on edge tiles at least {Battle.RitualSpawnDistance} steps from it.</p>");
         html.Append($"<p><b>Break the Ritual</b>: {Encounter.TotemCount} totems ({UnitStats.Totem.MaxHp} HP) stand on the far half, guarded by goblins. ");
         html.Append($"Smash them all before the summoning completes at the start of enemy turn {Encounter.SummonTurn}: you win, the guards flee, ");
         html.Append($"and you get the usual technique pick. If the summoning completes, the fight is lost (no gold) and you take a random curse; ");
@@ -552,7 +552,7 @@ public static class GamepediaWriter
         html.Append($"<li>Poison: {Battle.PoisonDamage} damage at the start of the target's turn, {Battle.PoisonTurns} times. Burning ground: {Battle.BurnDamage} damage at the start of the turn of whoever stands on it; enemies never stop on it.</li>");
         html.Append($"<li><b>Rubble</b> (the Sapper's keyword): a low heap that blocks walking like a wall but not shots, and gives no cover. A unit pushed into it is crushed for {Battle.CrushDamage} more than a normal collision ({Battle.CollisionDamage + Battle.CrushDamage} in all) and the rubble breaks. One hit from any unit clears it. Broken barricades collapse into rubble.</li>");
         html.Append("<li>Pinned units (the Archer's keyword: Pinning Shot, Snare Trap, Suppressing Fire) can't move on their next turn. Slowed units (the Mage's keyword: Frost Nova, Chill, Blizzard) can move or act on their next turn, not both.</li>");
-        html.Append("<li>Hidden units (Vanish, Smoke Bomb, Into the Shadows) can't be targeted or attacked by enemies until your next turn, though area blasts still hit them. Attacking doesn't reveal them; the first attack while hidden deals +2.</li>");
+        html.Append("<li>Hidden units (Vanish, Smoke Bomb, Into the Shadows) can't be targeted or attacked by enemies until your next turn, though area damage still hits them. Attacking doesn't reveal them; the first attack while hidden deals +2.</li>");
         html.Append("<li>Snares (Snare Trap) are hidden from enemies: the first enemy to walk onto one stops, takes damage and is pinned. The Archer's Overwatch is the Crossbowman's rule turned around: it shoots the first enemy that walks onto a tile the archer can shoot at, and stops it there.</li>");
         html.Append("<li>Hover any enemy to see what it plans to do next.</li>");
         html.Append("<li>Controls: left-click chooses (selects one of your units, or opens any unit's card; hover a name on the card for what it does), right-click acts (move, attack, or use the aimed action). Esc cancels an aimed action or closes the card.</li>");

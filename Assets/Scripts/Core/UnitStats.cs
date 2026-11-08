@@ -561,7 +561,7 @@ namespace ArmyRoguelike.Core
         public static readonly UnitStats Ogre = new UnitStats(UnitKind.Ogre, "Giant", 42, 5, 1, 1)
         {
             IsBoss = true, Size = 2, Weight = Weight.Huge, AreaMelee = true, ThrowCost = 1, ThrowDamage = 4, ThrowRange = 4, Slams = true, Abilities = A(Ability.Colossus, Ability.Wrath, Ability.StoneHeart),
-            Role = "Boss, 2x2. One action a turn, two from its second phase; rocks fall in its last. Slam: 3 damage to each of your units within 2 tiles, then shoves them 1 tile away. Smash hits every adjacent unit. " +
+            Role = "Boss, 2x2. One action a turn, two from its second phase; rocks fall in its last. Slam: 3 damage to each of your units within 2 tiles, then pushes them away. Smash hits every adjacent unit. " +
                    "Or throws a boulder 2-4 tiles away that stays as a rock. Nothing pins, slows or pushes it.",
         };
 
@@ -593,7 +593,7 @@ namespace ArmyRoguelike.Core
         public static readonly UnitStats Elemental = new UnitStats(UnitKind.Elemental, "Elemental", 8, 3, 1, 1)
         {
             Weight = Weight.Huge, SplitsInto = Shard, Abilities = A(Ability.Upheaval),
-            Role = "Throws your units out of line with the ground beneath them. When it dies it splits into 2 Shards (5 HP each).",
+            Role = "Bursts the ground under your units and pushes them out of line. When it dies it splits into 2 Shards (5 HP each).",
         };
 
         // ---------- Raised versions (necromancer boss) ----------
