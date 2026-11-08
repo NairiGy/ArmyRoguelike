@@ -202,7 +202,7 @@ namespace ArmyRoguelike.Core
         /// <summary>The Warrior's zone-of-control passive: <see cref="EffectEvent.Unit"/> struck an enemy stepping out of its reach.</summary>
         ZocStrike,
 
-        /// <summary>The Archer's Covering Fire: <see cref="EffectEvent.Unit"/> shoots an enemy walking into its sight.</summary>
+        /// <summary>The Archer's Overwatch (CoveringFire in code): <see cref="EffectEvent.Unit"/> shoots an enemy walking into its sight.</summary>
         CoveringFire,
 
         /// <summary>A hit used up the mark on <see cref="EffectEvent.Unit"/> for <see cref="EffectEvent.Amount"/> more damage.</summary>
@@ -326,7 +326,7 @@ namespace ArmyRoguelike.Core
         /// <summary>The Giant's last phase: rocks will fall on this unit's tile at the end of the enemy turn.</summary>
         Rockfall,
 
-        /// <summary>Grasp (skeletons): held in place, can't move on its next turn.</summary>
+        /// <summary>Grasp (skeletons): the target is pinned.</summary>
         Grasp,
 
         /// <summary>A vanished unit became visible again.</summary>

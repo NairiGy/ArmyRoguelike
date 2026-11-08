@@ -548,7 +548,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>
         /// A skeleton grasps rather than strikes a unit that would get away from it: a ranged one (it wants to back off
-        /// and shoot) or a Swift one. Only when Grasp is ready and the target isn't already held.
+        /// and shoot) or a Swift one. Only when Grasp is ready and the target isn't already pinned.
         /// </summary>
         public static bool WantsToGrasp(Battle battle, Unit enemy, Unit target) =>
             enemy.Has(Ability.Grasp) && battle.Ready(enemy, ActionKind.Grasp) && target != null && !target.IsObjective &&
@@ -714,7 +714,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>
         /// One of your units already stands next to a fighting unit of this side. Checked directly rather than with zone of
-        /// control, which ignores Slippery units.
+        /// control, which ignores Elusive units.
         /// </summary>
         private static bool InEnemyReach(Battle battle, Team side, Unit u) =>
             battle.Living(side).Any(e => !e.IsObjective && Battle.Distance(e, u) == 1);

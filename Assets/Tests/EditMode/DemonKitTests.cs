@@ -267,7 +267,7 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Spines_HurtAMeleeAttacker()
+        public void Thorns_FiendHurtsAMeleeAttacker()
         {
             var b = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(2, 2) }, new[] { E(UnitStats.Fiend, 2, 3) });
             var warrior = Player(b);

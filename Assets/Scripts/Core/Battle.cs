@@ -436,7 +436,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Tiles watched by a crossbowman on overwatch (your next unit walking onto one gets shot).</summary>
         public IEnumerable<GridPos> OverwatchTiles => _overwatch.Where(o => o.Key.IsAlive && o.Key.Team == Team.Enemy).SelectMany(o => o.Value).Distinct();
 
-        /// <summary>Tiles your archers cover with Covering Fire (the next enemy walking onto one gets shot).</summary>
+        /// <summary>Tiles your archers cover with Overwatch (CoveringFire in code; the next enemy walking onto one gets shot).</summary>
         public IEnumerable<GridPos> CoverTiles => _overwatch.Where(o => o.Key.IsAlive && o.Key.Team == Team.Player).SelectMany(o => o.Value).Distinct();
 
         public Phase Phase { get; private set; } = Phase.Placement;
@@ -1337,7 +1337,7 @@ namespace ArmyRoguelike.Core
         public bool InEnemyReach(Unit unit, GridPos anchor) => EngagedBy(unit, anchor).Any();
 
         /// <summary>The enemies whose reach holds the unit standing here: stepping out of their reach uses up its remaining moves.</summary>
-        public IEnumerable<Unit> EngagedBy(Unit unit, GridPos anchor) => unit.Has(Ability.Slippery) || unit.Has(Ability.Elusive) ? Enumerable.Empty<Unit>() :
+        public IEnumerable<Unit> EngagedBy(Unit unit, GridPos anchor) => unit.Has(Ability.Elusive) ? Enumerable.Empty<Unit>() :
             _units.Where(u => u.IsPlaced && u.IsAlive && u.Team != unit.Team && !u.IsObjective && Distance(anchor, unit.Size, u) == 1);
 
         /// <summary>
@@ -2846,7 +2846,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>
         /// Who attacks a unit for walking this path: each enemy with the zone-of-control passive, not used yet this
-        /// round, whose reach the path leaves. Slippery units ignore it, as they ignore zone of control.
+        /// round, whose reach the path leaves. Elusive units ignore it, as they ignore zone of control.
         /// </summary>
         private List<Unit> ZocStrikers(Unit unit, GridPos from, IReadOnlyList<GridPos> path)
         {
@@ -3157,12 +3157,12 @@ namespace ArmyRoguelike.Core
             return events;
         }
 
-        /// <summary>Grasp: an adjacent unit it could attack, not already held in place.</summary>
+        /// <summary>Grasp: an adjacent unit it could attack, not already pinned.</summary>
         public bool CanGrasp(Unit unit, Unit target) =>
             unit.Has(Ability.Grasp) && Ready(unit, ActionKind.Grasp) && CanAttack(unit, target) && Distance(unit, target) == 1 &&
             !target.IsObjective && target.SnareTurns == 0 && !target.Has(Ability.Colossus);
 
-        /// <summary>Grasp: no damage, but the target can't move on its next turn (the same hold as a pin).</summary>
+        /// <summary>Grasp: no damage, but the target is pinned.</summary>
         internal List<BattleEvent> DoGrasp(Unit unit, Unit target)
         {
             UseUp(unit, ActionKind.Grasp);
@@ -3727,10 +3727,10 @@ namespace ArmyRoguelike.Core
             return events;
         }
 
-        /// <summary>Thorned Mail: a melee attacker takes damage back from the unit it hit.</summary>
+        /// <summary>Thorns (Thorned Mail, the Fiend): a melee attacker takes damage back from the unit it hit.</summary>
         private void Thorns(Unit attacker, Unit target, List<BattleEvent> events)
         {
-            if (!(target.Has(Ability.ThornedMail) || target.Has(Ability.Spines)) || !attacker.IsAlive || target.Team == attacker.Team)
+            if (!target.Has(Ability.Thorns) || !attacker.IsAlive || target.Team == attacker.Team)
                 return;
             var after = new List<BattleEvent>();
             var hit = Damage(attacker, ThornsDamage, target, DamageKind.Tick, after);

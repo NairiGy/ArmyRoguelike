@@ -237,7 +237,7 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Slippery_GoblinsIgnoreZoneOfControl()
+        public void Elusive_GoblinsIgnoreZoneOfControl()
         {
             var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 1) }, new[] { (UnitStats.Goblin, new GridPos(3, 2)) });
             var goblin = Enemy(b);

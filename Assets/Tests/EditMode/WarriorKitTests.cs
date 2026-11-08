@@ -230,7 +230,7 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void ZocStrike_HitsAUnitLeavingItsReach_OnceARound_ButNotSlippery()
+        public void ZocStrike_HitsAUnitLeavingItsReach_OnceARound_ButNotElusive()
         {
             var b = Setup(new[] { M(UnitStats.Warrior, Technique.ZocStrike) }, new[] { P(3, 3) },
                 new[] { E(UnitStats.Crossbowman, 3, 4), E(UnitStats.Crossbowman, 4, 3) });
@@ -246,7 +246,7 @@ namespace ArmyRoguelike.Tests
             var slip = Setup(new[] { M(UnitStats.Warrior, Technique.ZocStrike) }, new[] { P(3, 3) }, new[] { E(UnitStats.Goblin, 3, 4) });
             Enemy(slip).Moves = 1;
             slip.DoMove(Enemy(slip), P(3, 5));
-            Assert.AreEqual(UnitStats.Goblin.MaxHp, Enemy(slip).Hp, "Slippery ignores it");
+            Assert.AreEqual(UnitStats.Goblin.MaxHp, Enemy(slip).Hp, "Elusive ignores it");
         }
     }
 }

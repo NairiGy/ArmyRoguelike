@@ -1105,7 +1105,7 @@ namespace ArmyRoguelike.View
                             DamagePopup.Spawn(at, "Pinned", DamagePopup.AbilityColor, 44);
                             break;
                         case StatusKind.Grasp:
-                            DamagePopup.Spawn(at, "Grasped: no move", DamagePopup.AbilityColor, 40);
+                            DamagePopup.Spawn(at, "Grasped: pinned", DamagePopup.AbilityColor, 40);
                             break;
                         case StatusKind.Wrath:
                             DamagePopup.Spawn(at, "Wrath! 2 actions a turn", DamagePopup.DamageColor, 48);
@@ -1374,7 +1374,7 @@ namespace ArmyRoguelike.View
                     DamagePopup.Spawn(at, $"Mark +{effect.Amount}", DamagePopup.DamageColor, 40);
                     break;
                 case EffectKind.CoveringFire:
-                    DamagePopup.Spawn(at, "Covering fire!", DamagePopup.AbilityColor, 44);
+                    DamagePopup.Spawn(at, "Overwatch!", DamagePopup.AbilityColor, 44);
                     break;
                 case EffectKind.Crush:
                     // Placeholder: popup only (see the "Art needed" rows in docs/night/mage-sapper.md).
@@ -2008,7 +2008,7 @@ namespace ArmyRoguelike.View
                 if (Battle.Snares.Contains(p))
                     return "Your snare: the first enemy to walk onto it stops, takes damage and is pinned. Enemies can't see it.";
                 if (Battle.CoverTiles.Contains(p))
-                    return "Covering Fire: your archer is aiming here. The first enemy to walk onto a marked tile is shot and stops.";
+                    return "Overwatch: your archer is aiming here. The first enemy to walk onto a marked tile is shot and stops.";
                 if (Battle.MineAt(p) != null)
                     return $"Your mine: an enemy stepping here sets it off ({Battle.MineAt(p).Damage} damage to whoever stands on this tile).";
                 if (Battle.IsBarricade(p))

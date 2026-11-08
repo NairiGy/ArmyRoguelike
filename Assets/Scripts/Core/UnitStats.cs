@@ -134,7 +134,7 @@ namespace ArmyRoguelike.Core
         /// <summary>+2 damage against enemies that can't move (pinned or slowed).</summary>
         CheapShot,
 
-        /// <summary>Ignores zone of control, like Slippery.</summary>
+        /// <summary>Ignores zone of control: leaving an enemy's reach doesn't use up its moves (Rogue technique, and goblins).</summary>
         Elusive,
 
         /// <summary>A kill hides it until your next turn (as Vanish, without the ambush bonus).</summary>
@@ -194,8 +194,8 @@ namespace ArmyRoguelike.Core
         /// <summary>Heals 2 HP on every kill.</summary>
         VampireFang,
 
-        /// <summary>An enemy that hits this unit in melee takes 1 damage.</summary>
-        ThornedMail,
+        /// <summary>Thorns: a unit that hits this one in melee takes 1 damage (the Thorned Mail item, and the Fiend).</summary>
+        Thorns,
 
         /// <summary>+1 move each turn.</summary>
         SpringBoots,
@@ -229,9 +229,6 @@ namespace ArmyRoguelike.Core
 
         // ---------- Goblins ----------
 
-        /// <summary>Ignores zone of control: leaving an enemy's reach doesn't use up its moves.</summary>
-        Slippery,
-
         /// <summary>Its action can be a fling: it throws an adjacent goblin, bomb or mine at one of your units 2-3 tiles away.</summary>
         Fling,
 
@@ -260,7 +257,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Its action can be Upheaval: the ground bursts up under a unit within 2 tiles, hurting it and pushing it off.</summary>
         Upheaval,
 
-        /// <summary>Its action can be Grasp: an adjacent unit can't move on its next turn.</summary>
+        /// <summary>Its action can be Grasp: an adjacent unit is pinned.</summary>
         Grasp,
 
         // ---------- Bosses ----------
@@ -299,9 +296,6 @@ namespace ArmyRoguelike.Core
         /// <summary>Its action can be Soul Contract: one of your units loses HP next enemy turn unless the Devil is hit first.</summary>
         SoulContract,
 
-        /// <summary>A melee attacker takes 1 damage (like Thorns).</summary>
-        Spines,
-
         /// <summary>Its action can be Fire Breath: 2 tiles in a straight line take damage and burn.</summary>
         FireBreath,
     }
@@ -333,6 +327,7 @@ namespace ArmyRoguelike.Core
         Kick,
         SnareTrap,
         FireArrow,
+        /// <summary>The Archer's Overwatch, the same rule as the Crossbowman's (kept as its own action in code; shown as "Overwatch").</summary>
         CoveringFire,
         SuppressingFire,
         ThrowingKnife,
@@ -547,7 +542,7 @@ namespace ArmyRoguelike.Core
             new UnitStats(UnitKind.Skeleton, "Skeleton", 4, 2, 1, 1)
             {
                 Weight = Weight.Small, LeavesRemains = true, Abilities = A(Ability.Grasp),
-                Role = "Grabs your units and holds them in place. Leaves a bone pile when killed; a Necromancer can raise it. Stand on the pile to stop that.",
+                Role = "Grabs your units and pins them. Leaves a bone pile when killed; a Necromancer can raise it. Stand on the pile to stop that.",
             };
 
         /// <summary>
@@ -643,7 +638,7 @@ namespace ArmyRoguelike.Core
 
         public static readonly UnitStats Goblin = new UnitStats(UnitKind.Goblin, "Goblin", 6, 2, 1, 1)
         {
-            Weight = Weight.Small, Abilities = A(Ability.Swift, Ability.Slippery, Ability.Fling),
+            Weight = Weight.Small, Abilities = A(Ability.Swift, Ability.Elusive, Ability.Fling),
             Role = "Slips past your line and flings its friends, and your own explosives, at you.",
         };
 
@@ -678,7 +673,7 @@ namespace ArmyRoguelike.Core
 
         public static readonly UnitStats Fiend = new UnitStats(UnitKind.Fiend, "Fiend", 7, 2, 1, 1)
         {
-            Weight = Weight.Small, Abilities = A(Ability.Swift, Ability.Hellborn, Ability.Spines, Ability.FireBreath),
+            Weight = Weight.Small, Abilities = A(Ability.Swift, Ability.Hellborn, Ability.Thorns, Ability.FireBreath),
             Role = "Fast and spiny: breathes fire down a line of your units and leaves the ground burning.",
         };
 

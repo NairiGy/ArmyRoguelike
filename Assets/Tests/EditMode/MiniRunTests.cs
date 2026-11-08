@@ -29,7 +29,7 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(4, Equipment.Catalog.Count);
             Assert.IsTrue(Equipment.Catalog.All(e => e.Ability != Ability.None));
             var unit = new Unit(0, Team.Player, UnitStats.Warrior, new ArmyMember(UnitStats.Warrior, Equipment.ThornedMail));
-            Assert.IsTrue(unit.Has(Ability.ThornedMail));
+            Assert.IsTrue(unit.Has(Ability.Thorns));
             Assert.AreEqual(UnitStats.Warrior.MaxHp, unit.MaxHp, "items no longer change stats");
         }
 

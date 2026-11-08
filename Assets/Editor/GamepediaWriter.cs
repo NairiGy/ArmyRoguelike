@@ -269,7 +269,7 @@ public static class GamepediaWriter
         html.Append("<tr><td>Fire Breath</td><td>A fiend with Fire Breath ready that can breathe at one of your units this turn, from its tile or one it can walk to.</td><td>The target, and the tile it breathes from.</td></tr>");
         html.Append($"<tr><td>Rending Blow</td><td>It has Rending Blow ready, more than {Battle.RendingBlowCost} HP, and can reach its target to attack this turn.</td><td>The target, with an arrow.</td></tr>");
         html.Append("<tr><td>Fling</td><td>A goblin that can't reach anyone to strike this turn, with a bomb, mine or unacted goblin next to it and one of your units 2-3 tiles away.</td><td>The target, the goblin to be thrown and its landing tile.</td></tr>");
-        html.Append("<tr><td>Grasp</td><td>It grasps, Grasp is ready, it can reach its target to attack this turn, and the target is ranged or Swift and not already held.</td><td>The target, with an arrow.</td></tr>");
+        html.Append("<tr><td>Grasp</td><td>It grasps, Grasp is ready, it can reach its target to attack this turn, and the target is ranged or Swift and not already pinned.</td><td>The target, with an arrow.</td></tr>");
         html.Append($"<tr><td>Upheaval</td><td>It has Upheaval ready, can't reach its target to strike this turn, and the target is within {Battle.UpheavalRange} tiles plus its moves. It may still pick a nearer unit once it has walked.</td><td>The target, with an arrow.</td></tr>");
         html.Append("<tr><td>Slam</td><td>It can slam, 2 or more of your units are within 2 tiles, and the slam would deal more in total than a smash.</td><td>The area within 2 tiles.</td></tr>");
         html.Append("<tr><td>Corpse Blast</td><td>It has Corpse Blast ready and a bone pile in range whose 3x3 holds more of your units than of its own (at least one).</td><td>The 3x3 around the pile.</td></tr>");
@@ -318,7 +318,7 @@ public static class GamepediaWriter
                 return new[]
                 {
                     $"If it can hit its {target} from where it stands: attack, or Bull Rush instead when it has it ready (Bandit Brute), " +
-                    "or Grasp instead when it has it ready and the target is ranged or Swift and not already held (Skeleton), " +
+                    "or Grasp instead when it has it ready and the target is ranged or Swift and not already pinned (Skeleton), " +
                     $"or Rending Blow instead when it has it ready and more than {Battle.RendingBlowCost} HP (Demon).",
                     "Fire Breath when it has it ready (Fiend): from its tile or one it can walk to, at whichever of your units puts the most of them in the line; it beats a strike.",
                     $"Otherwise {approach} to it.",
@@ -342,7 +342,7 @@ public static class GamepediaWriter
                     $"If a bomb or mine lies on an empty tile next to it: fling it at its {target}, or at the nearest of your units 2-{Battle.FlingRange} tiles away.",
                     $"If it can hit its {target} from where it stands: strike.",
                     $"If it can't reach anyone to strike this turn: fling a goblin next to it that hasn't acted at its target, or at the nearest of your units 2-{Battle.FlingRange} tiles away.",
-                    $"Otherwise {approach} to it (Slippery: your reach doesn't stop it), then try again.",
+                    $"Otherwise {approach} to it (Elusive: your reach doesn't stop it), then try again.",
                 };
             case EnemyBehaviour.Elemental:
                 return new[]
@@ -553,7 +553,7 @@ public static class GamepediaWriter
         html.Append($"<li><b>Rubble</b> (the Sapper's keyword): a low heap that blocks walking like a rock but not shots, and gives no cover. A unit pushed into it is crushed for {Battle.CrushDamage} more than a normal collision ({Battle.CollisionDamage + Battle.CrushDamage} in all) and the rubble breaks. One hit from any unit clears it. Broken barricades collapse into rubble.</li>");
         html.Append("<li>Pinned units (the Archer's keyword: Pinning Shot, Snare Trap, Suppressing Fire) can't move on their next turn. Slowed units (the Mage's keyword: Frost Nova, Chill, Blizzard) can move or act on their next turn, not both.</li>");
         html.Append("<li>Hidden units (Vanish, Smoke Bomb, Into the Shadows) can't be targeted or attacked by enemies until your next turn, though area blasts still hit them. Attacking doesn't reveal them; the first attack while hidden deals +2.</li>");
-        html.Append("<li>Snares (Snare Trap) are hidden from enemies: the first enemy to walk onto one stops, takes damage and is pinned. Covering Fire shoots the first enemy that walks onto a tile the archer can shoot at, and stops it there.</li>");
+        html.Append("<li>Snares (Snare Trap) are hidden from enemies: the first enemy to walk onto one stops, takes damage and is pinned. The Archer's Overwatch is the Crossbowman's rule turned around: it shoots the first enemy that walks onto a tile the archer can shoot at, and stops it there.</li>");
         html.Append("<li>Hover any enemy to see what it plans to do next.</li>");
         html.Append("<li>Controls: left-click chooses (selects one of your units, or opens any unit's card; hover a name on the card for what it does), right-click acts (move, attack, or use the aimed action). Esc cancels an aimed action or closes the card.</li>");
         html.Append("</ul></section>");

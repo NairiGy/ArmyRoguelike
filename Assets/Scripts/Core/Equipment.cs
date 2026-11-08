@@ -27,7 +27,7 @@ namespace ArmyRoguelike.Core
         public override string ToString() => Name;
 
         public static readonly Equipment VampireFang = new Equipment("Vampire Fang", 14, Ability.VampireFang);
-        public static readonly Equipment ThornedMail = new Equipment("Thorned Mail", 12, Ability.ThornedMail);
+        public static readonly Equipment ThornedMail = new Equipment("Thorned Mail", 12, Ability.Thorns);
         public static readonly Equipment SpringBoots = new Equipment("Spring Boots", 11, Ability.SpringBoots);
         public static readonly Equipment LuckyCharm = new Equipment("Lucky Charm", 15, Ability.LuckyCharm);
 
@@ -83,7 +83,7 @@ namespace ArmyRoguelike.Core
                 case Ability.Incendiary: return "Incendiary";
                 case Ability.SpikedBarricades: return "Spiked Barricades";
                 case Ability.VampireFang: return "Vampire Fang";
-                case Ability.ThornedMail: return "Thorns";
+                case Ability.Thorns: return "Thorns";
                 case Ability.SpringBoots: return "Spring Step";
                 case Ability.LuckyCharm: return "Last Stand";
                 case Ability.Immobile: return "Immobile";
@@ -92,7 +92,6 @@ namespace ArmyRoguelike.Core
                 case Ability.WolfBite: return "Wolf Bite";
                 case Ability.PackBond: return "Pack Bond";
                 case Ability.Howl: return "Howl";
-                case Ability.Slippery: return "Slippery";
                 case Ability.Fling: return "Fling";
                 case Ability.PowderKeg: return "Powder Keg";
                 case Ability.LightFingers: return "Light Fingers";
@@ -113,7 +112,6 @@ namespace ArmyRoguelike.Core
                 case Ability.Bloodlust: return "Bloodlust";
                 case Ability.RendingBlow: return "Rending Blow";
                 case Ability.SoulContract: return "Soul Contract";
-                case Ability.Spines: return "Spines";
                 case Ability.FireBreath: return "Fire Breath";
                 default: return "";
             }
@@ -165,7 +163,7 @@ namespace ArmyRoguelike.Core
                 case Ability.Incendiary: return $"its mines, bombs and blasts leave the ground they hit burning for {Battle.BurnRounds} rounds";
                 case Ability.SpikedBarricades: return $"an enemy starting its turn next to one of its barricades takes {Battle.SpikeDamage}";
                 case Ability.VampireFang: return $"heals {Battle.VampireHeal} HP on a kill";
-                case Ability.ThornedMail: return $"melee attackers take {Battle.ThornsDamage} damage";
+                case Ability.Thorns: return $"melee attackers take {Battle.ThornsDamage} damage";
                 case Ability.SpringBoots: return "+1 move each turn";
                 case Ability.LuckyCharm: return "once per battle, survives a killing blow at 1 HP";
                 case Ability.Immobile: return "can't move";
@@ -174,7 +172,6 @@ namespace ArmyRoguelike.Core
                 case Ability.WolfBite: return "+1 damage for every wolf bite earlier this turn";
                 case Ability.PackBond: return $"while it lives, every wolf has +{Battle.PackBondHp} max HP; once it dies they have -{Battle.PackBondHp} and lose {2 * Battle.PackBondHp} HP on the spot";
                 case Ability.Howl: return $"every wolf that hasn't acted yet gets +{Battle.HowlMoves} move this turn";
-                case Ability.Slippery: return "ignores zone of control";
                 case Ability.Fling: return $"throws what is next to it at a unit 2-{Battle.FlingRange} tiles away, over obstacles: a bomb or mine goes off there with its own blast; a goblin that hasn't acted lands next to the unit, deals {Battle.FlingDamage}, and can still act";
                 case Ability.PowderKeg: return $"when it dies it explodes: {Battle.PowderKegDamage} damage to everyone around it, its own side included";
                 case Ability.LightFingers: return "the only unit that can still move after attacking: it stabs, grabs the gold and runs in the same turn";
@@ -183,7 +180,7 @@ namespace ArmyRoguelike.Core
                 case Ability.Overwatch: return "instead of shooting, it aims: during your next turn the first of your units that walks onto a tile it can see in range is shot and stops there";
                 case Ability.BullRush: return $"hit a unit next to it and push it 1 tile; if it slams into a unit, both take {Battle.CollisionDamage}";
                 case Ability.Upheaval: return $"the ground bursts up under one of your units within {Battle.UpheavalRange} tiles (no line of sight needed): {Battle.UpheavalDamage} damage, and it is thrown 1 tile away from the caster ({Battle.CollisionDamage} more if blocked)";
-                case Ability.Grasp: return "grabs a unit next to it: no damage, but it can't move on its next turn";
+                case Ability.Grasp: return "grabs a unit next to it: no damage, but it is pinned";
                 case Ability.Colossus: return "can't be pushed, pinned, slowed or grasped";
                 case Ability.Wrath: return "from its second phase it gets 2 actions a turn instead of 1 (each still has its cooldown)";
                 case Ability.SoulHarvest: return "while it is on the board your units that die leave a bone pile; raising one brings it back on its side as a Bone version with only its basic attack";
@@ -195,7 +192,6 @@ namespace ArmyRoguelike.Core
                 case Ability.Bloodlust: return $"gains {Battle.BloodlustFury} Fury whenever a unit next to it dies, friend or foe";
                 case Ability.RendingBlow: return $"loses {Battle.RendingBlowCost} of its own HP, then hits a unit next to it for its damage +{Battle.RendingBlowBonus}";
                 case Ability.SoulContract: return $"marks one of your units within {Battle.ContractRange} tiles (no line of sight needed): at the start of the next enemy turn it takes {Battle.ContractDamage} damage (shields and damage reductions still count), unless the Devil takes damage before then";
-                case Ability.Spines: return $"melee attackers take {Battle.ThornsDamage} damage";
                 case Ability.FireBreath: return $"breathes down a straight line of {Battle.FireBreathLength} tiles at one of your units on it (a rock stops it): {Battle.FireBreathDamage} damage to each of your units there, and the tiles burn for {Battle.BurnRounds} rounds";
                 default: return "";
             }
@@ -243,7 +239,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Kick: return "Kick";
                 case ActionKind.SnareTrap: return "Snare Trap";
                 case ActionKind.FireArrow: return "Fire Arrow";
-                case ActionKind.CoveringFire: return "Covering Fire";
+                case ActionKind.CoveringFire: return "Overwatch";
                 case ActionKind.SuppressingFire: return "Suppressing Fire";
                 case ActionKind.ThrowingKnife: return "Throwing Knife";
                 case ActionKind.Shadowstep: return "Shadowstep";
@@ -273,7 +269,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.PlaceMine: return $"put a mine within {Battle.MineRange} (max {Battle.MaxMinesPerUnit}): {Battle.MineDamage} damage when an enemy steps on it";
                 case ActionKind.ShieldBash: return $"{Battle.BashDamage} damage and push an enemy next to it; what it slams into takes {Battle.CollisionDamage} too";
                 case ActionKind.SnareTrap: return $"hide a snare within {Battle.SnareRange}: the first enemy on it stops, takes {Battle.SnareDamage} and is pinned";
-                case ActionKind.CoveringFire: return "aim instead: the first enemy to walk into its sight next turn is shot and stops";
+                case ActionKind.CoveringFire: return "aim instead of shooting: the first enemy to walk into its sight is shot and stops";
                 case ActionKind.SuppressingFire: return $"every enemy on a row or column takes {Battle.PinDamage} and is pinned";
                 case ActionKind.ThrowingKnife: return $"{Battle.KnifeDamage} damage 2-{Battle.KnifeRange} tiles away (line of sight), with its damage bonuses";
                 case ActionKind.Shadowstep: return $"teleport next to an enemy within {Battle.ShadowstepRange}, ignoring zone of control; it can still attack. Free";
@@ -320,7 +316,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Kick: return $"{Battle.KickDamage} damage to an enemy next to it and push it 1 tile";
                 case ActionKind.SnareTrap: return $"hide a snare on a free tile within {Battle.SnareRange} (max {Battle.MaxSnares}); the first enemy to walk onto it stops, takes {Battle.SnareDamage} and is pinned. Enemies don't see snares";
                 case ActionKind.FireArrow: return $"shoot an enemy in shot range for its attack damage; the ground under it burns for {Battle.BurnRounds} rounds";
-                case ActionKind.CoveringFire: return "aim instead of shooting: during the enemy turn, the first enemy that walks onto a tile it can shoot at is shot for its attack damage and stops there";
+                case ActionKind.CoveringFire: return "instead of shooting, it aims: during the enemy turn the first enemy that walks onto a tile it can see in range is shot and stops there";
                 case ActionKind.SuppressingFire: return $"shoot along a row or column up to its range, stopped by rocks: every enemy on the line takes {Battle.PinDamage} and is pinned";
                 case ActionKind.ThrowingKnife: return $"{Battle.KnifeDamage} damage (plus its damage bonuses) to an enemy 2-{Battle.KnifeRange} tiles away, needs line of sight. Carries Poison, Cheap Shot and the Vanish bonus";
                 case ActionKind.Shadowstep: return $"teleport to a free tile next to an enemy within {Battle.ShadowstepRange}, ignoring rocks and zone of control. Free, before it acts, but it can't walk afterwards: it can still attack";
