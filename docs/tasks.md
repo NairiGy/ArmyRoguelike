@@ -149,10 +149,10 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [x] UI: summoning scenario needs a clearer sign of when it completes (today only a HUD text line). Done: a top-centre countdown panel with a pip per turn, red on the last one.
 - [x] UI: icon over a unit when the current action would kill it (today only "-N kills" on the hover card). Done: a red skull for the basic attack (including walk-and-attack), Pinning Shot and Fireball; other actions show none yet.
 
-### Night pass (2026-11-08, branch `feature/night-fun`)
+### Night pass (2026-11-08, merged into `main`)
 
 - [x] Cracks, four events with a price, champions, Stone Heart boss phases, Crumbling Roof, Hone (lead); Archer, Rogue, Mage and Sapper pools to 59 techniques, Demons faction (builders). See "Night pass" in the design note and `docs/night-log.md`. Tests pass; nothing played.
-- [ ] Playtest a bundle on `feature/night-fun`, then decide what to merge into `main` (user).
+- [x] Playtest a bundle on `feature/night-fun`, then decide what to merge into `main` (user): merged in full on 2026-11-08 after one playtest.
 - [ ] The Loser banner with cracks: a death gives +1 HP and +1 damage for a crack that costs 10 to mend. User's call (Loser was left uncapped on purpose).
 - [ ] What's On His Mind? hides every intent, including the demons' swap-then-hit and pushes into holes: maybe still show intents that move your units (exploit review).
 - [ ] Enemies can't see mines, snares or Covering Fire tiles and walk into them. With more traps in the pools (Quick Fuse mines every turn, Snare Trap) this may be "win without playing". Watch it in a playtest.
