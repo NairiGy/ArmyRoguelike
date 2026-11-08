@@ -410,13 +410,15 @@ namespace ArmyRoguelike.Core
         /// </summary>
         public bool WouldFall(Unit unit, GridPos dir, Unit pusher)
         {
-            if (!EdgeKills || !unit.IsAlive || unit.IsObjective || unit.Has(Ability.Colossus) || unit.Size > 1)
+            if (!(EdgeKills || RoofCrumbles) || !unit.IsAlive || unit.IsObjective || unit.Has(Ability.Colossus) || unit.Size > 1)
                 return false;
             var p = unit.Pos;
             for (var step = 0; step < PushDistance(unit, pusher); step++)
             {
                 var to = p + dir;
                 if (!Board.InBounds(to))
+                    return EdgeKills;
+                if (Board.IsHole(to))
                     return true;
                 if (!CanStand(unit, to))
                     return false;
@@ -440,6 +442,57 @@ namespace ArmyRoguelike.Core
             var after = new List<BattleEvent>();
             BreakPackBond(unit, after);
             events.Add(new FallEvent(unit, pusher, edge, edge + dir, new Hit(unit, hp, 0)));
+            events.AddRange(after);
+            CheckEnd();
+        }
+
+        // ---------- Crumbling Roof ----------
+
+        private readonly Dictionary<GridPos, int> _floorCracks = new Dictionary<GridPos, int>();
+
+        /// <summary>Crumbling Roof: cracked tiles and how many cracks each has (a hole opens at <see cref="Battlefields.CracksToHole"/>).</summary>
+        public IReadOnlyDictionary<GridPos, int> FloorCracks => _floorCracks;
+
+        public bool RoofCrumbles => Field == Battlefield.CrumblingRoof;
+
+        /// <summary>Crumbling Roof: one more crack in the tile; the last one opens a hole, and whoever stands there falls.</summary>
+        private void CrackFloor(GridPos p, List<BattleEvent> events)
+        {
+            if (!RoofCrumbles || !Board.InBounds(p) || Board.IsObstacle(p))
+                return;
+            _floorCracks.TryGetValue(p, out var cracks);
+            cracks++;
+            if (cracks < Battlefields.CracksToHole)
+            {
+                _floorCracks[p] = cracks;
+                events.Add(new TileEvent("crack", p, true, null));
+                return;
+            }
+
+            _floorCracks.Remove(p);
+            Board.AddHole(p);
+            _mines.RemoveAll(m => m.Tile == p);
+            _bombs.RemoveAll(b => b.Tile == p);
+            _caltrops.Remove(p);
+            foreach (var pile in _units.Where(u => u.IsRemains && u.Pos == p))
+                pile.PileGone = true;
+            events.Add(new TileEvent("hole", p, true, null));
+            var victim = UnitAt(p);
+            if (victim != null && victim.IsAlive && victim.Size == 1 && !victim.IsObjective && !victim.Has(Ability.Colossus))
+                DropIntoHole(victim, null, p, p, events);
+        }
+
+        /// <summary>A unit falls through a hole in the roof: like falling off the edge, it dies outright with no bone pile.</summary>
+        private void DropIntoHole(Unit unit, Unit pusher, GridPos from, GridPos hole, List<BattleEvent> events)
+        {
+            var hp = unit.Hp;
+            unit.Hp = 0;
+            unit.Fell = true;
+            unit.PileGone = true;
+            unit.Pos = hole;
+            var after = new List<BattleEvent>();
+            BreakPackBond(unit, after);
+            events.Add(new FallEvent(unit, pusher, from, hole, new Hit(unit, hp, 0)));
             events.AddRange(after);
             CheckEnd();
         }
@@ -735,6 +788,8 @@ namespace ArmyRoguelike.Core
             copy._sunMarks.AddRange(_sunMarks);
             copy._stormMarks.AddRange(_stormMarks);
             copy._rockfall.UnionWith(_rockfall);
+            foreach (var crack in _floorCracks)
+                copy._floorCracks.Add(crack.Key, crack.Value);
             copy._banners.UnionWith(_banners);
             copy._deployZone = _deployZone == null ? null : new HashSet<GridPos>(_deployZone);
             copy._nextId = _nextId;
@@ -1709,6 +1764,15 @@ namespace ArmyRoguelike.Core
                     return;
                 }
 
+                // Crumbling Roof: pushed into a hole, it falls (huge units aren't pushed in the first place).
+                if (unit.Size == 1 && Board.IsHole(to))
+                {
+                    if (from != start)
+                        events.Add(new PushEvent(unit, pusher, start, from, null));
+                    DropIntoHole(unit, pusher, from, to, events);
+                    return;
+                }
+
                 if (!CanStand(unit, to))
                 {
                     if (from != start)
@@ -1729,6 +1793,10 @@ namespace ArmyRoguelike.Core
                         events.Add(new TickEvent("collision", Damage(blocker, CollisionDamage, pusher, DamageKind.Collision, blockerAfter), pusher));
                         events.AddRange(blockerAfter);
                     }
+
+                    // Crumbling Roof: the slam cracks the floor under it.
+                    if (!unit.Fell)
+                        CrackFloor(unit.Pos, events);
 
                     break;
                 }
@@ -2193,7 +2261,7 @@ namespace ArmyRoguelike.Core
             if (attacker.Has(Ability.Pierce) && dir != null)
             {
                 kind = "pierce";
-                for (var p = attacker.Pos + dir.Value; Board.InBounds(p) && !Board.IsObstacle(p) && attacker.Pos.StepsTo(p) <= attacker.Range; p += dir.Value)
+                for (var p = attacker.Pos + dir.Value; Board.InBounds(p) && !Board.IsRock(p) && attacker.Pos.StepsTo(p) <= attacker.Range; p += dir.Value)
                     line.Add(p);
             }
             else if (attacker.Has(Ability.LongReach) && dir != null)
@@ -2202,7 +2270,7 @@ namespace ArmyRoguelike.Core
                 for (var p = attacker.Pos + dir.Value; Board.InBounds(p) && attacker.Pos.StepsTo(p) <= attacker.Range; p += dir.Value)
                 {
                     line.Add(p);
-                    if (Board.IsObstacle(p))
+                    if (Board.IsRock(p))
                         break;
                 }
             }
@@ -2335,7 +2403,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Behind Cover: a unit with it standing next to a rock (or ice, or a barricade) can't be hit from range.</summary>
         public bool InCover(Unit unit) =>
-            unit.Has(Ability.BehindCover) && Cells(unit).Any(c => c.Neighbours().Any(Board.IsObstacle));
+            unit.Has(Ability.BehindCover) && Cells(unit).Any(c => c.Neighbours().Any(Board.IsRock));
 
         /// <summary>Caltrops: on the cutpurse's own tile or a free tile next to it, with none there yet.</summary>
         public bool CanDropCaltrops(Unit unit, GridPos tile) =>
@@ -2668,6 +2736,10 @@ namespace ArmyRoguelike.Core
 
                 if (target.Has(Ability.PowderKeg))
                     Explode(target.Pos, PowderKegDamage, "powder keg", target, after);
+
+                // Crumbling Roof: a statue crashing down cracks the floor under it.
+                if (!target.Fell && target.Size == 1 && target.IsPlaced && !target.IsObjective)
+                    CrackFloor(target.Pos, after);
 
                 // A Vengeful champion hits back at everyone of the other side next to it as it dies.
                 if (target.Affix == Affix.Vengeful && !target.Fell)

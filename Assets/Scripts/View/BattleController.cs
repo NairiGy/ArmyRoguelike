@@ -2121,6 +2121,8 @@ namespace ArmyRoguelike.View
                 lines.Add($"Stone Heart: phase {u.BossPhase} of {Battle.BossPhases}" + (Battle.NextPhaseHp(u) > 0 ? $"; can't drop below {Math.Max(u.PhaseFloor, Battle.NextPhaseHp(u))} HP this round" : "; last phase"));
             if (Battle.OnStormMark(u))
                 lines.Add(Battle.IsRockfallMark(u.Pos) ? $"Under falling rocks: {Battle.RockfallDamage} damage after the enemy turn unless it moves" : $"On a storm mark: lightning strikes for {Battlefields.StormDamage} after the enemy turn");
+            if (Battle.FloorCracks.TryGetValue(u.Pos, out var cracksUnder))
+                lines.Add($"On a cracked tile ({cracksUnder} of {Battlefields.CracksToHole}): one more crack and it falls in, taking this unit with it");
             if (u.Team == Team.Player && Battle.Phase == Phase.PlayerTurn && u.ActedThisTurn && !u.IsDone)
                 lines.Add("Has acted: can't move again this turn");
             if (u.IsSnared)

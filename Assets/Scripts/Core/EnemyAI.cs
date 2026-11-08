@@ -601,7 +601,7 @@ namespace ArmyRoguelike.Core
                     continue;
                 }
 
-                bool Covered(GridPos p) => p.Neighbours().Any(battle.Board.IsObstacle);
+                bool Covered(GridPos p) => p.Neighbours().Any(battle.Board.IsRock);
                 var reachable = battle.GetReachable(shooter);
                 if (shooter.Ap >= Battle.AttackCost)
                 {

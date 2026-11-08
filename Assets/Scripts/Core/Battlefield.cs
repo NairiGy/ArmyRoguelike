@@ -22,6 +22,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Enemy intents are hidden.</summary>
         HiddenMinds,
+
+        /// <summary>Collisions and deaths crack the roof; a tile cracked twice falls in, and a unit pushed into a hole falls.</summary>
+        CrumblingRoof,
     }
 
     /// <summary>Names, rule text and numbers for battlefields, shared by the screens and the gamepedia.</summary>
@@ -30,13 +33,16 @@ namespace ArmyRoguelike.Core
         public static readonly IReadOnlyList<Battlefield> All = new[]
         {
             Battlefield.EdgeOfTheWorld, Battlefield.Storm, Battlefield.ArcaneOverflow, Battlefield.FortunesFavored,
-            Battlefield.HiddenMinds,
+            Battlefield.HiddenMinds, Battlefield.CrumblingRoof,
         };
 
         // Placeholders.
         public const int StormDamage = 3;
         public const int CooldownCut = 1;
         public const int FavoredMultiplier = 2;
+
+        /// <summary>Crumbling Roof: cracks that open a hole.</summary>
+        public const int CracksToHole = 2;
 
         public static string Name(Battlefield field)
         {
@@ -47,6 +53,7 @@ namespace ArmyRoguelike.Core
                 case Battlefield.ArcaneOverflow: return "Arcane Overflow";
                 case Battlefield.FortunesFavored: return "Fortune's Favored";
                 case Battlefield.HiddenMinds: return "What's On His Mind?";
+                case Battlefield.CrumblingRoof: return "Crumbling Roof";
                 default: return field.ToString();
             }
         }
@@ -68,6 +75,10 @@ namespace ArmyRoguelike.Core
                            $"their attacks and blasts deal {FavoredMultiplier}x damage until the next round. A boss is never favored.";
                 case Battlefield.HiddenMinds:
                     return "You can't see what the enemies plan to do.";
+                case Battlefield.CrumblingRoof:
+                    return "The old roof gives way. A unit slammed into something, or a unit dying, cracks the tile it stands on; " +
+                           $"a tile cracked {CracksToHole} times falls in. Whoever stands on it, or is pushed into a hole, falls and dies. " +
+                           "Holes block walking but not shots. Huge units are too heavy to push in, and the Giant never falls.";
                 default:
                     return "";
             }

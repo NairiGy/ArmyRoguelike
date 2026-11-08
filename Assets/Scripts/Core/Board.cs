@@ -11,11 +11,15 @@ namespace ArmyRoguelike.Core
 
         private readonly bool[,] _obstacles;
 
+        // Holes in the roof (Crumbling Roof): nothing stands on them, but shots fly over them.
+        private readonly bool[,] _holes;
+
         public Board(int width, int height, IEnumerable<GridPos> obstacles = null)
         {
             Width = width;
             Height = height;
             _obstacles = new bool[width, height];
+            _holes = new bool[width, height];
             if (obstacles == null)
                 return;
             foreach (var p in obstacles)
@@ -27,6 +31,7 @@ namespace ArmyRoguelike.Core
             Width = other.Width;
             Height = other.Height;
             _obstacles = (bool[,])other._obstacles.Clone();
+            _holes = (bool[,])other._holes.Clone();
         }
 
         /// <summary>A separate board with the same rocks.</summary>
@@ -34,7 +39,20 @@ namespace ArmyRoguelike.Core
 
         public bool InBounds(GridPos p) => p.X >= 0 && p.Y >= 0 && p.X < Width && p.Y < Height;
 
-        public bool IsObstacle(GridPos p) => InBounds(p) && _obstacles[p.X, p.Y];
+        /// <summary>Nothing can stand on or walk through it: a rock, or a hole in the roof.</summary>
+        public bool IsObstacle(GridPos p) => InBounds(p) && (_obstacles[p.X, p.Y] || _holes[p.X, p.Y]);
+
+        /// <summary>A rock (or ice, a barricade): blocks sight too. Holes don't.</summary>
+        public bool IsRock(GridPos p) => InBounds(p) && _obstacles[p.X, p.Y];
+
+        /// <summary>A hole in the roof (Crumbling Roof): a unit pushed into it falls.</summary>
+        public bool IsHole(GridPos p) => InBounds(p) && _holes[p.X, p.Y];
+
+        public void AddHole(GridPos p)
+        {
+            if (InBounds(p))
+                _holes[p.X, p.Y] = true;
+        }
 
         /// <summary>Adds a rock during a battle, e.g. where an ogre's boulder lands.</summary>
         public void AddObstacle(GridPos p)
@@ -103,7 +121,7 @@ namespace ArmyRoguelike.Core
                 var p = new GridPos(cx, cy);
                 if (p == from || p == to)
                     continue;
-                if (!IsObstacle(p))
+                if (!IsRock(p))
                     return false;
                 any = true;
             }

@@ -54,7 +54,7 @@ namespace ArmyRoguelike.View
                 highlight.enabled = false;
                 _highlights[p] = highlight;
 
-                if (battle.Board.IsObstacle(p))
+                if (battle.Board.IsRock(p))
                     AddRock(p);
             }
 
@@ -145,6 +145,9 @@ namespace ArmyRoguelike.View
 
         private readonly Dictionary<GridPos, SpriteRenderer> _rocks = new Dictionary<GridPos, SpriteRenderer>();
         private readonly Dictionary<GridPos, SpriteRenderer> _burns = new Dictionary<GridPos, SpriteRenderer>();
+        private readonly Dictionary<GridPos, SpriteRenderer> _floors = new Dictionary<GridPos, SpriteRenderer>();
+        private static readonly Color CrackTint = new Color(0.25f, 0.2f, 0.15f, 0.45f);
+        private static readonly Color HoleTint = new Color(0.02f, 0.02f, 0.04f, 0.95f);
 
         /// <summary>Draws a rock on a tile (once). Also used when a boulder lands during the battle.</summary>
         public void AddRock(GridPos p)
@@ -208,7 +211,7 @@ namespace ArmyRoguelike.View
         {
             foreach (var p in Battle.Board.AllTiles())
             {
-                if (Battle.Board.IsObstacle(p))
+                if (Battle.Board.IsRock(p))
                 {
                     AddRock(p);
                     StyleRock(p, _rocks[p]);
@@ -217,6 +220,29 @@ namespace ArmyRoguelike.View
                 {
                     Destroy(rock.gameObject);
                     _rocks.Remove(p);
+                }
+
+                // Crumbling Roof (placeholder look): cracked tiles darken, holes go nearly black.
+                Battle.FloorCracks.TryGetValue(p, out var cracks);
+                var floor = Battle.Board.IsHole(p) ? HoleTint : cracks > 0 ? CrackTint : (Color?)null;
+                if (floor.HasValue)
+                {
+                    if (!_floors.TryGetValue(p, out var sr))
+                    {
+                        sr = new GameObject($"Floor {p}").AddComponent<SpriteRenderer>();
+                        sr.transform.SetParent(transform, false);
+                        sr.transform.position = IsoMath.GridToWorld(p);
+                        sr.sprite = PlaceholderArt.Tile;
+                        sr.sortingOrder = _tiles[p].sortingOrder + 2;
+                        _floors[p] = sr;
+                    }
+
+                    sr.color = floor.Value;
+                }
+                else if (_floors.TryGetValue(p, out var old))
+                {
+                    Destroy(old.gameObject);
+                    _floors.Remove(p);
                 }
 
                 var burning = Battle.BurningTiles.ContainsKey(p);

@@ -159,6 +159,62 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(1 + Battle.PhaseSkeletons, b.Living(Team.Enemy).Count());
         }
 
+        // ---------- Crumbling Roof ----------
+
+        [Test]
+        public void CrumblingRoof_CollisionAndDeathOpenAHole_PushedUnitFallsIn()
+        {
+            var b = new Battle(new Board(6, 6, new[] { new GridPos(2, 5) }), new[] { new ArmyMember(UnitStats.Warrior), new ArmyMember(UnitStats.Warrior) },
+                new[] { (UnitStats.Crossbowman, new GridPos(2, 4)), (UnitStats.Wolf, new GridPos(3, 4)) });
+            b.SetField(Battlefield.CrumblingRoof);
+            Assert.IsTrue(b.Place(Player(b, 0), new GridPos(0, 0)));
+            Assert.IsTrue(b.Place(Player(b, 1), new GridPos(1, 0)));
+            b.StartBattle();
+            var w1 = Player(b, 0);
+            var w2 = Player(b, 1);
+            var bow = Enemy(b, 0);
+            var wolf = Enemy(b, 1);
+            w1.Pos = new GridPos(2, 3);
+            bow.Hp = 10;
+            b.PlayerUseAction(w1, ActionKind.ShieldBash, bow.Pos);
+            Assert.AreEqual(1, b.FloorCracks[new GridPos(2, 4)], "the slam into the rock cracks the floor");
+            bow.Hp = 1;
+            w1.Ap = 5;
+            w1.IsDone = false;
+            b.PlayerAttack(w1, bow);
+            Assert.IsFalse(bow.IsAlive, $"bow hp {bow.Hp} at {bow.Pos}, w1 {w1}");
+            Assert.IsTrue(b.Board.IsHole(new GridPos(2, 4)), "a death on the cracked tile opens a hole");
+            b.EndUnitTurn(w1);
+            w2.Pos = new GridPos(4, 4);
+            Assert.IsTrue(b.WouldFall(wolf, new GridPos(-1, 0), w2));
+            var events = b.PlayerUseAction(w2, ActionKind.ShieldBash, wolf.Pos);
+            Assert.IsFalse(wolf.IsAlive, $"wolf {wolf}, w2 {w2}, events {string.Join(",", events.Select(e => e.GetType().Name))}");
+            Assert.IsTrue(wolf.Fell);
+            Assert.IsTrue(events.OfType<FallEvent>().Any());
+        }
+
+        [Test]
+        public void CrumblingRoof_HolesDontBlockSight()
+        {
+            var board = new Board(6, 6);
+            board.AddHole(new GridPos(2, 2));
+            Assert.IsTrue(board.IsObstacle(new GridPos(2, 2)));
+            Assert.IsFalse(board.IsRock(new GridPos(2, 2)));
+            Assert.IsTrue(board.HasLineOfSight(new GridPos(2, 0), new GridPos(2, 4)));
+        }
+
+        [Test]
+        public void CrumblingRoof_OffOtherFields_NothingCracks()
+        {
+            var b = new Battle(new Board(6, 6, new[] { new GridPos(2, 5) }), new[] { new ArmyMember(UnitStats.Warrior) },
+                new[] { (UnitStats.Crossbowman, new GridPos(2, 4)) });
+            Assert.IsTrue(b.Place(Player(b), new GridPos(0, 0)));
+            b.StartBattle();
+            Player(b).Pos = new GridPos(2, 3);
+            b.PlayerUseAction(Player(b), ActionKind.ShieldBash, Enemy(b).Pos);
+            Assert.AreEqual(0, b.FloorCracks.Count);
+        }
+
         [Test]
         public void Boss_StrengthenedByArmyLevels()
         {
