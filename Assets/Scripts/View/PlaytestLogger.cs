@@ -347,6 +347,7 @@ namespace ArmyRoguelike.View
                 case EffectKind.ZocStrike: return "zoc strike";
                 case EffectKind.CoveringFire: return "covering fire";
                 case EffectKind.Mark: return "mark";
+                case EffectKind.Crush: return "crush";
                 default: return "guard";
             }
         }

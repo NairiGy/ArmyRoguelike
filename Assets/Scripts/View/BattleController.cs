@@ -197,6 +197,9 @@ namespace ArmyRoguelike.View
             }
         }
 
+        /// <summary>What the action costs this unit right now: Quick Fuse and an unused Twincast make it free.</summary>
+        private static int CardCost(Unit unit, ActionKind action) => Battle.TwincastFree(unit, action) ? 0 : Battle.CostOf(unit, action);
+
         /// <summary>AP the selected unit would spend if the player clicked the hovered tile now (0 if nothing).</summary>
         private int PreviewCost()
         {
@@ -204,7 +207,7 @@ namespace ArmyRoguelike.View
                 return 0;
             var tile = _hovered.Value;
             if (_action.HasValue)
-                return Battle.CanUseAction(_selected, _action.Value, tile) ? Battle.ActionCost(_action.Value) : 0;
+                return Battle.CanUseAction(_selected, _action.Value, tile) ? CardCost(_selected, _action.Value) : 0;
             if (_hoveredUnit != null && _hoveredUnit.Team == Team.Enemy)
             {
                 if (Battle.CanAttack(_selected, _hoveredUnit))
@@ -1003,7 +1006,7 @@ namespace ArmyRoguelike.View
                     {
                         if (area.Kind == "slam")
                             StartCoroutine(Shake(0.08f, BlastTime));
-                        if (area.Kind == "volley" || area.Kind == "pierce" || area.Kind == "slam")
+                        if (area.Kind == "volley" || area.Kind == "pierce" || area.Kind == "slam" || area.Kind == "firewall" || area.Kind == "blizzard")
                             StartCoroutine(_board.Flash(area.Area, BlastTime * 0.6f));
                         yield return attacker.Lunge(aim, () =>
                         {
@@ -1079,6 +1082,16 @@ namespace ArmyRoguelike.View
                             break;
                         case StatusKind.ShieldUp:
                             DamagePopup.Spawn(at, "Shield Up!", DamagePopup.AbilityColor, 44);
+                            break;
+                        case StatusKind.FrostNova:
+                            DamagePopup.Spawn(at, "Frost Nova!", DamagePopup.AbilityColor, 48);
+                            StartCoroutine(_board.Flash(Battle.Board.AllTiles().Where(p => p.StepsTo(status.Source.Pos) == 1).ToList(), BlastTime * 0.6f));
+                            break;
+                        case StatusKind.Hooked:
+                            DamagePopup.Spawn(at, "Hooked!", DamagePopup.AbilityColor, 44);
+                            break;
+                        case StatusKind.Twincast:
+                            DamagePopup.Spawn(at, "Twincast: free", DamagePopup.AbilityColor, 40);
                             break;
                         case StatusKind.Battlecry:
                             DamagePopup.Spawn(at, $"+1 move, +{status.Amount} HP", DamagePopup.HealColor, 40);
@@ -1295,6 +1308,10 @@ namespace ArmyRoguelike.View
                     break;
                 case EffectKind.CoveringFire:
                     DamagePopup.Spawn(at, "Covering fire!", DamagePopup.AbilityColor, 44);
+                    break;
+                case EffectKind.Crush:
+                    // Placeholder: popup only (see the "Art needed" rows in docs/night/mage-sapper.md).
+                    DamagePopup.Spawn(at, "Crushed!", DamagePopup.DamageColor, 48);
                     break;
                 case EffectKind.Steal:
                     DamagePopup.Spawn(at, $"Stole {effect.Amount} gold!", DamagePopup.DamageColor, 44);
@@ -1804,8 +1821,8 @@ namespace ArmyRoguelike.View
                 var status = aiming ? $"<color={ActionColor}>Aiming: click a yellow tile</color>"
                     : cooldown > 0 ? $"<color={NextColor}>Ready in {cooldown} turn{(cooldown == 1 ? "" : "s")}</color>"
                     : !usable ? $"<color={DimColor}>No target in reach</color>"
-                    : Battle.CooldownIn(action) == 0 ? $"<color={ActionColor}>{Battle.ActionCost(action)} AP  ·  once per battle</color>"
-                    : $"<color={ActionColor}>{Battle.ActionCost(action)} AP  ·  cooldown {Battle.CooldownIn(action)}</color>";
+                    : Battle.CooldownFor(_selected, action) == 0 ? $"<color={ActionColor}>{CardCost(_selected, action)} AP  ·  once per battle</color>"
+                    : $"<color={ActionColor}>{CardCost(_selected, action)} AP  ·  cooldown {Battle.CooldownFor(_selected, action)}</color>";
                 GUILayout.Label(status, cost);
                 GUILayout.Label($"<color={TextColor}>{Capitalise(Abilities.Describe(action))}</color>", text);
                 GUILayout.EndArea();
@@ -1920,10 +1937,15 @@ namespace ArmyRoguelike.View
                 if (Battle.CoverTiles.Contains(p))
                     return "Covering Fire: your archer is aiming here. The first enemy to walk onto a marked tile is shot and stops.";
                 if (Battle.MineAt(p) != null)
-                    return $"Your mine: an enemy stepping here sets it off ({Battle.MineDamage} damage to everyone around, your units too).";
+                    return $"Your mine: an enemy stepping here sets it off ({Battle.MineAt(p).Damage} damage to whoever stands on this tile).";
                 if (Battle.IsBarricade(p))
                     return $"Barricade: {Battle.BarricadeHpAt(p)}/{Battle.BarricadeHp} HP. Blocks paths and shots; either side can attack it, and it breaks at 0." +
                            (_selected != null && Battle.CanAttackBarricade(_selected, p) ? $"\nClick: attack it for {Battle.EffectiveDamage(_selected)} ({Battle.AttackCost} AP)." : "");
+                if (Battle.IsRubble(p))
+                    return $"Rubble: blocks walking but not shots, and gives no cover. A unit pushed into it is crushed for {Battle.CollisionDamage + Battle.CrushDamage} and the rubble breaks. One hit clears it." +
+                           (_selected != null && Battle.CanAttackBarricade(_selected, p) ? $"\nClick: clear it ({Battle.AttackCost} AP)." : "");
+                if (Battle.BurningTiles.TryGetValue(p, out var burnRounds))
+                    return $"Burning ground ({burnRounds} round(s) left): {Battle.BurnDamage} damage to whoever starts a turn here. Enemies walk through it but never stop on it.";
                 if (Battle.RemainsAt(p) is Unit bones)
                     return $"Bone pile ({bones.Stats.Name}). The Necromancer can raise it.\nStand on it to stop that.";
                 if (_selected != null && !_action.HasValue && Battle.GetReachable(_selected).TryGetValue(p, out var cost))
@@ -2139,6 +2161,8 @@ namespace ArmyRoguelike.View
                 lines.Add($"Taunting: enemies within {Battle.TauntRange} tiles can only target it");
             if (u.ShieldThrown)
                 lines.Add($"Shield thrown: +{Battle.ThrowShieldDamage} damage, +{Battle.ThrowShieldMoves} move");
+            if (u.Team == Team.Player && u.Has(Ability.Twincast) && !u.TwincastUsed)
+                lines.Add("Twincast ready: its next action this turn costs no AP");
             if (u.Favored)
                 lines.Add($"Favored by fortune: {Battlefields.FavoredMultiplier}x damage this round");
             if (u.IsChampion)

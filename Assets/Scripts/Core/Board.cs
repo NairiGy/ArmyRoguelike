@@ -13,6 +13,8 @@ namespace ArmyRoguelike.Core
 
         // Holes in the roof (Crumbling Roof): nothing stands on them, but shots fly over them.
         private readonly bool[,] _holes;
+        // Low obstacles (Rubble): block walking and standing like a rock, but not line of sight.
+        private readonly bool[,] _low;
 
         public Board(int width, int height, IEnumerable<GridPos> obstacles = null)
         {
@@ -20,6 +22,7 @@ namespace ArmyRoguelike.Core
             Height = height;
             _obstacles = new bool[width, height];
             _holes = new bool[width, height];
+            _low = new bool[width, height];
             if (obstacles == null)
                 return;
             foreach (var p in obstacles)
@@ -32,6 +35,7 @@ namespace ArmyRoguelike.Core
             Height = other.Height;
             _obstacles = (bool[,])other._obstacles.Clone();
             _holes = (bool[,])other._holes.Clone();
+            _low = (bool[,])other._low.Clone();
         }
 
         /// <summary>A separate board with the same rocks.</summary>
@@ -39,11 +43,11 @@ namespace ArmyRoguelike.Core
 
         public bool InBounds(GridPos p) => p.X >= 0 && p.Y >= 0 && p.X < Width && p.Y < Height;
 
-        /// <summary>Nothing can stand on or walk through it: a rock, or a hole in the roof.</summary>
+        /// <summary>Nothing can stand on or walk through it: a rock, rubble, or a hole in the roof.</summary>
         public bool IsObstacle(GridPos p) => InBounds(p) && (_obstacles[p.X, p.Y] || _holes[p.X, p.Y]);
 
-        /// <summary>A rock (or ice, a barricade): blocks sight too. Holes don't.</summary>
-        public bool IsRock(GridPos p) => InBounds(p) && _obstacles[p.X, p.Y];
+        /// <summary>A rock (or ice, a barricade): blocks sight and gives cover. Holes and rubble don't.</summary>
+        public bool IsRock(GridPos p) => InBounds(p) && _obstacles[p.X, p.Y] && !_low[p.X, p.Y];
 
         /// <summary>A hole in the roof (Crumbling Roof): a unit pushed into it falls.</summary>
         public bool IsHole(GridPos p) => InBounds(p) && _holes[p.X, p.Y];
@@ -57,15 +61,31 @@ namespace ArmyRoguelike.Core
         /// <summary>Adds a rock during a battle, e.g. where an ogre's boulder lands.</summary>
         public void AddObstacle(GridPos p)
         {
-            if (InBounds(p))
-                _obstacles[p.X, p.Y] = true;
+            if (!InBounds(p))
+                return;
+            _obstacles[p.X, p.Y] = true;
+            _low[p.X, p.Y] = false;
         }
+
+        /// <summary>Adds a low obstacle (Rubble): it blocks walking and standing, but shots and line of sight pass over it.</summary>
+        public void AddLowObstacle(GridPos p)
+        {
+            if (!InBounds(p))
+                return;
+            _obstacles[p.X, p.Y] = true;
+            _low[p.X, p.Y] = true;
+        }
+
+        /// <summary>A low obstacle (Rubble) stands here.</summary>
+        public bool IsLowObstacle(GridPos p) => InBounds(p) && _low[p.X, p.Y];
 
         /// <summary>Clears a tile, e.g. when an ice wall melts or a barricade blows up.</summary>
         public void RemoveObstacle(GridPos p)
         {
-            if (InBounds(p))
-                _obstacles[p.X, p.Y] = false;
+            if (!InBounds(p))
+                return;
+            _obstacles[p.X, p.Y] = false;
+            _low[p.X, p.Y] = false;
         }
 
         public IEnumerable<GridPos> AllTiles()

@@ -227,9 +227,59 @@ namespace ArmyRoguelike.Core
         public const int SunDamage = 3;
         public const int MoonShield = 4;
 
+        // ---------- Mage and Sapper night pool (placeholders) ----------
+
+        /// <summary>Firewall: range, and damage to whoever stands in the line when it lights.</summary>
+        public const int FirewallRange = 3;
+        public const int FirewallDamage = 1;
+
+        /// <summary>Blizzard: range, and damage to each enemy in the plus (they are also slowed).</summary>
+        public const int BlizzardRange = 3;
+        public const int BlizzardDamage = 1;
+
+        /// <summary>Shatter: extra damage slowed enemies take from every attack of your side.</summary>
+        public const int ShatterBonus = 2;
+
+        /// <summary>Transpose: range in steps (ignores line of sight).</summary>
+        public const int TransposeRange = 3;
+
+        /// <summary>Place Mine: how far from the sapper a mine can go.</summary>
+        public const int MineRange = 2;
+
+        /// <summary>Cave-In: range for dropping rubble.</summary>
+        public const int CaveInRange = 3;
+
+        /// <summary>Rubble: extra collision damage for a unit pushed into it (on top of the normal collision); the rubble breaks.</summary>
+        public const int CrushDamage = 2;
+
+        /// <summary>Grappling Hook: the target must be this many steps away in a straight line (at least 2).</summary>
+        public const int HookRange = 3;
+
+        /// <summary>Demolish: range, and blast damage in the 3x3 around the demolished tile.</summary>
+        public const int DemolishRange = 3;
+        public const int DemolishDamage = 3;
+
+        /// <summary>Spiked Barricades: damage to an enemy starting its turn next to one.</summary>
+        public const int SpikeDamage = 1;
+
         /// <summary>Special actions cost the unit's one AP, except Blink and Vanish: free, but only before it has acted.</summary>
         public static int ActionCost(ActionKind action) =>
             action == ActionKind.Blink || action == ActionKind.Vanish || action == ActionKind.ThrowShield || action == ActionKind.Shadowstep || action == ActionKind.MarkTarget ? 0 : action == ActionKind.PlaceMine ? MineCost : AttackCost;
+
+        /// <summary>
+        /// What the action costs this unit: <see cref="ActionCost(ActionKind)"/>, but Quick Fuse makes Place Mine free
+        /// (before acting, like Blink). Twincast is separate: see <see cref="TwincastFree"/>.
+        /// </summary>
+        public static int CostOf(Unit unit, ActionKind action) =>
+            action == ActionKind.PlaceMine && unit.Has(Ability.QuickFuse) ? 0 : ActionCost(action);
+
+        /// <summary>Twincast: the unit's first AP-costing action this turn takes no AP (it still stops it moving).</summary>
+        public static bool TwincastFree(Unit unit, ActionKind action) =>
+            unit.Has(Ability.Twincast) && !unit.TwincastUsed && CostOf(unit, action) > 0;
+
+        /// <summary>The action's cooldown for this unit in this battle: Quick Fuse makes Place Mine ready every turn.</summary>
+        public int CooldownFor(Unit unit, ActionKind action) =>
+            action == ActionKind.PlaceMine && unit.Has(Ability.QuickFuse) ? 1 : CooldownIn(action);
 
         /// <summary>
         /// Cooldown of every action in the unit's own turns *(placeholders)*: used now, ready again this many turns
@@ -254,6 +304,9 @@ namespace ArmyRoguelike.Core
                 case ActionKind.SuppressingFire:
                 case ActionKind.Shadowstep:
                 case ActionKind.SmokeBomb:
+                case ActionKind.Firewall:
+                case ActionKind.Blizzard:
+                case ActionKind.Demolish:
                     return 3;
                 // Once per battle instead.
                 case ActionKind.ThrowShield:
@@ -277,9 +330,16 @@ namespace ArmyRoguelike.Core
         /// <summary>Pays for an action and puts it on cooldown.</summary>
         private void UseUp(Unit unit, ActionKind action)
         {
-            if (ActionCost(action) > 0)
-                SpendAp(unit, ActionCost(action));
-            unit.StartCooldown(action, CooldownIn(action));
+            if (TwincastFree(unit, action))
+            {
+                // Twincast: no AP, but the unit has committed, so it can't move again this turn.
+                unit.TwincastUsed = true;
+                unit.ActedThisTurn = true;
+            }
+            else if (CostOf(unit, action) > 0)
+                SpendAp(unit, CostOf(unit, action));
+
+            unit.StartCooldown(action, CooldownFor(unit, action));
             unit.CountUse(action);
         }
 
@@ -946,6 +1006,47 @@ namespace ArmyRoguelike.Core
 
         public bool IsBarricade(GridPos p) => _barricades.Any(b => b.tile == p);
 
+        /// <summary>
+        /// Rubble (the Sapper's keyword): a low heap that blocks walking and standing like a rock but not shots. A unit
+        /// pushed into it is crushed for <see cref="CrushDamage"/> more and the rubble breaks; any unit can clear it with a
+        /// basic attack. It doesn't give Behind Cover.
+        /// </summary>
+        public bool IsRubble(GridPos p) => Board.IsLowObstacle(p);
+
+        public IEnumerable<GridPos> Rubble => Board.AllTiles().Where(IsRubble);
+
+        /// <summary>Leaves rubble on an empty tile (no unit, rock or wall); whatever lay there (mine, bomb, caltrops, fire) is buried.</summary>
+        private void AddRubble(GridPos p, Unit source, List<BattleEvent> events)
+        {
+            if (!Board.InBounds(p) || Board.IsObstacle(p) || UnitAt(p) != null)
+                return;
+            _mines.RemoveAll(m => m.Tile == p);
+            _bombs.RemoveAll(b => b.Tile == p);
+            _caltrops.Remove(p);
+            _burning.Remove(p);
+            _burnOwners.Remove(p);
+            Board.AddLowObstacle(p);
+            events.Add(new TileEvent("rubble", p, true, source));
+        }
+
+        private void ClearRubble(GridPos p, Unit source, List<BattleEvent> events)
+        {
+            if (!IsRubble(p))
+                return;
+            Board.RemoveObstacle(p);
+            events.Add(new TileEvent("rubble", p, false, source));
+        }
+
+        /// <summary>Sets a tile burning for <see cref="BurnRounds"/> rounds (not under a rock or wall).</summary>
+        private void SetBurning(GridPos p, Unit owner, List<BattleEvent> events)
+        {
+            if (!Board.InBounds(p) || Board.IsObstacle(p))
+                return;
+            _burning[p] = BurnRounds;
+            _burnOwners[p] = owner;
+            events.Add(new TileEvent("burn", p, true, owner));
+        }
+
         /// <summary>HP left on the barricade at this tile (0 if there is none).</summary>
         public int BarricadeHpAt(GridPos p) => _barricadeHp.TryGetValue(p, out var hp) ? hp : 0;
 
@@ -1033,7 +1134,7 @@ namespace ArmyRoguelike.Core
             return Math.Max(1, damage);
         }
 
-        /// <summary>Damage of an attack on this particular target: Pincer, Prey, Shatter and the opening shot.</summary>
+        /// <summary>Damage of an attack on this particular target: Pincer, Prey, Shatter (any of your units on a slowed enemy) and the opening shot.</summary>
         public int DamageAgainst(Unit attacker, Unit target)
         {
             var damage = EffectiveDamage(attacker);
@@ -1047,8 +1148,8 @@ namespace ArmyRoguelike.Core
                 damage += LongShotBonus;
             if (attacker.Has(Ability.Isolate) && IsExposed(target))
                 damage += IsolateBonus;
-            if (attacker.Has(Ability.Shatter) && target.IsSlowed)
-                damage *= 2;
+            if (target.IsSlowed && Living(attacker.Team).Any(u => u.Has(Ability.Shatter)))
+                damage += ShatterBonus;
             if (attacker.IsHidden && !attacker.AmbushUsed)
                 damage += VanishBonus;
             if (attacker.Has(Ability.WolfBite))
@@ -1304,7 +1405,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>
         /// Every anchor tile the unit can walk to with its remaining moves, with the move cost. Excludes its own tile.
-        /// Enemies never stop on a storm mark.
+        /// Enemies never stop on a storm mark or on burning ground.
         /// </summary>
         public Dictionary<GridPos, int> GetReachable(Unit unit)
         {
@@ -1316,6 +1417,10 @@ namespace ArmyRoguelike.Core
             routes.Remove(unit.Pos);
             if (unit.Team == Team.Enemy && _stormMarks.Count > 0)
                 foreach (var anchor in routes.Keys.Where(a => Footprint(a, unit.Size).Any(_stormMarks.Contains)).ToList())
+                    routes.Remove(anchor);
+            // Burning ground (the Mage's keyword): enemies walk through it but never stop on it.
+            if (unit.Team == Team.Enemy && _burning.Count > 0)
+                foreach (var anchor in routes.Keys.Where(a => Footprint(a, unit.Size).Any(_burning.ContainsKey)).ToList())
                     routes.Remove(anchor);
             return routes;
         }
@@ -1462,14 +1567,30 @@ namespace ArmyRoguelike.Core
 
         public bool CanUseAction(Unit unit, ActionKind action, GridPos tile)
         {
-            if (IsOver || !unit.IsAlive || !unit.HasAction(action) || unit.Ap < ActionCost(action) || (ActionCost(action) == 0 && unit.ActedThisTurn) || !Ready(unit, action) || !Board.InBounds(tile))
+            var cost = CostOf(unit, action);
+            if (IsOver || !unit.IsAlive || !unit.HasAction(action) || (unit.Ap < cost && !TwincastFree(unit, action)) || (cost == 0 && unit.ActedThisTurn) || !Ready(unit, action) || !Board.InBounds(tile))
                 return false;
             var target = UnitAt(tile);
             var steps = Distance(tile, 1, unit);
             switch (action)
             {
                 case ActionKind.PlaceMine:
-                    return MinesOf(unit) < MaxMinesFor(unit) && steps == 1 && IsFree(tile) && !HasHazard(tile);
+                    return MinesOf(unit) < MaxMinesFor(unit) && steps >= 1 && steps <= MineRange && IsFree(tile) && !HasHazard(tile);
+                case ActionKind.FrostNova:
+                    return tile == unit.Pos && AdjacentFoes(unit).Any(u => !u.IsObjective);
+                case ActionKind.Firewall:
+                    return steps >= 1 && steps <= FirewallRange && !Board.IsObstacle(tile) && !IsShroudedFrom(tile, unit.Team);
+                case ActionKind.Blizzard:
+                    return steps >= 1 && steps <= BlizzardRange && !IsShroudedFrom(tile, unit.Team);
+                case ActionKind.Transpose:
+                    return target != null && target != unit && unit.Size == 1 && target.Size == 1 && steps <= TransposeRange &&
+                           !target.IsObjective && !target.Has(Ability.Colossus) && (!target.IsHidden || target.Team == unit.Team);
+                case ActionKind.CaveIn:
+                    return steps >= 1 && steps <= CaveInRange && IsFree(tile) && !HasHazard(tile) && RemainsAt(tile) == null;
+                case ActionKind.Hook:
+                    return HookLine(unit, target).HasValue;
+                case ActionKind.Demolish:
+                    return steps >= 1 && steps <= DemolishRange && Board.IsObstacle(tile);
                 case ActionKind.ThrowBomb:
                     return steps >= 2 && steps <= PlayerBombRange && !Board.IsObstacle(tile) && BombAt(tile) == null &&
                            !IsShroudedFrom(tile, unit.Team);
@@ -1565,7 +1686,10 @@ namespace ArmyRoguelike.Core
                 return null;
             ActiveUnit = unit;
             var events = new List<BattleEvent>();
+            var twincast = TwincastFree(unit, action);
             UseUp(unit, action);
+            if (twincast)
+                events.Add(new StatusEvent(unit, unit, StatusKind.Twincast, 0));
             switch (action)
             {
                 case ActionKind.PlaceMine:
@@ -1805,16 +1929,158 @@ namespace ArmyRoguelike.Core
                         Board.RemoveObstacle(b.tile);
                         events.Add(new TileEvent("barricade", b.tile, false, unit));
                         Explode(b.tile, BarricadeBlastDamage, "barricade", unit, events);
+                        AddRubble(b.tile, null, events);
                     }
 
                     break;
                 case ActionKind.Charge:
                     Charge(unit, tile, events);
                     break;
+                case ActionKind.FrostNova:
+                    FrostNova(unit, events);
+                    break;
+                case ActionKind.Firewall:
+                    Firewall(unit, tile, events);
+                    break;
+                case ActionKind.Blizzard:
+                    Blizzard(unit, tile, events);
+                    break;
+                case ActionKind.Transpose:
+                {
+                    var other = UnitAt(tile);
+                    var from = unit.Pos;
+                    unit.Pos = tile;
+                    other.Pos = from;
+                    unit.MovedThisTurn = true;
+                    events.Add(new MoveEvent(unit, from, new List<GridPos> { tile }));
+                    events.Add(new MoveEvent(other, tile, new List<GridPos> { from }));
+                    // An enemy put down on a mine sets it off.
+                    if (other.Team == Team.Enemy && MineAt(from) is Mine mine)
+                        Explode(mine.Tile, mine.Damage, "mine", mine.Owner, events);
+                    break;
+                }
+                case ActionKind.CaveIn:
+                    AddRubble(tile, unit, events);
+                    break;
+                case ActionKind.Hook:
+                {
+                    var target = UnitAt(tile);
+                    var dir = HookLine(unit, target).Value;
+                    events.Add(new StatusEvent(unit, target, StatusKind.Hooked, 0));
+                    Push(target, dir, unit, events, distance: unit.Pos.StepsTo(target.Pos) - 1);
+                    break;
+                }
+                case ActionKind.Demolish:
+                    Demolish(unit, tile, events);
+                    break;
             }
 
             CheckEnd();
             return events;
+        }
+
+        /// <summary>
+        /// Frost Nova (the Mage's base spell): every enemy next to the caster is slowed (can't move on its next turn)
+        /// and pushed 1 tile away, by the usual weight rules. A Colossus shrugs off both.
+        /// </summary>
+        private void FrostNova(Unit caster, List<BattleEvent> events)
+        {
+            events.Add(new StatusEvent(caster, caster, StatusKind.FrostNova, 0));
+            foreach (var foe in AdjacentFoes(caster).Where(u => !u.IsObjective).OrderBy(u => u.Id).ToList())
+            {
+                if (!foe.IsAlive || IsOver || foe.Has(Ability.Colossus))
+                    continue;
+                foe.SlowNext = 1;
+                events.Add(new StatusEvent(caster, foe, StatusKind.Slow, 1));
+                var near = Cells(foe).Where(c => c.StepsTo(caster.Pos) == 1).Cast<GridPos?>().FirstOrDefault();
+                var dir = near.HasValue ? StraightDirection(caster.Pos, near.Value) : null;
+                if (dir.HasValue)
+                    Push(foe, dir.Value, caster, events);
+            }
+        }
+
+        /// <summary>
+        /// The 3 tiles a Firewall lights: the chosen tile and its two neighbours across the caster's line of aim
+        /// (the longer of the two axes; a tie counts as left-right aim).
+        /// </summary>
+        public List<GridPos> FirewallLine(Unit caster, GridPos center)
+        {
+            var dx = center.X - caster.Pos.X;
+            var dy = center.Y - caster.Pos.Y;
+            var side = Math.Abs(dx) >= Math.Abs(dy) ? new GridPos(0, 1) : new GridPos(1, 0);
+            return new[] { center + side, center, new GridPos(center.X - side.X, center.Y - side.Y) }
+                .Where(p => Board.InBounds(p) && !Board.IsObstacle(p)).ToList();
+        }
+
+        /// <summary>Firewall: a line of 3 burning tiles; whoever stands there takes the damage now, friend or foe.</summary>
+        private void Firewall(Unit caster, GridPos center, List<BattleEvent> events)
+        {
+            var line = FirewallLine(caster, center);
+            var after = new List<BattleEvent>();
+            var hits = _units.Where(u => u.IsPlaced && u.IsAlive && Cells(u).Any(line.Contains)).ToList()
+                .Select(u => Damage(u, FirewallDamage, caster, DamageKind.Blast, after)).ToList();
+            events.Add(new AreaAttackEvent(caster, "firewall", center, line, hits));
+            events.AddRange(after);
+            foreach (var p in line)
+                SetBurning(p, caster, events);
+        }
+
+        /// <summary>Blizzard: every enemy in the plus takes the damage and is slowed. Your units in it are spared.</summary>
+        private void Blizzard(Unit caster, GridPos center, List<BattleEvent> events)
+        {
+            var area = PlusArea(center);
+            var foes = _units.Where(u => u.IsPlaced && u.IsAlive && u.Team != caster.Team && Cells(u).Any(area.Contains)).ToList();
+            var after = new List<BattleEvent>();
+            var hits = foes.Select(u => Damage(u, BlizzardDamage, caster, DamageKind.Blast, after)).ToList();
+            events.Add(new AreaAttackEvent(caster, "blizzard", center, area, hits));
+            events.AddRange(after);
+            foreach (var foe in foes.Where(u => u.IsAlive && !u.IsObjective && !u.Has(Ability.Colossus)))
+            {
+                foe.SlowNext = 1;
+                events.Add(new StatusEvent(caster, foe, StatusKind.Slow, 1));
+            }
+        }
+
+        /// <summary>
+        /// Grappling Hook: the pull direction (from the target towards the sapper) if the target is an enemy 2 to
+        /// <see cref="HookRange"/> steps away in a straight line, in sight (rubble doesn't block it), not huge.
+        /// </summary>
+        public GridPos? HookLine(Unit unit, Unit target)
+        {
+            if (target == null || target.Team == unit.Team || target.IsObjective || target.IsHidden || target.Size != 1 || unit.Size != 1 ||
+                target.Has(Ability.Colossus) || target.Stats.Weight == Weight.Huge)
+                return null;
+            var dir = StraightDirection(target.Pos, unit.Pos);
+            var steps = unit.Pos.StepsTo(target.Pos);
+            if (dir == null || steps < 2 || steps > HookRange || !Board.HasLineOfSight(unit.Pos, target.Pos))
+                return null;
+            return dir;
+        }
+
+        /// <summary>
+        /// Demolish: blows up a rock, rubble, barricade or ice wall in range for a blast in the 3x3. A rock or barricade
+        /// collapses into rubble; rubble and ice are gone.
+        /// </summary>
+        private void Demolish(Unit unit, GridPos tile, List<BattleEvent> events)
+        {
+            var leavesRubble = !IsRubble(tile) && !_ice.ContainsKey(tile);
+            if (IsBarricade(tile))
+            {
+                _barricades.RemoveAll(b => b.tile == tile);
+                _barricadeHp.Remove(tile);
+                events.Add(new TileEvent("barricade", tile, false, unit));
+            }
+            else if (_ice.Remove(tile))
+                events.Add(new TileEvent("ice", tile, false, unit));
+            else if (IsRubble(tile))
+                events.Add(new TileEvent("rubble", tile, false, unit));
+            else
+                events.Add(new TileEvent("rock", tile, false, unit));
+
+            Board.RemoveObstacle(tile);
+            Explode(tile, DemolishDamage, "demolish", unit, events);
+            if (leavesRubble)
+                AddRubble(tile, null, events);
         }
 
         private void Fireball(Unit caster, GridPos center, List<BattleEvent> events)
@@ -2000,14 +2266,14 @@ namespace ArmyRoguelike.Core
         /// stops and takes collision damage. An enemy shoved onto a mine sets it off. Battering Ram adds its damage
         /// at the end, whether the unit moved or not.
         /// </summary>
-        private void Push(Unit unit, GridPos dir, Unit pusher, List<BattleEvent> events, bool hurtsBlocker = false)
+        private void Push(Unit unit, GridPos dir, Unit pusher, List<BattleEvent> events, bool hurtsBlocker = false, int? distance = null)
         {
             // The shrine is rooted to its tile, and nothing moves a Colossus.
             if (!unit.IsAlive || unit.IsObjective || unit.Has(Ability.Colossus))
                 return;
             var start = unit.Pos;
-            var distance = PushDistance(unit, pusher);
-            for (var step = 0; step < distance && unit.IsAlive; step++)
+            var tiles = distance ?? PushDistance(unit, pusher);
+            for (var step = 0; step < tiles && unit.IsAlive; step++)
             {
                 var from = unit.Pos;
                 var to = from + dir;
@@ -2038,10 +2304,16 @@ namespace ArmyRoguelike.Core
                     var blockers = hurtsBlocker
                         ? Footprint(to, unit.Size).Select(UnitAt).Where(u => u != null && u != unit).Distinct().ToList()
                         : new List<Unit>();
+                    // Rubble crushes: more damage, and the heap breaks.
+                    var rubble = Footprint(to, unit.Size).Where(IsRubble).ToList();
                     var after = new List<BattleEvent>();
-                    var hit = Damage(unit, CollisionDamage, pusher, DamageKind.Collision, after);
+                    var hit = Damage(unit, CollisionDamage + (rubble.Count > 0 ? CrushDamage : 0), pusher, DamageKind.Collision, after);
                     events.Add(new PushEvent(unit, pusher, from, from, hit));
+                    if (rubble.Count > 0)
+                        events.Add(new EffectEvent(EffectKind.Crush, unit, CrushDamage, unit.Hp, pusher));
                     events.AddRange(after);
+                    foreach (var r in rubble)
+                        ClearRubble(r, null, events);
                     foreach (var blocker in blockers.Where(b => b.IsAlive))
                     {
                         var blockerAfter = new List<BattleEvent>();
@@ -2222,7 +2494,7 @@ namespace ArmyRoguelike.Core
         /// </summary>
         public bool CanAttackBarricade(Unit attacker, GridPos tile)
         {
-            if (IsOver || !attacker.IsAlive || attacker.IsObjective || attacker.Stats.Damage <= 0 || attacker.Ap < AttackCost || !IsBarricade(tile))
+            if (IsOver || !attacker.IsAlive || attacker.IsObjective || attacker.Stats.Damage <= 0 || attacker.Ap < AttackCost || (!IsBarricade(tile) && !IsRubble(tile)))
                 return false;
             var steps = Cells(attacker).Min(c => c.StepsTo(tile));
             return steps <= attacker.Range && (steps == 1 || Cells(attacker).Any(c => Board.HasLineOfSight(c, tile)));
@@ -2238,15 +2510,26 @@ namespace ArmyRoguelike.Core
             SpendAp(attacker, AttackCost);
             attacker.AttackedThisTurn = true;
             var damage = EffectiveDamage(attacker);
-            var hp = Math.Max(0, BarricadeHpAt(tile) - damage);
-            _barricadeHp[tile] = hp;
-            events.Add(new BarricadeHitEvent(attacker, tile, damage, hp));
-            if (hp == 0)
+            if (IsRubble(tile))
             {
-                _barricades.RemoveAll(b => b.tile == tile);
-                _barricadeHp.Remove(tile);
-                Board.RemoveObstacle(tile);
-                events.Add(new TileEvent("barricade", tile, false, attacker));
+                // Rubble goes with one hit.
+                events.Add(new BarricadeHitEvent(attacker, tile, damage, 0));
+                ClearRubble(tile, attacker, events);
+            }
+            else
+            {
+                var hp = Math.Max(0, BarricadeHpAt(tile) - damage);
+                _barricadeHp[tile] = hp;
+                events.Add(new BarricadeHitEvent(attacker, tile, damage, hp));
+                if (hp == 0)
+                {
+                    // A broken barricade collapses into rubble.
+                    _barricades.RemoveAll(b => b.tile == tile);
+                    _barricadeHp.Remove(tile);
+                    Board.RemoveObstacle(tile);
+                    events.Add(new TileEvent("barricade", tile, false, attacker));
+                    AddRubble(tile, null, events);
+                }
             }
 
             // Attacking doesn't reveal a hidden unit (Vanish lasts until your next turn); it only spends the +2.
@@ -2509,6 +2792,11 @@ namespace ArmyRoguelike.Core
                 BiteChain++;
             foreach (var hitUnit in struck)
                 attacker.MarkStruck(hitUnit);
+
+            // Searing Bolt: the target's ground catches fire.
+            if (attacker.Has(Ability.SearingBolt) && !IsOver)
+                foreach (var cell in Cells(target).ToList())
+                    SetBurning(cell, attacker, events);
 
             if (!attacker.IsRanged)
             {
@@ -2873,6 +3161,11 @@ namespace ArmyRoguelike.Core
                 events.Add(new ExplosionEvent(blast.cause, blast.owner, blast.center, area, hits, blast.depth));
                 events.AddRange(after);
 
+                // Incendiary: the sapper's mines, bombs and blasts leave the ground burning.
+                if (blast.owner != null && blast.owner.Has(Ability.Incendiary))
+                    foreach (var p in area)
+                        SetBurning(p, blast.owner, events);
+
                 foreach (var mine in _mines.Where(m => area.Contains(m.Tile)).ToList())
                 {
                     _mines.Remove(mine);
@@ -3211,6 +3504,16 @@ namespace ArmyRoguelike.Core
                     events.Add(new TickEvent("poison", Damage(u, PoisonDamage, null, DamageKind.Tick, after), u.PoisonSource));
                     events.AddRange(after);
                 }
+
+                // Spiked Barricades: once per turn, however many spiked barricades it stands next to.
+                var spikes = u.IsAlive ? _barricades.FirstOrDefault(b => b.owner != null && b.owner.Team != u.Team && b.owner.Has(Ability.SpikedBarricades) &&
+                                                                         Cells(u).Any(c => c.StepsTo(b.tile) == 1)) : default;
+                if (spikes.owner != null)
+                {
+                    var after = new List<BattleEvent>();
+                    events.Add(new TickEvent("spikes", Damage(u, SpikeDamage, null, DamageKind.Tick, after), spikes.owner));
+                    events.AddRange(after);
+                }
             }
 
             if (team == Team.Player)
@@ -3248,6 +3551,7 @@ namespace ArmyRoguelike.Core
             foreach (var u in Living(team))
             {
                 u.ZocStrikeUsed = false;
+                u.TwincastUsed = false;
                 u.ShieldUpTurns = Math.Max(0, u.ShieldUpTurns - 1);
                 u.TauntTurns = Math.Max(0, u.TauntTurns - 1);
                 if (u.BattlecryTurns > 0 && --u.BattlecryTurns == 0)

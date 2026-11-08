@@ -54,6 +54,10 @@ public static class BalanceSim
             for (var j = i + 1; j < bases.Length; j++)
                 for (var k = j + 1; k < bases.Length; k++)
                     drafts.Add(new[] { bases[i], bases[j], bases[k] });
+        // SIM_DRAFT=Ma keeps only the drafts with that unit's label (e.g. Ma, Sa, W, A, R).
+        var only = Environment.GetEnvironmentVariable("SIM_DRAFT");
+        if (!string.IsNullOrEmpty(only))
+            drafts = drafts.Where(d => d.Any(s => s.Label == only)).ToList();
         return drafts;
     }
 

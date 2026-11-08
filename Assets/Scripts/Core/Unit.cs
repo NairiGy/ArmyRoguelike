@@ -151,6 +151,9 @@ namespace ArmyRoguelike.Core
         /// <summary>Throw Shield was used in this battle: more damage and a move for good.</summary>
         public bool ShieldThrown { get; internal set; }
 
+        /// <summary>Twincast: the free action of this turn was already used.</summary>
+        public bool TwincastUsed { get; internal set; }
+
         /// <summary>The zone-of-control attack was already used this round.</summary>
         public bool ZocStrikeUsed { get; internal set; }
 
@@ -206,7 +209,7 @@ namespace ArmyRoguelike.Core
                 IsMercenary = IsMercenary, Escaped = Escaped, Fell = Fell, Favored = Favored, PackHp = PackHp,
                 BannerAp = BannerAp, BannerMoves = BannerMoves, LeftPile = LeftPile, PileGone = PileGone,
                 ShieldUpTurns = ShieldUpTurns, TauntTurns = TauntTurns, BattlecryTurns = BattlecryTurns, TempHp = TempHp,
-                ShieldThrown = ShieldThrown, ZocStrikeUsed = ZocStrikeUsed, AmbushUsed = AmbushUsed, Marked = Marked, MarkSpreads = MarkSpreads,
+                ShieldThrown = ShieldThrown, ZocStrikeUsed = ZocStrikeUsed, AmbushUsed = AmbushUsed, Marked = Marked, MarkSpreads = MarkSpreads, TwincastUsed = TwincastUsed,
                 Affix = Affix, ExtraHp = ExtraHp, BossPhase = BossPhase, PhaseFloor = PhaseFloor,
             };
             foreach (var cooldown in _cooldowns)

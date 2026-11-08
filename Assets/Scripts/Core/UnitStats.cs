@@ -157,6 +157,12 @@ namespace ArmyRoguelike.Core
         /// <summary>Ward also shields every ally next to the target.</summary>
         WideWard,
 
+        /// <summary>Its bolt sets the target's tile burning.</summary>
+        SearingBolt,
+
+        /// <summary>The first special action it uses each turn costs no AP (it still can't move afterwards).</summary>
+        Twincast,
+
         // ---------- Sapper line ----------
 
         /// <summary>Can place mines (see the Place Mine action).</summary>
@@ -167,6 +173,15 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Its own blasts don't hurt its side.</summary>
         BlastProof,
+
+        /// <summary>Place Mine is free (before acting) and ready every turn.</summary>
+        QuickFuse,
+
+        /// <summary>Its mines, bombs and blasts leave their area burning.</summary>
+        Incendiary,
+
+        /// <summary>Enemies starting their turn next to one of its barricades take damage.</summary>
+        SpikedBarricades,
 
         // ---------- Items ----------
 
@@ -294,6 +309,14 @@ namespace ArmyRoguelike.Core
         SmokeBomb,
         Rupture,
         MarkTarget,
+        // Mage/Sapper night pool
+        FrostNova,
+        Firewall,
+        Blizzard,
+        Transpose,
+        CaveIn,
+        Hook,
+        Demolish,
 
         // Enemy actions: never in a unit's Actions list (the AI uses them), but they share the cooldown table.
         Slam,
@@ -439,10 +462,10 @@ namespace ArmyRoguelike.Core
             "Fast, deadly, fragile. Slips out of sight.", A(Ability.Swift), Do(ActionKind.Vanish), Weight.Small);
 
         public static readonly UnitStats Apprentice = Player(UnitKind.Mage, "Mage Apprentice", "Ma", 5, 2, 3, 1,
-            "Weak bolt that flies over obstacles.", A(Ability.ArcaneBolt), Do(ActionKind.Blink), Weight.Small);
+            "Fragile spellcaster that controls space with fire and ice.", A(Ability.ArcaneBolt), Do(ActionKind.FrostNova), Weight.Small);
 
-        public static readonly UnitStats Sapper = Player(UnitKind.Sapper, "Sapper", "Sa", 6, 2, 1, 1,
-            "Lays mines that enemies walk into.", A(Ability.Mines), Do(ActionKind.PlaceMine));
+        public static readonly UnitStats Sapper = Player(UnitKind.Sapper, "Sapper", "Sa", 7, 2, 1, 1,
+            "Engineer who reshapes the board: mines, rubble and walls.", A(Ability.Mines), Do(ActionKind.PlaceMine));
 
         /// <summary>Placed with the Sapper's Turret technique. Can't move; shoots like a small archer.</summary>
         public static readonly UnitStats Turret = new UnitStats(UnitKind.Turret, "Turret", 4, 2, 2, 1)

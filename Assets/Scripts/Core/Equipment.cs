@@ -77,6 +77,11 @@ namespace ArmyRoguelike.Core
                 case Ability.Mines: return "Mines";
                 case Ability.BigMines: return "Big Mines";
                 case Ability.BlastProof: return "Blast Proof";
+                case Ability.SearingBolt: return "Searing Bolt";
+                case Ability.Twincast: return "Twincast";
+                case Ability.QuickFuse: return "Quick Fuse";
+                case Ability.Incendiary: return "Incendiary";
+                case Ability.SpikedBarricades: return "Spiked Barricades";
                 case Ability.VampireFang: return "Vampire Fang";
                 case Ability.ThornedMail: return "Thorns";
                 case Ability.SpringBoots: return "Spring Step";
@@ -138,14 +143,19 @@ namespace ArmyRoguelike.Core
                 case Ability.CounterAll: return "counter-attacks every melee hit";
                 case Ability.Dodge: return "the first hit each enemy turn deals 0 damage";
                 case Ability.ArcaneBolt: return "its bolt ignores line of sight";
-                case Ability.Burning: return $"fireballs leave the area burning for {Battle.BurnRounds} rounds ({Battle.BurnDamage} damage at the start of each turn)";
+                case Ability.Burning: return $"fireballs leave the area burning for {Battle.BurnRounds} rounds ({Battle.BurnDamage} damage at the start of each turn there; enemies won't stop on burning ground)";
                 case Ability.Concussive: return "fireballs push units outward and set off mines and bombs";
                 case Ability.Chill: return "its hits slow: the target can't move on its next turn";
-                case Ability.Shatter: return "double damage to slowed enemies";
+                case Ability.Shatter: return $"slowed enemies take +{Battle.ShatterBonus} damage from every attack of your units";
                 case Ability.WideWard: return "Ward also shields every ally next to the target";
                 case Ability.Mines: return "an enemy stepping on one of its mines sets it off: it hurts whoever stands on that tile";
                 case Ability.BigMines: return $"its mines deal {Battle.BigMineDamage} damage and it can have {Battle.BigMaxMines} out";
                 case Ability.BlastProof: return "its blasts don't hurt your units";
+                case Ability.SearingBolt: return $"its bolt sets the target's tile burning for {Battle.BurnRounds} rounds ({Battle.BurnDamage} damage at the start of each turn there; enemies won't stop on burning ground)";
+                case Ability.Twincast: return "the first action it uses each turn costs no AP, so it can still attack or cast another (it can't move afterwards)";
+                case Ability.QuickFuse: return "Place Mine is free and ready every turn: use it before acting, then move and attack as usual";
+                case Ability.Incendiary: return $"its mines, bombs and blasts leave the ground they hit burning for {Battle.BurnRounds} rounds";
+                case Ability.SpikedBarricades: return $"an enemy starting its turn next to one of its barricades takes {Battle.SpikeDamage}";
                 case Ability.VampireFang: return $"heals {Battle.VampireHeal} HP on a kill";
                 case Ability.ThornedMail: return $"melee attackers take {Battle.ThornsDamage} damage";
                 case Ability.SpringBoots: return "+1 move each turn";
@@ -220,6 +230,13 @@ namespace ArmyRoguelike.Core
                 case ActionKind.SmokeBomb: return "Smoke Bomb";
                 case ActionKind.Rupture: return "Rupture";
                 case ActionKind.MarkTarget: return "Mark Target";
+                case ActionKind.FrostNova: return "Frost Nova";
+                case ActionKind.Firewall: return "Firewall";
+                case ActionKind.Blizzard: return "Blizzard";
+                case ActionKind.Transpose: return "Transpose";
+                case ActionKind.CaveIn: return "Cave-In";
+                case ActionKind.Hook: return "Grappling Hook";
+                case ActionKind.Demolish: return "Demolish";
                 default: return action.ToString();
             }
         }
@@ -229,7 +246,7 @@ namespace ArmyRoguelike.Core
             switch (action)
             {
                 case ActionKind.PlaceMine:
-                    return $"put a mine on a free tile next to it (max {Battle.MaxMinesPerUnit}); an enemy stepping on it sets it off for {Battle.MineDamage} damage to whoever stands on that tile";
+                    return $"put a mine on a free tile within {Battle.MineRange} (max {Battle.MaxMinesPerUnit}); an enemy stepping on it sets it off for {Battle.MineDamage} damage to whoever stands on that tile";
                 case ActionKind.ThrowBomb:
                     return $"lob a bomb 2-{Battle.PlayerBombRange} tiles away; it explodes for {Battle.PlayerBombDamage} on that tile at the start of the next enemy turn";
                 case ActionKind.PinningShot: return $"{Battle.PinDamage} damage to an enemy in shot range (needs line of sight), and it can't move on its next turn";
@@ -250,15 +267,22 @@ namespace ArmyRoguelike.Core
                 case ActionKind.IceWall: return $"turn a free tile within {Battle.ActionRange} into ice (blocks like a rock) for {Battle.IceRounds} rounds";
                 case ActionKind.Ward: return $"an ally within {Battle.ActionRange} tiles gets a shield that absorbs {Battle.WardShield} damage";
                 case ActionKind.Mend: return $"heal an ally within {Battle.ActionRange} tiles for {Battle.MendHeal}";
-                case ActionKind.Barricade: return $"build a barricade on a free tile next to it (max {Battle.MaxBarricades}): blocks paths and shots, {Battle.BarricadeHp} HP, either side can break it";
+                case ActionKind.Barricade: return $"build a barricade on a free tile next to it (max {Battle.MaxBarricades}): blocks paths and shots, {Battle.BarricadeHp} HP, either side can break it, and a broken one collapses into rubble";
                 case ActionKind.Turret: return "build a turret next to it (one at a time); it acts on your turn but can't move";
-                case ActionKind.Detonate: return $"blow up all its barricades: {Battle.BarricadeBlastDamage} damage in a 3x3 around each";
+                case ActionKind.Detonate: return $"blow up all its barricades: {Battle.BarricadeBlastDamage} damage in a 3x3 around each, and each leaves rubble";
                 case ActionKind.Charge: return $"rush up to {Battle.ChargeRange} tiles in a straight line, past allies: {Battle.ChargeDamage} damage to every enemy on the way, each pushed to a random side. One that doesn't move stops the charge";
                 case ActionKind.Sweep: return "hit an enemy next to it and the enemies on both sides of it";
                 case ActionKind.ShieldUp: return $"takes {Battle.ShieldUpReduction} less damage from every source (at least 1) for {Battle.ShieldUpTurns} enemy turns";
                 case ActionKind.Battlecry: return $"every ally within {Battle.BattlecryRange} tiles, itself included, gets +{Battle.BattlecryMoves} move and {Battle.BattlecryHp} temporary HP until your next turn";
                 case ActionKind.Taunt: return $"until your next turn, enemies within {Battle.TauntRange} tiles can only attack or use offensive abilities on this unit";
                 case ActionKind.ThrowShield: return $"for the rest of the battle: +{Battle.ThrowShieldMoves} move and +{Battle.ThrowShieldDamage} damage, for {Battle.ThrowShieldHpCost} HP. Once per battle. Free, before it acts: it can still move and attack";
+                case ActionKind.FrostNova: return "every enemy next to it is slowed (can't move on its next turn) and pushed 1 tile away";
+                case ActionKind.Firewall: return $"set 3 tiles in a line across its aim, up to {Battle.FirewallRange} tiles away, burning for {Battle.BurnRounds} rounds; whoever stands there takes {Battle.FirewallDamage} now. Enemies won't stop on burning ground";
+                case ActionKind.Blizzard: return $"{Battle.BlizzardDamage} damage to every enemy on a tile up to {Battle.BlizzardRange} tiles away and the 4 next to it, and they are slowed (can't move on their next turn). Spares your units";
+                case ActionKind.Transpose: return $"swap places with any unit within {Battle.TransposeRange} tiles, friend or foe (not the Giant or objectives). An enemy put down on a mine sets it off";
+                case ActionKind.CaveIn: return $"drop rubble on a free tile within {Battle.CaveInRange}: it blocks walking but not shots, and a unit pushed into it takes {Battle.CrushDamage} more and breaks it";
+                case ActionKind.Hook: return $"pull an enemy 2-{Battle.HookRange} tiles away in a straight line (in sight) to the tile next to it; mines on the way go off, and it slams into whatever blocks it (not huge units)";
+                case ActionKind.Demolish: return $"blow up a rock, rubble, barricade or ice wall within {Battle.DemolishRange}: {Battle.DemolishDamage} damage to everyone in the 3x3 around it. A rock or barricade collapses into rubble";
                 default: return "";
             }
         }

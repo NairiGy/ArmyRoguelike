@@ -104,11 +104,12 @@ namespace ArmyRoguelike.Tests
         // ---------- Sapper mines ----------
 
         [Test]
-        public void Mine_PlacedNextToSapper_WithLimits()
+        public void Mine_PlacedNearSapper_WithLimits()
         {
             var b = Started(new[] { M(UnitStats.Sapper) }, new[] { P(3, 1) }, new[] { (UnitStats.Wolf, P(7, 7)) });
             var sapper = Player(b);
-            Assert.IsFalse(b.CanPlaceMine(sapper, P(3, 3)), "not adjacent");
+            Assert.IsTrue(b.CanPlaceMine(sapper, P(3, 3)), "2 tiles away is in range");
+            Assert.IsFalse(b.CanPlaceMine(sapper, P(3, 4)), "3 tiles is too far");
             Assert.IsNotNull(b.PlayerPlaceMine(sapper, P(3, 2)));
             Assert.AreEqual(1 - Battle.MineCost, sapper.Ap);
             Assert.IsFalse(b.CanPlaceMine(sapper, P(2, 1)), "one action a turn");
@@ -336,8 +337,8 @@ namespace ArmyRoguelike.Tests
         public void CanStillAct_CountsMinePlacement()
         {
             var b = Started(new[] { M(UnitStats.Sapper) }, new[] { P(0, 0) }, new[] { (UnitStats.Wolf, P(7, 7)) },
-                P(1, 0), P(0, 1));
-            // Boxed into the corner: it can't move, but it can't place a mine either (no free neighbour).
+                P(1, 0), P(0, 1), P(2, 0), P(1, 1), P(0, 2));
+            // Boxed into the corner: it can't move, but it can't place a mine either (no free tile in its range).
             Assert.IsFalse(b.CanStillAct(Player(b)));
         }
     }
