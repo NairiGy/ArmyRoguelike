@@ -201,7 +201,7 @@ namespace ArmyRoguelike.Core
         public Equipment Equipment => Member?.Equipment;
 
         // Stats after run-long bonuses.
-        public int MaxHp => Math.Max(1, Stats.MaxHp + (Member?.BonusMaxHp ?? 0) + (Member?.LevelHp ?? 0) + PackHp);
+        public int MaxHp => Math.Max(1, Stats.MaxHp + (Member?.BonusMaxHp ?? 0) + (Member?.LevelHp ?? 0) - (Member?.Cracks ?? 0) * Run.CrackHp + PackHp);
 
         /// <summary>Max HP from a Pack Leader's Pack Bond: +1 while one lives, -1 once the last one dies.</summary>
         public int PackHp { get; internal set; }

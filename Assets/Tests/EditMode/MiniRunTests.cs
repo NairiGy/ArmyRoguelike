@@ -151,6 +151,18 @@ namespace ArmyRoguelike.Tests
                         case EventKind.Shrine:
                             run.PrayAtShrine(run.Army[0]);
                             break;
+                        case EventKind.Mason:
+                            run.VisitMason(run.Army[0]);
+                            break;
+                        case EventKind.Altar:
+                            run.TakeAltar(null);
+                            break;
+                        case EventKind.Sculptor:
+                            run.Sculpt(null, null);
+                            break;
+                        case EventKind.Bargain:
+                            run.Bargain(false);
+                            break;
                     }
 
                     break;

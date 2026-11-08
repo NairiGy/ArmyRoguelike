@@ -140,6 +140,11 @@ namespace ArmyRoguelike.View
             if (_lastNote != null && _run.LastLoserGains.Count > 0)
                 _lastNote += $" Loser: {string.Join(", ", _run.LastLoserGains.Select(m => m.Stats.Name))} " +
                              $"+{Banners.LoserHp} max HP, +{Banners.LoserDamage} damage.";
+            var cracked = _run.LastCracked.Where(m => !_run.LastShattered.Contains(m)).ToList();
+            if (_lastNote != null && cracked.Count > 0)
+                _lastNote += $" Cracked: {string.Join(", ", cracked.Select(m => $"{m.Stats.Name} ({m.Cracks}/{Run.CracksToShatter})"))}.";
+            if (_lastNote != null && _run.LastShattered.Count > 0)
+                _lastNote += $" Shattered for good: {string.Join(", ", _run.LastShattered.Select(m => m.Stats.Name))}.";
             if (_run.State == RunState.Won || _run.State == RunState.Lost)
                 _runLog.Save();
         }
@@ -509,10 +514,16 @@ namespace ArmyRoguelike.View
                     bonus += $", +{m.LevelDamage + m.BonusDamage} damage";
                 if (m.LevelMines > 0)
                     bonus += $", +{m.LevelMines} mine";
+                if (m.Cracks > 0)
+                    bonus += $", {CrackText(m)}";
                 var item = m.Equipment != null ? $" [{m.Equipment.Name}]" : "";
                 GUILayout.Label($"  {m.Stats.Name} (level {m.Level}){item}: {techniques}{bonus}");
             }
         }
+
+        /// <summary>"2 cracks (-2 max HP, 1 more shatters it)".</summary>
+        private static string CrackText(ArmyMember m) =>
+            $"{m.Cracks} crack{(m.Cracks == 1 ? "" : "s")} (-{m.Cracks * Run.CrackHp} max HP{(m.Cracks == Run.CracksToShatter - 1 ? ", one more shatters it" : "")})";
 
         /// <summary>One button's text for a technique: name, rarity, line, requirement and rule.</summary>
         private static string Describe(Technique t)
@@ -949,6 +960,14 @@ namespace ArmyRoguelike.View
                     DrawForgetCard(forgetRect, forgetters);
             }
 
+            var cracked = _run.Army.Where(m => m.Cracks > 0).ToList();
+            if (cracked.Count > 0)
+            {
+                GUILayout.Space(CardGap);
+                var mendRect = GUILayoutUtility.GetRect(scrollInner, 8 + 22 + 20 + cracked.Count * 24 + 30, GUILayout.ExpandWidth(false));
+                DrawMendCard(mendRect, cracked);
+            }
+
             GUILayout.EndScrollView();
 
             GUILayout.Space(10);
@@ -1028,6 +1047,34 @@ namespace ArmyRoguelike.View
             Price(r, Run.ForgetPrice);
         }
 
+        // Mending: takes one crack off a unit.
+        private void DrawMendCard(Rect r, System.Collections.Generic.List<ArmyMember> cracked)
+        {
+            Card(r, false, false);
+            var x = r.x + 10;
+            var inner = r.width - 20;
+            Label(new Rect(x, r.y + 8, inner, 22), "Mend a crack", _cardName, Color.white);
+            Label(new Rect(x, r.y + 30, inner, 18), $"Each crack costs {Run.CrackHp} max HP, and a statue with {Run.CracksToShatter} shatters for good. Click a unit to mend one crack.", _cardText, DimText);
+            var y = r.y + 52;
+            foreach (var member in cracked)
+            {
+                var text = $"{member.Stats.Name}: {CrackText(member)}";
+                var size = _chip.CalcSize(new GUIContent(text));
+                GUI.enabled = _run.CanMend(member);
+                var m = member;
+                if (GUI.Button(new Rect(x, y, size.x, 20), text, _chip))
+                    Do(() =>
+                    {
+                        if (_run.Mend(m))
+                            _runLog.RecordMend(m);
+                    });
+                GUI.enabled = true;
+                y += 24;
+            }
+
+            Price(r, Run.MendPrice);
+        }
+
         /// <summary>A unit in the army row: statue, level, item and techniques. While an offer is picked, clicking it buys the offer for that unit.</summary>
         private void DrawMemberCard(Rect r, ArmyMember m)
         {
@@ -1072,6 +1119,12 @@ namespace ArmyRoguelike.View
             if (bonus.Count > 0)
             {
                 Label(new Rect(x, y, inner, 16), string.Join(", ", bonus), _cardText, TextColor);
+                y += 16;
+            }
+
+            if (m.Cracks > 0)
+            {
+                Label(new Rect(x, y, inner, 16), $"{m.Cracks} crack{(m.Cracks == 1 ? "" : "s")}: -{m.Cracks * Run.CrackHp} max HP", _cardText, HudArt.HarmColor);
                 y += 16;
             }
 
@@ -1227,6 +1280,131 @@ namespace ArmyRoguelike.View
                         }
                     }
 
+                    break;
+
+                case EventKind.Mason:
+                    GUILayout.Label("A Travelling Stonemason", Title);
+                    if (_run.ArmyHasCracks)
+                    {
+                        GUILayout.Label("\"Those cracks will be the end of you. Hold still.\" She offers to mend every crack in your army, free of charge.");
+                        if (GUILayout.Button("Mend every crack", GUILayout.Height(32)))
+                            Do(() =>
+                            {
+                                _run.VisitMason(null);
+                                AfterEvent("mend all");
+                            });
+                    }
+                    else
+                    {
+                        GUILayout.Label($"\"Not a scratch on you. I'll reinforce one of you, then.\" (+{Run.MasonHp} max HP for the run)");
+                        foreach (var member in _run.Army)
+                        {
+                            var m = member;
+                            if (GUILayout.Button($"Reinforce the {member.Stats.Name}"))
+                                Do(() =>
+                                {
+                                    _run.VisitMason(m);
+                                    AfterEvent($"reinforce {m.Stats.Name}");
+                                });
+                        }
+                    }
+
+                    if (GUILayout.Button("Move on"))
+                        Do(() =>
+                        {
+                            _run.VisitMason(null, true);
+                            AfterEvent("leave");
+                        });
+                    break;
+
+                case EventKind.Altar:
+                    GUILayout.Label("A Cracked Altar", Title);
+                    var altar = _run.AltarTechnique;
+                    if (altar != null)
+                    {
+                        GUILayout.Label($"Power seeps from a split in the stone. A statue that lays its hands on it learns a rare technique, but takes a crack (-{Run.CrackHp} max HP until mended; {Run.CracksToShatter} cracks shatter it).\n" + Describe(altar));
+                        foreach (var member in _run.Army)
+                        {
+                            var m = member;
+                            var why = !Run.CanCrackFor(member) ? "one crack from shattering" : !altar.CanLearn(member) ? WhyNot(altar, member) : "";
+                            GUI.enabled = _run.CanTakeAltar(member);
+                            if (GUILayout.Button($"The {member.Stats.Name} touches it ({member.Cracks} crack{(member.Cracks == 1 ? "" : "s")} now){(why.Length > 0 ? $"  ({why})" : "")}"))
+                                Do(() =>
+                                {
+                                    _run.TakeAltar(m);
+                                    AfterEvent($"{altar.Name} -> {m.Stats.Name}");
+                                });
+                            GUI.enabled = true;
+                        }
+                    }
+                    else
+                    {
+                        GUILayout.Label("A split altar, long gone cold. Nothing here for your army.");
+                    }
+
+                    if (GUILayout.Button("Leave it"))
+                        Do(() =>
+                        {
+                            _run.TakeAltar(null);
+                            AfterEvent("leave");
+                        });
+                    break;
+
+                case EventKind.Sculptor:
+                    GUILayout.Label("The Sculptor", Title);
+                    GUILayout.Label("\"I can carve something better out of you. Give me one of your techniques, and I'll chisel a rare one of your line in its place. Which one? That's up to the stone.\"");
+                    var any = false;
+                    foreach (var member in _run.Army.Where(m => m.Techniques.Count > 0))
+                    {
+                        GUILayout.Label($"{member.Stats.Name} gives up:");
+                        GUILayout.BeginHorizontal();
+                        foreach (var technique in member.Techniques.ToList())
+                        {
+                            var m = member;
+                            var t = technique;
+                            GUI.enabled = _run.CanSculpt(member, technique);
+                            any |= GUI.enabled;
+                            if (GUILayout.Button(technique.Name))
+                                Do(() =>
+                                {
+                                    _run.Sculpt(m, t);
+                                    AfterEvent($"{t.Name} ({m.Stats.Name}) -> {_run.SculptedInto?.Name}");
+                                });
+                            GUI.enabled = true;
+                        }
+
+                        GUILayout.EndHorizontal();
+                    }
+
+                    if (!any)
+                        GUILayout.Label("Nobody has a technique the sculptor can rework yet.");
+                    if (GUILayout.Button("No, thank you"))
+                        Do(() =>
+                        {
+                            _run.Sculpt(null, null);
+                            AfterEvent("leave");
+                        });
+                    break;
+
+                case EventKind.Bargain:
+                    GUILayout.Label("A Hooded Stranger", Title);
+                    GUILayout.Label($"\"Gold for your luck. {Run.BargainGold} pieces, and all I ask is a little misfortune to follow you.\"\nAccepting gives a random curse for every later battle.");
+                    GUI.enabled = _run.CanBargain;
+                    if (GUILayout.Button($"Take the gold (+{Run.BargainGold} gold, a curse)", GUILayout.Height(32)))
+                        Do(() =>
+                        {
+                            _run.Bargain(true);
+                            if (_run.LastCurse.HasValue)
+                                _runLog.RecordOmen(_run.LastCurse.Value, false);
+                            AfterEvent("accept");
+                        });
+                    GUI.enabled = true;
+                    if (GUILayout.Button("Refuse"))
+                        Do(() =>
+                        {
+                            _run.Bargain(false);
+                            AfterEvent("refuse");
+                        });
                     break;
             }
 

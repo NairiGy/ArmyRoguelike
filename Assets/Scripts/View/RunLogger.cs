@@ -71,6 +71,8 @@ namespace ArmyRoguelike.View
                 totemsLeft = battle?.Totems.Count(t => t.IsAlive) ?? 0,
                 mercenary = _pendingMerc,
                 loserGains = _run.LastLoserGains.Select(m => m.Stats.Name).ToList(),
+                cracked = _run.LastCracked.Select(m => $"{m.Stats.Name} {m.Cracks}").ToList(),
+                shattered = _run.LastShattered.Select(m => m.Stats.Name).ToList(),
             });
             _pendingMerc = null;
         }
@@ -171,6 +173,12 @@ namespace ArmyRoguelike.View
             _shop?.purchases.Add(new Purchase { kind = "recruit", item = unit, price = price, unit = unit });
         }
 
+        /// <summary>A crack mended at the shop; levelAfter holds the cracks left.</summary>
+        public void RecordMend(ArmyMember member)
+        {
+            _shop?.purchases.Add(new Purchase { kind = "mend", item = "crack", price = Run.MendPrice, unit = member.Stats.Name, levelAfter = member.Cracks });
+        }
+
         /// <summary>A technique forgotten at the shop (techniques that needed it went too).</summary>
         public void RecordForget(Technique technique, ArmyMember member)
         {
@@ -230,7 +238,7 @@ namespace ArmyRoguelike.View
             _log.finalArmy = _run.Army.Select(m => new ArmyEntry
             {
                 unit = m.Stats.Name, level = m.Level, techniques = m.Techniques.Select(t => t.Name).ToList(), equipment = m.Equipment?.Name ?? "",
-                levelHp = m.LevelHp, levelDamage = m.LevelDamage, bonusDamage = m.BonusDamage, bonusMaxHp = m.BonusMaxHp,
+                levelHp = m.LevelHp, levelDamage = m.LevelDamage, bonusDamage = m.BonusDamage, bonusMaxHp = m.BonusMaxHp, cracks = m.Cracks,
             }).ToList();
             WriteFile();
         }
@@ -348,6 +356,10 @@ namespace ArmyRoguelike.View
             /// <summary>Mercenaries banner: who was for hire and who was hired (empty: none). Loser banner: units that fell and grew.</summary>
             public MercHire mercenary;
             public List<string> loserGains = new List<string>();
+
+            /// <summary>Cracks: army units that fell, with their crack count after the fight ("Rogue 2"), and those that shattered and left.</summary>
+            public List<string> cracked = new List<string>();
+            public List<string> shattered = new List<string>();
         }
 
         [Serializable]
@@ -410,7 +422,7 @@ namespace ArmyRoguelike.View
         [Serializable]
         private sealed class Purchase
         {
-            /// <summary>"technique", "item", "recruit" or "banner".</summary>
+            /// <summary>"technique", "item", "recruit", "banner" or "mend" (levelAfter = cracks left).</summary>
             public string kind;
 
             /// <summary>The technique, item or recruited unit.</summary>
@@ -486,6 +498,7 @@ namespace ArmyRoguelike.View
             public int levelDamage;
             public int bonusDamage;
             public int bonusMaxHp;
+            public int cracks;
         }
     }
 }

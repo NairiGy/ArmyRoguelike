@@ -18,6 +18,12 @@ namespace ArmyRoguelike.Core
         /// <summary>Max HP gained during the run, e.g. from a shrine.</summary>
         public int BonusMaxHp { get; internal set; }
 
+        /// <summary>
+        /// Cracks from falling in fights: each costs <see cref="Run.CrackHp"/> max HP until mended, and the
+        /// <see cref="Run.CracksToShatter"/>th shatters the statue for good.
+        /// </summary>
+        public int Cracks { get; internal set; }
+
         private readonly List<Technique> _techniques = new List<Technique>();
 
         /// <summary>The techniques it knows, in the order learned.</summary>
@@ -118,6 +124,18 @@ namespace ArmyRoguelike.Core
 
         /// <summary>One unit gets +2 max HP for the run.</summary>
         Shrine,
+
+        /// <summary>A stonemason mends every crack for free (or, with none, reinforces one unit: +1 max HP).</summary>
+        Mason,
+
+        /// <summary>A cracked altar teaches one unit a rare technique, for a crack.</summary>
+        Altar,
+
+        /// <summary>A sculptor recarves one unit: it gives up a technique of your choice for a random rare one of its line.</summary>
+        Sculptor,
+
+        /// <summary>A hooded stranger pays gold for a curse.</summary>
+        Bargain,
     }
 
     /// <summary>One choice on the map.</summary>
@@ -219,6 +237,11 @@ namespace ArmyRoguelike.Core
 
         /// <summary>The shop's fee to make a unit forget a technique (its level stays).</summary>
         public const int ForgetPrice = 8;
+
+        /// <summary>Cracks: max HP lost per crack, the crack that shatters a statue for good, and a shop's price to mend one.</summary>
+        public const int CrackHp = 1;
+        public const int CracksToShatter = 3;
+        public const int MendPrice = 6;
 
         /// <summary>Map steps (0-based) where both choices are fights, so every run has at least this many before the boss.</summary>
         public static readonly IReadOnlyList<int> FightSteps = new[] { 0, 3, 5, 7, 9 };
@@ -701,6 +724,23 @@ namespace ArmyRoguelike.Core
                 }
             }
 
+            // Cracks: every army unit that fell is cracked; the last crack shatters it, and it leaves the army.
+            _lastCracked.Clear();
+            _lastShattered.Clear();
+            if (battle.Phase == Phase.Victory || battle.ScenarioLost)
+            {
+                foreach (var fallen in battle.Units.Where(u => u.Team == Team.Player && !u.IsAlive && u.Member != null && Army.Contains(u.Member)).Select(u => u.Member).Distinct().ToList())
+                {
+                    fallen.Cracks++;
+                    _lastCracked.Add(fallen);
+                    if (fallen.Cracks >= CracksToShatter && Army.Count > 1)
+                    {
+                        Army.Remove(fallen);
+                        _lastShattered.Add(fallen);
+                    }
+                }
+            }
+
             if (battle.Phase == Phase.Defeat)
             {
                 // Losing a scenario fight with the army still standing isn't the end: it costs a random curse.
@@ -747,6 +787,26 @@ namespace ArmyRoguelike.Core
         }
 
         private readonly List<ArmyMember> _lastLoserGains = new List<ArmyMember>();
+        private readonly List<ArmyMember> _lastCracked = new List<ArmyMember>();
+        private readonly List<ArmyMember> _lastShattered = new List<ArmyMember>();
+
+        /// <summary>Army members that fell in the last battle and were cracked (shattered ones included).</summary>
+        public IReadOnlyList<ArmyMember> LastCracked => _lastCracked;
+
+        /// <summary>Army members whose last crack shattered them after the last battle; they left the army.</summary>
+        public IReadOnlyList<ArmyMember> LastShattered => _lastShattered;
+
+        public bool CanMend(ArmyMember member) => State == RunState.Shop && Army.Contains(member) && member.Cracks > 0 && Gold >= MendPrice;
+
+        /// <summary>Shop service: pays to mend one of a member's cracks.</summary>
+        public bool Mend(ArmyMember member)
+        {
+            if (!CanMend(member))
+                return false;
+            Gold -= MendPrice;
+            member.Cracks--;
+            return true;
+        }
 
         /// <summary>Army members that fell in the last battle and grew from the Loser banner.</summary>
         public IReadOnlyList<ArmyMember> LastLoserGains => _lastLoserGains;
@@ -882,6 +942,13 @@ namespace ArmyRoguelike.Core
                     CartItem = Equipment.Catalog[_rng.Next(Equipment.Catalog.Count)];
             }
 
+            AltarTechnique = null;
+            if (CurrentEvent == EventKind.Altar)
+            {
+                var rares = Technique.All.Where(t => t.Rarity == TechniqueRarity.Rare && Army.Any(m => CanCrackFor(m) && t.CanLearn(m))).ToList();
+                AltarTechnique = rares.Count > 0 ? rares[_rng.Next(rares.Count)] : null;
+            }
+
             EventRecruit = CurrentEvent == EventKind.WanderingRecruit ? UnitStats.BaseUnits[_rng.Next(UnitStats.BaseUnits.Count)] : null;
             var fresh = FreshFactions();
             AmbushEncounter = CurrentEvent == EventKind.Ambush && fresh.Count > 0 ? fresh[_rng.Next(fresh.Count)] : null;
@@ -1001,6 +1068,140 @@ namespace ArmyRoguelike.Core
                 return false;
             member.BonusMaxHp += ShrineHp;
             EventOutcome = $"The {member.Stats.Name} feels sturdier (+{ShrineHp} max HP).";
+            NextStep();
+            return true;
+        }
+
+        // ---------- Events with a price ----------
+
+        public const int MasonHp = 1;
+        public const int BargainGold = 30;
+
+        /// <summary>Any crack in the army for the Stonemason to mend.</summary>
+        public bool ArmyHasCracks => Army.Any(m => m.Cracks > 0);
+
+        /// <summary>
+        /// Stonemason: mends every crack in the army for free. With no cracks to mend, it reinforces
+        /// <paramref name="member"/> instead (+1 max HP for the run). Null leaves.
+        /// </summary>
+        public bool VisitMason(ArmyMember member, bool leave = false)
+        {
+            if (State != RunState.Event || CurrentEvent != EventKind.Mason)
+                return false;
+            if (leave)
+            {
+                EventOutcome = "You thank the mason and move on.";
+            }
+            else if (ArmyHasCracks)
+            {
+                var mended = Army.Sum(m => m.Cracks);
+                foreach (var m in Army)
+                    m.Cracks = 0;
+                EventOutcome = $"The mason fills {mended} crack{(mended == 1 ? "" : "s")} with fresh mortar. Good as new.";
+            }
+            else
+            {
+                if (member == null || !Army.Contains(member))
+                    return false;
+                member.BonusMaxHp += MasonHp;
+                EventOutcome = $"Nothing to mend, so the mason reinforces the {member.Stats.Name} (+{MasonHp} max HP).";
+            }
+
+            NextStep();
+            return true;
+        }
+
+        /// <summary>Cracked Altar: the rare technique it teaches (null: nobody could take it).</summary>
+        public Technique AltarTechnique { get; private set; }
+
+        /// <summary>A crack that wouldn't shatter the unit.</summary>
+        public static bool CanCrackFor(ArmyMember member) => member.Cracks < CracksToShatter - 1;
+
+        public bool CanTakeAltar(ArmyMember member) =>
+            State == RunState.Event && CurrentEvent == EventKind.Altar && AltarTechnique != null && Army.Contains(member) &&
+            CanCrackFor(member) && AltarTechnique.CanLearn(member);
+
+        /// <summary>Cracked Altar: the member takes a crack and learns the altar's rare technique. Null leaves.</summary>
+        public bool TakeAltar(ArmyMember member)
+        {
+            if (State != RunState.Event || CurrentEvent != EventKind.Altar)
+                return false;
+            if (member == null)
+            {
+                EventOutcome = "You leave the altar be.";
+            }
+            else
+            {
+                if (!CanTakeAltar(member))
+                    return false;
+                member.Cracks++;
+                member.Learn(AltarTechnique);
+                EventOutcome = $"The altar splits the {member.Stats.Name}'s stone, and {AltarTechnique.Name} pours into the crack.";
+            }
+
+            NextStep();
+            return true;
+        }
+
+        /// <summary>Sculptor: the technique the last recarving gave, for the screen and the log.</summary>
+        public Technique SculptedInto { get; private set; }
+
+        /// <summary>Rare techniques of the member's line it could learn if it gave up <paramref name="given"/>.</summary>
+        private List<Technique> SculptPool(ArmyMember member, Technique given) =>
+            Technique.All.Where(t => t != given && t.Rarity == TechniqueRarity.Rare && t.Line == member.Stats && !member.Knows(t) &&
+                                     (t.Requires == null || (t.Requires != given && member.Knows(t.Requires)))).ToList();
+
+        public bool CanSculpt(ArmyMember member, Technique given) =>
+            State == RunState.Event && CurrentEvent == EventKind.Sculptor && Army.Contains(member) && member.Knows(given) &&
+            SculptPool(member, given).Count > 0;
+
+        /// <summary>Sculptor: the member forgets <paramref name="given"/> (level kept) and learns a random rare technique of its line. Null member leaves.</summary>
+        public bool Sculpt(ArmyMember member, Technique given)
+        {
+            if (State != RunState.Event || CurrentEvent != EventKind.Sculptor)
+                return false;
+            SculptedInto = null;
+            if (member == null)
+            {
+                EventOutcome = "You decline. The sculptor shrugs and goes back to his chisels.";
+            }
+            else
+            {
+                if (!CanSculpt(member, given))
+                    return false;
+                var pool = SculptPool(member, given);
+                var into = pool[_rng.Next(pool.Count)];
+                member.Forget(given);
+                member.Learn(into);
+                SculptedInto = into;
+                EventOutcome = $"The sculptor chips away the {member.Stats.Name}'s {given.Name} and carves {into.Name} in its place.";
+            }
+
+            NextStep();
+            return true;
+        }
+
+        /// <summary>Hooded Stranger: there is a curse left to sell.</summary>
+        public bool CanBargain => State == RunState.Event && CurrentEvent == EventKind.Bargain && Omens.All.Any(o => !_curses.Contains(o));
+
+        /// <summary>Hooded Stranger: take <see cref="BargainGold"/> gold and a random curse, or refuse.</summary>
+        public bool Bargain(bool accept)
+        {
+            if (State != RunState.Event || CurrentEvent != EventKind.Bargain)
+                return false;
+            if (accept)
+            {
+                if (!CanBargain)
+                    return false;
+                Gold += BargainGold;
+                TakeCurse();
+                EventOutcome = $"The stranger's purse is heavy: +{BargainGold} gold. {Omens.Name(LastCurse.Value, false)}: {Omens.Describe(LastCurse.Value, false)}";
+            }
+            else
+            {
+                EventOutcome = "You refuse. The stranger melts into the shadows.";
+            }
+
             NextStep();
             return true;
         }

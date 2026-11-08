@@ -188,6 +188,9 @@ public static class RunSim
 
     private static void Shop(Run run, Random rng, RunLog log, Mode mode)
     {
+        // Mends a unit one crack from shattering first.
+        foreach (var member in run.Army.Where(m => m.Cracks >= Run.CracksToShatter - 1).ToList())
+            run.Mend(member);
         if (run.CanBuyRecruit && run.BuyRecruit())
             log.Bought++;
         if (mode.Natural && run.CanBuyBanner)
@@ -236,6 +239,21 @@ public static class RunSim
                 break;
             case EventKind.Shrine:
                 run.PrayAtShrine(run.Army[rng.Next(run.Army.Count)]);
+                break;
+            case EventKind.Mason:
+                run.VisitMason(run.Army[rng.Next(run.Army.Count)]);
+                break;
+            case EventKind.Altar:
+                // Takes it on a unit with no cracks yet, else leaves.
+                run.TakeAltar(run.Army.Where(m => m.Cracks == 0 && run.CanTakeAltar(m)).OrderBy(_ => rng.Next()).FirstOrDefault());
+                break;
+            case EventKind.Sculptor:
+                var sculpt = (from m in run.Army from t in m.Techniques where run.CanSculpt(m, t) && t.Rarity == TechniqueRarity.Common select (m, t))
+                    .OrderBy(_ => rng.Next()).FirstOrDefault();
+                run.Sculpt(sculpt.m, sculpt.t);
+                break;
+            case EventKind.Bargain:
+                run.Bargain(run.CanBargain && run.Curses.Count == 0);
                 break;
         }
     }
