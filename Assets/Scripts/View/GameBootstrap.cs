@@ -829,9 +829,13 @@ namespace ArmyRoguelike.View
             DrawDetailStats(new Rect(area.x, area.y, leftWidth, area.height), s);
 
             // Skills on the right, passive and active side by side, scrolling if they don't fit.
-            _hoveredSkill = _hoveredSkillNext;
+            // Hovers count only in the draw pass: in the layout pass GetRect hands out placeholder rects, so the
+            // list sat at the top of the panel and the hover landed one card lower.
             if (e.type == EventType.Repaint)
+            {
+                _hoveredSkill = _hoveredSkillNext;
                 _hoveredSkillNext = null;
+            }
             var skills = new Rect(area.x + leftWidth + 16, area.y, area.width - leftWidth - 16, area.height);
             var (passive, active) = DetailSkills(s);
             const float columnGap = 14f, scrollBar = 16f;
@@ -1015,7 +1019,7 @@ namespace ArmyRoguelike.View
                 var h = SkillHeight(skill, r.width);
                 var indent = skill.Indented ? Indent : 0f;
                 var card = new Rect(r.x + indent, y, r.width - indent, h);
-                if (card.Contains(_detailMouse))
+                if (Event.current.type == EventType.Repaint && card.Contains(_detailMouse))
                     _hoveredSkillNext = skill.Name;
 
                 // Hovering a skill lights up it, what it needs and what needs it.

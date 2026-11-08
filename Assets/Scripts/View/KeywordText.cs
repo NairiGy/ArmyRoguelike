@@ -141,7 +141,7 @@ namespace ArmyRoguelike.View
                                 GUI.DrawTexture(new Rect(r.x, r.yMax - 2f, r.width, 1f), HudArt.Solid(new Color(KeywordColor.r, KeywordColor.g, KeywordColor.b, 0.5f)));
                         }
 
-                        if (piece.Keyword.HasValue && r.Contains(mouse))
+                        if (draw && piece.Keyword.HasValue && r.Contains(mouse))
                         {
                             _hovered = piece.Keyword;
                             _hoveredFrame = Time.frameCount;
