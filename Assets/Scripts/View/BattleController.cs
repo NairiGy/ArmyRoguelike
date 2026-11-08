@@ -1126,7 +1126,7 @@ namespace ArmyRoguelike.View
                             target.SetHidden(false);
                             break;
                         case StatusKind.Slow:
-                            DamagePopup.Spawn(at, "Slowed: no move", DamagePopup.AbilityColor, 40);
+                            DamagePopup.Spawn(at, "Slowed: move or act", DamagePopup.AbilityColor, 40);
                             break;
                         case StatusKind.ShieldUp:
                             DamagePopup.Spawn(at, "Shield Up!", DamagePopup.AbilityColor, 44);
@@ -2491,7 +2491,7 @@ namespace ArmyRoguelike.View
             if (u.IsHidden)
                 chips.Add(("Hidden", "Until your next turn: enemies can't target it" + (u.AmbushUsed ? "." : $". +{Battle.VanishBonus} on its next attack."), true));
             if (u.IsSlowed)
-                chips.Add(("Slowed", "Can't move.", false));
+                chips.Add(("Slowed", "This turn it can move or act, not both.", false));
             if (u.Marked)
                 chips.Add(($"Marked +{Battle.MarkBonus}", $"The next hit on it deals +{Battle.MarkBonus}.", false));
             if (u.PoisonTurns > 0)

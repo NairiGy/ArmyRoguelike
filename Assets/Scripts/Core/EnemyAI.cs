@@ -730,9 +730,10 @@ namespace ArmyRoguelike.Core
         {
             if (battle.Phase == Phase.EnemyTurn)
                 return check();
-            var saved = (unit.Moves, unit.Ap, unit.ActedThisTurn, unit.MovedThisTurn, unit.RootedThisTurn);
+            var saved = (unit.Moves, unit.Ap, unit.ActedThisTurn, unit.MovedThisTurn, unit.RootedThisTurn, unit.SlowedThisTurn);
             unit.Ap = unit.MaxAp;
-            unit.Moves = unit.SlowNext > 0 ? 0 : unit.MaxMoves;
+            unit.Moves = unit.MaxMoves;
+            unit.SlowedThisTurn = unit.SlowNext > 0;
             unit.ActedThisTurn = false;
             unit.MovedThisTurn = false;
             unit.RootedThisTurn = unit.SnareTurns > 0;
@@ -742,7 +743,7 @@ namespace ArmyRoguelike.Core
             }
             finally
             {
-                (unit.Moves, unit.Ap, unit.ActedThisTurn, unit.MovedThisTurn, unit.RootedThisTurn) = saved;
+                (unit.Moves, unit.Ap, unit.ActedThisTurn, unit.MovedThisTurn, unit.RootedThisTurn, unit.SlowedThisTurn) = saved;
             }
         }
 
@@ -759,7 +760,8 @@ namespace ArmyRoguelike.Core
             var copy = battle.Clone();
             var me = copy.Units.First(u => u.Id == devil.Id);
             me.Ap = me.MaxAp;
-            me.Moves = me.SlowNext > 0 ? 0 : me.MaxMoves;
+            me.Moves = me.MaxMoves;
+            me.SlowedThisTurn = me.SlowNext > 0;
             me.ActedThisTurn = false;
             me.MovedThisTurn = false;
             me.RootedThisTurn = me.SnareTurns > 0;
@@ -1293,6 +1295,9 @@ namespace ArmyRoguelike.Core
         /// <summary>Moves to the reachable tile furthest from every player unit. False if nothing is safer.</summary>
         private static bool Retreat(Battle battle, Unit enemy, List<BattleEvent> events)
         {
+            // Slowed: backing off would cost it the action, so it stands and fights.
+            if (enemy.SlowedThisTurn)
+                return false;
             int Safety(GridPos anchor) =>
                 battle.Living(Team.Player).Select(u => Battle.Distance(anchor, enemy.Size, u)).DefaultIfEmpty(0).Min();
 

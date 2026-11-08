@@ -128,6 +128,63 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void Slowed_WalkingCostsTheAttack()
+        {
+            var b = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(3, 1) }, new[] { E(UnitStats.Brute, 3, 3), Far });
+            var warrior = Player(b);
+            warrior.SlowedThisTurn = true;
+            Assert.IsTrue(b.CanMove(warrior), "slowed units still walk");
+            Assert.IsNotNull(b.PlayerMove(warrior, P(3, 2)));
+            Assert.AreEqual(0, warrior.Ap);
+            Assert.IsFalse(b.CanAttack(warrior, Enemy(b)), "it walked, so no attack");
+        }
+
+        [Test]
+        public void Slowed_ActingEndsItsMoves()
+        {
+            var b = Setup(new[] { M(UnitStats.Rogue) }, new[] { P(3, 1) }, new[] { E(UnitStats.Brute, 3, 2), Far });
+            var rogue = Player(b);
+            rogue.SlowedThisTurn = true;
+            Assert.IsNotNull(b.PlayerAttack(rogue, Enemy(b)));
+            Assert.AreEqual(0, rogue.Moves, "Swift moves are gone too");
+            Assert.IsFalse(b.CanMove(rogue));
+        }
+
+        [Test]
+        public void Slowed_TwincastCantCastAfterWalking()
+        {
+            var b = Setup(new[] { M(UnitStats.Apprentice, Technique.Ward, Technique.Twincast), M(UnitStats.Warrior) }, new[] { P(3, 0), P(1, 0) },
+                new[] { Far });
+            var mage = Player(b);
+            mage.SlowedThisTurn = true;
+            Assert.IsNotNull(b.PlayerMove(mage, P(3, 1)));
+            Assert.IsFalse(b.CanUseAction(mage, ActionKind.Ward, P(1, 0)));
+        }
+
+        [Test]
+        public void Slowed_EnemyStrikesFromWhereItStands_ElseWalksWithoutStriking()
+        {
+            var b = Setup(new[] { M(UnitStats.Warrior), M(UnitStats.Warrior) }, new[] { P(0, 1), P(5, 1) },
+                new[] { E(UnitStats.Brute, 0, 2), E(UnitStats.Brute, 5, 3) });
+            Enemy(b, 0).SlowNext = 1;
+            Enemy(b, 1).SlowNext = 1;
+            b.EndPlayerTurn();
+            Assert.Less(Player(b, 0).Hp, Player(b, 0).MaxHp, "adjacent: it strikes");
+            Assert.AreEqual(P(0, 2), Enemy(b, 0).Pos);
+            Assert.AreEqual(P(5, 2), Enemy(b, 1).Pos, "out of reach: it walks up");
+            Assert.AreEqual(Player(b, 1).MaxHp, Player(b, 1).Hp, "and can't strike after walking");
+        }
+
+        [Test]
+        public void Slowed_BomberDoesntBackOff()
+        {
+            var b = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(3, 1) }, new[] { E(UnitStats.GoblinBomber, 3, 2) });
+            Enemy(b).SlowNext = 1;
+            b.EndPlayerTurn();
+            Assert.AreEqual(P(3, 2), Enemy(b).Pos);
+        }
+
+        [Test]
         public void Transpose_SwapsPlaces_AnEnemyPutOnAMineSetsItOff()
         {
             var b = Setup(new[] { M(UnitStats.Sapper), M(UnitStats.Apprentice, Technique.Transpose) }, new[] { P(0, 1), P(3, 1) },

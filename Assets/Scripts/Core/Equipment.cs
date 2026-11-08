@@ -139,7 +139,7 @@ namespace ArmyRoguelike.Core
                 case Ability.LongShot: return $"+{Battle.LongShotBonus} damage to targets {Battle.LongShotRange} or more tiles away";
                 case Ability.Vantage: return $"while next to a rock, ice or barricade: +{Battle.VantageRange} range, and its shots ignore Behind Cover";
                 case Ability.SpikedSnares: return $"its snares deal {Battle.SpikedSnareDamage} damage instead of {Battle.SnareDamage}";
-                case Ability.CheapShot: return $"+{Battle.CheapShotBonus} damage to enemies that can't move (pinned or slowed)";
+                case Ability.CheapShot: return $"+{Battle.CheapShotBonus} damage to pinned or slowed enemies";
                 case Ability.Elusive: return "ignores zone of control";
                 case Ability.DeathMark: return "its marks spread: when a marked enemy dies, every enemy next to it is marked";
                 case Ability.Isolate: return $"+{Battle.IsolateBonus} damage to exposed enemies";
@@ -153,7 +153,7 @@ namespace ArmyRoguelike.Core
                 case Ability.ArcaneBolt: return "its bolt ignores line of sight";
                 case Ability.Burning: return $"fireballs leave the area burning for {Battle.BurnRounds} rounds";
                 case Ability.Concussive: return "fireballs push units outward and set off mines and bombs";
-                case Ability.Chill: return "its hits slow: the target can't move on its next turn";
+                case Ability.Chill: return "its hits leave the target slowed";
                 case Ability.Shatter: return $"slowed enemies take +{Battle.ShatterBonus} damage from every attack of your units";
                 case Ability.WideWard: return "Ward also shields every ally next to the target";
                 case Ability.Mines: return "an enemy stepping on one of its mines sets it off: it hurts whoever stands on that tile";

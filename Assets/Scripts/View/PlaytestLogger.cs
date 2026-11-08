@@ -94,7 +94,7 @@ namespace ArmyRoguelike.View
                         turn = turn, team = move.Unit.Team.ToString(), unit = Name(move.Unit), type = "move",
                         fromX = move.From.X, fromY = move.From.Y, toX = move.To.X, toY = move.To.Y, tiles = move.Path.Count,
                         apAfter = ApAfter(move.Unit), movesAfter = move.Unit.Moves, autoApproach = autoApproach, amount = move.Cost, zocSteps = move.ZocSteps,
-                        throughAllies = move.Path.Take(move.Path.Count - 1).Count(p => _battle.UnitAt(p) != null),
+                        throughAllies = move.Path.Take(move.Path.Count - 1).Count(p => _battle.UnitAt(p) != null), slowed = move.Unit.SlowedThisTurn,
                     });
                     break;
                 case AttackEvent attack:
@@ -366,6 +366,7 @@ namespace ArmyRoguelike.View
             turn = turn, team = attacker.Team.ToString(), unit = Name(attacker), type = type, target = Name(hit.Target),
             damage = hit.Damage, targetHpAfter = hit.HpAfter, killed = hit.Killed, apAfter = ApAfter(attacker),
             ranged = attacker.IsRanged && Battle.Distance(attacker, hit.Target) > 1, favored = attacker.Favored, fury = attacker.Fury,
+            slowed = attacker.SlowedThisTurn,
         };
 
         private static int ApAfter(Unit u) => u.Team == Team.Player ? u.Ap : -1;
@@ -374,7 +375,7 @@ namespace ArmyRoguelike.View
         {
             _log.actions.Add(new ActionEntry
             {
-                turn = turn, team = unit.Team.ToString(), unit = Name(unit), type = "done", apAfter = unit.Ap, movesAfter = unit.Moves,
+                turn = turn, team = unit.Team.ToString(), unit = Name(unit), type = "done", apAfter = unit.Ap, movesAfter = unit.Moves, slowed = unit.SlowedThisTurn,
             });
         }
 
@@ -728,6 +729,9 @@ namespace ArmyRoguelike.View
 
             /// <summary>Attacks and area hits: a ranged shot from 2+ tiles away (for the ranged vs melee damage split).</summary>
             public bool ranged;
+
+            /// <summary>Move, hit and done: the unit was slowed this turn (it can move or act, not both). A slowed move with no hit after it is an action given up.</summary>
+            public bool slowed;
 
             /// <summary>Hits and explosions: dealt by a unit favored by fortune (Fortune's Favored), so at double damage.</summary>
             public bool favored;

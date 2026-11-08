@@ -1397,17 +1397,26 @@ namespace ArmyRoguelike.Core
             return count;
         }
 
-        /// <summary>Immobile, pinned or slowed units can't move, and nobody moves again after spending AP that turn.</summary>
-        /// <summary>Pinned or slowed on its own turn: it can't move, and Blink and Shadowstep are blocked like a move.</summary>
+        /// <summary>
+        /// Pinned or slowed on its own turn: Blink and Shadowstep are blocked (a pinned unit can't move; for a slowed
+        /// one they would be a move and an action at once).
+        /// </summary>
         public static bool IsHeld(Unit unit) => unit.RootedThisTurn || unit.SlowedThisTurn;
 
-        public bool CanMove(Unit unit) => !unit.Has(Ability.Immobile) && !unit.RootedThisTurn && (!unit.ActedThisTurn || unit.Has(Ability.LightFingers));
+        /// <summary>
+        /// Immobile and pinned units can't move, and nobody moves again after spending AP that turn (Light Fingers
+        /// excepted, but never while slowed: a slowed unit moves or acts, not both).
+        /// </summary>
+        public bool CanMove(Unit unit) => !unit.Has(Ability.Immobile) && !unit.RootedThisTurn &&
+            (!unit.ActedThisTurn || (unit.Has(Ability.LightFingers) && !unit.SlowedThisTurn));
 
         /// <summary>Pays for an attack or action. Once a unit has spent AP it can't move for the rest of the turn.</summary>
         private static void SpendAp(Unit unit, int cost)
         {
             unit.Ap -= cost;
             unit.ActedThisTurn = true;
+            if (unit.SlowedThisTurn)
+                unit.Moves = 0;
         }
 
         /// <summary>
@@ -1614,6 +1623,9 @@ namespace ArmyRoguelike.Core
             var cost = CostOf(unit, action);
             if (IsOver || !unit.IsAlive || !unit.HasAction(action) || (unit.Ap < cost && !TwincastFree(unit, action)) || (cost == 0 && unit.ActedThisTurn) || !Ready(unit, action) || !Board.InBounds(tile))
                 return false;
+            // Slowed: once it has walked, no action that costs AP (Twincast's free one included).
+            if (unit.SlowedThisTurn && unit.MovedThisTurn && cost > 0)
+                return false;
             var target = UnitAt(tile);
             var steps = Distance(tile, 1, unit);
             switch (action)
@@ -1786,7 +1798,7 @@ namespace ArmyRoguelike.Core
                     foreach (var ally in Living(unit.Team).Where(u => !u.IsObjective && Distance(unit, u) <= BattlecryRange).ToList())
                     {
                         // A second shout refreshes the bonus rather than stacking it.
-                        if (ally.BattlecryTurns == 0 && !ally.SlowedThisTurn)
+                        if (ally.BattlecryTurns == 0 && !(ally.SlowedThisTurn && ally.ActedThisTurn))
                             ally.Moves += BattlecryMoves;
                         ally.BattlecryTurns = BattlecryTurns;
                         ally.TempHp = BattlecryHp;
@@ -1797,7 +1809,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.ThrowShield:
                     unit.ShieldThrown = true;
                     unit.Hp -= ThrowShieldHpCost;
-                    if (!unit.SlowedThisTurn)
+                    if (!(unit.SlowedThisTurn && unit.ActedThisTurn))
                         unit.Moves += ThrowShieldMoves;
                     events.Add(new StatusEvent(unit, unit, StatusKind.ThrowShield, ThrowShieldHpCost));
                     break;
@@ -2755,6 +2767,9 @@ namespace ArmyRoguelike.Core
             var strikers = ZocStrikers(unit, from, path);
             unit.Moves -= cost;
             unit.MovedThisTurn = true;
+            // Slowed: it chose to move, so it can't attack or spend AP this turn.
+            if (unit.SlowedThisTurn)
+                unit.Ap = 0;
             unit.Pos = path[path.Count - 1];
             var events = new List<BattleEvent> { new MoveEvent(unit, from, path, cost, zoc) };
             foreach (var striker in strikers.Where(s => unit.IsAlive && s.IsAlive))
@@ -3551,8 +3566,12 @@ namespace ArmyRoguelike.Core
                 if (source.Has(Ability.KillRefund) && kind == DamageKind.Attack)
                 {
                     source.Ap += KillRefundAp;
-                    source.Moves += KillRefundMoves;
-                    source.ActedThisTurn = false;
+                    // A slowed unit chose to act this turn: the kill gives the action back, not the move.
+                    if (!source.SlowedThisTurn)
+                    {
+                        source.Moves += KillRefundMoves;
+                        source.ActedThisTurn = false;
+                    }
                     after.Add(new EffectEvent(EffectKind.Refund, source, KillRefundAp, source.Hp, source));
                 }
 
@@ -3834,7 +3853,7 @@ namespace ArmyRoguelike.Core
                 }
                 u.SlowedThisTurn = u.SlowNext > 0;
                 u.SlowNext = 0;
-                u.Moves = u.SlowedThisTurn ? 0 : u.MaxMoves;
+                u.Moves = u.MaxMoves;
                 u.RootedThisTurn = u.SnareTurns > 0;
                 if (u.RootedThisTurn)
                     u.SnareTurns--;

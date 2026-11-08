@@ -113,10 +113,10 @@ namespace ArmyRoguelike.Core
         /// <summary>Can't move this turn (a snare took effect).</summary>
         public bool RootedThisTurn { get; internal set; }
 
-        /// <summary>Chilled: can't move on its next turn.</summary>
+        /// <summary>Slowed (Chill, Frost Nova, Blizzard): on its next turn it can move or act, not both.</summary>
         public int SlowNext { get; internal set; }
 
-        /// <summary>Can't move this turn because of Chill.</summary>
+        /// <summary>Slowed this turn: walking sets its AP to 0, and spending AP ends its moves.</summary>
         public bool SlowedThisTurn { get; internal set; }
 
         /// <summary>Poison ticks left; each deals poison damage at the start of the unit's turn.</summary>

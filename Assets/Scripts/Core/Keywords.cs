@@ -51,7 +51,7 @@ namespace ArmyRoguelike.Core
             switch (k)
             {
                 case Keyword.Pinned: return "Can't move on its next turn.";
-                case Keyword.Slowed: return "Can't move on its next turn.";
+                case Keyword.Slowed: return "On its next turn it can move or act, not both: walking costs it the attack, and acting ends its moves.";
                 case Keyword.Marked: return $"The next hit on it, by anyone and from anything but poison or fire, deals +{Battle.MarkBonus}. Then the mark is gone.";
                 case Keyword.Exposed: return "No ally of its own stands next to it.";
                 case Keyword.Hidden: return "Until your next turn, enemies can't target or attack it (area blasts still hit). Attacking doesn't reveal it.";

@@ -449,7 +449,8 @@ namespace ArmyRoguelike.Tests
             b.EndUnitTurn(glacier);
             b.EndPlayerTurn();
             Assert.IsFalse(brute.IsSlowed, "the slow held it for its own turn only, not into yours");
-            Assert.AreEqual(P(3, 2), brute.Pos, "chilled: it couldn't move");
+            Assert.AreEqual(P(3, 1), brute.Pos, "chilled: it walked up");
+            Assert.AreEqual(glacier.MaxHp, glacier.Hp, "and so couldn't strike");
         }
 
         [Test]
