@@ -36,9 +36,26 @@ public static class SmartBot
         var layouts = new List<List<GridPos>>();
         var sensible = tiles.OrderByDescending(p => p.Y).ThenBy(p => Math.Abs(p.X * 2 - 5)).ToList();
         var byReach = army.OrderBy(u => u.Stats.Range).ToList();
-        layouts.Add(army.Select(u => sensible[byReach.IndexOf(u)]).ToList());
+        // Each unit takes the first tile in the order that it may stand on (Vanguard's extra row is the Warrior's only).
+        List<GridPos> Assign(IEnumerable<Unit> order, List<GridPos> candidates)
+        {
+            var layout = army.Select(_ => default(GridPos)).ToList();
+            var used = new HashSet<GridPos>();
+            foreach (var u in order)
+            {
+                var tile = candidates.Where(p => !used.Contains(p) && battle.CanPlace(u, p)).Cast<GridPos?>().FirstOrDefault();
+                if (!tile.HasValue)
+                    return new List<GridPos>();
+                used.Add(tile.Value);
+                layout[army.IndexOf(u)] = tile.Value;
+            }
+
+            return layout;
+        }
+
+        layouts.Add(Assign(byReach, sensible));
         for (var i = 0; i < DeployTries; i++)
-            layouts.Add(tiles.OrderBy(_ => rng.Next()).Take(army.Count).ToList());
+            layouts.Add(Assign(army.OrderBy(_ => rng.Next()), tiles.OrderBy(_ => rng.Next()).ToList()));
 
         List<GridPos> best = null;
         var bestScore = double.MinValue;
