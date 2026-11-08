@@ -182,7 +182,7 @@ public static class GamepediaWriter
             lines.Add($"<b>Howl</b> ({cost} AP, cooldown {Battle.Cooldown(ActionKind.Howl)}): {Esc(Abilities.Describe(Ability.Howl))}. The leader acts before the other enemies, so the move reaches wolves that haven't acted.");
         if (e.Slams)
             lines.Add($"<b>Slam</b> ({cost} AP, cooldown {Battle.Cooldown(ActionKind.Slam)}): {Battle.SlamDamage} damage to each of your units within 2 tiles, then shoves every other 1x1 unit within 2 tiles (yours and its own) 1 tile away from it. " +
-                      $"A unit pushed into a rock, unit or the edge takes {Battle.CollisionDamage} damage.");
+                      $"A unit pushed into a wall, unit or the edge takes {Battle.CollisionDamage} damage.");
         if (e.CanThrow)
             lines.Add($"<b>Boulder</b> ({e.ThrowCost} AP, cooldown {Battle.Cooldown(ActionKind.Boulder)}): {e.ThrowDamage} damage to a unit 2-{e.ThrowRange} tiles away, ignoring line of sight. " +
                       "The boulder stays as a rock on the free tile next to the target that is closest to the thrower, burying any mine or bomb there.");
@@ -327,7 +327,7 @@ public static class GamepediaWriter
                 return new[]
                 {
                     $"If it can shoot its {target} from where it stands: shoot.",
-                    "Otherwise walk to the cheapest tile with a shot, preferring one next to a rock (Behind Cover), and shoot.",
+                    "Otherwise walk to the cheapest tile with a shot, preferring one next to a wall (Behind Cover), and shoot.",
                     "With no shot this turn: walk closer, into cover if it can, then go on Overwatch if it's ready.",
                 };
             case EnemyBehaviour.Thief:
@@ -370,7 +370,7 @@ public static class GamepediaWriter
                 return new[]
                 {
                     $"With its action (two actions a turn from its second phase, Wrath; it loops until both are spent): smash or slam, whichever deals more in total (slam needs 2 or more of your units within 2 tiles; {Battle.SlamDamage} damage to each), ties going to smash.",
-                    "Or, with nobody close enough for either: throw a boulder at its target if it is 2 to throw-range tiles away and the rock wouldn't wall the Giant off from it.",
+                    "Or, with nobody close enough for either: throw a boulder at its target if it is 2 to throw-range tiles away and the rock wouldn't block the Giant's own way to it.",
                     $"Without an action to take: {approach} to the {target}, then try again.",
                 };
             case EnemyBehaviour.Necromancer:
@@ -546,11 +546,11 @@ public static class GamepediaWriter
         html.Append("<li><b>Cooldowns</b>: basic attacks have none. Every other action, yours and the enemies', is ready again a set number of the unit's own turns after it's used (cooldown 2: used now, ready again two turns later).</li>");
         html.Append("<li>Side phases: all your units act (one at a time), then all enemies.</li>");
         html.Append($"<li><b>Zone of control</b>: stepping out of a tile next to an enemy uses up all your remaining moves, for both sides. You can always back off one tile, but you can't slip past.</li>");
-        html.Append("<li>Ranged attacks need line of sight (rocks block); Arcane Bolt ignores it. Bombs, boulders and fireballs are lobbed.</li>");
+        html.Append("<li>Ranged attacks need line of sight (walls block it); Arcane Bolt ignores it. Bombs, boulders and fireballs are lobbed.</li>");
         html.Append($"<li>Mines: {Battle.MineDamage} damage ({Battle.BigMineDamage} with Big Mines) to whoever stands on its tile, set off when an enemy steps on one (or a blast, fling or fireball sets it off). Bombs explode at the start of the next enemy turn and hit only their own tile. Fireballs and Volley hit a plus: the tile and its 4 neighbours. Blasts set each other off.</li>");
-        html.Append($"<li>Push: a unit pushed into a rock, unit or the edge stops there and takes {Battle.CollisionDamage} damage. An enemy pushed onto a mine sets it off. <b>Weight</b>: a push moves a medium unit 1 tile, a small one 2 and a huge one none (no collision damage either); Battering Ram adds 1 tile to your pushes.</li>");
+        html.Append($"<li>Push: a unit pushed into a wall, unit or the edge stops there and takes {Battle.CollisionDamage} damage. An enemy pushed onto a mine sets it off. <b>Weight</b>: a push moves a medium unit 1 tile, a small one 2 and a huge one none (no collision damage either); Battering Ram adds 1 tile to your pushes.</li>");
         html.Append($"<li>Poison: {Battle.PoisonDamage} damage at the start of the target's turn, {Battle.PoisonTurns} times. Burning ground: {Battle.BurnDamage} damage at the start of the turn of whoever stands on it; enemies never stop on it.</li>");
-        html.Append($"<li><b>Rubble</b> (the Sapper's keyword): a low heap that blocks walking like a rock but not shots, and gives no cover. A unit pushed into it is crushed for {Battle.CrushDamage} more than a normal collision ({Battle.CollisionDamage + Battle.CrushDamage} in all) and the rubble breaks. One hit from any unit clears it. Broken barricades collapse into rubble.</li>");
+        html.Append($"<li><b>Rubble</b> (the Sapper's keyword): a low heap that blocks walking like a wall but not shots, and gives no cover. A unit pushed into it is crushed for {Battle.CrushDamage} more than a normal collision ({Battle.CollisionDamage + Battle.CrushDamage} in all) and the rubble breaks. One hit from any unit clears it. Broken barricades collapse into rubble.</li>");
         html.Append("<li>Pinned units (the Archer's keyword: Pinning Shot, Snare Trap, Suppressing Fire) can't move on their next turn. Slowed units (the Mage's keyword: Frost Nova, Chill, Blizzard) can move or act on their next turn, not both.</li>");
         html.Append("<li>Hidden units (Vanish, Smoke Bomb, Into the Shadows) can't be targeted or attacked by enemies until your next turn, though area blasts still hit them. Attacking doesn't reveal them; the first attack while hidden deals +2.</li>");
         html.Append("<li>Snares (Snare Trap) are hidden from enemies: the first enemy to walk onto one stops, takes damage and is pinned. The Archer's Overwatch is the Crossbowman's rule turned around: it shoots the first enemy that walks onto a tile the archer can shoot at, and stops it there.</li>");

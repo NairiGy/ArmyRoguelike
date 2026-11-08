@@ -3898,7 +3898,7 @@ namespace ArmyRoguelike.Core
         /// <summary>
         /// Start of the player's turn: last round's shrouds and moon shields fade, then each omen picks a
         /// random unit (never the objective): the Sun marks a tile under one of the other side's units, the
-        /// Night shrouds the 3x3 around one of its own side's units, the Moon shields one of its own side's units.
+        /// Night shrouds the plus around one of its own side's units, the Moon shields one of its own side's units.
         /// </summary>
         private void ApplyOmens(List<BattleEvent> events)
         {

@@ -14,6 +14,7 @@ namespace ArmyRoguelike.Core
         Exposed,
         Hidden,
         Burning,
+        Wall,
         Rubble,
         Poison,
         Push,
@@ -30,7 +31,7 @@ namespace ArmyRoguelike.Core
     {
         public static readonly Keyword[] All =
         {
-            Keyword.Pinned, Keyword.Slowed, Keyword.Marked, Keyword.Exposed, Keyword.Hidden, Keyword.Burning, Keyword.Rubble,
+            Keyword.Pinned, Keyword.Slowed, Keyword.Marked, Keyword.Exposed, Keyword.Hidden, Keyword.Burning, Keyword.Wall, Keyword.Rubble,
             Keyword.Poison, Keyword.Push, Keyword.ZoneOfControl, Keyword.LineOfSight, Keyword.Fury, Keyword.Swift,
             Keyword.Shield, Keyword.Free,
         };
@@ -56,11 +57,12 @@ namespace ArmyRoguelike.Core
                 case Keyword.Exposed: return "No ally of its own stands next to it.";
                 case Keyword.Hidden: return "Until your next turn, enemies can't target or attack it (area blasts still hit). Attacking doesn't reveal it.";
                 case Keyword.Burning: return $"Burning ground: {Battle.BurnDamage} damage to whoever starts a turn on it. Enemies walk through it but never stop on it.";
+                case Keyword.Wall: return "A rock (crystals, tombstones and boulders too), ice or a barricade: blocks walking and shots, and gives cover. Rubble and holes are not walls.";
                 case Keyword.Rubble: return $"A low heap: blocks walking but not shots, and gives no cover. A unit pushed into it is crushed for {Battle.CollisionDamage + Battle.CrushDamage} and the rubble breaks. One hit clears it.";
                 case Keyword.Poison: return $"{Battle.PoisonDamage} damage at the start of the target's turn, {Battle.PoisonTurns} times.";
-                case Keyword.Push: return $"A medium unit moves 1 tile, a small one 2, a huge one not at all. If it slams into a rock, a unit or the edge, it stops and takes {Battle.CollisionDamage}. An enemy pushed onto a mine sets it off.";
+                case Keyword.Push: return $"A medium unit moves 1 tile, a small one 2, a huge one not at all. If it slams into a wall, a unit or the edge, it stops and takes {Battle.CollisionDamage}. An enemy pushed onto a mine sets it off.";
                 case Keyword.ZoneOfControl: return "Stepping out of a tile next to an enemy uses up all remaining moves, for both sides.";
-                case Keyword.LineOfSight: return "Rocks block shots. Bombs, boulders and fireballs are lobbed over them.";
+                case Keyword.LineOfSight: return "Walls block shots. Bombs, boulders and fireballs are lobbed over them.";
                 case Keyword.Fury: return $"+1 damage per Fury for the rest of the fight, {Battle.MaxFury} at most.";
                 case Keyword.Swift: return $"{Battle.BaseMoves + 1} moves a turn instead of {Battle.BaseMoves}.";
                 case Keyword.Shield: return "Absorbs damage before HP. Enemies go for an unshielded unit they can reach first, and hit a shield only when there is none.";
@@ -80,6 +82,7 @@ namespace ArmyRoguelike.Core
                 case Keyword.Exposed: return new[] { "exposed" };
                 case Keyword.Hidden: return new[] { "hidden" };
                 case Keyword.Burning: return new[] { "burning", "burns" };
+                case Keyword.Wall: return new[] { "walls", "wall" };
                 case Keyword.Rubble: return new[] { "rubble" };
                 case Keyword.Poison: return new[] { "poisoned", "poisons", "poison" };
                 case Keyword.Push: return new[] { "pushed", "pushes", "push" };
@@ -148,20 +151,28 @@ namespace ArmyRoguelike.Core
 
                 foreach (var form in Forms(k))
                     if (at + form.Length <= lower.Length && string.CompareOrdinal(lower, at, form, 0, form.Length) == 0 &&
-                        IsWordEnd(lower, at + form.Length) && !(k == Keyword.Shield && InShieldName(lower, at, form.Length)))
+                        IsWordEnd(lower, at + form.Length) && !InActionName(k, lower, at, form.Length))
                         best = Longer(best, (form.Length, k));
             }
 
             return best;
         }
 
-        /// <summary>"Shield" inside an action's name (Shield Up, Shield Bash, Shield Wall, Throw Shield) is not the keyword.</summary>
-        private static bool InShieldName(string lower, int at, int length)
+        /// <summary>
+        /// The word is part of an action's name, not the keyword: "shield" in Shield Up, Shield Bash, Shield Wall and
+        /// Throw Shield; "wall" in Ice Wall and Shield Wall.
+        /// </summary>
+        private static bool InActionName(Keyword k, string lower, int at, int length)
         {
             bool Before(string s) => at >= s.Length && string.CompareOrdinal(lower, at - s.Length, s, 0, s.Length) == 0;
             bool After(string s) => at + length + s.Length <= lower.Length && string.CompareOrdinal(lower, at + length, s, 0, s.Length) == 0 &&
                                     IsWordEnd(lower, at + length + s.Length);
-            return Before("throw ") || After(" up") || After(" bash") || After(" wall");
+            switch (k)
+            {
+                case Keyword.Shield: return Before("throw ") || After(" up") || After(" bash") || After(" wall");
+                case Keyword.Wall: return Before("ice ") || Before("shield ");
+                default: return false;
+            }
         }
 
         private static (int, Keyword)? Longer((int length, Keyword keyword)? best, (int length, Keyword keyword) candidate) =>

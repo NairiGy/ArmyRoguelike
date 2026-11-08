@@ -11,7 +11,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Each turn a tile under one of the other side's units is marked, and a sun beam strikes it.</summary>
         Sun,
 
-        /// <summary>Each turn one unit and the 3x3 around it are shrouded: the other side can't hit those tiles from range.</summary>
+        /// <summary>Each turn one unit and the 4 tiles next to it (a plus) are shrouded: the other side can't hit those tiles from range.</summary>
         Night,
 
         /// <summary>Each turn one unit gets a shield that lasts a round.</summary>
@@ -36,7 +36,7 @@ namespace ArmyRoguelike.Core
                     return $"At the start of your turn, a sun sigil appears under {theirs}. At the start of the enemy turn a sun beam " +
                            $"strikes it for {Battle.SunDamage} damage, hitting whoever stands there.";
                 case Omen.Night:
-                    return $"At the start of your turn, {mine} unit and the 3x3 around it are shrouded until your next turn: " +
+                    return $"At the start of your turn, {mine} unit and the 4 tiles next to it are shrouded until your next turn: " +
                            $"{(blessing ? "enemies" : "your units")} can't hit units there from range.";
                 case Omen.Moon:
                     return $"At the start of your turn, {mine} unit gets a shield that absorbs {Battle.MoonShield} damage until your next turn.";

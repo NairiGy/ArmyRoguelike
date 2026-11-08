@@ -36,6 +36,14 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void WallInActionNamesIsNotTheKeyword()
+        {
+            Assert.IsEmpty(Keywords.Find("Ice Wall and Shield Wall; a Firewall"));
+            Assert.AreEqual(new[] { Keyword.Wall }, Keywords.In(Abilities.Describe(Ability.Vantage)).Where(k => k == Keyword.Wall).ToArray());
+            CollectionAssert.Contains(Keywords.In(Abilities.Describe(ActionKind.IceWall)), Keyword.Wall);
+        }
+
+        [Test]
         public void OnlyTheArchersMarkIsMarked()
         {
             var texts = new[]

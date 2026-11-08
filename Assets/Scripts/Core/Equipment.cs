@@ -135,7 +135,7 @@ namespace ArmyRoguelike.Core
                 case Ability.PreyOnSnared: return $"pinned enemies take +{Battle.PreyBonus} damage from everyone";
                 case Ability.Volley: return "shots hit the target and the 4 tiles next to it for 1 less damage, friend or foe";
                 case Ability.LongShot: return $"+{Battle.LongShotBonus} damage to targets {Battle.LongShotRange} or more tiles away";
-                case Ability.Vantage: return $"while next to a rock, ice or barricade: +{Battle.VantageRange} range, and its shots ignore Behind Cover";
+                case Ability.Vantage: return $"while next to a wall: +{Battle.VantageRange} range, and its shots ignore Behind Cover";
                 case Ability.SpikedSnares: return $"its snares deal {Battle.SpikedSnareDamage} damage instead of {Battle.SnareDamage}";
                 case Ability.CheapShot: return $"+{Battle.CheapShotBonus} damage to pinned or slowed enemies";
                 case Ability.Elusive: return "ignores zone of control";
@@ -176,7 +176,7 @@ namespace ArmyRoguelike.Core
                 case Ability.PowderKeg: return $"when it dies it explodes: {Battle.PowderKegDamage} damage to everyone around it, its own side included";
                 case Ability.LightFingers: return "the only unit that can still move after attacking: it stabs, grabs the gold and runs in the same turn";
                 case Ability.Caltrops: return $"drops caltrops on its tile or a free tile next to it; a unit of yours stepping on them takes {Battle.CaltropsDamage} and its movement ends";
-                case Ability.BehindCover: return "while next to a rock it can't be hit by ranged attacks; melee, bombs and blasts still reach it";
+                case Ability.BehindCover: return "while next to a wall it can't be hit by ranged attacks; melee, bombs and blasts still reach it";
                 case Ability.Overwatch: return "instead of shooting, it aims: during your next turn the first of your units that walks onto a tile it can see in range is shot and stops there";
                 case Ability.BullRush: return $"hit a unit next to it and push it 1 tile; if it slams into a unit, both take {Battle.CollisionDamage}";
                 case Ability.Upheaval: return $"the ground bursts up under one of your units within {Battle.UpheavalRange} tiles (no line of sight needed): {Battle.UpheavalDamage} damage, and it is thrown 1 tile away from the caster ({Battle.CollisionDamage} more if blocked)";
@@ -192,7 +192,7 @@ namespace ArmyRoguelike.Core
                 case Ability.Bloodlust: return $"gains {Battle.BloodlustFury} Fury whenever a unit next to it dies, friend or foe";
                 case Ability.RendingBlow: return $"loses {Battle.RendingBlowCost} of its own HP, then hits a unit next to it for its damage +{Battle.RendingBlowBonus}";
                 case Ability.SoulContract: return $"signs a contract on one of your units within {Battle.ContractRange} tiles (no line of sight needed): at the start of the next enemy turn it takes {Battle.ContractDamage} damage (shields and damage reductions still count), unless the Devil takes damage before then";
-                case Ability.FireBreath: return $"breathes down a straight line of {Battle.FireBreathLength} tiles at one of your units on it (a rock stops it): {Battle.FireBreathDamage} damage to each of your units there, and the tiles burn for {Battle.BurnRounds} rounds";
+                case Ability.FireBreath: return $"breathes down a straight line of {Battle.FireBreathLength} tiles at one of your units on it (a wall stops it): {Battle.FireBreathDamage} damage to each of your units there, and the tiles burn for {Battle.BurnRounds} rounds";
                 default: return "";
             }
         }
@@ -285,7 +285,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Blizzard: return $"{Battle.BlizzardDamage} damage to enemies on a tile and the 4 next to it, and they are slowed";
                 case ActionKind.Transpose: return $"swap places with any unit within {Battle.TransposeRange}";
                 case ActionKind.Hook: return $"pull an enemy 2-{Battle.HookRange} tiles away in a straight line next to it";
-                case ActionKind.Demolish: return $"blow up a rock, rubble, barricade or ice wall within {Battle.DemolishRange}: {Battle.DemolishDamage} damage in a 3x3";
+                case ActionKind.Demolish: return $"blow up a wall or rubble within {Battle.DemolishRange}: {Battle.DemolishDamage} damage in a 3x3";
                 default: return Describe(action);
             }
         }
@@ -311,21 +311,21 @@ namespace ArmyRoguelike.Core
                 case ActionKind.ThrowBomb:
                     return $"lob a bomb 2-{Battle.PlayerBombRange} tiles away; it explodes for {Battle.PlayerBombDamage} on that tile at the start of the next enemy turn";
                 case ActionKind.PinningShot: return $"{Battle.PinDamage} damage to an enemy in shot range (line of sight), and it is pinned";
-                case ActionKind.ShieldBash: return $"{Battle.BashDamage} damage to an enemy next to it and push it 1 tile; {Battle.CollisionDamage} more if it slams into a rock, unit or the edge, and the unit it slams into takes {Battle.CollisionDamage} too";
+                case ActionKind.ShieldBash: return $"{Battle.BashDamage} damage to an enemy next to it and push it 1 tile; {Battle.CollisionDamage} more if it slams into a wall, unit or the edge, and the unit it slams into takes {Battle.CollisionDamage} too";
                 case ActionKind.Vanish: return $"becomes hidden until your next turn; its first attack while hidden deals +{Battle.VanishBonus}. Free";
                 case ActionKind.Kick: return $"{Battle.KickDamage} damage to an enemy next to it and push it 1 tile";
                 case ActionKind.SnareTrap: return $"hide a snare on a free tile within {Battle.SnareRange} (max {Battle.MaxSnares}); the first enemy to walk onto it stops, takes {Battle.SnareDamage} and is pinned. Enemies don't see snares";
                 case ActionKind.FireArrow: return $"shoot an enemy in shot range for its attack damage; the ground under it burns for {Battle.BurnRounds} rounds";
                 case ActionKind.CoveringFire: return "instead of shooting, it aims: during the enemy turn the first enemy that walks onto a tile it can see in range is shot and stops there";
-                case ActionKind.SuppressingFire: return $"shoot along a row or column up to its range, stopped by rocks: every enemy on the line takes {Battle.PinDamage} and is pinned";
+                case ActionKind.SuppressingFire: return $"shoot along a row or column up to its range, stopped by walls: every enemy on the line takes {Battle.PinDamage} and is pinned";
                 case ActionKind.ThrowingKnife: return $"{Battle.KnifeDamage} damage (plus its damage bonuses) to an enemy 2-{Battle.KnifeRange} tiles away, needs line of sight. Carries Poison, Cheap Shot and the Vanish bonus";
-                case ActionKind.Shadowstep: return $"teleport to a free tile next to an enemy within {Battle.ShadowstepRange}, ignoring rocks and zone of control. Free, before it acts, but it can't walk afterwards: it can still attack";
+                case ActionKind.Shadowstep: return $"teleport to a free tile next to an enemy within {Battle.ShadowstepRange}, ignoring walls and zone of control. Free, before it acts, but it can't walk afterwards: it can still attack";
                 case ActionKind.SmokeBomb: return $"smoke itself and one ally within {Battle.SmokeRange} tiles: both are hidden until your next turn, as with Vanish but without its +{Battle.VanishBonus}";
                 case ActionKind.MarkTarget: return $"an enemy in shot range becomes marked (+{Battle.MarkBonus} on the next hit on it). Free";
                 case ActionKind.Rupture: return $"strike a poisoned enemy next to it: first its poison bursts, {Battle.PoisonDamage} damage for every turn of poison left, then the strike (which poisons again)";
-                case ActionKind.Blink: return $"teleport to a free tile within {Battle.BlinkRange}, ignoring rocks and zone of control. Free";
+                case ActionKind.Blink: return $"teleport to a free tile within {Battle.BlinkRange}, ignoring walls and zone of control. Free";
                 case ActionKind.Fireball: return $"{Battle.FireballDamage} damage to everyone on the tile and the 4 next to it, up to {Battle.FireballRange} tiles away";
-                case ActionKind.IceWall: return $"turn a free tile within {Battle.ActionRange} into ice (blocks like a rock) for {Battle.IceRounds} rounds";
+                case ActionKind.IceWall: return $"turn a free tile within {Battle.ActionRange} into ice (a wall) for {Battle.IceRounds} rounds";
                 case ActionKind.Ward: return $"an ally within {Battle.ActionRange} tiles gets a shield that absorbs {Battle.WardShield} damage and lasts until used up";
                 case ActionKind.Mend: return $"heal an ally within {Battle.ActionRange} tiles for {Battle.MendHeal}";
                 case ActionKind.Barricade: return $"build a barricade on a free tile next to it (max {Battle.MaxBarricades}): blocks paths and shots, {Battle.BarricadeHp} HP, either side can break it, and a broken one collapses into rubble";
@@ -343,7 +343,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Transpose: return $"swap places with any unit within {Battle.TransposeRange} tiles, friend or foe (not the Giant or objectives). An enemy put down on a mine sets it off";
                 case ActionKind.CaveIn: return $"drop rubble on a free tile within {Battle.CaveInRange}";
                 case ActionKind.Hook: return $"pull an enemy 2-{Battle.HookRange} tiles away in a straight line (in sight) to the tile next to it; mines on the way go off, and it slams into whatever blocks it (not huge units)";
-                case ActionKind.Demolish: return $"blow up a rock, rubble, barricade or ice wall within {Battle.DemolishRange}: {Battle.DemolishDamage} damage to everyone in the 3x3 around it. A rock or barricade collapses into rubble";
+                case ActionKind.Demolish: return $"blow up a wall or rubble within {Battle.DemolishRange}: {Battle.DemolishDamage} damage to everyone in the 3x3 around it. A rock or barricade collapses into rubble";
                 default: return "";
             }
         }
