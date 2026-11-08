@@ -90,3 +90,7 @@ Each entry: what was done or tried, and why. Scrapped and reverted ideas stay in
   (before: 15 / 54 / 80 / 96). Necromancer at fixed levels: 0 / 0 / 5 / 17%, so the Necromancer is now the hard boss.
 - **09:41** **Illustrated gamepedia re-exported** through Unity in batch mode, with cracks, champions, Hone and the new events added to the writer.
   The demon statues aren't imported yet (an art chat task), so demons show code placeholders.
+- **Wrap-up:** published the visual timeline page (https://claude.ai/artifact/Fvq8e5d9qYuz83dRP3qDZo, private) and removed the
+  watchdog task. Everything is committed on `feature/night-fun`; `main` is untouched. Nothing has been played.
+
+NIGHT WORK DONE
