@@ -130,6 +130,14 @@ ul.plain li.divider { list-style: none; margin-left: -18px; }
 .kwtip:focus-visible, .herotip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 #tip .tip-name { font-family: var(--display); font-size: 17px; }
 tr.flash td { animation: flash 1.6s ease-out; }
+.role { display: inline-block; font-size: 12px; font-weight: 600; padding: 0 7px; border-radius: 3px; background: var(--bg); border: 1px solid var(--line); color: var(--fg); white-space: nowrap; }
+.scores { display: inline-flex; gap: 3px; margin-top: 4px; }
+.sc { font-family: var(--mono); font-size: 11px; font-weight: 500; width: 18px; height: 18px; line-height: 16px; text-align: center; border-radius: 3px; border: 1px solid currentColor; }
+.sc.good { color: var(--good); } .sc.warn { color: var(--muted); border-style: dotted; } .sc.bad { color: var(--bad); background: var(--hurts-bg); }
+.sc.pow { color: var(--makes); background: var(--makes-bg); } .sc.fair { color: var(--muted); border-style: dotted; } .sc.low { color: var(--uses); background: var(--uses-bg); }
+.verdict { font-size: 13px; margin-top: 4px; }
+.flag-group h3 { margin-top: 4px; }
+.flag-group ul { margin-top: 0; }
 @keyframes flash { from { background: var(--makes-bg); } to { background: transparent; } }
 @media (prefers-reduced-motion: reduce) { tr.flash td { animation: none; background: var(--makes-bg); } }
 </style>
@@ -151,6 +159,7 @@ tr.flash td { animation: flash 1.6s ease-out; }
     <button role="tab" id="tab-pairs" aria-selected="true" data-view="pairs">Hero pairs</button>
     <button role="tab" id="tab-themes" aria-selected="false" data-view="themes">Themes</button>
     <button role="tab" id="tab-all" aria-selected="false" data-view="all">All entities</button>
+    <button role="tab" id="tab-judge" aria-selected="false" data-view="judge">Roles and judgment</button>
     <button role="tab" id="tab-dupes" aria-selected="false" data-view="dupes">Rule duplicates</button>
     <button role="tab" id="tab-holes" aria-selected="false" data-view="holes">Holes</button>
   </nav>
@@ -184,10 +193,40 @@ tr.flash td { animation: flash 1.6s ease-out; }
       <div class="filters">
         <select id="f-owner" aria-label="Owner"></select>
         <select id="f-key" aria-label="Keyword"></select>
+        <select id="f-role" aria-label="Role"></select>
         <input id="f-text" type="search" placeholder="Search names and effects" aria-label="Search">
         <span class="count" id="f-count"></span>
       </div>
       <div class="scroll"><table id="entities"></table></div>
+    </div>
+  </section>
+
+  <section id="view-judge" hidden>
+    <div class="panel">
+      <h2>What we learned</h2>
+      <p class="note">First pass, 2026-11-09. Not every entry needs a synergy: a standalone with no tags is doing its job.</p>
+      <ul class="plain" id="takeaways" style="margin-top:10px"></ul>
+    </div>
+    <div class="cols">
+      <div class="panel">
+        <h2>Roles</h2>
+        <div class="scroll" style="margin-top:10px"><table id="roles"></table></div>
+      </div>
+      <div class="panel">
+        <h2>Criteria</h2>
+        <p class="note">In order of weight. The first three are design questions, Power is a balance question: a dull mechanic isn't fixed by its numbers.</p>
+        <div class="scroll" style="margin-top:10px"><table id="criteria"></table></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Role mix per owner</h2>
+      <p class="note">A healthy hero has some of each. Click a number to list those entries.</p>
+      <div class="scroll" style="margin-top:10px"><table id="rolemix"></table></div>
+    </div>
+    <div class="panel">
+      <h2>Flagged entries</h2>
+      <p class="note">Every entry with a weak score, by criterion. Some are fine on purpose (a weak fallback, a flat but safe item); the verdict says which.</p>
+      <div id="flags" style="margin-top:10px; display:grid; gap:18px"></div>
     </div>
   </section>
 
@@ -488,6 +527,144 @@ const BRIDGES = [
   ["Rogue", "Rogue", "Dodge", "Riposte", "The first hit deals 0 and gets countered."],
 ];
 
+// What job an entry does in a build. Untagged is fine for a standalone: it is meant to work anywhere.
+const ROLES = {
+  standalone: { label: "Standalone", meaning: "Good anywhere, no setup. Needs no synergy." },
+  enabler:    { label: "Enabler",    meaning: "Makes a theme's situation; modest on its own." },
+  payoff:     { label: "Payoff",     meaning: "Rewards a theme; weak without its enablers." },
+  bridge:     { label: "Bridge",     meaning: "Uses one theme and makes another, or links two heroes." },
+  tension:    { label: "Tension",    meaning: "Strong with a deliberate cost or anti-synergy." },
+  condition:  { label: "Condition",  meaning: "A fight rule (battlefield, omen), not a pick: judged by the play it asks for." },
+  counter:    { label: "Counter",    meaning: "An enemy champion affix: judged by the answer it asks for." },
+};
+
+// The criteria, in order of weight. D, B, A, R: g good, o ok, w weak. P (power, a design estimate): + strong, = fair, - weak.
+const CRITERIA = [
+  ["D", "Decision", "There is a moment where using or picking it is right, and one where it is wrong."],
+  ["B", "Board", "It changes where units stand or the order they act in."],
+  ["A", "Answer", "Some enemy, faction or rule pushes back on it."],
+  ["R", "Readability", "The text says what it does and you can see it working."],
+  ["P", "Power", "Strength against how hard its conditions are. A design estimate: the bots don't use actions yet, so the sim can't judge it."],
+];
+const TIMING = { early: "Early: raises the floor", mid: "Mid: sets a direction", late: "Late: raises the ceiling", any: "Any time", "-": "" };
+
+// "Owner|Name": [role, timing, "DBARP", verdict]. First pass, 2026-11-09.
+const JUDGE = {
+  "Warrior|Strike": ["standalone", "any", "oogg=", "The fallback. Needs no synergy."],
+  "Warrior|Shield Bash": ["bridge", "early", "ggoo+", "The Warrior's best tactical piece: aim decides the push, the slam and who ends up exposed."],
+  "Warrior|Sweep": ["tension", "mid", "ggog=", "A good anti-synergy: wants enemies grouped while Isolate wants them alone."],
+  "Warrior|Shield Up": ["enabler", "early", "owog=", "Flat on its own; becomes a plan with Taunt."],
+  "Warrior|Throw Shield": ["tension", "mid", "goow+", "Strong trade (4 HP for +1 move and +2 damage), but the name says nothing about the buff."],
+  "Warrior|Vanguard": ["enabler", "early", "wowg-", "A dead pick without Charge. Could help the whole front row instead."],
+  "Warrior|Charge": ["enabler", "mid", "ggow+", "Each enemy pushed to a random side: hard to plan around on a 6x6 board."],
+  "Warrior|Battlecry": ["tension", "mid", "ggog=", "Good tension: the extra move tempts the Archer off Steady Aim."],
+  "Warrior|Taunt": ["bridge", "mid", "ggog=", "Steers the enemy turn; links to Shield Up, Placeholder and the Archer standing still."],
+  "Warrior|Placeholder": ["payoff", "late", "wgow=", "Needs a name. Reads like a second zone of control; it could say so."],
+
+  "Archer|Shot": ["standalone", "any", "oogg=", "The fallback."],
+  "Archer|Steady Aim": ["payoff", "early", "ggog=", "A real choice every turn: move or hit harder. The Still theme works."],
+  "Archer|Pinning Shot": ["enabler", "early", "ggog=", "Clean enabler with a visible effect."],
+  "Archer|Steady Aim+": ["payoff", "mid", "ooog=", "A number upgrade: no new decision, so a flat pick moment."],
+  "Archer|Long Shot": ["standalone", "any", "ooog-", "Small; at least it pulls the Archer to the back."],
+  "Archer|Vantage": ["payoff", "mid", "ogoo=", "Links to the Sapper's and Mage's walls."],
+  "Archer|Kick": ["bridge", "early", "ggog=", "Clears an adjacent enemy without moving: Still and Push in one."],
+  "Archer|Snare Trap": ["enabler", "early", "ggog=", "Rewards reading enemy intents."],
+  "Archer|Fire Arrow": ["enabler", "mid", "oowg=", "Burning aimed by hand, the useful kind. Useless against Demons."],
+  "Archer|Mark Target": ["enabler", "early", "owog=", "Free and short: you use it every time it's ready, so the only choice is who."],
+  "Archer|Pierce": ["payoff", "mid", "ggog+", "Makes lining enemies up a goal."],
+  "Archer|Opening Shot": ["standalone", "mid", "goog+", "Pushes you to spread fire. With Pierce it doubles a whole line: watch it."],
+  "Archer|Prey": ["payoff", "mid", "ooog=", "The same +2 as Shatter on a different status."],
+  "Archer|Overwatch": ["standalone", "mid", "ggoo=", "Shoot now or aim: a real choice, and it denies ground."],
+  "Archer|Suppressing Fire": ["enabler", "late", "ggog+", "Pins a whole line: the late game of the Pinned theme."],
+  "Archer|Death Mark": ["payoff", "late", "oooo=", "Pays only when enemies are grouped; fine as a late payoff."],
+
+  "Rogue|Strike": ["standalone", "any", "oogg=", "The fallback, and the best use of a mark."],
+  "Rogue|Swift": ["standalone", "any", "ogog=", "Its identity: everything else in the kit leans on reach."],
+  "Rogue|Vanish": ["enabler", "early", "ggog=", "When to vanish is a real choice."],
+  "Rogue|Pincer": ["payoff", "mid", "ggog+", "The best cross-hero passive: it makes allies' positions matter."],
+  "Rogue|Riposte": ["standalone", "mid", "woog=", "Passive defense, no decision. Ranged enemies ignore it."],
+  "Rogue|Poison": ["enabler", "mid", "wwog=", "Damage over time with no board effect; interesting only with Rupture."],
+  "Rogue|Cheap Shot": ["bridge", "mid", "ooog=", "The piece that links the Archer's pins and the Mage's slows."],
+  "Rogue|Elusive": ["standalone", "mid", "ogwo=", "Changes paths, but you have to know zone of control to feel it."],
+  "Rogue|Throwing Knife": ["payoff", "mid", "ggoo=", "A ranged option for a melee unit; the carry list is long."],
+  "Rogue|Shadowstep": ["enabler", "mid", "ggog+", "Reach to the back line; the engine for Isolate."],
+  "Rogue|Isolate": ["payoff", "mid", "ggog=", "Choosing the lonely target is a good decision."],
+  "Rogue|Momentum": ["payoff", "late", "ggog+", "A snowball: chained kills can end a fight in one turn. Watch it."],
+  "Rogue|Dodge": ["standalone", "mid", "wwog+", "Strong and flat: no decision, no board effect."],
+  "Rogue|Smoke Bomb": ["bridge", "mid", "ggog=", "Protects an ally and asks you to stay within 3."],
+  "Rogue|Rupture": ["payoff", "late", "gooo=", "Timing matters; the arithmetic is hard to see."],
+  "Rogue|Into the Shadows": ["payoff", "late", "oooo=", "Overlaps Vanish and shares the kill trigger with Momentum."],
+
+  "Mage|Bolt": ["standalone", "any", "oogg=", "The fallback."],
+  "Mage|Arcane Bolt": ["standalone", "any", "wogo=", "The base trait that makes Bolt fly over obstacles; Bolt's text already says so."],
+  "Mage|Frost Nova": ["bridge", "early", "ggog=", "Self-peel with a slow and a push."],
+  "Mage|Fireball": ["payoff", "mid", "ggog+", "Area damage that rewards grouping, and it pops marks."],
+  "Mage|Burning Ground": ["enabler", "mid", "wowg-", "Passive burning in a random shape: adds to a theme with nothing to cash."],
+  "Mage|Firewall": ["bridge", "mid", "ggwg=", "Burning used right: enemies never stop on it, so a line steers them."],
+  "Mage|Searing Bolt": ["enabler", "mid", "wowg-", "The third passive burning source."],
+  "Mage|Concussive": ["bridge", "late", "ogoo=", "Push and blast in one; changes what Fireball is for."],
+  "Mage|Chill": ["enabler", "mid", "woog=", "A passive status; needed for Shatter."],
+  "Mage|Ice Wall": ["enabler", "mid", "ggog=", "Builds the board for everyone: pushes, Vantage, Demolish."],
+  "Mage|Shatter": ["payoff", "late", "ooog+", "The same +2 as Prey on a different status."],
+  "Mage|Blizzard": ["enabler", "mid", "ggog=", "Slows an area without hurting allies."],
+  "Mage|Ward": ["enabler", "early", "ggog=", "Enemies avoid shields, so where you put it steers them."],
+  "Mage|Mend": ["standalone", "any", "owog=", "A plain heal. Fine."],
+  "Mage|Transpose": ["bridge", "mid", "ggog=", "The best board piece: rearranges anything."],
+  "Mage|Twincast": ["payoff", "late", "gowo+", "Two actions a turn. Strong; watch it."],
+
+  "Sapper|Strike": ["standalone", "any", "owgg-", "A weak fallback, on purpose."],
+  "Sapper|Place Mine": ["enabler", "early", "ggog=", "Predicting paths is the Sapper's skill."],
+  "Sapper|Big Mines": ["payoff", "mid", "woog=", "A number upgrade."],
+  "Sapper|Grappling Hook": ["bridge", "mid", "ggoo=", "Pull versus push takes explaining."],
+  "Sapper|Quick Fuse": ["payoff", "late", "ogog+", "A free mine every turn: placing stops being a choice. Watch it."],
+  "Sapper|Barricade": ["enabler", "early", "ggog=", "Builds the board."],
+  "Sapper|Cave-In": ["enabler", "mid", "ggoo=", "Tagged as making a wall, but rubble isn't one: it feeds Demolish and push crushes, not Vantage."],
+  "Sapper|Spiked Barricades": ["payoff", "mid", "woog-", "Small chip damage, only from its own barricades."],
+  "Sapper|Demolish": ["bridge", "mid", "ggog=", "Uses anyone's walls, including the Mage's ice."],
+  "Sapper|Build Turret": ["standalone", "mid", "ogow=", "The text doesn't say what the turret does."],
+  "Sapper|Throw Bomb": ["enabler", "early", "ggog=", "A telegraphed blast: you predict where they'll be."],
+  "Sapper|Blast Proof": ["payoff", "late", "wowg=", "Removes a tension instead of adding one; it does free aggressive play."],
+  "Sapper|Incendiary": ["bridge", "late", "wowg-", "Feeds Burning, which has no payoff."],
+  "Sapper|Detonate": ["payoff", "late", "ggog+", "A planned finisher for a barricade build."],
+
+  "Item|Vampire Fang": ["payoff", "any", "owog-", "Small."],
+  "Item|Thorned Mail": ["payoff", "mid", "ooog-", "Good only on a Taunting Warrior."],
+  "Item|Spring Boots": ["tension", "any", "ogog=", "Good on most units, wrong on the Archer: a fine trap."],
+  "Item|Lucky Charm": ["standalone", "any", "owwg=", "Safety. Fine."],
+
+  "Banner|Vampiric": ["tension", "early", "goog=", "The right shape for a banner: a strong rule with a real cost."],
+  "Banner|Third Wheel": ["tension", "early", "ggog+", "Changes the whole run."],
+  "Banner|Loser": ["tension", "early", "goog=", "Ties into the cracks: dying gets stronger, but 3 cracks shatter."],
+  "Banner|Mercenaries": ["standalone", "early", "gwwg=", "An economy choice before each fight."],
+  "Banner|Battering Ram": ["payoff", "early", "ogog=", "Every push gets better: sets a direction from the start."],
+
+  "Battlefield|Edge of the World": ["condition", "-", "gggg=", "Makes pushes lethal for both sides."],
+  "Battlefield|Storm": ["condition", "-", "gggo=", "Asks you to push or pin enemies onto the strike."],
+  "Battlefield|Arcane Overflow": ["condition", "-", "wwgg=", "Changes the pace, not the decisions: the weakest battlefield."],
+  "Battlefield|Fortune's Favored": ["condition", "-", "gogo=", "Who to use and who to protect changes each round."],
+  "Battlefield|What's On His Mind?": ["condition", "-", "oogg=", "Takes information away instead of adding a rule. Hurts Overwatch and Snare Trap play."],
+  "Battlefield|Crumbling Roof": ["condition", "-", "gggo=", "The board changes as you fight."],
+
+  "Omen|Sun (blessing)": ["condition", "-", "gggg=", "Pin the enemy on the sigil."],
+  "Omen|Night (blessing)": ["condition", "-", "ogoo=", "A third \"can't be hit\" rule."],
+  "Omen|Moon (blessing)": ["condition", "-", "ooog=", "A random unit, so little to plan."],
+
+  "Champion|Armored": ["counter", "-", "gwgo=", "Asks for big single hits and marks; punishes multi-hit builds."],
+  "Champion|Vengeful": ["counter", "-", "gggg=", "Asks you to kill it from range."],
+  "Champion|Regenerating": ["counter", "-", "gwgg=", "Asks for focus and burst."],
+  "Champion|Mighty": ["counter", "-", "wwgg=", "A flat number: changes nothing about how you play."],
+  "Champion|Fleet": ["counter", "-", "oggg=", "Asks for pins."],
+};
+
+const judgeOf = e => JUDGE[e.owner + "|" + e.name] || null;
+const SCORE_WORD = { g: "good", o: "ok", w: "weak", "+": "strong", "=": "fair", "-": "weak" };
+const SCORE_CLASS = { g: "good", o: "warn", w: "bad", "+": "pow", "=": "fair", "-": "low" };
+const rolePill = r => r ? `<span class="role" title="${esc(ROLES[r].meaning)}">${ROLES[r].label}</span>` : "";
+function scoreDots(s) {
+  return `<span class="scores">${CRITERIA.map(([c, name], i) =>
+    `<span class="sc ${SCORE_CLASS[s[i]]}" title="${name}: ${SCORE_WORD[s[i]]}">${c}</span>`).join("")}</span>`;
+}
+
 const heroOf = e => HEROES.includes(e.owner) ? e.owner : null;
 
 function links(a, b) {
@@ -548,8 +725,10 @@ const nameLink = (name, owner) => {
 function tipHtml(e) {
   const meta = [ownerTag(e.owner), e.rarity, e.meta].filter(Boolean).join(" · ");
   const tags = e.tags.map(t => chip(t.r, t.k, t.self)).join("");
+  const j = judgeOf(e);
   return `<div class="tip-name">${esc(e.name)}</div><div class="tag">${meta}</div><p>${esc(e.effect)}</p>` +
-    (tags ? `<div>${tags}</div>` : "") + (e.note ? `<p class="note">${esc(e.note)}</p>` : "");
+    (tags ? `<div>${tags}</div>` : "") + (e.note ? `<p class="note">${esc(e.note)}</p>` : "") +
+    (j ? `<div>${rolePill(j[0])}${TIMING[j[1]] ? ` <span class="tag">${TIMING[j[1]]}</span>` : ""}<br>${scoreDots(j[2])}</div><p>${esc(j[3])}</p>` : "");
 }
 
 const ROLE_TEXT = { M: "Makes it: this entry creates the keyword's situation.", U: "Uses it: the payoff that gets stronger with it.", H: "Hurts it: an anti-synergy that works against it." };
@@ -715,11 +894,15 @@ const STATUS_HELP = {
 };
 
 function renderEntities() {
-  const o = document.getElementById("f-owner").value, k = document.getElementById("f-key").value, q = document.getElementById("f-text").value.trim().toLowerCase();
-  const rows = ENT.filter(e => (!o || e.owner === o) && (!k || e.tags.some(t => t.k === k)) &&
-    (!q || (e.name + " " + e.effect + " " + e.note).toLowerCase().includes(q)));
-  let h = "<tr><th>Name</th><th>Owner</th><th>Rarity</th><th>Effect</th><th>Tags</th><th>Note</th></tr>";
-  for (const e of rows) h += `<tr id="ent-${e.id}"><td><b>${esc(e.name)}</b></td><td class="owner">${ownerTag(e.owner, true)}</td><td class="rar">${e.rarity}</td><td>${esc(e.effect)}${e.meta ? `<div class="tag">${esc(e.meta)}</div>` : ""}</td><td>${e.tags.map(t => chip(t.r, t.k, t.self)).join("") || '<span class="note">none</span>'}</td><td class="note">${esc(e.note)}</td></tr>`;
+  const o = document.getElementById("f-owner").value, k = document.getElementById("f-key").value, r = document.getElementById("f-role").value, q = document.getElementById("f-text").value.trim().toLowerCase();
+  const rows = ENT.filter(e => (!o || e.owner === o) && (!k || e.tags.some(t => t.k === k)) && (!r || (judgeOf(e) || [])[0] === r) &&
+    (!q || (e.name + " " + e.effect + " " + e.note + " " + ((judgeOf(e) || [])[3] || "")).toLowerCase().includes(q)));
+  let h = "<tr><th>Name</th><th>Owner</th><th>Rarity</th><th>Effect</th><th>Tags</th><th>Role and judgment</th><th>Note</th></tr>";
+  for (const e of rows) {
+    const j = judgeOf(e);
+    const judged = j ? `${rolePill(j[0])}<br>${scoreDots(j[2])}<div class="verdict">${esc(j[3])}</div>` : '<span class="note">not judged</span>';
+    h += `<tr id="ent-${e.id}"><td><b>${esc(e.name)}</b></td><td class="owner">${ownerTag(e.owner, true)}</td><td class="rar">${e.rarity}</td><td>${esc(e.effect)}${e.meta ? `<div class="tag">${esc(e.meta)}</div>` : ""}</td><td>${e.tags.map(t => chip(t.r, t.k, t.self)).join("") || '<span class="note">none</span>'}</td><td style="min-width:220px">${judged}</td><td class="note">${esc(e.note)}</td></tr>`;
+  }
   document.getElementById("entities").innerHTML = h;
   document.getElementById("f-count").textContent = rows.length + " of " + ENT.length;
 }
@@ -776,6 +959,66 @@ const HOLES = [
   "<b>Weakest pairs</b>: Warrior and Archer (only Taunt helping Steady Aim, and Battlecry works against it), Rogue and Sapper (only the Grappling Hook leaving an enemy exposed).",
 ];
 
+const TAKEAWAYS = [
+  "<b>Untagged isn't a hole.</b> 17 entries are standalones or fallbacks (Strike, Shot, Bolt, Mend, Lucky Charm, Mercenaries…). They should stay that way: they keep early picks safe and let a run recover when a combo doesn't come together.",
+  "<b>The flattest picks are number-only passives</b>: Steady Aim+, Big Mines, Spiked Barricades, Searing Bolt, Burning Ground, Poison, Chill, Riposte, Dodge, Blast Proof, Incendiary. Each adds damage or safety without a new decision. Some are needed as enablers (Chill, Poison); the rest are where a pick screen feels dull.",
+  "<b>Burning's problem isn't a missing payoff, it's aim.</b> Its real effect is steering (enemies never stop on it). Firewall and Fire Arrow aim it; Searing Bolt, Burning Ground and Incendiary scatter it where the hit lands. Fewer passive burn sources may help more than a new burning payoff.",
+  "<b>The tension pieces are the best-shaped part of the game</b>: Sweep, Battlecry, Throw Shield, Spring Boots and the banners Vampiric, Third Wheel and Loser. More of these would be worth more than more payoffs. Among the heroes only the Warrior has any: the Archer, Rogue, Mage and Sapper have none.",
+  "<b>Watch for too strong</b> (16 entries score strong; these are the ones most likely to break a fight): Opening Shot with Pierce, Momentum, Twincast, Quick Fuse, Third Wheel. Balance can't measure any of them yet, because the sim bots only move and basic-attack: teaching them to use actions is the tool that's missing.",
+  "<b>Readability fixes, cheap and worth doing</b>: Placeholder needs a name; Throw Shield's name doesn't say it's a buff; Build Turret doesn't say what the turret does; Charge pushes to a random side, which is hard to plan; Mark Target is free and short enough to be automatic.",
+  "<b>Rules that change numbers, not play</b>: the Mighty champion and the Arcane Overflow battlefield. Lowest priority in their groups, candidates for a rework when there's time.",
+  "<b>A tagging error on this map</b>: Cave-In is tagged as making a wall, but rubble isn't a wall. It feeds Demolish and push crushes, not Vantage. The tag stays until a rubble keyword is decided.",
+];
+
+const roleCount = (es, r) => es.filter(e => (judgeOf(e) || [])[0] === r);
+
+function renderJudge() {
+  document.getElementById("takeaways").innerHTML = TAKEAWAYS.map(x => `<li>${x}</li>`).join("");
+  const judged = ENT.filter(judgeOf);
+  document.getElementById("roles").innerHTML = "<tr><th>Role</th><th>Meaning</th><th>Entries</th></tr>" +
+    Object.entries(ROLES).map(([r, v]) => `<tr><td>${rolePill(r)}</td><td class="note">${v.meaning}</td><td class="num">${roleCount(judged, r).length}</td></tr>`).join("");
+  document.getElementById("criteria").innerHTML = "<tr><th></th><th>Criterion</th><th>Question</th></tr>" +
+    CRITERIA.map(([c, name, q]) => `<tr><td><span class="sc good">${c}</span></td><td><b>${name}</b></td><td class="note">${q}</td></tr>`).join("") +
+    `<tr><td></td><td colspan="2" class="note">Scores: <span class="sc good">g</span> good, <span class="sc warn">o</span> ok, <span class="sc bad">w</span> weak. Power: <span class="sc pow">+</span> strong, <span class="sc fair">=</span> fair, <span class="sc low">-</span> weak.</td></tr>`;
+
+  const roles = Object.keys(ROLES).filter(r => r !== "condition" && r !== "counter");
+  const owners = [...new Set(ENT.map(e => e.owner))].filter(o => ENT.some(e => e.owner === o && roles.includes((judgeOf(e) || [])[0])));
+  let h = `<tr><th>Owner</th>${roles.map(r => `<th>${ROLES[r].label}</th>`).join("")}</tr>`;
+  for (const o of owners) {
+    const es = judged.filter(e => e.owner === o);
+    h += `<tr><td class="owner">${ownerTag(o, true)}</td>${roles.map(r => {
+      const n = roleCount(es, r).length;
+      return `<td>${n ? `<button type="button" class="ent num" data-mix="${o}|${r}">${n}</button>` : '<span class="note">0</span>'}</td>`;
+    }).join("")}</tr>`;
+  }
+  const mix = document.getElementById("rolemix");
+  mix.innerHTML = h;
+  mix.querySelectorAll("[data-mix]").forEach(b => b.addEventListener("click", ev => {
+    ev.stopPropagation();
+    const [o, r] = b.dataset.mix.split("|");
+    document.getElementById("f-owner").value = o;
+    document.getElementById("f-key").value = "";
+    document.getElementById("f-role").value = r;
+    document.getElementById("f-text").value = "";
+    renderEntities();
+    showView("all");
+  }));
+
+  const groups = [
+    ["No real decision (D weak)", e => judgeOf(e)[2][0] === "w"],
+    ["No board effect (B weak)", e => judgeOf(e)[2][1] === "w"],
+    ["Nothing pushes back (A weak)", e => judgeOf(e)[2][2] === "w"],
+    ["Hard to read (R weak)", e => judgeOf(e)[2][3] === "w"],
+    ["Possibly too strong (P +)", e => judgeOf(e)[2][4] === "+"],
+    ["Weak for what it asks (P -)", e => judgeOf(e)[2][4] === "-"],
+  ];
+  document.getElementById("flags").innerHTML = groups.map(([title, f]) => {
+    const es = judged.filter(f);
+    return `<div class="flag-group"><h3>${title} · ${es.length}</h3><ul class="plain">${es.map(e =>
+      `<li>${entLink(e)} ${ownerTag(e.owner)} ${rolePill(judgeOf(e)[0])} <span class="note">${esc(judgeOf(e)[3])}</span></li>`).join("")}</ul></div>`;
+  }).join("");
+}
+
 function showView(v) {
   document.querySelectorAll("nav button").forEach(b => b.setAttribute("aria-selected", b.dataset.view === v));
   document.querySelectorAll("section").forEach(s => s.hidden = s.id !== "view-" + v);
@@ -786,7 +1029,8 @@ function init() {
   const owners = [...new Set(ENT.map(e => e.owner))];
   document.getElementById("f-owner").innerHTML = `<option value="">Every owner</option>` + owners.map(o => `<option>${o}</option>`).join("");
   document.getElementById("f-key").innerHTML = `<option value="">Every keyword</option>` + Object.entries(KEYWORDS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("");
-  ["f-owner", "f-key", "f-text"].forEach(id => document.getElementById(id).addEventListener("input", renderEntities));
+  document.getElementById("f-role").innerHTML = `<option value="">Every role</option>` + Object.entries(ROLES).map(([r, v]) => `<option value="${r}">${v.label}</option>`).join("");
+  ["f-owner", "f-key", "f-role", "f-text"].forEach(id => document.getElementById(id).addEventListener("input", renderEntities));
   document.addEventListener("mouseover", ev => { const b = ev.target.closest && ev.target.closest(TIP_SEL); if (b && !b.closest("#tip")) showTip(b); });
   document.addEventListener("mouseout", ev => { const b = ev.target.closest && ev.target.closest(TIP_SEL); if (b && !b.contains(ev.relatedTarget)) hideTip(); });
   document.addEventListener("focusin", ev => { if (ev.target.matches && ev.target.matches(TIP_SEL)) showTip(ev.target); });
@@ -797,7 +1041,7 @@ function init() {
   window.addEventListener("scroll", hideTip, { passive: true });
   document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));
   renderHoles();
-  renderMatrix(); renderDetail(); renderThemes(); renderEntities(); renderDupes();
+  renderMatrix(); renderDetail(); renderThemes(); renderEntities(); renderDupes(); renderJudge();
   let v = null;
   try { v = localStorage.getItem("synergy-view"); } catch (e) {}
   if (v && document.getElementById("view-" + v)) showView(v);

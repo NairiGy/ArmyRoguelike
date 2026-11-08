@@ -17,7 +17,7 @@ Where things are written down:
 - [docs/design-note.md](docs/design-note.md): what has been decided and why, current rules only. Keep it updated when design decisions change. Replaced rules are in [docs/design-history.md](docs/design-history.md).
 - [docs/tasks.md](docs/tasks.md): open tasks across all topics. Read it at the start of a session and update it when you finish or find work.
 - [docs/gamepedia.html](docs/gamepedia.html): every unit, ability, item, enemy and rule with its numbers, generated from the game data. Numbers are right there, not in the design note.
-- [docs/synergy-map.html](docs/synergy-map.html) ([published](https://claude.ai/artifact/BCBjEq3EFMuN1tZi1sLoyw)): every hero skill, item and rule tagged by the theme keywords it makes, uses or hurts; hero-pair synergies, theme health, rule duplicates and holes.
+- [docs/synergy-map.html](docs/synergy-map.html) ([published](https://claude.ai/artifact/BCBjEq3EFMuN1tZi1sLoyw)): every hero skill, item and rule tagged by the theme keywords it makes, uses or hurts, with its role in a build and a judgment on five criteria; hero-pair synergies, theme health, rule duplicates and holes.
 
 ## Tech
 
@@ -57,7 +57,7 @@ Where things are written down:
 - Ask about unknowns rather than guessing.
 - Keep `PlaytestLogger` and `RunLogger` up to date whenever gameplay changes: log whatever new data is needed to judge it. The user reports how it feels; the logs cover the numbers.
 - Keep the gamepedia current: after changing units, abilities, items, enemies or rules, re-export it (Tools → Export Gamepedia, or the batch method when the editor is closed) and commit `docs/gamepedia.html`.
-- Keep the synergy map current the same way: after changing a hero skill, item, banner, battlefield, omen or champion affix, run `tools/dev.sh synergy` (it copies the game's rule texts in and lists anything new, renamed or removed), add or retag those entries in [docs/synergy-map.html](docs/synergy-map.html) (makes / uses / hurts), mark fixed rule duplicates or holes "(fixed date)", commit it, and republish it to its link with the Artifact tool.
+- Keep the synergy map current the same way: after changing a hero skill, item, banner, battlefield, omen or champion affix, run `tools/dev.sh synergy` (it copies the game's rule texts in and lists anything new, renamed or removed), add or retag those entries in [docs/synergy-map.html](docs/synergy-map.html) (makes / uses / hurts, and a role and judgment in `JUDGE`), mark fixed rule duplicates or holes "(fixed date)", commit it, and republish it to its link with the Artifact tool.
 - Update this file when the project's structure or status changes.
 
 ## Working across chats
