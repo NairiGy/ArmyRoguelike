@@ -472,6 +472,8 @@ The user asked Claude to make the game more fun and interesting overnight, with 
 
 **Demons (5th faction, pool 2, see `docs/night/demons.md`):** Imp, Demon, Devil and Fiend, with Fury (+1 damage per point), Blood Offering, Hellswap, Rending Blow, Soul Contract, Spines and Fire Breath. Each has its own AI and intents, plus an elite and a raised version for the Necromancer. Statue art exists but isn't imported yet.
 
+**Balance after the night (bot, 300 runs):** 83% run win rate (same as Nov 1), drafts 77-97% (were 60-95%). Giant 36 to 42 HP. The Necromancer is now the harder boss (fixed-level bot 17% at level 3).
+
 **Open after the night:** playtest everything; the Loser banner now combines with cracks (a death is +1 HP and +1 damage for a crack that costs 10 to mend; the user's call); review fixes still landing from the builders (see the log).
 
 ## Test mode (for testing only)

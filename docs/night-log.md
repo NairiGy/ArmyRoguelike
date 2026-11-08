@@ -79,3 +79,14 @@ Each entry: what was done or tried, and why. Scrapped and reverted ideas stay in
   Breath line, an uncapped Fury that one-shots with Fortune's Favored).
 - **Flag for the user:** the Loser banner with cracks. A death gives +1 HP and +1 damage, the crack takes 1 HP back and costs 10 to
   mend. Dying is now nearly free growth again. Left as is (the user chose an uncapped Loser); decide in the morning.
+- **09:41** **Builders' review fixes merged** (Archer/Rogue d883a8c, Mage/Sapper e9ec7ea, Demons f549caa). One clash: both had added an
+  action tag to attack events; kept one (`Via`). 343 tests pass.
+- **09:41** **Run sim was broken since the Warrior redesign** (Nov 5): with a Vanguard Warrior the bot put other units on the Warrior's
+  extra deploy row, so every layout failed ("no deployment"). Fixed in the bot (each unit only on tiles it may use).
+- **09:41** **Run sim, night branch, 300 runs:** **83%** (Nov 1 baseline 83%, after the lead's first changes 80%). Drafts now **77-97%**
+  (were 60-95%; Sapper drafts gained most). Necromancer 95% with 6 run-ending losses, Giant 99%, elites 90-100%, Demons 97% at
+  step 5 (Elementals 92%). The bot sees the enemy's next turn, so players will win less.
+- **09:41** **Giant 36 → 42 HP** (balance): it was the easiest wall. Fixed-level bot after: 9 / 50 / 79 / 93% at levels 0-3
+  (before: 15 / 54 / 80 / 96). Necromancer at fixed levels: 0 / 0 / 5 / 17%, so the Necromancer is now the hard boss.
+- **09:41** **Illustrated gamepedia re-exported** through Unity in batch mode, with cracks, champions, Hone and the new events added to the writer.
+  The demon statues aren't imported yet (an art chat task), so demons show code placeholders.

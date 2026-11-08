@@ -563,7 +563,7 @@ namespace ArmyRoguelike.Core
             };
 
         /// <summary>Act 1 boss (the ogre). Its basic attack is the club smash, which hits everyone adjacent.</summary>
-        public static readonly UnitStats Ogre = new UnitStats(UnitKind.Ogre, "Giant", 36, 5, 1, 1)
+        public static readonly UnitStats Ogre = new UnitStats(UnitKind.Ogre, "Giant", 42, 5, 1, 1)
         {
             IsBoss = true, Size = 2, Weight = Weight.Huge, AreaMelee = true, ThrowCost = 1, ThrowDamage = 4, ThrowRange = 4, Slams = true, Abilities = A(Ability.Colossus, Ability.Wrath, Ability.StoneHeart),
             Role = "Boss, 2x2. One action a turn, two from its second phase; rocks fall in its last. Slam: 3 damage to each of your units within 2 tiles, then shoves them 1 tile away. Smash hits every adjacent unit. " +
