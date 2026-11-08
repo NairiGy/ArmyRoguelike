@@ -33,7 +33,7 @@ namespace ArmyRoguelike.Core
             switch (omen)
             {
                 case Omen.Sun:
-                    return $"At the start of your turn, the tile under {theirs} is marked. At the start of the enemy turn a sun beam " +
+                    return $"At the start of your turn, a sun sigil appears under {theirs}. At the start of the enemy turn a sun beam " +
                            $"strikes it for {Battle.SunDamage} damage, hitting whoever stands there.";
                 case Omen.Night:
                     return $"At the start of your turn, {mine} unit and the 3x3 around it are shrouded until your next turn: " +

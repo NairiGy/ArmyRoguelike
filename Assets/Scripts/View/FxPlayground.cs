@@ -31,7 +31,7 @@ namespace ArmyRoguelike.View
         /// <summary>The panel's sections: title, the sound name prefix it holds, and how to trigger the effect.</summary>
         private static readonly (string Title, string Prefix, string Keys)[] Sections =
         {
-            ("Sun omen", "sun_", "5 mark the tile    6 strike it"),
+            ("Sun omen", "sun_", "5 place the sigil    6 strike it"),
             ("Moon shield", "moon_", "7 shield the unit    8 hit it    9 fade"),
             ("Lightning", "lightning_", "0 strike the tile"),
             ("Units", "unit_", "walk, attack and kill in the battle"),

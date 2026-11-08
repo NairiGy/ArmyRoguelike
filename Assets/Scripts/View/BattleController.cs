@@ -1238,7 +1238,7 @@ namespace ArmyRoguelike.View
                     }
                     else
                     {
-                        DamagePopup.Spawn(view.TopWorld + Vector3.up * 0.25f, "Storm mark", DamagePopup.DamageColor, 40);
+                        DamagePopup.Spawn(view.TopWorld + Vector3.up * 0.25f, "Lightning gathers", DamagePopup.DamageColor, 40);
                         foreach (var p in field.Tiles)
                             _board.SetHighlight(p, StormMarkColor);
                     }
@@ -1293,7 +1293,7 @@ namespace ArmyRoguelike.View
                     var view = _board.ViewOf(omen.Unit);
                     if (view == null)
                         break;
-                    var text = omen.Omen == Omen.Sun ? "Sun mark" : omen.Omen == Omen.Night ? "Shrouded" : $"Moon shield {Battle.MoonShield}";
+                    var text = omen.Omen == Omen.Sun ? "Sun sigil" : omen.Omen == Omen.Night ? "Shrouded" : $"Moon shield {Battle.MoonShield}";
                     DamagePopup.Spawn(view.TopWorld + Vector3.up * 0.25f, text, omen.Blessing ? DamagePopup.HealColor : DamagePopup.DamageColor, 40);
                     view.RefreshStatus();
                     if (omen.Omen == Omen.Moon)
@@ -1994,7 +1994,7 @@ namespace ArmyRoguelike.View
             {
                 var p = _hovered.Value;
                 if (Battle.SunMarks.Contains(p))
-                    return $"Sun mark: a sun beam strikes this tile at the start of the enemy turn for {Battle.SunDamage} damage to whoever stands here.";
+                    return $"Sun sigil: a sun beam strikes this tile at the start of the enemy turn for {Battle.SunDamage} damage to whoever stands here.";
                 if (Battle.Shroud.TryGetValue(p, out var side))
                     return side == Team.Player
                         ? "Shrouded: enemies can't hit units here from range."
@@ -2004,11 +2004,11 @@ namespace ArmyRoguelike.View
                 if (Battle.Caltrops.Contains(p))
                     return $"Caltrops: a unit of yours stepping here takes {Battle.CaltropsDamage} and its movement ends.";
                 if (Battle.OverwatchTiles.Contains(p))
-                    return "Overwatch: a crossbowman is aiming here. The first of your units to walk onto a marked tile is shot and stops.";
+                    return "Overwatch: a crossbowman is aiming here. The first of your units to walk onto a highlighted tile is shot and stops.";
                 if (Battle.Snares.Contains(p))
                     return "Your snare: the first enemy to walk onto it stops, takes damage and is pinned. Enemies can't see it.";
                 if (Battle.CoverTiles.Contains(p))
-                    return "Overwatch: your archer is aiming here. The first enemy to walk onto a marked tile is shot and stops.";
+                    return "Overwatch: your archer is aiming here. The first enemy to walk onto a highlighted tile is shot and stops.";
                 if (Battle.MineAt(p) != null)
                     return $"Your mine: an enemy stepping here sets it off ({Battle.MineAt(p).Damage} damage to whoever stands on this tile).";
                 if (Battle.IsBarricade(p))
@@ -2479,7 +2479,7 @@ namespace ArmyRoguelike.View
             if (Battle.OnStormMark(u))
                 chips.Add(Battle.IsRockfallMark(u.Pos)
                     ? ("Falling rocks", $"{Battle.RockfallDamage} damage after the enemy turn unless it moves.", false)
-                    : ("Storm mark", $"Lightning strikes it for {Battlefields.StormDamage} after the enemy turn.", false));
+                    : ("Storm", $"Lightning gathers over it and strikes for {Battlefields.StormDamage} after the enemy turn.", false));
             if (Battle.FloorCracks.TryGetValue(u.Pos, out var cracksUnder))
                 chips.Add(($"Fractured {cracksUnder}/{Battlefields.CracksToHole}", $"On a fractured tile ({cracksUnder} of {Battlefields.CracksToHole}): one more fracture and it falls in, taking this unit with it.", false));
             if (u.Team == Team.Player && Battle.Phase == Phase.PlayerTurn && u.ActedThisTurn && !u.IsDone)

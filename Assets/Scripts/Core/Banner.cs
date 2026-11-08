@@ -64,7 +64,7 @@ namespace ArmyRoguelike.Core
             {
                 case Banner.Vampiric:
                     return $"Every attack of yours that deals damage heals the attacker {VampiricHeal}. " +
-                           $"But the sun hunts you: every fight has the Curse of the Sun (a beam marks one of your units each turn, {Battle.SunDamage} damage).";
+                           $"But the sun hunts you: every fight has the Curse of the Sun (a sun beam targets one of your units each turn, {Battle.SunDamage} damage).";
                 case Banner.ThirdWheel:
                     return $"Your units get +{ThirdWheelAp} AP and +{ThirdWheelMoves} move. But the army holds {ThirdWheelArmySize} units at most.";
                 case Banner.Loser:

@@ -191,7 +191,7 @@ namespace ArmyRoguelike.Core
                 case Ability.Hellswap: return $"trades places with one of your units 2-{Battle.HellswapRange} tiles away (no line of sight needed); nothing on either tile goes off";
                 case Ability.Bloodlust: return $"gains {Battle.BloodlustFury} Fury whenever a unit next to it dies, friend or foe";
                 case Ability.RendingBlow: return $"loses {Battle.RendingBlowCost} of its own HP, then hits a unit next to it for its damage +{Battle.RendingBlowBonus}";
-                case Ability.SoulContract: return $"marks one of your units within {Battle.ContractRange} tiles (no line of sight needed): at the start of the next enemy turn it takes {Battle.ContractDamage} damage (shields and damage reductions still count), unless the Devil takes damage before then";
+                case Ability.SoulContract: return $"signs a contract on one of your units within {Battle.ContractRange} tiles (no line of sight needed): at the start of the next enemy turn it takes {Battle.ContractDamage} damage (shields and damage reductions still count), unless the Devil takes damage before then";
                 case Ability.FireBreath: return $"breathes down a straight line of {Battle.FireBreathLength} tiles at one of your units on it (a rock stops it): {Battle.FireBreathDamage} damage to each of your units there, and the tiles burn for {Battle.BurnRounds} rounds";
                 default: return "";
             }

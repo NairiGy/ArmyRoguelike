@@ -66,7 +66,7 @@ namespace ArmyRoguelike.Core
                     return "A unit pushed off the board falls from the tower and dies, on either side. Nothing saves it, " +
                            "and it leaves no bone pile. Huge units can't be pushed.";
                 case Battlefield.Storm:
-                    return "At the start of each round, lightning marks the tile under one of your units and one enemy. " +
+                    return "At the start of each round, lightning gathers over the tile under one of your units and one enemy. " +
                            $"At the end of the enemy turn it strikes those tiles for {StormDamage} damage, hitting whoever stands there.";
                 case Battlefield.ArcaneOverflow:
                     return $"Every action's cooldown is {CooldownCut} shorter (1 at least), for both sides.";

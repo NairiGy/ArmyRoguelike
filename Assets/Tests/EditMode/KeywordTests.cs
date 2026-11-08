@@ -36,6 +36,18 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void OnlyTheArchersMarkIsMarked()
+        {
+            var texts = new[]
+            {
+                Omens.Describe(Omen.Sun, true), Omens.Describe(Omen.Sun, false), Battlefields.Describe(Battlefield.Storm),
+                Banners.Describe(Banner.Vampiric), Abilities.Describe(Ability.SoulContract),
+            };
+            foreach (var text in texts)
+                CollectionAssert.DoesNotContain(Keywords.In(text), Keyword.Marked, text);
+        }
+
+        [Test]
         public void FreeCountsOnlyCapitalised()
         {
             Assert.IsEmpty(Keywords.Find("teleport to a free tile"));

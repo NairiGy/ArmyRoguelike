@@ -536,7 +536,7 @@ public static class GamepediaWriter
         foreach (var field in Battlefields.All)
             html.Append($"<tr><td>{Esc(Battlefields.Name(field))}</td><td>{Esc(Battlefields.Describe(field))}</td></tr>");
         html.Append("</table><p>Enemy AI: on Edge of the World an enemy that can push one of your units off the board with Bull Rush or Upheaval does that first. ");
-        html.Append("In a Storm, enemies never stop on a marked tile and step off one before acting.</p></section>");
+        html.Append("In a Storm, enemies never stop on a tile the lightning gathers over, and step off one before acting.</p></section>");
     }
 
     private static void Rules(StringBuilder html)
