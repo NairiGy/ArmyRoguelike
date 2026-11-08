@@ -107,6 +107,16 @@ tr.fixed td, li.fixed { color: var(--muted); }
 tr.fixed b { color: var(--muted); font-weight: 600; }
 tr.divider td { border-bottom: 1px solid var(--line); }
 ul.plain li.divider { list-style: none; margin-left: -18px; }
+.ent { font: inherit; font-weight: 600; color: var(--fg); background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-decoration: underline dotted var(--muted); text-underline-offset: 3px; text-align: left; }
+.ent:hover, .ent:focus-visible { color: var(--accent); text-decoration-color: var(--accent); }
+.ent:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+#tip { position: fixed; z-index: 50; max-width: min(340px, calc(100vw - 16px)); background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; box-shadow: 0 6px 24px rgba(0,0,0,.18); pointer-events: none; display: grid; gap: 6px; font-size: 13px; }
+#tip p { margin: 0; }
+#tip[hidden] { display: none; }
+#tip .tip-name { font-family: var(--display); font-size: 17px; }
+tr.flash td { animation: flash 1.6s ease-out; }
+@keyframes flash { from { background: var(--makes-bg); } to { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { tr.flash td { animation: none; background: var(--makes-bg); } }
 </style>
 
 <div class="wrap">
@@ -118,6 +128,7 @@ ul.plain li.divider { list-style: none; margin-left: -18px; }
       <span><span class="chip U">U push</span> uses it (payoff)</span>
       <span><span class="chip H">H still</span> hurts it (anti-synergy)</span>
       <span><span class="chip U">U wall!</span> the ! means it only uses its own (e.g. its own barricades), so it links inside the kit only</span>
+      <span><button type="button" class="ent" data-id="0">Underlined names</button>: hover for what it does, click to open it in All entities</span>
     </div>
   </header>
 
@@ -180,6 +191,7 @@ ul.plain li.divider { list-style: none; margin-left: -18px; }
     </div>
   </section>
 </div>
+<div id="tip" role="tooltip" hidden></div>
 
 <script>
 const HEROES = ["Warrior", "Archer", "Rogue", "Mage", "Sapper"];
@@ -374,6 +386,54 @@ const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
 function heat(n) { return n === 0 ? "--heat0" : n <= 2 ? "--heat1" : n <= 4 ? "--heat2" : n <= 7 ? "--heat3" : "--heat4"; }
 
+// A skill, item or rule name that shows its card on hover and opens its row in "All entities" on click.
+const entLink = e => `<button type="button" class="ent" data-id="${e.id}">${esc(e.name)}</button>`;
+// The hand-written links name things by text; link them when the name is an entity of that owner.
+const nameLink = (name, owner) => {
+  const e = ENT.find(x => x.name === name && x.owner === owner);
+  return e ? entLink(e) : `<b>${esc(name)}</b>`;
+};
+
+function tipHtml(e) {
+  const meta = [e.owner, e.rarity].filter(Boolean).join(" · ");
+  const tags = e.tags.map(t => chip(t.r, t.k, t.self)).join("");
+  return `<div class="tip-name">${esc(e.name)}</div><div class="tag">${meta}</div><p>${esc(e.effect)}</p>` +
+    (tags ? `<div>${tags}</div>` : "") + (e.note ? `<p class="note">${esc(e.note)}</p>` : "");
+}
+
+function showTip(btn) {
+  const e = ENT[+btn.dataset.id], tip = document.getElementById("tip");
+  if (!e) return;
+  tip.innerHTML = tipHtml(e);
+  tip.style.left = "0px";
+  tip.style.top = "0px";
+  tip.hidden = false;
+  const r = btn.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight, pad = 8;
+  let left = Math.min(Math.max(pad, r.left), window.innerWidth - w - pad);
+  let top = r.bottom + 6;
+  if (top + h > window.innerHeight - pad) top = Math.max(pad, r.top - h - 6);
+  tip.style.left = left + "px";
+  tip.style.top = top + "px";
+}
+
+function hideTip() { document.getElementById("tip").hidden = true; }
+
+function openEntity(id) {
+  const e = ENT[id];
+  hideTip();
+  document.getElementById("f-owner").value = "";
+  document.getElementById("f-key").value = "";
+  document.getElementById("f-text").value = "";
+  renderEntities();
+  showView("all");
+  const row = document.getElementById("ent-" + id);
+  if (!row) return;
+  row.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  row.classList.remove("flash");
+  void row.offsetWidth;
+  row.classList.add("flash");
+}
+
 let selected = ["Warrior", "Archer"];
 
 function renderMatrix() {
@@ -405,17 +465,17 @@ function renderDetail() {
   const verdict = n >= 4 ? ["good", "strong"] : n >= 2 ? ["warn", "medium"] : n === 1 ? ["bad", "weak"] : ["bad", "none"];
   h += `<p class="note"><span class="pill ${verdict[0]}">${verdict[1]}</span> &nbsp;${n} link${n === 1 ? "" : "s"} counted (one per keyword, plus hand-written ones)</p><div class="links" style="margin-top:14px">`;
   for (const [k, ls] of Object.entries(byKey)) {
-    const pairs = ls.map(l => `<b>${esc(l.maker.name)}</b> <span class="tag">(${l.maker.owner})</span> → <b>${esc(l.user.name)}</b> <span class="tag">(${l.user.owner})</span>`);
+    const pairs = ls.map(l => `${entLink(l.maker)} <span class="tag">(${l.maker.owner})</span> → ${entLink(l.user)} <span class="tag">(${l.user.owner})</span>`);
     h += `<div class="link"><span class="chip K">${KEYWORDS[k].label}</span><div>${[...new Set(pairs)].join("<br>")}</div></div>`;
   }
   for (const [x, y, what, to, why] of B) {
-    h += `<div class="link"><span class="chip K">by hand</span><div><b>${what}</b> <span class="tag">(${x})</span> → ${to} <span class="tag">(${y})</span></div><div class="why">${why}</div></div>`;
+    h += `<div class="link"><span class="chip K">by hand</span><div>${nameLink(what, x)} <span class="tag">(${x})</span> → ${nameLink(to, y)} <span class="tag">(${y})</span></div><div class="why">${why}</div></div>`;
   }
   if (!L.length && !B.length) h += `<p class="note">No links. This pair needs a designed bridge.</p>`;
   h += "</div>";
   if (H.length) {
     h += `<h3 style="margin-top:18px">Clashes</h3><div class="links">`;
-    for (const x of H) h += `<div class="link"><span class="chip H">H ${x.k}</span><div><b>${esc(x.h.name)}</b> <span class="tag">(${x.h.owner})</span> works against <b>${esc(x.u.name)}</b> <span class="tag">(${x.u.owner})</span></div></div>`;
+    for (const x of H) h += `<div class="link"><span class="chip H">H ${x.k}</span><div>${entLink(x.h)} <span class="tag">(${x.h.owner})</span> works against ${entLink(x.u)} <span class="tag">(${x.u.owner})</span></div></div>`;
     h += "</div>";
   }
   document.getElementById("pair-detail").innerHTML = h;
@@ -429,7 +489,7 @@ function renderThemes() {
   let h = "<tr><th>Keyword</th><th>Meaning</th><th>Makes it</th><th>Uses it</th><th>Hurts it</th><th>Status</th></tr>";
   for (const [k, kw] of Object.entries(KEYWORDS)) {
     const list = r => ENT.filter(e => e.tags.some(t => t.r === r && t.k === k));
-    const fmt = es => es.length ? es.map(e => `${esc(e.name)} <span class="tag">${e.owner}</span>`).join("<br>") : `<span class="note">none</span>`;
+    const fmt = es => es.length ? es.map(e => `${entLink(e)} <span class="tag">${e.owner}</span>`).join("<br>") : `<span class="note">none</span>`;
     const mk = list("M"), us = list("U"), hu = list("H");
     const heroes = new Set([...mk, ...us].map(heroOf).filter(Boolean));
     let status = ["good", "healthy"];
@@ -447,7 +507,7 @@ function renderEntities() {
   const rows = ENT.filter(e => (!o || e.owner === o) && (!k || e.tags.some(t => t.k === k)) &&
     (!q || (e.name + " " + e.effect + " " + e.note).toLowerCase().includes(q)));
   let h = "<tr><th>Name</th><th>Owner</th><th>Rarity</th><th>Effect</th><th>Tags</th><th>Note</th></tr>";
-  for (const e of rows) h += `<tr><td><b>${esc(e.name)}</b></td><td class="owner">${e.owner}</td><td class="rar">${e.rarity}</td><td>${esc(e.effect)}</td><td>${e.tags.map(t => chip(t.r, t.k, t.self)).join("") || '<span class="note">none</span>'}</td><td class="note">${esc(e.note)}</td></tr>`;
+  for (const e of rows) h += `<tr id="ent-${e.id}"><td><b>${esc(e.name)}</b></td><td class="owner">${e.owner}</td><td class="rar">${e.rarity}</td><td>${esc(e.effect)}</td><td>${e.tags.map(t => chip(t.r, t.k, t.self)).join("") || '<span class="note">none</span>'}</td><td class="note">${esc(e.note)}</td></tr>`;
   document.getElementById("entities").innerHTML = h;
   document.getElementById("f-count").textContent = rows.length + " of " + ENT.length;
 }
@@ -515,6 +575,13 @@ function init() {
   document.getElementById("f-owner").innerHTML = `<option value="">Every owner</option>` + owners.map(o => `<option>${o}</option>`).join("");
   document.getElementById("f-key").innerHTML = `<option value="">Every keyword</option>` + Object.entries(KEYWORDS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("");
   ["f-owner", "f-key", "f-text"].forEach(id => document.getElementById(id).addEventListener("input", renderEntities));
+  document.addEventListener("mouseover", ev => { const b = ev.target.closest && ev.target.closest(".ent"); if (b) showTip(b); });
+  document.addEventListener("mouseout", ev => { const b = ev.target.closest && ev.target.closest(".ent"); if (b && !b.contains(ev.relatedTarget)) hideTip(); });
+  document.addEventListener("focusin", ev => { if (ev.target.classList && ev.target.classList.contains("ent")) showTip(ev.target); });
+  document.addEventListener("focusout", ev => { if (ev.target.classList && ev.target.classList.contains("ent")) hideTip(); });
+  document.addEventListener("click", ev => { const b = ev.target.closest && ev.target.closest(".ent"); if (b) openEntity(+b.dataset.id); });
+  document.addEventListener("keydown", ev => { if (ev.key === "Escape") hideTip(); });
+  window.addEventListener("scroll", hideTip, { passive: true });
   document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));
   renderHoles();
   renderMatrix(); renderDetail(); renderThemes(); renderEntities(); renderDupes();
