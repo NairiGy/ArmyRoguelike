@@ -1,0 +1,526 @@
+<title>Hero Synergy Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one working column, tabs across the top; summary (matrix) first, detail tables after. Stone by day, the tower roof by night. */
+:root {
+  --bg: #eef0f2;
+  --panel: #f8f9fa;
+  --line: #d3d8de;
+  --fg: #1d2329;
+  --muted: #5d6873;
+  --accent: #3d5f86;
+  --makes: #2f6fb0;
+  --makes-bg: #dbe8f6;
+  --uses: #8a6a14;
+  --uses-bg: #f3e8c6;
+  --hurts: #b2412b;
+  --hurts-bg: #f6dcd5;
+  --good: #2e7d4f;
+  --warn: #a8701b;
+  --bad: #b2412b;
+  --heat0: #f8f9fa;
+  --heat1: #dbe5ef;
+  --heat2: #b5cbe2;
+  --heat3: #8fb0d4;
+  --heat4: #6a95c6;
+  --display: "Marcellus", "Trajan Pro", Georgia, serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151d; --panel: #1a1f2a; --line: #2c3442; --fg: #e3e7ee; --muted: #9aa5b5; --accent: #9dbbe0;
+    --makes: #8fbdf0; --makes-bg: #1f3350; --uses: #e2c46e; --uses-bg: #3a3118; --hurts: #f08f78; --hurts-bg: #43221b;
+    --good: #6cc792; --warn: #e2b05a; --bad: #f08f78;
+    --heat0: #1a1f2a; --heat1: #1f2c40; --heat2: #27405f; --heat3: #30578a; --heat4: #3c6fb0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151d; --panel: #1a1f2a; --line: #2c3442; --fg: #e3e7ee; --muted: #9aa5b5; --accent: #9dbbe0;
+  --makes: #8fbdf0; --makes-bg: #1f3350; --uses: #e2c46e; --uses-bg: #3a3118; --hurts: #f08f78; --hurts-bg: #43221b;
+  --good: #6cc792; --warn: #e2b05a; --bad: #f08f78;
+  --heat0: #1a1f2a; --heat1: #1f2c40; --heat2: #27405f; --heat3: #30578a; --heat4: #3c6fb0;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1 { font-family: var(--display); font-weight: 400; font-size: 34px; letter-spacing: .02em; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 400; font-size: 22px; margin: 0 0 6px; text-wrap: balance; }
+h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+p { margin: 0; max-width: 72ch; }
+.sub { color: var(--muted); margin-top: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px; color: var(--muted); font-size: 13px; align-items: center; }
+nav { display: flex; flex-wrap: wrap; gap: 4px; margin: 22px 0 18px; border-bottom: 1px solid var(--line); }
+nav button { font: inherit; font-weight: 500; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); padding: 8px 12px; cursor: pointer; margin-bottom: -1px; }
+nav button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+nav button:focus-visible, select:focus-visible, input:focus-visible, .cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+section { display: grid; gap: 22px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 18px; min-width: 0; }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; }
+@media (max-width: 820px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+.chip { display: inline-block; font-family: var(--mono); font-size: 12px; padding: 1px 7px; border-radius: 3px; margin: 1px 3px 1px 0; white-space: nowrap; }
+.chip.M { color: var(--makes); background: var(--makes-bg); }
+.chip.U { color: var(--uses); background: var(--uses-bg); }
+.chip.H { color: var(--hurts); background: var(--hurts-bg); }
+.chip.K { color: var(--fg); background: var(--bg); border: 1px solid var(--line); }
+.tag { font-size: 12px; color: var(--muted); }
+.pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 10px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.good { color: var(--good); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); }
+.matrix { border-collapse: separate; border-spacing: 4px; width: auto; }
+.matrix th { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--fg); padding: 6px 8px; text-align: center; }
+.matrix th.row { text-align: right; }
+.matrix td { border: 0; padding: 0; }
+.cell { width: 84px; height: 56px; border-radius: 4px; border: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; font-variant-numeric: tabular-nums; background: var(--heat0); color: var(--fg); font: inherit; }
+.cell b { font-size: 20px; font-weight: 600; line-height: 1; }
+.cell span { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.cell.self { cursor: pointer; border-style: dashed; }
+.cell[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.links { display: grid; gap: 10px; }
+.link { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; align-items: baseline; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.link:last-child { border-bottom: 0; padding-bottom: 0; }
+.link .why { grid-column: 2; color: var(--muted); font-size: 13px; }
+.filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+select, input { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--fg); }
+input { min-width: 0; flex: 1 1 200px; }
+.count { color: var(--muted); font-size: 13px; align-self: center; }
+.owner { font-weight: 600; white-space: nowrap; }
+.rar { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.note { color: var(--muted); font-size: 13px; }
+.num { font-family: var(--mono); color: var(--muted); }
+ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.theme-row td:first-child { white-space: nowrap; }
+.hero-themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.hero-card { border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; background: var(--bg); min-width: 0; }
+.hero-card h4 { font-family: var(--display); font-weight: 400; font-size: 18px; margin: 0 0 6px; }
+.hero-card .k { font-size: 13px; }
+tr.fixed td, li.fixed { color: var(--muted); }
+tr.fixed b { color: var(--muted); font-weight: 600; }
+tr.divider td { border-bottom: 1px solid var(--line); }
+ul.plain li.divider { list-style: none; margin-left: -18px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Hero Synergy Map</h1>
+    <p class="sub">Every hero skill, item, banner, battlefield, omen and champion affix, tagged by the theme keywords it makes, uses or hurts. Synergies are counted from those tags: a link is one hero <em>making</em> a keyword that another (or the same) hero <em>uses</em>. Data from the gamepedia of 2026-11-08; numbers are placeholders.</p>
+    <div class="legend">
+      <span><span class="chip M">M push</span> makes it</span>
+      <span><span class="chip U">U push</span> uses it (payoff)</span>
+      <span><span class="chip H">H still</span> hurts it (anti-synergy)</span>
+      <span><span class="chip U">U wall!</span> the ! means it only uses its own (e.g. its own barricades), so it links inside the kit only</span>
+    </div>
+  </header>
+
+  <nav role="tablist" aria-label="Views">
+    <button role="tab" id="tab-pairs" aria-selected="true" data-view="pairs">Hero pairs</button>
+    <button role="tab" id="tab-themes" aria-selected="false" data-view="themes">Themes</button>
+    <button role="tab" id="tab-all" aria-selected="false" data-view="all">All entities</button>
+    <button role="tab" id="tab-dupes" aria-selected="false" data-view="dupes">Rule duplicates</button>
+    <button role="tab" id="tab-holes" aria-selected="false" data-view="holes">Holes</button>
+  </nav>
+
+  <section id="view-pairs">
+    <div class="cols">
+      <div class="panel">
+        <h2>Synergy links between heroes</h2>
+        <p class="note">Each number counts the keyword links between two heroes (make → use, both directions), plus hand-written links that no keyword covers. The diagonal (dashed) is inside the hero's own kit. Pick a cell to see the links.</p>
+        <div class="scroll" style="margin-top:14px"><table class="matrix" id="matrix"></table></div>
+      </div>
+      <div class="panel" id="pair-detail"></div>
+    </div>
+  </section>
+
+  <section id="view-themes" hidden>
+    <div class="panel">
+      <h2>Proposed themes per hero</h2>
+      <p class="note">Main and second theme for each hero, from what its kit already does. Bold keywords are new and don't exist in the game yet.</p>
+      <div class="hero-themes" id="hero-themes" style="margin-top:14px"></div>
+    </div>
+    <div class="panel">
+      <h2>Theme keywords</h2>
+      <p class="note">A healthy theme has producers and payoffs, spread across at least two heroes.</p>
+      <div class="scroll" style="margin-top:10px"><table id="themes"></table></div>
+    </div>
+  </section>
+
+  <section id="view-all" hidden>
+    <div class="panel">
+      <div class="filters">
+        <select id="f-owner" aria-label="Owner"></select>
+        <select id="f-key" aria-label="Keyword"></select>
+        <input id="f-text" type="search" placeholder="Search names and effects" aria-label="Search">
+        <span class="count" id="f-count"></span>
+      </div>
+      <div class="scroll"><table id="entities"></table></div>
+    </div>
+  </section>
+
+  <section id="view-dupes" hidden>
+    <div class="panel">
+      <h2>Same rule, two names (or two rules, one name)</h2>
+      <p class="note">Fix these before the themes, since the themes depend on the keyword names. Checked against the code in <span class="num">Core/Battle.cs</span> and <span class="num">Core/EnemyAI.cs</span>. Fixed rows sit at the bottom; a row counts as fixed when its name ends in "(fixed <i>date</i>)" in the page's data (<span class="num">docs/synergy-map.html</span>).</p>
+      <div class="scroll" style="margin-top:10px"><table id="dupes"></table></div>
+    </div>
+  </section>
+
+  <section id="view-holes" hidden>
+    <div class="panel">
+      <h2>Holes the tags show</h2>
+      <ul class="plain" id="holes" style="margin-top:10px"></ul>
+    </div>
+  </section>
+</div>
+
+<script>
+const HEROES = ["Warrior", "Archer", "Rogue", "Mage", "Sapper"];
+
+const KEYWORDS = {
+  push:    { label: "Push",    exists: true,  meaning: "Moving enemies; collisions into rocks, units, the edge." },
+  guard:   { label: "Guard",   exists: false, meaning: "Protecting allies: shields (Shield is a keyword since 2026-11-08), taunts, damage cuts." },
+  pinned:  { label: "Pinned",  exists: true,  meaning: "Can't move on its next turn." },
+  slowed:  { label: "Slowed",  exists: true,  meaning: "On its next turn it can move or act, not both (since 2026-11-08)." },
+  marked:  { label: "Marked",  exists: true,  meaning: "+2 on the next hit, from anyone." },
+  exposed: { label: "Exposed", exists: true,  meaning: "No ally of its own next to it." },
+  hidden:  { label: "Hidden",  exists: true,  meaning: "Can't be targeted until your next turn." },
+  poison:  { label: "Poison",  exists: true,  meaning: "Damage at the start of each of its turns." },
+  burning: { label: "Burning", exists: true,  meaning: "Burning ground; enemies never stop on it." },
+  wall:    { label: "Wall",    exists: true,  meaning: "Building the board. Wall is a keyword since 2026-11-08: a rock, ice or barricade (rubble is low, not a wall)." },
+  blast:   { label: "Blast",   exists: true,  meaning: "Explosions: mines, bombs, Demolish, Detonate. A keyword since 2026-11-08." },
+  kill:    { label: "Kill",    exists: false, meaning: "Triggers on a kill (not a status)." },
+  still:   { label: "Still",   exists: false, meaning: "The Archer standing still (Steady Aim)." },
+};
+
+const HERO_THEMES = {
+  Warrior: [["push", "main"], ["guard", "second"]],
+  Archer:  [["pinned", "main"], ["marked", "second"]],
+  Rogue:   [["exposed", "main"], ["hidden", "second"], ["poison", "second"]],
+  Mage:    [["slowed", "main"], ["burning", "second"]],
+  Sapper:  [["wall", "main"], ["blast", "second"]],
+};
+
+// [name, owner, rarity, effect, tags, note]
+const E = [
+  ["Strike", "Warrior", "base", "3 damage to an adjacent unit", "", ""],
+  ["Shield Bash", "Warrior", "base", "2 damage and push 1; +2 if it slams into something, and the thing it hits takes 2", "M:push M:exposed U:wall", "Pushing an enemy away from its group leaves it exposed"],
+  ["Sweep", "Warrior", "common", "Hits the target and the enemies on both sides", "H:exposed", "Wants enemies grouped, the opposite of Isolate"],
+  ["Shield Up", "Warrior", "common", "Takes 2 less damage from every source for 2 enemy turns", "M:guard", ""],
+  ["Throw Shield", "Warrior", "common", "+1 move and +2 damage for the rest of the battle, for 4 HP", "", ""],
+  ["Vanguard", "Warrior", "common", "Deploys 1 row further forward", "", "Pairs with Charge on turn 1"],
+  ["Charge", "Warrior", "rare", "Rushes 3 tiles: 2 damage to each enemy on the way, pushed to a random side", "M:push", ""],
+  ["Battlecry", "Warrior", "rare", "Allies within 2: +1 move and a 2-point shield", "M:guard H:still", "The extra move tempts the Archer off Steady Aim"],
+  ["Taunt", "Warrior", "rare", "Enemies within 2 can only target this unit", "M:guard M:still", "Keeps enemies off the Archer so it can stand still"],
+  ["Placeholder", "Warrior", "rare", "Attacks any unit that steps out of its reach, once a round", "", "Still literally named Placeholder in game; pairs with Taunt"],
+
+  ["Shot", "Archer", "base", "2 damage up to 3 tiles, needs line of sight", "", ""],
+  ["Steady Aim", "Archer", "base", "+1 damage if it hasn't moved this turn", "U:still", ""],
+  ["Pinning Shot", "Archer", "base", "1 damage and pins", "M:pinned", ""],
+  ["Steady Aim+", "Archer", "common", "+2 damage if it hasn't moved this turn", "U:still", ""],
+  ["Long Shot", "Archer", "common", "+1 damage to targets 3+ tiles away", "", "Pairs with Vantage's +1 range"],
+  ["Vantage", "Archer", "common", "Next to a wall: +1 range, ignores Behind Cover", "U:wall", ""],
+  ["Kick", "Archer", "common", "1 damage and push 1", "M:push M:still", "Clears an adjacent enemy without moving"],
+  ["Snare Trap", "Archer", "common", "Hidden snare within 3: the first enemy on it takes 1 and is pinned", "M:pinned", ""],
+  ["Fire Arrow", "Archer", "common", "Shot for its damage; the target's tile burns for 2 rounds", "M:burning", ""],
+  ["Mark Target", "Archer", "common", "0 AP: an enemy in range becomes marked", "M:marked", ""],
+  ["Pierce", "Archer", "rare", "Shots along a row or column hit every enemy in the line", "U:marked", "Pops a line of marks after Death Mark"],
+  ["Opening Shot", "Archer", "rare", "Double damage the first time it hits each enemy", "", "Pairs with Pierce"],
+  ["Prey", "Archer", "rare", "Pinned enemies take +2 from everyone", "U:pinned", ""],
+  ["Overwatch", "Archer", "rare", "Aims: the first enemy walking into sight is shot and stops", "", "Same rule as the Crossbowman's Overwatch (was Covering Fire)"],
+  ["Suppressing Fire", "Archer", "rare", "Needs Pierce. Line: every enemy takes 1 and is pinned", "M:pinned", ""],
+  ["Death Mark", "Archer", "rare", "Needs Mark Target. When a marked enemy dies, its neighbours are marked", "U:marked! U:kill M:marked", ""],
+
+  ["Strike", "Rogue", "base", "4 damage to an adjacent unit", "U:marked", "The biggest single hit, the best use of a mark"],
+  ["Swift", "Rogue", "base", "2 moves per turn", "", ""],
+  ["Vanish", "Rogue", "base", "0 AP: hidden until your next turn; first attack while hidden +2", "M:hidden U:hidden!", ""],
+  ["Pincer", "Rogue", "common", "+3 if an ally stands on the far side of the target", "", "Needs an ally: hand-written link to the Warrior"],
+  ["Riposte", "Rogue", "common", "Counters the first melee hit each enemy turn", "", "Pairs with Dodge"],
+  ["Poison", "Rogue", "common", "Its hits poison", "M:poison", ""],
+  ["Cheap Shot", "Rogue", "common", "+2 damage to pinned or slowed enemies", "U:pinned U:slowed", ""],
+  ["Elusive", "Rogue", "common", "Ignores zone of control", "", "Goblins have it too"],
+  ["Throwing Knife", "Rogue", "common", "2 damage at 2-3 tiles; carries Poison, Cheap Shot and the Vanish bonus", "U:poison U:hidden!", ""],
+  ["Shadowstep", "Rogue", "common", "0 AP: teleport next to an enemy within 3", "", "Reaches lone back-liners for Isolate"],
+  ["Isolate", "Rogue", "common", "+2 damage to exposed enemies", "U:exposed", ""],
+  ["Momentum", "Rogue", "rare", "A kill gives its action and 1 move back", "U:kill", ""],
+  ["Dodge", "Rogue", "rare", "The first hit each enemy turn deals 0", "", ""],
+  ["Smoke Bomb", "Rogue", "rare", "Hides itself and one ally within 3 (no +2)", "M:hidden M:guard", "Protects the Archer or Mage"],
+  ["Rupture", "Rogue", "rare", "Needs Poison. Bursts the poison (2 per turn left), then strikes", "U:poison", ""],
+  ["Into the Shadows", "Rogue", "rare", "A kill hides it until your next turn (every 3 turns at most)", "U:kill M:hidden", ""],
+
+  ["Bolt", "Mage", "base", "2 damage up to 3 tiles", "", ""],
+  ["Arcane Bolt", "Mage", "base", "Its bolt ignores line of sight", "", ""],
+  ["Frost Nova", "Mage", "base", "Every adjacent enemy is slowed and pushed 1", "M:slowed M:push", ""],
+  ["Fireball", "Mage", "common", "3 damage to a plus of tiles, up to 3 away", "U:marked", "Pops several marks after Death Mark"],
+  ["Burning Ground", "Mage", "common", "Needs Fireball. The area burns for 2 rounds", "M:burning", ""],
+  ["Firewall", "Mage", "common", "3 tiles in a line burn for 2 rounds; 1 damage now", "M:burning U:push", "Push enemies into it"],
+  ["Searing Bolt", "Mage", "common", "Its bolt sets the target's tile burning", "M:burning", ""],
+  ["Concussive", "Mage", "rare", "Needs Fireball. Pushes units outward, sets off mines and bombs", "M:push U:blast", ""],
+  ["Chill", "Mage", "common", "Its hits leave the target slowed", "M:slowed", ""],
+  ["Ice Wall", "Mage", "common", "A free tile within 3 becomes ice for 2 rounds", "M:wall U:push", "Something to push enemies into"],
+  ["Shatter", "Mage", "rare", "Needs Chill. Slowed enemies take +2 from all your units", "U:slowed", ""],
+  ["Blizzard", "Mage", "rare", "1 damage and slow on a plus of tiles, spares your units", "M:slowed", ""],
+  ["Ward", "Mage", "common", "An ally within 3 gets a 3-point shield that lasts until used up", "M:guard", "Enemies avoid shielded units, so it also steers them"],
+  ["Mend", "Mage", "common", "Needs Ward. Heals an ally within 3 for 3", "", ""],
+  ["Transpose", "Mage", "common", "Swaps places with any unit within 3; an enemy put on a mine sets it off", "M:exposed U:blast", "Also sets up Pincer"],
+  ["Twincast", "Mage", "rare", "The first action each turn costs no AP", "", "Ward then Bolt, Ice Wall then Fireball"],
+
+  ["Strike", "Sapper", "base", "2 damage to an adjacent unit", "", ""],
+  ["Place Mine", "Sapper", "base", "Mine within 2 (max 3): 4 damage to the enemy that steps on it", "M:blast U:push", "Enemies pushed onto it set it off"],
+  ["Big Mines", "Sapper", "common", "Mines deal 5 and it can have 4 out", "U:blast", ""],
+  ["Grappling Hook", "Sapper", "common", "Pulls an enemy 2-3 tiles away to it, setting off mines on the way", "M:push M:exposed U:blast", "A pull, not a push: Battering Ram does not change it"],
+  ["Quick Fuse", "Sapper", "rare", "Place Mine is free and ready every turn", "U:blast", ""],
+  ["Barricade", "Sapper", "common", "Barricade next to it (max 3): blocks paths and shots, 4 HP", "M:wall U:push", "Something to push enemies into"],
+  ["Cave-In", "Sapper", "common", "Drops rubble on a free tile within 3", "M:wall", ""],
+  ["Spiked Barricades", "Sapper", "common", "Needs Barricade. Enemies starting next to one take 1", "U:wall!", ""],
+  ["Demolish", "Sapper", "rare", "Blows up a wall or rubble within 3: 3 damage in 3x3", "U:wall M:blast", "Uses the Mage's Ice Wall too"],
+  ["Build Turret", "Sapper", "rare", "Builds a turret next to it", "", ""],
+  ["Throw Bomb", "Sapper", "common", "Bomb 2-3 tiles away: 4 at the start of the next enemy turn", "M:blast", ""],
+  ["Blast Proof", "Sapper", "common", "Its blasts don't hurt your units", "U:blast", "Covers all its blasts: mines, bombs, Demolish, Detonate"],
+  ["Incendiary", "Sapper", "common", "Its mines, bombs and blasts leave burning ground", "U:blast M:burning", ""],
+  ["Detonate", "Sapper", "rare", "Needs Barricade. Blows up all its barricades: 3 in 3x3 each", "U:wall! M:blast", ""],
+
+  ["Vampire Fang", "Item", "14 gold", "Heals 2 on a kill", "U:kill", ""],
+  ["Thorned Mail", "Item", "12 gold", "Melee attackers take 1", "U:guard", "Best on a Taunting Warrior; grants Thorns, which the Fiend has too"],
+  ["Spring Boots", "Item", "11 gold", "+1 move each turn", "H:still", ""],
+  ["Lucky Charm", "Item", "15 gold", "Once per battle, survives a killing blow at 1 HP", "M:guard", ""],
+
+  ["Vampiric", "Banner", "", "Every damaging attack heals the attacker; the Sun curse in every fight", "", "Best with multi-hit attacks (Sweep, Pierce)"],
+  ["Third Wheel", "Banner", "", "+AP and +1 move, but a smaller army", "H:still", ""],
+  ["Loser", "Banner", "", "A unit that dies gets +max HP and +damage for the run", "", ""],
+  ["Mercenaries", "Banner", "", "Hire a base unit for one battle before each fight", "", ""],
+  ["Battering Ram", "Banner", "", "Your pushes go 1 tile further and deal damage", "U:push", "Every push, but not the Grappling Hook's pull"],
+
+  ["Edge of the World", "Battlefield", "", "A unit pushed off the board dies", "U:push", ""],
+  ["Storm", "Battlefield", "", "Lightning gathers over a tile under one unit per side and strikes it each round", "U:push U:pinned", "Push an enemy onto it, pin it there"],
+  ["Arcane Overflow", "Battlefield", "", "Every cooldown is shorter, both sides", "", ""],
+  ["Fortune's Favored", "Battlefield", "", "One unit per side deals double damage each round", "", ""],
+  ["What's On His Mind?", "Battlefield", "", "No enemy intents", "", ""],
+  ["Crumbling Roof", "Battlefield", "", "Slams and deaths crack tiles; holes kill", "U:push", ""],
+
+  ["Sun (blessing)", "Omen", "", "A sun sigil appears under a random enemy; a beam hits that tile", "U:pinned", "Tile-based: pin the enemy so it can't step off"],
+  ["Night (blessing)", "Omen", "", "A unit and the plus around it can't be hit from range", "", "A third 'can't be hit' rule next to Hidden and Behind Cover"],
+  ["Moon (blessing)", "Omen", "", "A random unit gets a 4-point shield", "M:guard", ""],
+
+  ["Armored", "Champion", "", "Takes 2 less from everything (at least 1)", "", "Countered by Marked and big single hits; hurts multi-hit builds"],
+  ["Vengeful", "Champion", "", "On death, damage to each of your units next to it", "", "Hurts the melee Rogue; ranged and Blast kill it safely"],
+  ["Regenerating", "Champion", "", "Heals at the start of its turn", "", "Countered by burst (Rupture, Marked)"],
+  ["Mighty", "Champion", "", "+damage", "", "Countered by Guard"],
+  ["Fleet", "Champion", "", "+1 move", "", "Countered by Pinned"],
+];
+
+const ENT = E.map(([name, owner, rarity, effect, tags, note], i) => ({
+  id: i, name, owner, rarity, effect, note,
+  tags: tags.split(" ").filter(Boolean).map(t => {
+    const [r, k] = t.split(":");
+    return { r, k: k.replace("!", ""), self: k.endsWith("!") };
+  }),
+}));
+
+// Links nobody's keyword covers.
+const BRIDGES = [
+  ["Warrior", "Rogue", "Pincer", "the Warrior's front line", "Pincer needs an ally on the far side of the target; the Warrior holds that spot."],
+  ["Rogue", "Archer", "Smoke Bomb", "the Archer", "Hides a fragile shooter for the enemy turn."],
+  ["Rogue", "Mage", "Smoke Bomb", "the Mage", "Hides a fragile caster for the enemy turn."],
+  ["Mage", "Rogue", "Transpose", "Pincer", "Swaps an enemy into a spot where an ally is on its far side."],
+  ["Warrior", "Warrior", "Taunt", "Shield Up", "Enemies must hit it, and it takes 2 less from each hit."],
+  ["Warrior", "Warrior", "Vanguard", "Charge", "Starts a row forward, so it charges on turn 1."],
+  ["Warrior", "Warrior", "Taunt", "Placeholder", "Taunt pulls enemies close; the passive hits them when they leave."],
+  ["Rogue", "Rogue", "Dodge", "Riposte", "The first hit deals 0 and gets countered."],
+];
+
+const heroOf = e => HEROES.includes(e.owner) ? e.owner : null;
+
+function links(a, b) {
+  const out = [];
+  const add = (from, to) => {
+    for (const m of ENT.filter(e => e.owner === from)) for (const tm of m.tags.filter(t => t.r === "M")) {
+      for (const u of ENT.filter(e => e.owner === to && e !== m)) for (const tu of u.tags.filter(t => t.r === "U" && t.k === tm.k)) {
+        if (tu.self && from !== to) continue;
+        out.push({ k: tm.k, maker: m, user: u });
+      }
+    }
+  };
+  add(a, b);
+  if (a !== b) add(b, a);
+  return out;
+}
+
+function bridges(a, b) {
+  return BRIDGES.filter(([x, y]) => (x === a && y === b) || (x === b && y === a));
+}
+
+function hurts(a, b) {
+  const out = [];
+  const add = (from, to) => {
+    for (const h of ENT.filter(e => e.owner === from)) for (const th of h.tags.filter(t => t.r === "H")) {
+      for (const u of ENT.filter(e => e.owner === to && e !== h)) if (u.tags.some(t => t.r === "U" && t.k === th.k)) out.push({ k: th.k, h, u });
+    }
+  };
+  add(a, b);
+  if (a !== b) add(b, a);
+  return out;
+}
+
+const chip = (r, k, self) => `<span class="chip ${r}">${r} ${k}${self ? "!" : ""}</span>`;
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+function heat(n) { return n === 0 ? "--heat0" : n <= 2 ? "--heat1" : n <= 4 ? "--heat2" : n <= 7 ? "--heat3" : "--heat4"; }
+
+let selected = ["Warrior", "Archer"];
+
+function renderMatrix() {
+  const m = document.getElementById("matrix");
+  let h = "<tr><th></th>" + HEROES.map(x => `<th>${x}</th>`).join("") + "</tr>";
+  for (const a of HEROES) {
+    h += `<tr><th class="row">${a}</th>`;
+    for (const b of HEROES) {
+      const kws = new Set(links(a, b).map(l => l.k));
+      const n = kws.size + bridges(a, b).length;
+      const hz = hurts(a, b).length;
+      const on = (selected[0] === a && selected[1] === b) || (selected[0] === b && selected[1] === a);
+      h += `<td><button class="cell${a === b ? " self" : ""}" style="background:var(${heat(n)})" data-a="${a}" data-b="${b}" aria-pressed="${on}" aria-label="${a} and ${b}: ${n} links">
+        <b>${n}</b><span>${a === b ? "in kit" : hz ? hz + " clash" + (hz > 1 ? "es" : "") : "links"}</span></button></td>`;
+    }
+    h += "</tr>";
+  }
+  m.innerHTML = h;
+  m.querySelectorAll(".cell").forEach(c => c.addEventListener("click", () => { selected = [c.dataset.a, c.dataset.b]; renderMatrix(); renderDetail(); }));
+}
+
+function renderDetail() {
+  const [a, b] = selected;
+  const L = links(a, b), B = bridges(a, b), H = hurts(a, b);
+  const byKey = {};
+  for (const l of L) (byKey[l.k] = byKey[l.k] || []).push(l);
+  let h = `<h2>${a === b ? a + ", inside its kit" : a + " and " + b}</h2>`;
+  const n = Object.keys(byKey).length + B.length;
+  const verdict = n >= 4 ? ["good", "strong"] : n >= 2 ? ["warn", "medium"] : n === 1 ? ["bad", "weak"] : ["bad", "none"];
+  h += `<p class="note"><span class="pill ${verdict[0]}">${verdict[1]}</span> &nbsp;${n} link${n === 1 ? "" : "s"} counted (one per keyword, plus hand-written ones)</p><div class="links" style="margin-top:14px">`;
+  for (const [k, ls] of Object.entries(byKey)) {
+    const pairs = ls.map(l => `<b>${esc(l.maker.name)}</b> <span class="tag">(${l.maker.owner})</span> → <b>${esc(l.user.name)}</b> <span class="tag">(${l.user.owner})</span>`);
+    h += `<div class="link"><span class="chip K">${KEYWORDS[k].label}</span><div>${[...new Set(pairs)].join("<br>")}</div></div>`;
+  }
+  for (const [x, y, what, to, why] of B) {
+    h += `<div class="link"><span class="chip K">by hand</span><div><b>${what}</b> <span class="tag">(${x})</span> → ${to} <span class="tag">(${y})</span></div><div class="why">${why}</div></div>`;
+  }
+  if (!L.length && !B.length) h += `<p class="note">No links. This pair needs a designed bridge.</p>`;
+  h += "</div>";
+  if (H.length) {
+    h += `<h3 style="margin-top:18px">Clashes</h3><div class="links">`;
+    for (const x of H) h += `<div class="link"><span class="chip H">H ${x.k}</span><div><b>${esc(x.h.name)}</b> <span class="tag">(${x.h.owner})</span> works against <b>${esc(x.u.name)}</b> <span class="tag">(${x.u.owner})</span></div></div>`;
+    h += "</div>";
+  }
+  document.getElementById("pair-detail").innerHTML = h;
+}
+
+function renderThemes() {
+  document.getElementById("hero-themes").innerHTML = HEROES.map(hero =>
+    `<div class="hero-card"><h4>${hero}</h4>${HERO_THEMES[hero].map(([k, role]) =>
+      `<div class="k"><span class="tag">${role}:</span> ${KEYWORDS[k].exists ? KEYWORDS[k].label : "<b>" + KEYWORDS[k].label + "</b>"}</div>`).join("")}</div>`).join("");
+
+  let h = "<tr><th>Keyword</th><th>Meaning</th><th>Makes it</th><th>Uses it</th><th>Hurts it</th><th>Status</th></tr>";
+  for (const [k, kw] of Object.entries(KEYWORDS)) {
+    const list = r => ENT.filter(e => e.tags.some(t => t.r === r && t.k === k));
+    const fmt = es => es.length ? es.map(e => `${esc(e.name)} <span class="tag">${e.owner}</span>`).join("<br>") : `<span class="note">none</span>`;
+    const mk = list("M"), us = list("U"), hu = list("H");
+    const heroes = new Set([...mk, ...us].map(heroOf).filter(Boolean));
+    let status = ["good", "healthy"];
+    if (!mk.length) status = ["bad", "no producer"];
+    else if (!us.length) status = ["bad", "no payoff"];
+    else if (heroes.size < 2) status = ["warn", "one hero only"];
+    else if (us.every(e => e.tags.some(t => t.k === k && t.self))) status = ["warn", "payoff only for itself"];
+    h += `<tr class="theme-row"><td><b>${kw.label}</b>${kw.exists ? "" : '<div class="tag">new</div>'}</td><td class="note">${kw.meaning}</td><td>${fmt(mk)}</td><td>${fmt(us)}</td><td>${fmt(hu)}</td><td><span class="pill ${status[0]}">${status[1]}</span></td></tr>`;
+  }
+  document.getElementById("themes").innerHTML = h;
+}
+
+function renderEntities() {
+  const o = document.getElementById("f-owner").value, k = document.getElementById("f-key").value, q = document.getElementById("f-text").value.trim().toLowerCase();
+  const rows = ENT.filter(e => (!o || e.owner === o) && (!k || e.tags.some(t => t.k === k)) &&
+    (!q || (e.name + " " + e.effect + " " + e.note).toLowerCase().includes(q)));
+  let h = "<tr><th>Name</th><th>Owner</th><th>Rarity</th><th>Effect</th><th>Tags</th><th>Note</th></tr>";
+  for (const e of rows) h += `<tr><td><b>${esc(e.name)}</b></td><td class="owner">${e.owner}</td><td class="rar">${e.rarity}</td><td>${esc(e.effect)}</td><td>${e.tags.map(t => chip(t.r, t.k, t.self)).join("") || '<span class="note">none</span>'}</td><td class="note">${esc(e.note)}</td></tr>`;
+  document.getElementById("entities").innerHTML = h;
+  document.getElementById("f-count").textContent = rows.length + " of " + ENT.length;
+}
+
+const DUPES = [
+  ["Pinned and slowed (fixed 2026-11-08)", "Both meant \"can't move on its next turn\", and Prey and Shatter were the same +2 rule on each. Now slowed means \"move or act, not both\": walking sets its AP to 0, acting ends its moves, and slowed enemies never back off. The Skeleton's Grasp now says it pins.", "Done: Pinned is the Archer's theme, Slowed the Mage's"],
+  ["Shield and temporary HP (fixed 2026-11-08)", "Ward and the Moon omen gave shields, Battlecry gave temporary HP that absorbed the same way, but enemies only avoided shields. Now Battlecry gives a 2-point shield until your next turn, enemies avoid it like any shield, and Shield is a keyword (Shield Up, Shield Bash and Throw Shield are not highlighted as it).", "Done: one keyword, Shield. Each text says how long its shield lasts (Ward: until used up)"],
+  ["Elusive and Slippery (fixed 2026-11-08)", "The Rogue's Elusive and the Goblin's Slippery were one check in code (ignores zone of control).", "Done: goblins have Elusive now"],
+  ["Thorned Mail and Spines (fixed 2026-11-08)", "The item and the Fiend's passive were one check in code (melee attackers take 1).", "Done: both are Thorns (the item is still called Thorned Mail)"],
+  ["Covering Fire and Overwatch (fixed 2026-11-08)", "The Archer's and the Crossbowman's versions of the same mechanic had two names.", "Done: both are Overwatch, with matching texts"],
+  ["\"Mark\" meant four things (fixed 2026-11-08)", "Marked (+2 on the next hit), the Devil's Soul Contract \"marks\" a unit, the Sun omen and Storm lightning \"mark\" a tile. The Sun text even showed the +2 tooltip on its word \"marked\".", "Done: a sun sigil appears under a unit, lightning gathers over a tile, the Devil signs a contract. Marked is only the Archer's +2"],
+  ["No word for \"tall obstacle\" (fixed 2026-11-08)", "Vantage listed rock, ice and barricade, Behind Cover said only rock, Demolish listed four materials, though the code has one check for all of them. Wall is now a keyword: a rock (crystals, tombstones and boulders too), ice or a barricade. Rubble and holes are not walls.", "Done: texts say wall (Ice Wall and Shield Wall are not highlighted as it)"],
+  ["Push, pull, shove, thrown (fixed 2026-11-08)", "Slam said shoves and Upheaval said thrown 1 tile, but both are real pushes, so weight decides the distance (small units fly 2). Kick, Shield Bash, Bull Rush and Frost Nova also said 1 tile. The Grappling Hook is different on purpose: a pull with a set distance that weight and Battering Ram don't change.", "Done: every push says push, with no tile count (the Push keyword explains weight). The hook says it is a pull, not a push"],
+  ["Is a mine a blast? (fixed 2026-11-08)", "Two things were called blast: explosions (mines, bombs, Demolish, Detonate, Powder Keg, Corpse Blast), which Blast Proof and Incendiary cover, and any area damage, which Fortune's Favored and Hidden meant.", "Done: Blast is a keyword for explosions only. Favored says hits, Hidden and Behind Cover say area damage"],
+  ["Damage cut without a keyword (minor)", "\"Takes 2 less from every source, at least 1\" appears on Shield Up and the Armored champion.", "Optional keyword, e.g. Armor"],
+  ["Three \"can't be hit\" rules (minor)", "Hidden (can't be targeted), the Night shroud (can't be hit from range), Behind Cover (can't be hit by ranged next to a rock).", "Fine if they stay clearly different"],
+];
+
+// A row or hole is fixed when its text says "(fixed <date>)"; fixed ones go to the bottom.
+const isFixed = s => /\(fixed [0-9-]+\)/.test(s);
+const fixedDate = s => (s.match(/\(fixed ([0-9-]+)\)/) || [])[1] || "";
+const stripFixed = s => s.replace(/\s*\(fixed [0-9-]+\)/, "");
+
+function renderDupes() {
+  const open = DUPES.filter(d => !isFixed(d[0])), done = DUPES.filter(d => isFixed(d[0]));
+  let h = "<tr><th>#</th><th>Problem</th><th>What the code does</th><th>Fix idea</th></tr>";
+  open.forEach(([p, w, f], i) => h += `<tr><td class="num">${i + 1}</td><td><b>${p}</b></td><td>${esc(w)}</td><td>${f}</td></tr>`);
+  if (!open.length) h += `<tr><td></td><td colspan="3" class="note">Nothing open.</td></tr>`;
+  if (done.length) {
+    h += `<tr class="divider"><td colspan="4"><h3 style="margin:14px 0 0">Fixed (${done.length})</h3></td></tr>`;
+    done.forEach(([p, w, f]) => h += `<tr class="fixed"><td><span class="pill good">fixed</span></td><td><b>${stripFixed(p)}</b><div class="tag">${fixedDate(p)}</div></td><td>${esc(w)}</td><td>${f}</td></tr>`);
+  }
+  document.getElementById("dupes").innerHTML = h;
+}
+
+function renderHoles() {
+  const open = HOLES.filter(x => !isFixed(x)), done = HOLES.filter(isFixed);
+  let h = open.map(x => `<li>${x}</li>`).join("");
+  if (done.length)
+    h += `<li class="divider"><h3 style="margin:14px 0 0">Fixed (${done.length})</h3></li>` +
+         done.map(x => `<li class="fixed"><span class="pill good">fixed</span> ${x.replace(/\s*\(fixed [0-9-]+\)/, "")} <span class="tag">${fixedDate(x)}</span></li>`).join("");
+  document.getElementById("holes").innerHTML = h;
+}
+
+const HOLES = [
+  "<b>Burning has no payoff</b>: five producers, nothing that rewards a burning enemy. It's also useless against Demons (Hellborn).",
+  "<b>Poison is Rogue only</b>: producer and payoff are both in the Rogue's kit.",
+  "<b>Hidden only pays the Rogue</b>: Smoke Bomb hides an ally, but no ally gets anything from being hidden beyond safety.",
+  "<b>Guard has almost no payoff</b>: only Thorned Mail. Shields and taunts protect, but nothing rewards being guarded.",
+  "<b>Kill has no producer tag</b>: it's a trigger, not a status, so it only shows up inside kits (Momentum, Death Mark).",
+  "<b>The Mage has too many themes</b>: Slowed, Burning, Wall, Guard and Push, so its identity is spread thin.",
+  "<b>The Warrior has no in-kit payoff for its pushes</b>: Shield Bash uses walls, but the push payoffs are all outside (Sapper, Battering Ram, battlefields).",
+  "<b>Archer and Mage no longer share a theme</b> (fixed 2026-11-08): the Archer pins, the Mage slows, and the Rogue's Cheap Shot uses both.",
+  "<b>Weakest pairs</b>: Warrior and Archer (only Taunt helping Steady Aim, and Battlecry works against it), Rogue and Sapper (only the Grappling Hook leaving an enemy exposed).",
+];
+
+function showView(v) {
+  document.querySelectorAll("nav button").forEach(b => b.setAttribute("aria-selected", b.dataset.view === v));
+  document.querySelectorAll("section").forEach(s => s.hidden = s.id !== "view-" + v);
+  try { localStorage.setItem("synergy-view", v); } catch (e) {}
+}
+
+function init() {
+  const owners = [...new Set(ENT.map(e => e.owner))];
+  document.getElementById("f-owner").innerHTML = `<option value="">Every owner</option>` + owners.map(o => `<option>${o}</option>`).join("");
+  document.getElementById("f-key").innerHTML = `<option value="">Every keyword</option>` + Object.entries(KEYWORDS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("");
+  ["f-owner", "f-key", "f-text"].forEach(id => document.getElementById(id).addEventListener("input", renderEntities));
+  document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));
+  renderHoles();
+  renderMatrix(); renderDetail(); renderThemes(); renderEntities(); renderDupes();
+  let v = null;
+  try { v = localStorage.getItem("synergy-view"); } catch (e) {}
+  if (v && document.getElementById("view-" + v)) showView(v);
+}
+init();
+</script>
