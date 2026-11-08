@@ -541,6 +541,11 @@ public static class ArtExperiment
         // The objectives tower over the units around them.
         { UnitKind.Shrine, 1.6f },
         { UnitKind.Totem, 1.3f },
+        // Demons: a small hunched imp, the hulking demon, the tall slender devil and the feral fiend on all fours.
+        { UnitKind.Imp, 0.7f },
+        { UnitKind.Demon, 1.6f },
+        { UnitKind.Devil, 1.3f },
+        { UnitKind.Fiend, 0.8f },
     };
 
     private static float FigureHeight(UnitKind kind) => FigureHeights.TryGetValue(kind, out var h) ? h : DefaultFigureHeight;

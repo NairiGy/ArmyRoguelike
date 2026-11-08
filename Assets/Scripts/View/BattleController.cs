@@ -758,6 +758,16 @@ namespace ArmyRoguelike.View
                     foreach (var wolf in Battle.Living(enemy.Team).Where(w => w.IsWolf))
                         _board.SetHighlight(wolf.Pos, AuraColor);
                     break;
+                case IntentKind.Hellswap:
+                case IntentKind.FireBreath:
+                    // Placeholder: the target, and the tile the swapped unit lands on or the fiend breathes from.
+                    _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
+                    if (intent.Tile.HasValue && intent.Tile.Value != enemy.Pos)
+                        _board.SetHighlight(intent.Tile.Value, RockLandingColor);
+                    else if (intent.Kind == IntentKind.Hellswap)
+                        _board.SetHighlight(enemy.Pos, RockLandingColor);
+                    line.Show(from, to);
+                    break;
                 default:
                     _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
                     line.Show(from, to);
@@ -987,7 +997,7 @@ namespace ArmyRoguelike.View
                     {
                         if (area.Kind == "slam")
                             StartCoroutine(Shake(0.08f, BlastTime));
-                        if (area.Kind == "volley" || area.Kind == "pierce" || area.Kind == "slam")
+                        if (area.Kind == "volley" || area.Kind == "pierce" || area.Kind == "slam" || area.Kind == "fire breath")
                             StartCoroutine(_board.Flash(area.Area, BlastTime * 0.6f));
                         yield return attacker.Lunge(aim, () =>
                         {
@@ -1025,7 +1035,7 @@ namespace ArmyRoguelike.View
                     var source = _board.ViewOf(status.Source);
                     var target = _board.ViewOf(status.Target);
                     // Statuses applied by a hit show without an extra lunge; actions lunge at their target.
-                    if (status.Kind == StatusKind.Ward || status.Kind == StatusKind.Heal || status.Kind == StatusKind.Grasp)
+                    if (status.Kind == StatusKind.Ward || status.Kind == StatusKind.Heal || status.Kind == StatusKind.Grasp || status.Kind == StatusKind.Contract)
                     {
                         yield return source.Lunge(target.transform.position, null);
                         source.SetGridPosition(status.Source.Pos);
@@ -1077,6 +1087,12 @@ namespace ArmyRoguelike.View
                         case StatusKind.Heal:
                             DamagePopup.Spawn(at, $"+{status.Amount}", DamagePopup.HealColor);
                             target.RefreshHp(status.Target.Hp);
+                            break;
+                        case StatusKind.Contract:
+                            DamagePopup.Spawn(at, $"Contract: -{status.Amount} next turn", DamagePopup.DamageColor, 40);
+                            break;
+                        case StatusKind.ContractBroken:
+                            DamagePopup.Spawn(at, "Contract broken", DamagePopup.HealColor, 40);
                             break;
                     }
 
@@ -1216,6 +1232,19 @@ namespace ArmyRoguelike.View
                     yield return new WaitForSeconds(0.35f);
                     break;
                 }
+                case SwapEvent swap:
+                {
+                    // Placeholder: both statues jump to their new tiles with a popup (see the "Art needed" table).
+                    var caster = _board.ViewOf(swap.Caster);
+                    var target = _board.ViewOf(swap.Target);
+                    DamagePopup.Spawn(caster.TopWorld + Vector3.up * 0.25f, "Hellswap!", DamagePopup.AbilityColor, 44);
+                    yield return new WaitForSeconds(0.2f);
+                    caster.SetGridPosition(swap.Caster.Pos);
+                    target.SetGridPosition(swap.Target.Pos);
+                    DamagePopup.Spawn(target.TopWorld + Vector3.up * 0.1f, "Swapped!", DamagePopup.DamageColor, 40);
+                    yield return new WaitForSeconds(0.35f);
+                    break;
+                }
                 case SummonEvent summon:
                 {
                     var builder = _board.ViewOf(summon.Summoner);
@@ -1267,6 +1296,10 @@ namespace ArmyRoguelike.View
                     break;
                 case EffectKind.Steal:
                     DamagePopup.Spawn(at, $"Stole {effect.Amount} gold!", DamagePopup.DamageColor, 44);
+                    view.RefreshStatus();
+                    break;
+                case EffectKind.Fury:
+                    DamagePopup.Spawn(at, $"+{effect.Amount} Fury", DamagePopup.DamageColor, 44);
                     view.RefreshStatus();
                     break;
             }
@@ -2112,6 +2145,10 @@ namespace ArmyRoguelike.View
                 lines.Add($"Poisoned ({u.PoisonTurns} more)");
             if (u.CarryingLoot > 0)
                 lines.Add($"Carrying {u.CarryingLoot} of your gold");
+            if (u.Fury > 0)
+                lines.Add($"Fury {u.Fury}: +{u.Fury} damage for the rest of the fight");
+            if (u.ContractBy != null)
+                lines.Add($"Soul Contract: loses {Battle.ContractDamage} HP at the start of the enemy turn, unless the {u.ContractBy.Stats.Name} takes damage first");
             var engaged = EngagedLine(u);
             if (engaged.Length > 0)
                 lines.Add(engaged);
@@ -2165,6 +2202,14 @@ namespace ArmyRoguelike.View
                     return $"blow up the {name} bone pile: {Battle.CorpseBlastDamage} damage to everyone in the red area, its own side included";
                 case IntentKind.Howl:
                     return $"howl: every wolf gets +{Battle.HowlMoves} move this turn (wolves lit up)";
+                case IntentKind.Hellswap:
+                    return $"hellswap: trade places with the {name}, which lands on the dark tile";
+                case IntentKind.RendingBlow:
+                    return $"rending blow on the {name}: it pays {Battle.RendingBlowCost} HP to hit for +{Battle.RendingBlowBonus}";
+                case IntentKind.SoulContract:
+                    return $"soul contract on the {name}: it loses {Battle.ContractDamage} HP next enemy turn unless you hurt the Devil first";
+                case IntentKind.FireBreath:
+                    return $"fire breath at the {name} from the dark tile: {Battle.FireBreathDamage} damage to each of your units in a line of {Battle.FireBreathLength}, and the tiles burn";
                 default:
                     return $"attack the {name}";
             }

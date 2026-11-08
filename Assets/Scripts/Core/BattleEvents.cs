@@ -197,6 +197,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>The Warrior's zone-of-control passive: <see cref="EffectEvent.Unit"/> struck an enemy stepping out of its reach.</summary>
         ZocStrike,
+
+        /// <summary>A demon (<see cref="EffectEvent.Unit"/>) gained <see cref="EffectEvent.Amount"/> Fury (Blood Offering or Bloodlust; Source is the dying imp or the demon itself).</summary>
+        Fury,
     }
 
     /// <summary>A unit left the board, e.g. a cutpurse escaping with stolen gold.</summary>
@@ -323,6 +326,12 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Throw Shield: stronger and faster for the battle, <see cref="StatusEvent.Amount"/> HP lost.</summary>
         ThrowShield,
+
+        /// <summary>Soul Contract (Devil): the target loses <see cref="StatusEvent.Amount"/> HP next enemy turn unless the Devil is hurt first.</summary>
+        Contract,
+
+        /// <summary>The Devil (Source) took damage: its contract on the target is void.</summary>
+        ContractBroken,
     }
 
     /// <summary>A status or support effect was put on a unit by an action or a hit.</summary>
@@ -638,5 +647,27 @@ namespace ArmyRoguelike.Core
         }
 
         public override Unit Actor => null;
+    }
+
+    /// <summary>Hellswap (imps): the caster and the target traded tiles.</summary>
+    public sealed class SwapEvent : BattleEvent
+    {
+        public readonly Unit Caster;
+        public readonly Unit Target;
+
+        /// <summary>Where each stood before the swap (each now stands on the other's tile).</summary>
+        public readonly GridPos CasterFrom;
+
+        public readonly GridPos TargetFrom;
+
+        public SwapEvent(Unit caster, Unit target, GridPos casterFrom, GridPos targetFrom)
+        {
+            Caster = caster;
+            Target = target;
+            CasterFrom = casterFrom;
+            TargetFrom = targetFrom;
+        }
+
+        public override Unit Actor => Caster;
     }
 }

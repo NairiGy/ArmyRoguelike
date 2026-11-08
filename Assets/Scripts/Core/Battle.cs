@@ -186,6 +186,34 @@ namespace ArmyRoguelike.Core
         /// <summary>Corpse Blast (Necromancer): damage to everyone in the 3x3 around the bone pile, friend or foe.</summary>
         public const int CorpseBlastDamage = 2;
 
+        // Demons (placeholders, see docs/night/demons.md).
+
+        /// <summary>Blood Offering (imps): Fury given to the nearest other demon within this many steps.</summary>
+        public const int OfferingFury = 1;
+
+        public const int OfferingRange = 3;
+
+        /// <summary>Bloodlust (demons): Fury gained per death next to it.</summary>
+        public const int BloodlustFury = 1;
+
+        /// <summary>Hellswap (imps): range in steps, no line of sight needed.</summary>
+        public const int HellswapRange = 3;
+
+        /// <summary>Rending Blow (demons): HP it pays, and the extra damage of the hit.</summary>
+        public const int RendingBlowCost = 2;
+
+        public const int RendingBlowBonus = 2;
+
+        /// <summary>Soul Contract (devils): range in steps (no line of sight needed), and the HP lost when it comes due.</summary>
+        public const int ContractRange = 3;
+
+        public const int ContractDamage = 3;
+
+        /// <summary>Fire Breath (fiends): damage to each of your units on the 2 tiles of the line, which then burn.</summary>
+        public const int FireBreathDamage = 2;
+
+        public const int FireBreathLength = 2;
+
         // Omens (placeholders).
         public const int SunDamage = 3;
         public const int MoonShield = 4;
@@ -213,6 +241,8 @@ namespace ArmyRoguelike.Core
                 case ActionKind.ShieldUp:
                 case ActionKind.Battlecry:
                 case ActionKind.Taunt:
+                case ActionKind.Hellswap:
+                case ActionKind.SoulContract:
                     return 3;
                 // Once per battle instead.
                 case ActionKind.ThrowShield:
@@ -439,6 +469,7 @@ namespace ArmyRoguelike.Core
             unit.Pos = edge;
             var after = new List<BattleEvent>();
             BreakPackBond(unit, after);
+            DemonDeath(unit, after);
             events.Add(new FallEvent(unit, pusher, edge, edge + dir, new Hit(unit, hp, 0)));
             events.AddRange(after);
             CheckEnd();
@@ -800,7 +831,7 @@ namespace ArmyRoguelike.Core
         /// <summary>The unit's attack damage before target-specific bonuses.</summary>
         public int EffectiveDamage(Unit unit)
         {
-            var damage = unit.BaseDamage;
+            var damage = unit.BaseDamage + unit.Fury;
             if (!unit.MovedThisTurn)
             {
                 if (unit.Has(Ability.SteadyAimPlus))
@@ -1873,8 +1904,9 @@ namespace ArmyRoguelike.Core
                     Explode(bomb.Tile, bomb.Damage, "bomb", bomb.Owner, events);
             }
 
-            // Howlers go first, so the moves they hand out reach wolves that haven't acted yet.
-            foreach (var enemy in Living(Team.Enemy).OrderBy(e => e.Has(Ability.Howl) ? 0 : 1).ToList())
+            // Howlers go first, so the moves they hand out reach wolves that haven't acted yet; imps too, so a unit
+            // they swap in lands next to demons that still have their turn.
+            foreach (var enemy in Living(Team.Enemy).OrderBy(e => e.Has(Ability.Howl) || e.Has(Ability.Hellswap) ? 0 : 1).ToList())
             {
                 if (IsOver)
                     break;
@@ -2335,6 +2367,171 @@ namespace ArmyRoguelike.Core
             return new List<BattleEvent> { new HowlEvent(leader, wolves, HowlMoves) };
         }
 
+        // ---------- Demons ----------
+
+        /// <summary>
+        /// A unit just died: an imp's Blood Offering gives Fury to the nearest other demon of its side within
+        /// <see cref="OfferingRange"/>, and every Bloodlust demon next to it (either side's death) gains Fury.
+        /// </summary>
+        private void DemonDeath(Unit dead, List<BattleEvent> after)
+        {
+            if (dead.Has(Ability.BloodOffering))
+            {
+                var heir = Living(dead.Team).Where(u => u != dead && u.IsDemon && Distance(u, dead) <= OfferingRange)
+                    .OrderBy(u => Distance(u, dead)).ThenBy(u => u.Id).FirstOrDefault();
+                if (heir != null)
+                {
+                    heir.Fury += OfferingFury;
+                    after.Add(new EffectEvent(EffectKind.Fury, heir, OfferingFury, heir.Hp, dead));
+                }
+            }
+
+            foreach (var demon in _units.Where(u => u != dead && u.IsPlaced && u.IsAlive && u.Has(Ability.Bloodlust) && Distance(u, dead) == 1).ToList())
+            {
+                demon.Fury += BloodlustFury;
+                after.Add(new EffectEvent(EffectKind.Fury, demon, BloodlustFury, demon.Hp, demon));
+            }
+        }
+
+        /// <summary>Hellswap: a 1x1 unit of the other side 2 to <see cref="HellswapRange"/> steps away, seen or not.</summary>
+        public bool CanHellswap(Unit imp, Unit target) =>
+            !IsOver && imp.IsAlive && imp.Has(Ability.Hellswap) && imp.Ap >= AttackCost && Ready(imp, ActionKind.Hellswap) && imp.Size == 1 &&
+            target != null && target.IsAlive && target.IsPlaced && target.Team != imp.Team && !target.IsHidden && !target.IsObjective &&
+            target.Size == 1 && !target.Has(Ability.Colossus) && Distance(imp, target) >= 2 && Distance(imp, target) <= HellswapRange &&
+            !IsShroudedFrom(target, imp.Team);
+
+        /// <summary>Hellswap: the imp and the target trade tiles. Nothing on either tile goes off (it's a teleport).</summary>
+        internal List<BattleEvent> DoHellswap(Unit imp, Unit target)
+        {
+            UseUp(imp, ActionKind.Hellswap);
+            var impFrom = imp.Pos;
+            var targetFrom = target.Pos;
+            imp.Pos = targetFrom;
+            target.Pos = impFrom;
+            var events = new List<BattleEvent> { new SwapEvent(imp, target, impFrom, targetFrom) };
+            CheckEnd();
+            return events;
+        }
+
+        /// <summary>Rending Blow: a unit next to it, while it has more HP than the blow costs.</summary>
+        public bool CanRendingBlow(Unit unit, Unit target) =>
+            unit.Has(Ability.RendingBlow) && Ready(unit, ActionKind.RendingBlow) && unit.Hp > RendingBlowCost &&
+            CanAttack(unit, target) && Distance(unit, target) == 1;
+
+        /// <summary>Rending Blow: it loses <see cref="RendingBlowCost"/> HP (nothing stops that), then hits for its damage +<see cref="RendingBlowBonus"/>.</summary>
+        internal List<BattleEvent> DoRendingBlow(Unit unit, Unit target)
+        {
+            UseUp(unit, ActionKind.RendingBlow);
+            unit.Hp -= RendingBlowCost;
+            var events = new List<BattleEvent> { new TickEvent("blood price", new Hit(unit, RendingBlowCost, unit.Hp)) };
+            var after = new List<BattleEvent>();
+            var hit = Damage(target, DamageAgainst(unit, target) + RendingBlowBonus, unit, DamageKind.Attack, after);
+            unit.AttackedThisTurn = true;
+            unit.MarkStruck(target);
+            events.Add(new AttackEvent(unit, hit.Target, hit.Damage, hit.HpAfter));
+            events.AddRange(after);
+            Thorns(unit, hit.Target, events);
+            Riposte(hit.Target, unit, events);
+            CheckEnd();
+            return events;
+        }
+
+        /// <summary>Soul Contract: a unit of the other side within <see cref="ContractRange"/> steps (no line of sight needed) without a contract yet.</summary>
+        public bool CanSignContract(Unit devil, Unit target) =>
+            !IsOver && devil.IsAlive && devil.Has(Ability.SoulContract) && devil.Ap >= AttackCost && Ready(devil, ActionKind.SoulContract) &&
+            target != null && target.IsAlive && target.IsPlaced && target.Team != devil.Team && !target.IsHidden && !target.IsObjective &&
+            target.ContractBy == null && Distance(devil, target) <= ContractRange && !IsShroudedFrom(target, devil.Team);
+
+        /// <summary>Soul Contract: the target loses <see cref="ContractDamage"/> at the start of the next enemy turn, unless the Devil takes damage first.</summary>
+        internal List<BattleEvent> DoSoulContract(Unit devil, Unit target)
+        {
+            UseUp(devil, ActionKind.SoulContract);
+            target.ContractBy = devil;
+            return new List<BattleEvent> { new StatusEvent(devil, target, StatusKind.Contract, ContractDamage) };
+        }
+
+        /// <summary>The Devil took damage: every contract it signed is void.</summary>
+        private void BreakContracts(Unit devil, List<BattleEvent> after)
+        {
+            foreach (var u in _units.Where(u => u.ContractBy == devil).OrderBy(u => u.Id).ToList())
+            {
+                u.ContractBy = null;
+                after.Add(new StatusEvent(devil, u, StatusKind.ContractBroken, 0));
+            }
+        }
+
+        /// <summary>Start of the enemy turn: every contract still standing comes due (if its Devil and the unit still live).</summary>
+        private void CollectContracts(List<BattleEvent> events)
+        {
+            foreach (var u in _units.Where(u => u.ContractBy != null).OrderBy(u => u.Id).ToList())
+            {
+                var devil = u.ContractBy;
+                u.ContractBy = null;
+                if (IsOver || !u.IsAlive || !u.IsPlaced || !devil.IsAlive)
+                    continue;
+                var after = new List<BattleEvent>();
+                events.Add(new TickEvent("contract", Damage(u, ContractDamage, devil, DamageKind.Tick, after), devil));
+                events.AddRange(after);
+                CheckEnd();
+            }
+        }
+
+        /// <summary>
+        /// The tiles a Fire Breath at the target would cover: <see cref="FireBreathLength"/> tiles in a straight line from the
+        /// fiend, stopping at a rock. Null if the target isn't in that line.
+        /// </summary>
+        public List<GridPos> FireBreathLine(Unit fiend, Unit target)
+        {
+            if (fiend.Size != 1 || target == null || target.Size != 1)
+                return null;
+            var dir = StraightDirection(fiend.Pos, target.Pos);
+            if (dir == null || fiend.Pos.StepsTo(target.Pos) > FireBreathLength)
+                return null;
+            var line = new List<GridPos>();
+            for (var p = fiend.Pos + dir.Value; line.Count < FireBreathLength && Board.InBounds(p) && !Board.IsObstacle(p); p += dir.Value)
+                line.Add(p);
+            return line.Contains(target.Pos) ? line : null;
+        }
+
+        /// <summary>Fire Breath: one of your units 1-2 tiles away in a straight line, with no rock in between.</summary>
+        public bool CanFireBreath(Unit fiend, Unit target) =>
+            !IsOver && fiend.IsAlive && fiend.Has(Ability.FireBreath) && fiend.Ap >= AttackCost && Ready(fiend, ActionKind.FireBreath) &&
+            target != null && target.IsAlive && target.IsPlaced && target.Team != fiend.Team && !target.IsHidden &&
+            !IsShroudedFrom(target, fiend.Team) && FireBreathLine(fiend, target) != null;
+
+        /// <summary>The units of the other side a Fire Breath at the target would hit.</summary>
+        public List<Unit> FireBreathVictims(Unit fiend, Unit target)
+        {
+            var line = FireBreathLine(fiend, target);
+            return line == null
+                ? new List<Unit>()
+                : _units.Where(u => u.IsPlaced && u.IsAlive && u.Team != fiend.Team && Cells(u).Any(line.Contains)).ToList();
+        }
+
+        /// <summary>
+        /// Fire Breath: <see cref="FireBreathDamage"/> (plus Fury) to each unit of the other side on the line, then the line
+        /// burns for <see cref="BurnRounds"/> rounds. Demons are Hellborn, so it only hurts your side.
+        /// </summary>
+        internal List<BattleEvent> DoFireBreath(Unit fiend, Unit target)
+        {
+            UseUp(fiend, ActionKind.FireBreath);
+            var line = FireBreathLine(fiend, target);
+            var after = new List<BattleEvent>();
+            var hits = FireBreathVictims(fiend, target).Select(u => Damage(u, FireBreathDamage + fiend.Fury, fiend, DamageKind.Blast, after)).ToList();
+            fiend.AttackedThisTurn = true;
+            var events = new List<BattleEvent> { new AreaAttackEvent(fiend, "fire breath", target.Pos, line, hits) };
+            events.AddRange(after);
+            foreach (var p in line)
+            {
+                _burning[p] = BurnRounds;
+                _burnOwners[p] = fiend;
+                events.Add(new TileEvent("burn", p, true, fiend));
+            }
+
+            CheckEnd();
+            return events;
+        }
+
         internal List<BattleEvent> DoBomb(Unit thrower, Unit target)
         {
             UseUp(thrower, ActionKind.Bomb);
@@ -2522,9 +2719,14 @@ namespace ArmyRoguelike.Core
                 }
             }
 
+            // Soul Contract: any damage to the Devil voids the contracts it signed.
+            if (amount > 0 && target.Has(Ability.SoulContract))
+                BreakContracts(target, after);
+
             if (!target.IsAlive)
             {
                 BreakPackBond(target, after);
+                DemonDeath(target, after);
                 // Soul Harvest: one of your units dying while a harvester stands leaves a bone pile it can raise.
                 if (target.Team == Team.Player && !target.IsSummon && !target.IsObjective && !target.Stats.LeavesRemains &&
                     Living(Team.Enemy).Any(u => u.Has(Ability.SoulHarvest)))
@@ -2636,7 +2838,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Thorned Mail: a melee attacker takes damage back from the unit it hit.</summary>
         private void Thorns(Unit attacker, Unit target, List<BattleEvent> events)
         {
-            if (!target.Has(Ability.ThornedMail) || !attacker.IsAlive || target.Team == attacker.Team)
+            if (!(target.Has(Ability.ThornedMail) || target.Has(Ability.Spines)) || !attacker.IsAlive || target.Team == attacker.Team)
                 return;
             var after = new List<BattleEvent>();
             var hit = Damage(attacker, ThornsDamage, target, DamageKind.Tick, after);
@@ -2667,11 +2869,14 @@ namespace ArmyRoguelike.Core
         private void BeginTurn(Team team, List<BattleEvent> events)
         {
             if (team == Team.Enemy)
+            {
                 StrikeSunMarks(events);
+                CollectContracts(events);
+            }
 
             foreach (var u in Living(team).ToList())
             {
-                if (_burning.ContainsKey(u.Pos) || Cells(u).Any(_burning.ContainsKey))
+                if (!u.Has(Ability.Hellborn) && (_burning.ContainsKey(u.Pos) || Cells(u).Any(_burning.ContainsKey)))
                 {
                     var after = new List<BattleEvent>();
                     events.Add(new TickEvent("burn", Damage(u, BurnDamage, null, DamageKind.Tick, after), _burnOwners[Cells(u).First(_burning.ContainsKey)]));

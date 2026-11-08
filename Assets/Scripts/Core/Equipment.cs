@@ -93,6 +93,14 @@ namespace ArmyRoguelike.Core
                 case Ability.Wrath: return "Wrath";
                 case Ability.SoulHarvest: return "Soul Harvest";
                 case Ability.CorpseBlast: return "Corpse Blast";
+                case Ability.Hellborn: return "Hellborn";
+                case Ability.BloodOffering: return "Blood Offering";
+                case Ability.Hellswap: return "Hellswap";
+                case Ability.Bloodlust: return "Bloodlust";
+                case Ability.RendingBlow: return "Rending Blow";
+                case Ability.SoulContract: return "Soul Contract";
+                case Ability.Spines: return "Spines";
+                case Ability.FireBreath: return "Fire Breath";
                 default: return "";
             }
         }
@@ -153,6 +161,14 @@ namespace ArmyRoguelike.Core
                 case Ability.Wrath: return "at half HP or less it gets 2 actions a turn instead of 1 (each still has its cooldown)";
                 case Ability.SoulHarvest: return "while it is on the board your units that die leave a bone pile; raising one brings it back on its side as a Bone version with only its basic attack";
                 case Ability.CorpseBlast: return $"a bone pile within its raise range explodes for {Battle.CorpseBlastDamage} damage in the 3x3 around it, friend or foe; the pile is used up";
+                case Ability.Hellborn: return "burning ground doesn't hurt it";
+                case Ability.BloodOffering: return $"when it dies, the nearest other demon within {Battle.OfferingRange} tiles gains {Battle.OfferingFury} Fury (+1 damage per Fury for the rest of the fight)";
+                case Ability.Hellswap: return $"trades places with one of your units 2-{Battle.HellswapRange} tiles away (no line of sight needed); nothing on either tile goes off";
+                case Ability.Bloodlust: return $"gains {Battle.BloodlustFury} Fury (+1 damage for the rest of the fight) whenever a unit next to it dies, friend or foe";
+                case Ability.RendingBlow: return $"loses {Battle.RendingBlowCost} of its own HP, then hits a unit next to it for its damage +{Battle.RendingBlowBonus}";
+                case Ability.SoulContract: return $"marks one of your units within {Battle.ContractRange} tiles (no line of sight needed): at the start of the next enemy turn it loses {Battle.ContractDamage} HP, unless the Devil takes damage before then";
+                case Ability.Spines: return $"melee attackers take {Battle.ThornsDamage} damage";
+                case Ability.FireBreath: return $"breathes down a straight line of {Battle.FireBreathLength} tiles at one of your units on it (a rock stops it): {Battle.FireBreathDamage} damage to each of your units there, and the tiles burn for {Battle.BurnRounds} rounds";
                 default: return "";
             }
         }
@@ -179,6 +195,10 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Upheaval: return "Upheaval";
                 case ActionKind.Grasp: return "Grasp";
                 case ActionKind.CorpseBlast: return "Corpse Blast";
+                case ActionKind.Hellswap: return "Hellswap";
+                case ActionKind.RendingBlow: return "Rending Blow";
+                case ActionKind.SoulContract: return "Soul Contract";
+                case ActionKind.FireBreath: return "Fire Breath";
                 case ActionKind.Fireball: return "Fireball";
                 case ActionKind.IceWall: return "Ice Wall";
                 case ActionKind.Ward: return "Ward";
@@ -231,7 +251,8 @@ namespace ArmyRoguelike.Core
         public static bool IsAction(Ability ability) =>
             ability == Ability.WolfBite || ability == Ability.Howl || ability == Ability.Fling || ability == Ability.Caltrops ||
             ability == Ability.Overwatch || ability == Ability.BullRush || ability == Ability.Upheaval || ability == Ability.Grasp ||
-            ability == Ability.CorpseBlast;
+            ability == Ability.CorpseBlast || ability == Ability.Hellswap || ability == Ability.RendingBlow || ability == Ability.SoulContract ||
+            ability == Ability.FireBreath;
 
         /// <summary>The name of a unit type's basic attack, which is one of its actions.</summary>
         public static string AttackName(UnitStats s)
@@ -286,6 +307,8 @@ namespace ArmyRoguelike.Core
                          (Ability.Fling, ActionKind.Fling), (Ability.Howl, ActionKind.Howl), (Ability.Caltrops, ActionKind.Caltrops),
                          (Ability.Overwatch, ActionKind.Overwatch), (Ability.BullRush, ActionKind.BullRush),
                          (Ability.Upheaval, ActionKind.Upheaval), (Ability.Grasp, ActionKind.Grasp), (Ability.CorpseBlast, ActionKind.CorpseBlast),
+                         (Ability.Hellswap, ActionKind.Hellswap), (Ability.RendingBlow, ActionKind.RendingBlow),
+                         (Ability.SoulContract, ActionKind.SoulContract), (Ability.FireBreath, ActionKind.FireBreath),
                      })
                 if (s.Has(ability))
                     list.Add((Name(ability), Battle.AttackCost, kind, Describe(ability)));

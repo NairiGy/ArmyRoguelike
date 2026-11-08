@@ -157,6 +157,14 @@ namespace ArmyRoguelike.Core
         /// <summary>Fortune's Favored: deals double damage until the next player turn.</summary>
         public bool Favored { get; internal set; }
 
+        // ---------- Demons ----------
+
+        /// <summary>Fury (demons): +1 damage per point for the rest of the battle, from Blood Offering and Bloodlust.</summary>
+        public int Fury { get; internal set; }
+
+        /// <summary>Soul Contract: the Devil that signed one on this unit; it comes due at the start of the next enemy turn. Null = none.</summary>
+        public Unit ContractBy { get; internal set; }
+
         public Unit(int id, Team team, UnitStats stats, ArmyMember member = null, Unit summoner = null)
         {
             Id = id;
@@ -183,7 +191,7 @@ namespace ArmyRoguelike.Core
                 IsMercenary = IsMercenary, Escaped = Escaped, Fell = Fell, Favored = Favored, PackHp = PackHp,
                 BannerAp = BannerAp, BannerMoves = BannerMoves, LeftPile = LeftPile, PileGone = PileGone,
                 ShieldUpTurns = ShieldUpTurns, TauntTurns = TauntTurns, BattlecryTurns = BattlecryTurns, TempHp = TempHp,
-                ShieldThrown = ShieldThrown, ZocStrikeUsed = ZocStrikeUsed,
+                ShieldThrown = ShieldThrown, ZocStrikeUsed = ZocStrikeUsed, Fury = Fury,
             };
             foreach (var cooldown in _cooldowns)
                 c._cooldowns.Add(cooldown.Key, cooldown.Value);
@@ -194,8 +202,11 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>Second step of <see cref="CopyFor"/>: points the copy at the copied units.</summary>
-        internal void CopyLinks(Unit original, IReadOnlyDictionary<Unit, Unit> map) =>
+        internal void CopyLinks(Unit original, IReadOnlyDictionary<Unit, Unit> map)
+        {
             PoisonSource = original.PoisonSource == null ? null : map[original.PoisonSource];
+            ContractBy = original.ContractBy == null ? null : map[original.ContractBy];
+        }
 
         /// <summary>The item in this unit's single slot, or null.</summary>
         public Equipment Equipment => Member?.Equipment;
@@ -236,6 +247,9 @@ namespace ArmyRoguelike.Core
         public bool IsWolf => Stats.Kind == UnitKind.Wolf;
 
         public bool IsPackLeader => Stats.Kind == UnitKind.PackLeader;
+
+        /// <summary>One of the demon faction (they all have Hellborn), raised copies included.</summary>
+        public bool IsDemon => Stats.Has(Ability.Hellborn);
 
         public bool IsSnared => SnareTurns > 0 || RootedThisTurn;
 
