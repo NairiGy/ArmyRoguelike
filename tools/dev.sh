@@ -5,6 +5,7 @@
 #   tools/dev.sh test      build Core + EditMode tests into one exe and run them on Unity's .NET
 #   tools/dev.sh wiki      write docs/gamepedia.html without statue images (use the Unity menu
 #                          Tools > Export Gamepedia for the illustrated version)
+#   tools/dev.sh synergy   copy the game's rule texts into docs/synergy-map.html (its hover cards)
 #   tools/dev.sh sim [N]   play N seeds per draft and fight with bots (default 50); writes tools/out/balance-report.md
 #
 # Output goes to tools/out/ (git-ignored). Needs Git Bash on Windows and the project's Unity version.
@@ -70,6 +71,14 @@ case "${1:-}" in
     csc "$OUT/wiki.rsp" || { echo "BUILD FAILED"; exit 2; }
     runtimeconfig "$OUT/Wiki.runtimeconfig.json"
     "$DOTNET" "$OUT/Wiki.exe" "$R/docs/gamepedia.html" && echo "wrote docs/gamepedia.html (text only)"
+    ;;
+  synergy)
+    { echo "-nologo -nostdlib -noconfig -t:exe -out:\"$OUT/Synergy.exe\""
+      runtime_refs
+      for f in "$R"/Assets/Scripts/Core/*.cs "$R/tools/SynergyTexts.cs"; do echo "\"$f\""; done; } > "$OUT/synergy.rsp"
+    csc "$OUT/synergy.rsp" || { echo "BUILD FAILED"; exit 2; }
+    runtimeconfig "$OUT/Synergy.runtimeconfig.json"
+    "$DOTNET" "$OUT/Synergy.exe" "$R/docs/synergy-map.html"
     ;;
   sim)
     { echo "-nologo -nostdlib -noconfig -optimize+ -t:exe -out:\"$OUT/BalanceSim.exe\""

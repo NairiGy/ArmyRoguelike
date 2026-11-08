@@ -122,7 +122,7 @@ tr.flash td { animation: flash 1.6s ease-out; }
 <div class="wrap">
   <header>
     <h1>Hero Synergy Map</h1>
-    <p class="sub">Every hero skill, item, banner, battlefield, omen and champion affix, tagged by the theme keywords it makes, uses or hurts. Synergies are counted from those tags: a link is one hero <em>making</em> a keyword that another (or the same) hero <em>uses</em>. Data from the gamepedia of 2026-11-08; numbers are placeholders.</p>
+    <p class="sub">Every hero skill, item, banner, battlefield, omen and champion affix, tagged by the theme keywords it makes, uses or hurts. Synergies are counted from those tags: a link is one hero <em>making</em> a keyword that another (or the same) hero <em>uses</em>. Rule texts come straight from the game data (<span class="num">tools/dev.sh synergy</span> refreshes them); numbers are placeholders.</p>
     <div class="legend">
       <span><span class="chip M">M push</span> makes it</span>
       <span><span class="chip U">U push</span> uses it (payoff)</span>
@@ -328,8 +328,116 @@ const E = [
   ["Fleet", "Champion", "", "+1 move", "", "Countered by Pinned"],
 ];
 
+/* GAME TEXTS START: written by tools/dev.sh synergy, don't edit by hand */
+const GAME_TEXTS = {
+  "Warrior|Strike": { text: "3 damage to a unit next to it", meta: "1 AP" },
+  "Warrior|Shield Bash": { text: "2 damage to an enemy next to it and push it; 2 more if it slams into a wall, unit or the edge, and the unit it slams into takes 2 too", meta: "1 AP, cooldown 2" },
+  "Warrior|Sweep": { text: "Hit an enemy next to it and the enemies on both sides of it", meta: "1 AP, cooldown 2" },
+  "Warrior|Shield Up": { text: "Takes 2 less damage from every source (at least 1) for 2 enemy turns", meta: "1 AP, cooldown 3" },
+  "Warrior|Throw Shield": { text: "For the rest of the battle: +1 move and +2 damage, for 4 HP. Once per battle. Free", meta: "free" },
+  "Warrior|Vanguard": { text: "Can be deployed 1 row further forward", meta: "passive" },
+  "Warrior|Charge": { text: "Rush up to 3 tiles in a straight line, past allies: 2 damage to every enemy on the way, each pushed to a random side. One that doesn't move stops the charge", meta: "1 AP, cooldown 2" },
+  "Warrior|Battlecry": { text: "Every ally within 2 tiles, itself included, gets +1 move and a shield that absorbs 2 damage, both until your next turn", meta: "1 AP, cooldown 3" },
+  "Warrior|Taunt": { text: "Until your next turn, enemies within 2 tiles can only attack or use offensive abilities on this unit", meta: "1 AP, cooldown 3" },
+  "Warrior|Placeholder": { text: "Attacks any unit that steps out of its reach, at most once a round", meta: "passive" },
+  "Archer|Shot": { text: "2 damage up to 3 tiles away, needs line of sight", meta: "1 AP" },
+  "Archer|Pinning Shot": { text: "1 damage to an enemy in shot range (line of sight), and it is pinned", meta: "1 AP, cooldown 2" },
+  "Archer|Steady Aim": { text: "+1 damage if it hasn't moved this turn", meta: "passive" },
+  "Archer|Steady Aim+": { text: "+2 damage if it hasn't moved this turn", meta: "passive" },
+  "Archer|Long Shot": { text: "+1 damage to targets 3 or more tiles away", meta: "passive" },
+  "Archer|Vantage": { text: "While next to a wall: +1 range, and its shots ignore Behind Cover", meta: "passive" },
+  "Archer|Kick": { text: "1 damage to an enemy next to it and push it", meta: "1 AP, cooldown 2" },
+  "Archer|Snare Trap": { text: "Hide a snare on a free tile within 3 (max 2); the first enemy to walk onto it stops, takes 1 and is pinned. Enemies don't see snares", meta: "1 AP, cooldown 2" },
+  "Archer|Fire Arrow": { text: "Shoot an enemy in shot range for its attack damage; the ground under it burns for 2 rounds", meta: "1 AP, cooldown 3" },
+  "Archer|Mark Target": { text: "An enemy in shot range becomes marked (+2 on the next hit on it). Free", meta: "free, cooldown 2" },
+  "Archer|Pierce": { text: "Shots along a straight row or column hit every enemy in the line", meta: "passive" },
+  "Archer|Opening Shot": { text: "Double damage the first time it hits each enemy in a battle", meta: "passive" },
+  "Archer|Prey": { text: "Pinned enemies take +2 damage from everyone", meta: "passive" },
+  "Archer|Overwatch": { text: "Instead of shooting, it aims: during the enemy turn the first enemy that walks onto a tile it can see in range is shot and stops there", meta: "1 AP, cooldown 2" },
+  "Archer|Suppressing Fire": { text: "Shoot along a row or column up to its range, stopped by walls: every enemy on the line takes 1 and is pinned", meta: "1 AP, cooldown 3 · needs Pierce" },
+  "Archer|Death Mark": { text: "Its marks spread: when a marked enemy dies, every enemy next to it is marked", meta: "passive · needs Mark Target" },
+  "Rogue|Strike": { text: "4 damage to a unit next to it", meta: "1 AP" },
+  "Rogue|Vanish": { text: "Becomes hidden until your next turn; its first attack while hidden deals +2. Free", meta: "free, cooldown 3" },
+  "Rogue|Swift": { text: "2 moves per turn instead of 1", meta: "passive" },
+  "Rogue|Pincer": { text: "+3 damage if an ally stands on the far side of the target", meta: "passive" },
+  "Rogue|Riposte": { text: "Counter-attacks the first melee hit each enemy turn", meta: "passive" },
+  "Rogue|Poison": { text: "Its hits poison", meta: "passive" },
+  "Rogue|Cheap Shot": { text: "+2 damage to pinned or slowed enemies", meta: "passive" },
+  "Rogue|Elusive": { text: "Ignores zone of control", meta: "passive" },
+  "Rogue|Throwing Knife": { text: "2 damage (plus its damage bonuses) to an enemy 2-3 tiles away, needs line of sight. Carries Poison, Cheap Shot and the Vanish bonus", meta: "1 AP, cooldown 2" },
+  "Rogue|Shadowstep": { text: "Teleport to a free tile next to an enemy within 3, ignoring walls and zone of control. Free, before it acts, but it can't walk afterwards: it can still attack", meta: "free, cooldown 3" },
+  "Rogue|Isolate": { text: "+2 damage to exposed enemies", meta: "passive" },
+  "Rogue|Momentum": { text: "A kill gives its action back and 1 move: it can attack again or walk on", meta: "passive" },
+  "Rogue|Dodge": { text: "The first hit each enemy turn deals 0 damage", meta: "passive" },
+  "Rogue|Smoke Bomb": { text: "Smoke itself and one ally within 3 tiles: both are hidden until your next turn, as with Vanish but without its +2", meta: "1 AP, cooldown 4" },
+  "Rogue|Rupture": { text: "Strike a poisoned enemy next to it: first its poison bursts, 2 damage for every turn of poison left, then the strike (which poisons again)", meta: "1 AP, cooldown 2 · needs Poison" },
+  "Rogue|Into the Shadows": { text: "A kill hides it until your next turn: enemies can't target or attack it (area damage still hits). At most once every 3 turns", meta: "passive" },
+  "Mage|Bolt": { text: "2 damage up to 3 tiles away, over obstacles", meta: "1 AP" },
+  "Mage|Frost Nova": { text: "Every enemy next to it is slowed and pushed away", meta: "1 AP, cooldown 2" },
+  "Mage|Arcane Bolt": { text: "Its bolt ignores line of sight", meta: "passive" },
+  "Mage|Fireball": { text: "3 damage to everyone on the tile and the 4 next to it, up to 3 tiles away", meta: "1 AP, cooldown 3" },
+  "Mage|Burning Ground": { text: "Fireballs leave the area burning for 2 rounds", meta: "passive · needs Fireball" },
+  "Mage|Firewall": { text: "Set 3 tiles in a line across its aim, up to 3 tiles away, burning for 2 rounds; whoever stands there takes 1 now", meta: "1 AP, cooldown 3" },
+  "Mage|Searing Bolt": { text: "Its bolt sets the target's tile burning for 2 rounds", meta: "passive" },
+  "Mage|Concussive": { text: "Fireballs push units outward and set off mines and bombs", meta: "passive · needs Fireball" },
+  "Mage|Chill": { text: "Its hits leave the target slowed", meta: "passive" },
+  "Mage|Ice Wall": { text: "Turn a free tile within 3 into ice (a wall) for 2 rounds", meta: "1 AP, cooldown 3" },
+  "Mage|Shatter": { text: "Slowed enemies take +2 damage from every attack of your units", meta: "passive · needs Chill" },
+  "Mage|Blizzard": { text: "1 damage to every enemy on a tile up to 3 tiles away and the 4 next to it, and they are slowed. Spares your units", meta: "1 AP, cooldown 3" },
+  "Mage|Ward": { text: "An ally within 3 tiles gets a shield that absorbs 3 damage and lasts until used up", meta: "1 AP, cooldown 2" },
+  "Mage|Mend": { text: "Heal an ally within 3 tiles for 3", meta: "1 AP, cooldown 3 · needs Ward" },
+  "Mage|Transpose": { text: "Swap places with any unit within 3 tiles, friend or foe (not the Giant or objectives). An enemy put down on a mine sets it off", meta: "1 AP, cooldown 2" },
+  "Mage|Twincast": { text: "The first action it uses each turn costs no AP, so it can still attack or cast another (it can't move afterwards)", meta: "passive" },
+  "Sapper|Strike": { text: "2 damage to a unit next to it", meta: "1 AP" },
+  "Sapper|Place Mine": { text: "Put a mine on a free tile within 2 (max 3); an enemy stepping on it sets it off for 4 damage to whoever stands on that tile", meta: "1 AP, cooldown 2" },
+  "Sapper|Mines": { text: "An enemy stepping on one of its mines sets it off: it hurts whoever stands on that tile", meta: "passive" },
+  "Sapper|Big Mines": { text: "Its mines deal 5 damage and it can have 4 out", meta: "passive" },
+  "Sapper|Grappling Hook": { text: "Pull an enemy 2-3 tiles away in a straight line (in sight) to the tile next to it; mines on the way go off, and it slams into whatever blocks it (not huge units). A pull, not a push: weight and Battering Ram don't change it", meta: "1 AP, cooldown 2" },
+  "Sapper|Quick Fuse": { text: "Place Mine is free and ready every turn: use it before acting, then move and attack as usual", meta: "passive" },
+  "Sapper|Barricade": { text: "Build a barricade on a free tile next to it (max 3): blocks paths and shots, 4 HP, either side can break it, and a broken one collapses into rubble", meta: "1 AP, cooldown 2" },
+  "Sapper|Cave-In": { text: "Drop rubble on a free tile within 3", meta: "1 AP, cooldown 2" },
+  "Sapper|Spiked Barricades": { text: "An enemy starting its turn next to one of its barricades takes 1", meta: "passive · needs Barricade" },
+  "Sapper|Demolish": { text: "Blow up a wall or rubble within 3: 3 damage to everyone in the 3x3 around it. A rock or barricade collapses into rubble", meta: "1 AP, cooldown 3" },
+  "Sapper|Build Turret": { text: "Build a turret next to it (one at a time); it acts on your turn but can't move", meta: "1 AP, cooldown 3" },
+  "Sapper|Throw Bomb": { text: "Lob a bomb 2-3 tiles away; it explodes for 4 on that tile at the start of the next enemy turn", meta: "1 AP, cooldown 2" },
+  "Sapper|Blast Proof": { text: "Its blasts (mines, bombs, Demolish, Detonate) don't hurt your units", meta: "passive" },
+  "Sapper|Incendiary": { text: "Its blasts (mines, bombs, Demolish, Detonate) leave the ground they hit burning for 2 rounds", meta: "passive" },
+  "Sapper|Detonate": { text: "Blow up all its barricades: 3 damage in a 3x3 around each, and each leaves rubble", meta: "1 AP, cooldown 3 · needs Barricade" },
+  "Item|Vampire Fang": { text: "Heals 2 HP on a kill", meta: "" },
+  "Item|Thorned Mail": { text: "Melee attackers take 1 damage", meta: "" },
+  "Item|Spring Boots": { text: "+1 move each turn", meta: "" },
+  "Item|Lucky Charm": { text: "Once per battle, survives a killing blow at 1 HP", meta: "" },
+  "Banner|Vampiric": { text: "Every attack of yours that deals damage heals the attacker 1. But the sun hunts you: every fight has the Curse of the Sun (a sun beam targets one of your units each turn, 3 damage).", meta: "" },
+  "Banner|Third Wheel": { text: "Your units get +1 AP and +1 move. But the army holds 2 units at most.", meta: "" },
+  "Banner|Loser": { text: "A unit of yours that dies in a fight gets +1 max HP and +1 damage for the rest of the run (stacks).", meta: "" },
+  "Banner|Mercenaries": { text: "Before each fight, hire 1 of 2 random base units for 8 gold. It fights for that battle only and doesn't count as a survivor for gold.", meta: "" },
+  "Banner|Battering Ram": { text: "Your units' pushes go 1 tile further and deal 2 damage.", meta: "" },
+  "Battlefield|Edge of the World": { text: "A unit pushed off the board falls from the tower and dies, on either side. Nothing saves it, and it leaves no bone pile. Huge units can't be pushed.", meta: "" },
+  "Battlefield|Storm": { text: "At the start of each round, lightning gathers over the tile under one of your units and one enemy. At the end of the enemy turn it strikes those tiles for 3 damage, hitting whoever stands there.", meta: "" },
+  "Battlefield|Arcane Overflow": { text: "Every action's cooldown is 1 shorter (1 at least), for both sides.", meta: "" },
+  "Battlefield|Fortune's Favored": { text: "At the start of each round, one of your units and one enemy are favored: their hits deal 2x damage until the next round (not poison, burning ground or collisions). A boss is never favored.", meta: "" },
+  "Battlefield|What's On His Mind?": { text: "You can't see what the enemies plan to do.", meta: "" },
+  "Battlefield|Crumbling Roof": { text: "The old roof gives way. A unit slammed into something, or a unit dying, fractures the tile it stands on; a tile fractured 2 times falls in. Whoever stands on it, or is pushed into a hole, falls and dies. Holes block walking but not shots. Huge units are too heavy to push in, and the Giant never falls.", meta: "" },
+  "Omen|Sun (blessing)": { text: "At the start of your turn, a sun sigil appears under an enemy. At the start of the enemy turn a sun beam strikes it for 3 damage, hitting whoever stands there.", meta: "" },
+  "Omen|Sun (curse)": { text: "At the start of your turn, a sun sigil appears under one of your units. At the start of the enemy turn a sun beam strikes it for 3 damage, hitting whoever stands there.", meta: "" },
+  "Omen|Night (blessing)": { text: "At the start of your turn, your unit and the 4 tiles next to it are shrouded until your next turn: enemies can't hit units there from range.", meta: "" },
+  "Omen|Night (curse)": { text: "At the start of your turn, an enemy unit and the 4 tiles next to it are shrouded until your next turn: your units can't hit units there from range.", meta: "" },
+  "Omen|Moon (blessing)": { text: "At the start of your turn, your unit gets a shield that absorbs 4 damage until your next turn.", meta: "" },
+  "Omen|Moon (curse)": { text: "At the start of your turn, an enemy unit gets a shield that absorbs 4 damage until your next turn.", meta: "" },
+  "Champion|Armored": { text: "Takes 1 less damage from everything (at least 1)", meta: "" },
+  "Champion|Vengeful": { text: "When it dies, 2 damage to each of your units next to it", meta: "" },
+  "Champion|Regenerating": { text: "Heals 2 at the start of its turn", meta: "" },
+  "Champion|Mighty": { text: "+1 damage", meta: "" },
+  "Champion|Fleet": { text: "+1 move", meta: "" },
+};
+/* GAME TEXTS END */
+
+// The game's own text wins; the short effect above is only a fallback for entries the export doesn't cover.
 const ENT = E.map(([name, owner, rarity, effect, tags, note], i) => ({
-  id: i, name, owner, rarity, effect, note,
+  id: i, name, owner, rarity, note,
+  effect: (GAME_TEXTS[owner + "|" + name] || {}).text || effect,
+  meta: (GAME_TEXTS[owner + "|" + name] || {}).meta || "",
+  fromGame: !!GAME_TEXTS[owner + "|" + name],
   tags: tags.split(" ").filter(Boolean).map(t => {
     const [r, k] = t.split(":");
     return { r, k: k.replace("!", ""), self: k.endsWith("!") };
@@ -395,7 +503,7 @@ const nameLink = (name, owner) => {
 };
 
 function tipHtml(e) {
-  const meta = [e.owner, e.rarity].filter(Boolean).join(" · ");
+  const meta = [e.owner, e.rarity, e.meta].filter(Boolean).join(" · ");
   const tags = e.tags.map(t => chip(t.r, t.k, t.self)).join("");
   return `<div class="tip-name">${esc(e.name)}</div><div class="tag">${meta}</div><p>${esc(e.effect)}</p>` +
     (tags ? `<div>${tags}</div>` : "") + (e.note ? `<p class="note">${esc(e.note)}</p>` : "");
@@ -507,7 +615,7 @@ function renderEntities() {
   const rows = ENT.filter(e => (!o || e.owner === o) && (!k || e.tags.some(t => t.k === k)) &&
     (!q || (e.name + " " + e.effect + " " + e.note).toLowerCase().includes(q)));
   let h = "<tr><th>Name</th><th>Owner</th><th>Rarity</th><th>Effect</th><th>Tags</th><th>Note</th></tr>";
-  for (const e of rows) h += `<tr id="ent-${e.id}"><td><b>${esc(e.name)}</b></td><td class="owner">${e.owner}</td><td class="rar">${e.rarity}</td><td>${esc(e.effect)}</td><td>${e.tags.map(t => chip(t.r, t.k, t.self)).join("") || '<span class="note">none</span>'}</td><td class="note">${esc(e.note)}</td></tr>`;
+  for (const e of rows) h += `<tr id="ent-${e.id}"><td><b>${esc(e.name)}</b></td><td class="owner">${e.owner}</td><td class="rar">${e.rarity}</td><td>${esc(e.effect)}${e.meta ? `<div class="tag">${esc(e.meta)}</div>` : ""}</td><td>${e.tags.map(t => chip(t.r, t.k, t.self)).join("") || '<span class="note">none</span>'}</td><td class="note">${esc(e.note)}</td></tr>`;
   document.getElementById("entities").innerHTML = h;
   document.getElementById("f-count").textContent = rows.length + " of " + ENT.length;
 }

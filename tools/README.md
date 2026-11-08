@@ -6,6 +6,7 @@ Helpers for working on the project without the Unity Editor (it can stay open).
 tools/dev.sh compile   # compile Core, View and Editor scripts with Unity's compiler; prints errors only
 tools/dev.sh test      # run the EditMode tests on Unity's bundled .NET (no Editor needed)
 tools/dev.sh wiki      # write docs/gamepedia.html, text only
+tools/dev.sh synergy   # copy the game's rule texts into docs/synergy-map.html (hover cards)
 tools/dev.sh sim       # play battles with crude bots; writes tools/out/balance-report.md (optional: seeds per draft and fight, default 50)
 tools/dev.sh sim 10 smart  # the same with the look-ahead bot, about 12 minutes; writes tools/out/balance-smart.md
 tools/dev.sh sim 10 fights "Elementals,Giant"  # quick look-ahead check of chosen fights; set SIM_CORE to a patched copy of Core to try a number
@@ -16,6 +17,7 @@ tools/dev.sh sim 20 runs  # whole runs (seeds x 5 per draft without banners, see
 
 - `TestRunner.cs`: a minimal NUnit-style runner used by `dev.sh test`.
 - `GamepediaTextExport.cs`: entry point for `dev.sh wiki`.
+- `SynergyTexts.cs`: entry point for `dev.sh synergy`; rewrites the GAME TEXTS block in `docs/synergy-map.html`.
 - Build output goes to `tools/out/` (git-ignored).
 
 Things that need Unity itself (with the Editor closed, or driven live through the Pipeline package):
