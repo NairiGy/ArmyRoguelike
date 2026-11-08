@@ -160,13 +160,6 @@ namespace ArmyRoguelike.View
 
         // ---------- Banners ----------
 
-        private void ChooseStartBanner(Banner banner)
-        {
-            if (_run.ChooseStartBanner(banner))
-                _runLog.RecordBanner(banner, "start", _run.StartBanners);
-            _draftPicks.Clear();
-        }
-
         private void HireMerc(UnitStats unit)
         {
             var offered = _run.MercOffers.ToList();
@@ -596,60 +589,151 @@ namespace ArmyRoguelike.View
 
         private Vector2 _scroll;
 
-        private void DrawStartBanner(float screenWidth)
+        /// <summary>The start banner picked on the draft screen, taken when the run starts.</summary>
+        private Banner? _startPick;
+
+        /// <summary>Units to draft with a given start banner: 3, or the army limit (Third Wheel: 2).</summary>
+        private static int DraftCountWith(Banner? banner) =>
+            Math.Min(Run.DraftSize, banner == Banner.ThirdWheel ? Banners.ThirdWheelArmySize : Run.MaxArmySize);
+
+        private int DraftTarget => _run.StartBannerChosen ? _run.DraftCount : DraftCountWith(_startPick);
+
+        private const float DraftWidth = 1060f;
+        private const float StatueHeight = 96f;
+
+        /// <summary>
+        /// The run's start: pick one banner (top row) and the units (cards below) on one screen, then start the run.
+        /// </summary>
+        private void DrawDraft(float screenWidth)
         {
             EnsureShopStyles();
-            var w = Mathf.Min(900f, screenWidth - 20f);
-            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 20, w, 680), GUI.skin.box);
-            GUILayout.Label("Raise a banner", Title);
-            GUILayout.Label("A banner bends a rule for your whole army, for the whole run. Pick one to start with; shops sell more, and elites offer one.");
-            GUILayout.Space(6);
-            var row = GUILayoutUtility.GetRect(w - 12, 540f, GUILayout.ExpandWidth(true));
-            var banners = _run.StartBanners.ToList();
-            var cardWidth = (row.width - CardGap * (banners.Count - 1)) / banners.Count;
-            for (var i = 0; i < banners.Count; i++)
+            var w = Mathf.Min(DraftWidth, screenWidth - 20f);
+            var inner = w - 2 * ShopPad;
+            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 10, w, ReferenceHeight - 20), HudArt.PanelStyle(HudArt.PanelColor, ShopPad));
+            _shopTitle.normal.textColor = Color.white;
+            GUILayout.Label("Prepare your army", _shopTitle);
+            GUILayout.Space(4);
+
+            var banners = _run.StartBannerChosen ? new Banner[0] : _run.StartBanners.ToArray();
+            if (banners.Length > 0)
             {
-                var pick = banners[i];
-                DrawTallBannerCard(new Rect(row.x + i * (cardWidth + CardGap), row.y, cardWidth, row.height), pick, () => ChooseStartBanner(pick));
+                Section("BANNER  ·  pick 1, it bends a rule for your whole army all run", GoldColor);
+                var cardWidth = (inner - CardGap * (banners.Length - 1)) / banners.Length;
+                var row = GUILayoutUtility.GetRect(inner, banners.Max(b => BannerCardHeight(b, null, cardWidth)), GUILayout.ExpandWidth(false));
+                for (var i = 0; i < banners.Length; i++)
+                {
+                    var pick = banners[i];
+                    DrawBannerCard(new Rect(row.x + i * (cardWidth + CardGap), row.y, cardWidth, row.height), pick, null, () => PickStartBanner(pick), _startPick == pick);
+                }
+
+                GUILayout.Space(12);
             }
 
+            var target = DraftTarget;
+            Section($"UNITS  ·  pick {target}  ({_draftPicks.Count}/{target})  ·  each won fight teaches one of them a technique", GoldColor);
+            var pool = _run.DraftPool.ToList();
+            var unitWidth = (inner - CardGap * (pool.Count - 1)) / pool.Count;
+            var unitHeight = pool.Max(u => UnitCardHeight(u, unitWidth));
+            var rows = GUILayoutUtility.GetRect(inner, unitHeight, GUILayout.ExpandWidth(false));
+            for (var i = 0; i < pool.Count; i++)
+                DrawUnitCard(new Rect(rows.x + i * (unitWidth + CardGap), rows.y, unitWidth, rows.height), pool[i]);
+
             GUILayout.FlexibleSpace();
+            var missing = banners.Length > 0 && !_startPick.HasValue ? "Pick a banner"
+                : _draftPicks.Count < target ? $"Pick {target - _draftPicks.Count} more unit{(target - _draftPicks.Count == 1 ? "" : "s")}"
+                : "Start the run";
+            GUI.enabled = missing == "Start the run";
+            if (GUILayout.Button(missing, GUILayout.Height(36)))
+                Do(StartRun);
+            GUI.enabled = true;
             if (TestModeAvailable && GUILayout.Button("Test battle (testing only: any army, encounter and omen)"))
                 Do(EnterTestMode);
             GUILayout.EndArea();
         }
 
-        private void DrawDraft(float screenWidth)
+        /// <summary>Picks (or switches) the start banner; drops the last unit picks if it lowers the count.</summary>
+        private void PickStartBanner(Banner banner)
         {
-            if (!_run.StartBannerChosen)
+            _startPick = banner;
+            while (_draftPicks.Count > DraftTarget)
+                _draftPicks.RemoveAt(_draftPicks.Count - 1);
+        }
+
+        /// <summary>Takes the picked banner, then drafts the picked units.</summary>
+        private void StartRun()
+        {
+            if (!_run.StartBannerChosen && _startPick.HasValue && _run.ChooseStartBanner(_startPick.Value))
+                _runLog.RecordBanner(_startPick.Value, "start", _run.StartBanners);
+            ConfirmDraft();
+        }
+
+        /// <summary>A unit's kit for its draft card: (name and cost, rule text) per passive and action.</summary>
+        private static System.Collections.Generic.List<(string name, string text)> DraftKit(UnitStats s)
+        {
+            var kit = new System.Collections.Generic.List<(string, string)>();
+            foreach (var a in s.Abilities)
+                kit.Add((Abilities.Name(a), Capitalise(Abilities.Describe(a))));
+            foreach (var a in s.Actions)
+                kit.Add(($"{Abilities.Name(a)}  ·  {Battle.ActionCost(a)} AP", Capitalise(Abilities.Describe(a))));
+            return kit;
+        }
+
+        private static string Capitalise(string text) =>
+            string.IsNullOrEmpty(text) ? text : char.ToUpperInvariant(text[0]) + text.Substring(1);
+
+        private float UnitCardHeight(UnitStats s, float width)
+        {
+            var inner = width - 20;
+            var h = 8 + StatueHeight + 6 + 22 + 10 + 4 + 16 + _cardTag.CalcHeight(new GUIContent(s.Role), inner) + 6;
+            foreach (var (_, text) in DraftKit(s))
+                h += 18 + KeywordText.Height(text, _cardText, inner) + 6;
+            return h + 6;
+        }
+
+        /// <summary>A draft card: the statue, name, HP in pieces, stats, role, then each passive and action.</summary>
+        private void DrawUnitCard(Rect r, UnitStats s)
+        {
+            var picked = _draftPicks.Contains(s);
+            var full = !picked && _draftPicks.Count >= DraftTarget;
+            var old = GUI.color;
+            if (full)
+                GUI.color = Faded;
+            if (Card(r, picked, true))
+                Do(() => ToggleDraftPick(s));
+            var x = r.x + 10;
+            var inner = r.width - 20;
+            var y = r.y + 8;
+            DrawStatue(new Rect(x, y, inner, StatueHeight), s.Kind);
+            y += StatueHeight + 6;
+            Label(new Rect(x, y, inner, 22), s.Name, _cardName, picked ? GoldColor : Color.white);
+            y += 22;
+
+            // HP in pieces, like the bars over the statues.
+            if (Event.current.type == EventType.Repaint)
             {
-                DrawStartBanner(screenWidth);
-                return;
+                const float gap = 2f;
+                var piece = (inner - gap * (s.MaxHp - 1)) / s.MaxHp;
+                for (var i = 0; i < s.MaxHp; i++)
+                    GUI.DrawTexture(new Rect(x + i * (piece + gap), y, piece, 10f), HudArt.Solid(new Color(0.35f, 0.8f, 0.4f)));
             }
 
-            const float w = 600;
-            GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 20, w, 680), GUI.skin.box);
-            GUILayout.Label("Choose your army", Title);
-            if (_run.Banners.Count > 0)
-                GUILayout.Label($"Banner: {string.Join(", ", _run.Banners.Select(Banners.Name))}");
-            GUILayout.Label($"Pick {_run.DraftCount} different units. Each won fight lets one of them learn a technique (and go up a level).");
-            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(540));
-            foreach (var unit in _run.DraftPool)
+            y += 14;
+            Label(new Rect(x, y, inner, 16), $"HP {s.MaxHp}  ·  DMG {s.Damage}  ·  RNG {s.Range}  ·  MV {s.Moves}", _cardTag, DimText);
+            y += 16;
+            var roleHeight = _cardTag.CalcHeight(new GUIContent(s.Role), inner);
+            Label(new Rect(x, y, inner, roleHeight), s.Role, _cardTag, DimText);
+            y += roleHeight + 6;
+            _cardText.normal.textColor = TextColor;
+            foreach (var (name, text) in DraftKit(s))
             {
-                var picked = _draftPicks.Contains(unit);
-                var style = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.UpperLeft, wordWrap = true };
-                if (KeywordButton((picked ? "[X] " : "[  ] ") + Describe(unit), style, w - 40))
-                    Do(() => ToggleDraftPick(unit));
+                Label(new Rect(x, y, inner, 18), name, _section, Color.white);
+                y += 18;
+                var h = KeywordText.Height(text, _cardText, inner);
+                KeywordText.Draw(new Rect(x, y, inner, h), text, _cardText);
+                y += h + 6;
             }
 
-            GUILayout.EndScrollView();
-            GUI.enabled = _draftPicks.Count == _run.DraftCount;
-            if (GUILayout.Button($"Start the run ({_draftPicks.Count}/{_run.DraftCount})", GUILayout.Height(34)))
-                Do(ConfirmDraft);
-            GUI.enabled = true;
-            if (TestModeAvailable && GUILayout.Button("Test battle (testing only: any army, encounter and omen)"))
-                Do(EnterTestMode);
-            GUILayout.EndArea();
+            GUI.color = old;
         }
 
         /// <summary>
@@ -764,7 +848,7 @@ namespace ArmyRoguelike.View
         private static readonly Color DimText = new Color(0.62f, 0.62f, 0.67f);
         private static readonly Color Faded = new Color(1f, 1f, 1f, 0.5f);
 
-        private GUIStyle _shopTitle, _cardName, _cardText, _cardTag, _section, _price, _chip, _bannerName, _bannerRule;
+        private GUIStyle _shopTitle, _cardName, _cardText, _cardTag, _section, _price, _chip;
 
         private void EnsureShopStyles()
         {
@@ -777,8 +861,6 @@ namespace ArmyRoguelike.View
             _section = new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold };
             _price = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
             _chip = new GUIStyle(GUI.skin.button) { fontSize = 11, fixedHeight = 20, padding = new RectOffset(8, 8, 2, 2) };
-            _bannerName = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            _bannerRule = new GUIStyle(GUI.skin.label) { fontSize = 15, wordWrap = true, padding = new RectOffset() };
         }
 
         private static void Label(Rect rect, string text, GUIStyle style, Color color)
@@ -860,7 +942,7 @@ namespace ArmyRoguelike.View
         }
 
         private const string BannerTag = "Banner, for the whole army";
-        private const float BannerArtWidth = 62f;
+        private const float BannerArtWidth = 34f;
 
         /// <summary>Height of a wide banner card: its rule text beside the painted banner, at least tall enough to show it.</summary>
         private float BannerCardHeight(Banner banner, int? price, float width)
@@ -868,17 +950,17 @@ namespace ArmyRoguelike.View
             var textWidth = width - 20 - BannerArtWidth - 10;
             var text = 8 + 22 + _cardTag.CalcHeight(new GUIContent(BannerTag), textWidth) + 4 +
                        KeywordText.Height(Banners.Describe(banner), _cardText, textWidth) + (price.HasValue ? 30 : 8);
-            return Mathf.Max(126f, text);
+            return Mathf.Max(84f, text);
         }
 
         /// <summary>A wide banner card: the painted banner on the left, then its name, what it is, its rule and any price.</summary>
-        private void DrawBannerCard(Rect r, Banner banner, int? price, Action select)
+        private void DrawBannerCard(Rect r, Banner banner, int? price, Action select, bool selected = false)
         {
             var old = GUI.color;
             var affordable = !price.HasValue || _run.Gold >= price.Value;
             if (!affordable)
                 GUI.color = Faded;
-            if (Card(r, false, affordable))
+            if (Card(r, selected, affordable))
                 Do(select);
             BannerView.DrawCardArt(new Rect(r.x + 10, r.y + 8, BannerArtWidth, r.height - 16), banner);
             var x = r.x + 10 + BannerArtWidth + 10;
@@ -894,21 +976,6 @@ namespace ArmyRoguelike.View
             if (price.HasValue)
                 Price(r, price.Value);
             GUI.color = old;
-        }
-
-        /// <summary>A tall banner card for the start pick: the painted banner large, with its name and rule below.</summary>
-        private void DrawTallBannerCard(Rect r, Banner banner, Action select)
-        {
-            if (Card(r, false, true))
-                Do(select);
-            const float pad = 14f;
-            const float textHeight = 190f;
-            BannerView.DrawCardArt(new Rect(r.x + pad, r.y + pad, r.width - pad * 2, r.height - pad * 2 - textHeight), banner);
-            var y = r.yMax - pad - textHeight + 8;
-            Label(new Rect(r.x + pad, y, r.width - pad * 2, 30), Banners.Name(banner), _bannerName, Color.white);
-            y += 34;
-            _bannerRule.normal.textColor = TextColor;
-            KeywordText.Draw(new Rect(r.x + pad, y, r.width - pad * 2, r.yMax - pad - y), Banners.Describe(banner), _bannerRule);
         }
 
         /// <summary>A row of offer cards, three to a row's width so cards keep their size as they sell.</summary>

@@ -414,7 +414,7 @@ Decided with the user. Goals for every unit, to be applied one line at a time: m
 A banner bends a rule for the whole army for the rest of the run (like Balatro jokers). The user wants
 builds and synergies from them, so there's no limit on how many you hold; each is held once.
 
-- **Getting them** (not final, the user's first take): pick 1 of 3 random banners at the start of a run, before the draft. Every shop sells one you don't hold (20 gold). An elite's reward screen offers one you don't hold, taken instead of its technique.
+- **Getting them** (not final, the user's first take): pick 1 of 3 random banners at the start of a run, on the same screen as the draft ("Prepare your army", 2026-11-08: banner row on top, unit cards below, the banner can be switched until the run starts; Third Wheel lowers the units to pick). Every shop sells one you don't hold (20 gold). An elite's reward screen offers one you don't hold, taken instead of its technique.
 - **Vampiric:** every attack of yours that deals damage heals the attacker 1 (attacks only, not blasts or collisions; not above max HP). Cost: the Curse of the Sun in every fight (once, even if you also carry that curse). The user's idea was +2; +1 because units have 4-12 HP.
 - **Third Wheel:** your units get +1 AP and +1 move (a mercenary too). Cost: the army holds 2 units. Taken at the start, you draft 2. Taken later with more units, you choose who stays and the rest leave with their techniques and items. Move first still holds: move up to 2, then 2 actions.
 - **Loser:** an army unit that dies in a fight gets +1 max HP and +1 damage for the rest of the run, stacking. Also after a lost scenario fight. Dying still costs gold (rewards scale with survivors).
