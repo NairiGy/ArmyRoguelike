@@ -213,6 +213,15 @@ Decided with the user. Goals for the five heroes: every hero has at least one sy
 - **Themes** (proposed, not final): Warrior Push (main), Guard; Archer Pinned, Marked; Rogue Exposed, Hidden, Poison; Mage Slowed, Burning; Sapper Wall, Blast. Guard (shields, taunts, damage cuts) and Kill (on-kill triggers) are design tags, not game keywords.
 - **Pair links** (2026-11-08, in kit on the diagonal): Warrior 3 in kit; Warrior-Archer 1, Warrior-Rogue 2, Warrior-Mage 2, Warrior-Sapper 2; Archer 3 in kit, Archer-Rogue 3, Archer-Mage 3, Archer-Sapper 2; Rogue 3 in kit, Rogue-Mage 4, Rogue-Sapper 1; Mage 2 in kit, Mage-Sapper 3; Sapper 3 in kit.
 - **Holes:** Warrior-Archer (only Taunt helping Steady Aim; Battlecry's move works against it) and Rogue-Sapper (only the Grappling Hook). Burning, Poison and Guard have no payoff outside their own kit; nothing but the Rogue gains from being hidden. The Mage spreads over too many themes. The Warrior's pushes pay off only outside its kit. Prey (pinned) and Shatter (slowed) still pay the same +2.
+- **Roles and judgment** (2026-11-09): every entry on the map has a role (Standalone, Enabler, Payoff, Bridge, Tension; Condition for battlefields and omens, Counter for champion affixes) and is judged on Decision, Board, Answer, Readability and Power (in that order of weight; Power is a design estimate until the bots use actions). A standalone with no tags is doing its job, not a hole: not everything needs a synergy.
+- **Tension pieces for every hero** (decided with the user 2026-11-09, not built yet): a tension piece is strong with a real cost, so taking or using it is a choice. Only the Warrior had any (Sweep, Battlecry, Throw Shield), and they judged as the best-shaped part of the game. Where possible, a number-only passive is reworked into one instead of adding a new technique, so the pools don't grow. Numbers are placeholders.
+  - **Archer, Planted** (new): free, the Archer pins itself until your next turn; while pinned its shots deal +2 and pin. Cost: it can't get away, and Battlecry's move is wasted on it.
+  - **Archer, Steady Aim+** (rework): +3 if it hasn't moved this turn, -1 if it has.
+  - **Rogue, Lone Wolf** (new): +2 damage while the Rogue itself is exposed. Cost: alone means no Smoke Bomb, Ward or Taunt cover; the mirror of Isolate.
+  - **Mage, Overchannel** (new): free, the next spell this turn deals double damage, but the Mage is slowed on its next turn. Cost: the fragile Mage can't both cast and get away.
+  - **Sapper, Rigged Barricades** (replaces Spiked Barricades): a barricade that breaks explodes for 3 in the 3x3 around it (a blast). Cost: the wall is gone for Vantage and pushes, and the blast hurts your units next to it unless you have Blast Proof.
+  - **Sapper, Big Mines** (rework): mines deal 6, but it can have only 2 out.
+  - Why: Planted and Overchannel turn a hero's own theme status against itself, the same shape as Steady Aim and Battlecry, and they need no new keyword.
 
 ## UI and controls
 
