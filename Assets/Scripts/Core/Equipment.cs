@@ -143,7 +143,7 @@ namespace ArmyRoguelike.Core
                 case Ability.Elusive: return "ignores zone of control: leaving an enemy's reach doesn't use up its moves";
                 case Ability.DeathMark: return "its marks spread: when a marked enemy dies, every enemy next to it is marked";
                 case Ability.Isolate: return $"+{Battle.IsolateBonus} damage to exposed enemies (no ally of theirs next to them)";
-                case Ability.IntoShadows: return "a kill hides it until your next turn: enemies can't target or attack it (area blasts still hit)";
+                case Ability.IntoShadows: return $"a kill hides it until your next turn: enemies can't target or attack it (area blasts still hit). At most once every {Battle.IntoShadowsCooldown} turns";
                 case Ability.Pincer: return $"+{Battle.PincerBonus} damage if an ally stands on the far side of the target";
                 case Ability.KillRefund: return "a kill gives its action back and 1 move: it can attack again or walk on";
                 case Ability.Poison: return $"hits poison: {Battle.PoisonDamage} damage at the start of the target's next {Battle.PoisonTurns} turns";
@@ -279,7 +279,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.SuppressingFire: return $"shoot along a row or column up to its range, stopped by rocks: every enemy on the line takes {Battle.PinDamage} and is pinned (can't move on its next turn)";
                 case ActionKind.ThrowingKnife: return $"{Battle.KnifeDamage} damage (plus its damage bonuses) to an enemy 2-{Battle.KnifeRange} tiles away, needs line of sight. Carries Poison, Cheap Shot and the Vanish bonus";
                 case ActionKind.Shadowstep: return $"teleport to a free tile next to an enemy within {Battle.ShadowstepRange}, ignoring rocks and zone of control. Free, before it acts, but it can't walk afterwards: it can still attack";
-                case ActionKind.SmokeBomb: return $"smoke the tile and the 4 next to it, up to {Battle.SmokeRange} tiles away: every ally there (itself too) is hidden until your next turn, as with Vanish (its first attack while hidden deals +{Battle.VanishBonus})";
+                case ActionKind.SmokeBomb: return $"smoke itself and one ally within {Battle.SmokeRange} tiles: both are hidden until your next turn, as with Vanish but without its +{Battle.VanishBonus}";
                 case ActionKind.MarkTarget: return $"mark an enemy in shot range: the next hit on it, by anyone and from anything but poison or fire, deals +{Battle.MarkBonus}, then the mark is gone. Free, before it acts: it can still move and attack";
                 case ActionKind.Rupture: return $"strike a poisoned enemy next to it: first its poison bursts, {Battle.PoisonDamage} damage for every turn of poison left, then the strike (which poisons again)";
                 case ActionKind.Blink: return $"teleport to a free tile within {Battle.BlinkRange}, ignoring rocks and zone of control. Free, before it acts: it can still move and attack";

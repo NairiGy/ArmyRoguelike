@@ -353,24 +353,118 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void SmokeBomb_HidesAlliesInThePlus_AndTheirFirstAttackGetsTheBonus()
+        public void SmokeBomb_HidesItselfAndOneAlly_WithoutTheAmbushBonus()
         {
             var b = Setup(new[] { M(UnitStats.Rogue, Technique.SmokeBomb), M(UnitStats.Archer), M(UnitStats.Warrior) },
-                new[] { P(3, 1), P(4, 1), P(0, 0) }, new[] { E(UnitStats.Brute, 4, 4) });
+                new[] { P(3, 1), P(4, 1), P(2, 1) }, new[] { E(UnitStats.Brute, 4, 4) });
             var rogue = Player(b, 0);
             var archer = Player(b, 1);
             var warrior = Player(b, 2);
             var plain = b.DamageAgainst(archer, Enemy(b));
-            Assert.IsNotNull(b.PlayerUseAction(rogue, ActionKind.SmokeBomb, P(3, 1)));
+            Assert.IsFalse(b.CanUseAction(rogue, ActionKind.SmokeBomb, P(3, 2)), "aimed at an ally, not a tile");
+            Assert.IsNotNull(b.PlayerUseAction(rogue, ActionKind.SmokeBomb, archer.Pos));
             b.EndUnitTurn(rogue);
             Assert.IsTrue(rogue.IsHidden);
             Assert.IsTrue(archer.IsHidden);
-            Assert.IsFalse(warrior.IsHidden);
+            Assert.IsFalse(warrior.IsHidden, "next to it, but only one ally");
+            Assert.AreEqual(plain, b.DamageAgainst(archer, Enemy(b)), "no ambush from smoke");
+            Assert.AreEqual(4, Battle.Cooldown(ActionKind.SmokeBomb));
+        }
 
-            Assert.AreEqual(plain + Battle.VanishBonus, b.DamageAgainst(archer, Enemy(b)));
-            b.PlayerAttack(archer, Enemy(b));
-            Assert.IsTrue(archer.IsHidden, "still hidden after shooting");
-            Assert.IsTrue(archer.AmbushUsed);
+        [Test]
+        public void IntoTheShadows_HidesAtMostOnceEveryThreeTurns()
+        {
+            var b = Setup(new[] { M(UnitStats.Rogue, Technique.IntoShadows) }, new[] { P(3, 1) },
+                new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Wolf, 4, 1), Far });
+            var rogue = Player(b);
+            Enemy(b, 0).Hp = 1;
+            b.PlayerAttack(rogue, Enemy(b, 0));
+            Assert.IsTrue(rogue.IsHidden);
+            b.EndPlayerTurn();
+            Assert.IsFalse(rogue.IsHidden);
+            rogue.Pos = P(3, 1);
+            Enemy(b, 1).Pos = P(4, 1);
+            Enemy(b, 1).Hp = 1;
+            b.PlayerAttack(rogue, Enemy(b, 1));
+            Assert.IsFalse(rogue.IsHidden, "the next turn's kill doesn't hide it");
+        }
+
+        [Test]
+        public void Pins_CountOnlyUntilTheirTurnIsOver()
+        {
+            var b = Setup(new[] { M(UnitStats.Rogue, Technique.CheapShot) }, new[] { P(0, 0) }, new[] { E(UnitStats.Brute, 3, 3) });
+            var rogue = Player(b);
+            var brute = Enemy(b);
+            brute.SnareTurns = 1;
+            Assert.IsTrue(brute.IsSnared, "pinned for its coming turn");
+            b.EndPlayerTurn();
+            Assert.IsFalse(brute.IsSnared, "its pinned turn is over at yours");
+            rogue.Pos = P(3, 2);
+            Assert.AreEqual(b.EffectiveDamage(rogue), b.DamageAgainst(rogue, brute), "no Cheap Shot now");
+        }
+
+        [Test]
+        public void ConditionalBonuses_AreCappedAtFour()
+        {
+            var b = Setup(new[] { M(UnitStats.Rogue, Technique.CheapShot, Technique.Isolate, Technique.Pincer), M(UnitStats.Warrior) },
+                new[] { P(3, 1), P(3, 3) }, new[] { E(UnitStats.Brute, 3, 2) });
+            var rogue = Player(b);
+            var brute = Enemy(b);
+            brute.SnareTurns = 1;
+            b.PlayerUseAction(rogue, ActionKind.Vanish, rogue.Pos);
+            Assert.AreEqual(Battle.MaxConditionalBonus, b.ConditionalBonus(rogue, brute), "3 + 2 + 2 + 2, capped");
+            Assert.AreEqual(b.EffectiveDamage(rogue) + Battle.MaxConditionalBonus, b.DamageAgainst(rogue, brute));
+        }
+
+        [Test]
+        public void Kick_WithOpeningShot_DoublesTheKickNotTheShot()
+        {
+            var b = Setup(new[] { M(UnitStats.Archer, Technique.Kick, Technique.OpeningShot) }, new[] { P(3, 1) },
+                new[] { E(UnitStats.Brute, 3, 2) });
+            var archer = Player(b);
+            var brute = Enemy(b);
+            var kick = b.EffectiveDamage(archer) - archer.Stats.Damage + Battle.KickDamage;
+            b.PlayerUseAction(archer, ActionKind.Kick, brute.Pos);
+            Assert.AreEqual(UnitStats.Brute.MaxHp - 2 * kick, brute.Hp);
+        }
+
+        [Test]
+        public void DeathMark_SpreadsOnAnyDeath_TicksToo()
+        {
+            var b = Setup(new[] { M(UnitStats.Archer, Technique.MarkTarget, Technique.DeathMark) }, new[] { P(3, 0) },
+                new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Wolf, 4, 2), Far });
+            var target = Enemy(b, 0);
+            b.PlayerUseAction(Player(b), ActionKind.MarkTarget, target.Pos);
+            target.Hp = 1;
+            target.PoisonTurns = 1;
+            b.EndPlayerTurn();
+            Assert.IsFalse(target.IsAlive);
+            Assert.IsTrue(Enemy(b, 1).Marked);
+        }
+
+        [Test]
+        public void BlinkAndShadowstep_BlockedWhilePinnedOrSlowed()
+        {
+            var b = Setup(new[] { M(UnitStats.Rogue, Technique.Shadowstep), M(UnitStats.Apprentice, Technique.Blink) }, new[] { P(0, 0), P(5, 0) },
+                new[] { E(UnitStats.Wolf, 2, 2), Far });
+            var rogue = Player(b, 0);
+            var mage = Player(b, 1);
+            Assert.IsTrue(b.CanUseAction(rogue, ActionKind.Shadowstep, P(2, 1)));
+            Assert.IsTrue(b.CanUseAction(mage, ActionKind.Blink, P(5, 2)));
+            rogue.RootedThisTurn = true;
+            mage.SlowedThisTurn = true;
+            Assert.IsFalse(b.CanUseAction(rogue, ActionKind.Shadowstep, P(2, 1)));
+            Assert.IsFalse(b.CanUseAction(mage, ActionKind.Blink, P(5, 2)));
+        }
+
+        [Test]
+        public void Rupture_PreviewsTheKill()
+        {
+            var b = Setup(new[] { M(UnitStats.Rogue, Technique.Poison, Technique.Rupture) }, new[] { P(3, 1) }, new[] { E(UnitStats.Brute, 3, 2) });
+            var brute = Enemy(b);
+            brute.PoisonTurns = 2;
+            brute.Hp = 2 * Battle.PoisonDamage + 1;
+            CollectionAssert.Contains(b.ActionKills(Player(b), ActionKind.Rupture, brute.Pos), brute);
         }
 
         [Test]
