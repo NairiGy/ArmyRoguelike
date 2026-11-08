@@ -440,6 +440,7 @@ namespace ArmyRoguelike.View
 
         private void OnGUI()
         {
+            HudArt.ApplyFont();
             if (_run == null || _battleRoot != null)
                 return;
             var scale = Screen.height / ReferenceHeight;
@@ -1135,7 +1136,7 @@ namespace ArmyRoguelike.View
             KeywordText.LayoutLabel(tip, WrapLabel, w - 12);
             var glossary = string.IsNullOrEmpty(GUI.tooltip) ? "" : KeywordText.Glossary(GUI.tooltip);
             if (glossary.Length > 0)
-                GUILayout.Label(glossary, new GUIStyle(WrapLabel) { fontSize = 11 });
+                GUILayout.Label(glossary, new GUIStyle(WrapLabel) { fontSize = 12 });
             GUILayout.Space(8);
             // The army and the help scroll, so a big army can't push the button below off the panel.
             _mapScroll = GUILayout.BeginScrollView(_mapScroll, GUILayout.ExpandHeight(true));
@@ -1177,7 +1178,7 @@ namespace ArmyRoguelike.View
             _shopTitle = new GUIStyle(GUI.skin.label) { fontSize = 26, fontStyle = FontStyle.Bold };
             _cardName = new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, wordWrap = false, clipping = TextClipping.Clip };
             _cardText = new GUIStyle(GUI.skin.label) { fontSize = 12, wordWrap = true, padding = new RectOffset() };
-            _cardTag = new GUIStyle(_cardText) { fontSize = 11, richText = true };
+            _cardTag = new GUIStyle(_cardText) { fontSize = 12, richText = true };
             _section = new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold };
             _price = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight };
             _chip = new GUIStyle(GUI.skin.button) { fontSize = 11, fixedHeight = 20, padding = new RectOffset(8, 8, 2, 2) };

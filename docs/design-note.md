@@ -20,6 +20,7 @@ A roguelike army-builder: lead a small squad across a Slay the Spire–style map
 - Engine: Unity 6.
 
 ## Visual direction
+n- **Font** (2026-11-08, from the UI chat): Inter 4.1 (SIL Open Font License) for every IMGUI screen, in `Assets/Art/Fonts`; `HudArt.ApplyFont` sets it. Chosen for readability at small sizes; body text no smaller than 12 px.
 
 - **Look:** chunky, stylized, hand-painted statues on square pedestals, seen in 3/4 isometric view on the 2:1 board.
 - **Teams read by stone:** player statues are pale sandstone, enemies dark basalt, so enemy art is generated in dark basalt (the enemy colouring expects dark art; light art comes out pale). The one exception is the undead: skeletons stay pale bone on purpose (decided 2026-10-28). Rune glow is an optional extra, not required.

@@ -44,6 +44,20 @@ namespace ArmyRoguelike.View
         private static readonly Dictionary<Icon, Texture2D> Icons = new Dictionary<Icon, Texture2D>();
 
         /// <summary>A 1x1 texture of one colour, for IMGUI backgrounds and bars.</summary>
+        private static Font _font;
+
+        /// <summary>
+        /// Makes every IMGUI style without a font of its own use Inter (`Assets/Art/Fonts`). Call at the top of each
+        /// OnGUI. Falls back to Unity's built-in font if it isn't found.
+        /// </summary>
+        public static void ApplyFont()
+        {
+            if (_font == null)
+                _font = Resources.Load<Font>("Inter-Regular");
+            if (_font != null && GUI.skin.font != _font)
+                GUI.skin.font = _font;
+        }
+
         public static Texture2D Solid(Color color)
         {
             if (Solids.TryGetValue(color, out var tex) && tex != null)

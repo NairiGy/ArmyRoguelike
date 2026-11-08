@@ -1542,6 +1542,7 @@ namespace ArmyRoguelike.View
 
         private void OnGUI()
         {
+            HudArt.ApplyFont();
             if (_board == null)
                 return;
             var scale = Screen.height / ReferenceHeight;
