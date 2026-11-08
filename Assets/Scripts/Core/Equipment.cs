@@ -261,6 +261,51 @@ namespace ArmyRoguelike.Core
             }
         }
 
+        /// <summary>
+        /// A short form of a long action text, for small cards (the battle's action cards, the draft cards). The full
+        /// text (<see cref="Describe(ActionKind)"/>) stays on the detail screen, picks, shop and tooltips. Actions without
+        /// a short form use the full text.
+        /// </summary>
+        public static string Short(ActionKind action)
+        {
+            switch (action)
+            {
+                case ActionKind.PlaceMine: return $"put a mine within {Battle.MineRange} (max {Battle.MaxMinesPerUnit}): {Battle.MineDamage} damage when an enemy steps on it";
+                case ActionKind.ShieldBash: return $"{Battle.BashDamage} damage and push an enemy next to it; what it slams into takes {Battle.CollisionDamage} too";
+                case ActionKind.SnareTrap: return $"hide a snare within {Battle.SnareRange}: the first enemy on it stops, takes {Battle.SnareDamage} and is pinned";
+                case ActionKind.CoveringFire: return "aim instead: the first enemy to walk into its sight next turn is shot and stops";
+                case ActionKind.SuppressingFire: return $"every enemy on a row or column takes {Battle.PinDamage} and is pinned";
+                case ActionKind.ThrowingKnife: return $"{Battle.KnifeDamage} damage 2-{Battle.KnifeRange} tiles away (line of sight), with its damage bonuses";
+                case ActionKind.Shadowstep: return $"teleport next to an enemy within {Battle.ShadowstepRange}, ignoring zone of control; it can still attack. Free";
+                case ActionKind.SmokeBomb: return $"it and one ally within {Battle.SmokeRange} are hidden until your next turn";
+                case ActionKind.Rupture: return $"hit a poisoned enemy next to it: {Battle.PoisonDamage} per poison turn left, then poison again";
+                case ActionKind.Barricade: return $"build a barricade next to it ({Battle.BarricadeHp} HP, blocks paths and shots); broken, it leaves rubble";
+                case ActionKind.Detonate: return $"blow up its barricades: {Battle.BarricadeBlastDamage} damage in a 3x3 around each";
+                case ActionKind.Charge: return $"rush up to {Battle.ChargeRange} tiles straight: {Battle.ChargeDamage} damage to each enemy on the way, pushed aside";
+                case ActionKind.Battlecry: return $"allies within {Battle.BattlecryRange} get +{Battle.BattlecryMoves} move and {Battle.BattlecryHp} temporary HP";
+                case ActionKind.Taunt: return $"enemies within {Battle.TauntRange} can only target it until your next turn";
+                case ActionKind.ThrowShield: return $"+{Battle.ThrowShieldMoves} move and +{Battle.ThrowShieldDamage} damage for the battle, costs {Battle.ThrowShieldHpCost} HP. Once. Free";
+                case ActionKind.Firewall: return $"3 tiles in a line, up to {Battle.FirewallRange} away, burn for {Battle.BurnRounds} rounds ({Battle.FirewallDamage} damage now)";
+                case ActionKind.Blizzard: return $"{Battle.BlizzardDamage} damage to enemies on a tile and the 4 next to it, and they are slowed";
+                case ActionKind.Transpose: return $"swap places with any unit within {Battle.TransposeRange}";
+                case ActionKind.Hook: return $"pull an enemy 2-{Battle.HookRange} tiles away in a straight line next to it";
+                case ActionKind.Demolish: return $"blow up a rock, rubble, barricade or ice wall within {Battle.DemolishRange}: {Battle.DemolishDamage} damage in a 3x3";
+                default: return Describe(action);
+            }
+        }
+
+        /// <summary>A short form of a long passive text, for small cards; see <see cref="Short(ActionKind)"/>.</summary>
+        public static string Short(Ability ability)
+        {
+            switch (ability)
+            {
+                case Ability.Mines: return "its mines go off when an enemy steps on them";
+                case Ability.IntoShadows: return $"a kill makes it hidden until your next turn (once every {Battle.IntoShadowsCooldown} turns)";
+                case Ability.Twincast: return "its first action each turn costs no AP";
+                default: return Describe(ability);
+            }
+        }
+
         public static string Describe(ActionKind action)
         {
             switch (action)

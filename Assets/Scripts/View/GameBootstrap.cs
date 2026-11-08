@@ -678,9 +678,9 @@ namespace ArmyRoguelike.View
         {
             var kit = new System.Collections.Generic.List<(string, string)>();
             foreach (var a in s.Abilities)
-                kit.Add((Abilities.Name(a), Capitalise(Abilities.Describe(a))));
+                kit.Add((Abilities.Name(a), Capitalise(Abilities.Short(a))));
             foreach (var a in s.Actions)
-                kit.Add(($"{Abilities.Name(a)}  ·  {Battle.ActionCost(a)} AP", Capitalise(Abilities.Describe(a))));
+                kit.Add(($"{Abilities.Name(a)}  ·  {Battle.ActionCost(a)} AP", Capitalise(Abilities.Short(a))));
             return kit;
         }
 
@@ -712,11 +712,7 @@ namespace ArmyRoguelike.View
                 Do(() => ToggleDraftPick(s));
             GUI.color = old;
             if (GUI.Button(info, "More info"))
-                Do(() =>
-                {
-                    _detailUnit = s;
-                    _detailScroll = Vector2.zero;
-                });
+                Do(() => OpenDetail(s));
             if (full)
                 GUI.color = Faded;
             var x = r.x + 10;
@@ -762,23 +758,47 @@ namespace ArmyRoguelike.View
 
         private Vector2 _detailScroll;
 
-        private static readonly Color StartColor = new Color(0.55f, 0.85f, 1f);
+        /// <summary>The skill under the pointer last frame: it and the skills it needs or unlocks get a gold edge.</summary>
+        private string _hoveredSkill;
+        private string _hoveredSkillNext;
 
-        /// <summary>A skill on the detail screen: name, tag line, rule text and its name colour (start, common or rare).</summary>
-        private struct DetailSkill
+        private static readonly Color StartColor = new Color(0.55f, 0.85f, 1f);
+        private static readonly Color HpGrowthColor = new Color(0.35f, 0.8f, 0.4f);
+
+        /// <summary>A skill on the detail screen.</summary>
+        private sealed class DetailSkill
         {
-            public string Name, Tags, Text;
+            public string Name, Tags, Text, Requires;
             public Color Color;
+
+            /// <summary>Drawn under the skill it needs, with a connector (its requirement is in the same column).</summary>
+            public bool Indented;
         }
 
         /// <summary>
-        /// A unit's detail screen: its statue and every stat, what each level gives, and every skill it can have, split
-        /// into passive and active, coloured by where it comes from (starting kit, common or rare technique).
+        /// A unit's detail screen: its statue and stats, what each level gives, and every skill it can have, split into
+        /// passive and active and coloured by source (starting kit, common or rare). Skills that need another sit
+        /// under it; hovering a skill lights up what it needs and what it unlocks. Arrows (or the buttons) switch hero.
         /// </summary>
         private void DrawHeroDetail(float screenWidth)
         {
             EnsureShopStyles();
             var s = _detailUnit;
+            var pool = _run.DraftPool.ToList();
+            var index = Mathf.Max(0, pool.IndexOf(s));
+            var e = Event.current;
+            if (e.type == EventType.KeyDown && (e.keyCode == KeyCode.LeftArrow || e.keyCode == KeyCode.RightArrow))
+            {
+                var next = pool[(index + (e.keyCode == KeyCode.LeftArrow ? pool.Count - 1 : 1)) % pool.Count];
+                Do(() => OpenDetail(next));
+                e.Use();
+            }
+            else if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape)
+            {
+                Do(() => _detailUnit = null);
+                e.Use();
+            }
+
             var w = Mathf.Min(DraftWidth, screenWidth - 20f);
             var inner = w - 2 * ShopPad;
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 10, w, ReferenceHeight - 20), HudArt.PanelStyle(HudArt.PanelColor, ShopPad));
@@ -788,6 +808,13 @@ namespace ArmyRoguelike.View
             GUILayout.Space(12);
             _shopTitle.normal.textColor = Color.white;
             GUILayout.Label(s.Name, _shopTitle);
+            GUILayout.FlexibleSpace();
+            var prev = pool[(index + pool.Count - 1) % pool.Count];
+            var after = pool[(index + 1) % pool.Count];
+            if (GUILayout.Button($"< {prev.Name}", GUILayout.Width(150), GUILayout.Height(30)))
+                Do(() => OpenDetail(prev));
+            if (GUILayout.Button($"{after.Name} >", GUILayout.Width(150), GUILayout.Height(30)))
+                Do(() => OpenDetail(after));
             GUILayout.EndHorizontal();
             _cardText.normal.textColor = DimText;
             GUILayout.Label(s.Role, _cardText);
@@ -798,6 +825,9 @@ namespace ArmyRoguelike.View
             DrawDetailStats(new Rect(area.x, area.y, leftWidth, area.height), s);
 
             // Skills on the right, passive and active side by side, scrolling if they don't fit.
+            _hoveredSkill = _hoveredSkillNext;
+            if (e.type == EventType.Repaint)
+                _hoveredSkillNext = null;
             var skills = new Rect(area.x + leftWidth + 16, area.y, area.width - leftWidth - 16, area.height);
             var (passive, active) = DetailSkills(s);
             const float columnGap = 14f, scrollBar = 16f;
@@ -805,10 +835,34 @@ namespace ArmyRoguelike.View
             var contentHeight = Mathf.Max(SkillColumnHeight(passive, column), SkillColumnHeight(active, column)) + 30;
             _detailScroll = GUI.BeginScrollView(skills, _detailScroll, new Rect(0, 0, skills.width - scrollBar, contentHeight));
             DrawLegend(new Rect(0, 0, skills.width - scrollBar, 20));
-            DrawSkillColumn(new Rect(0, 26, column, contentHeight - 26), "PASSIVE", passive);
-            DrawSkillColumn(new Rect(column + columnGap, 26, column, contentHeight - 26), "ACTIVE", active);
+            var all = passive.Concat(active).ToList();
+            DrawSkillColumn(new Rect(0, 26, column, contentHeight - 26), "PASSIVE", passive, all);
+            DrawSkillColumn(new Rect(column + columnGap, 26, column, contentHeight - 26), "ACTIVE", active, all);
             GUI.EndScrollView();
             GUILayout.EndArea();
+        }
+
+        private void OpenDetail(UnitStats unit)
+        {
+            _detailUnit = unit;
+            _detailScroll = Vector2.zero;
+            _hoveredSkill = _hoveredSkillNext = null;
+        }
+
+        /// <summary>A stat icon, tinted, with its value beside it and its name dim after.</summary>
+        private float StatRow(float x, float y, HudArt.Icon icon, Color color, string value, string name)
+        {
+            if (Event.current.type == EventType.Repaint)
+            {
+                var old = GUI.color;
+                GUI.color = color;
+                GUI.DrawTexture(new Rect(x, y + 1, 16, 16), HudArt.IconTexture(icon));
+                GUI.color = old;
+            }
+
+            Label(new Rect(x + 24, y, 60, 20), value, _cardName, Color.white);
+            Label(new Rect(x + 70, y + 2, 160, 18), name, _cardText, DimText);
+            return y + 22;
         }
 
         /// <summary>Left column: the statue, the stats and what each level gives.</summary>
@@ -818,59 +872,73 @@ namespace ArmyRoguelike.View
             var x = r.x + 12;
             var inner = r.width - 24;
             var y = r.y + 10;
-            DrawStatue(new Rect(x, y, inner, 170), s.Kind);
-            y += 178;
+            DrawStatue(new Rect(x, y, inner, 160), s.Kind);
+            y += 168;
 
             if (Event.current.type == EventType.Repaint)
             {
                 const float gap = 2f;
                 var piece = (inner - gap * (s.MaxHp - 1)) / s.MaxHp;
                 for (var i = 0; i < s.MaxHp; i++)
-                    GUI.DrawTexture(new Rect(x + i * (piece + gap), y, piece, 10f), HudArt.Solid(new Color(0.35f, 0.8f, 0.4f)));
+                    GUI.DrawTexture(new Rect(x + i * (piece + gap), y, piece, 10f), HudArt.Solid(HpGrowthColor));
             }
 
-            y += 16;
-            var rows = new[]
-            {
-                ("HP", s.MaxHp.ToString()),
-                ("Damage", s.Damage.ToString()),
-                ("Range", s.Range == 1 ? "1 (next to it)" : s.Range.ToString()),
-                ("Moves", s.Moves.ToString()),
-                ("AP", s.MaxAp.ToString()),
-                ("Weight", s.Weight.ToString().ToLowerInvariant()),
-            };
-            foreach (var (name, value) in rows)
-            {
-                Label(new Rect(x, y, 90, 18), name, _cardText, DimText);
-                Label(new Rect(x + 90, y, inner - 90, 18), value, _cardName, Color.white);
-                y += 19;
-            }
+            y += 18;
+            y = StatRow(x, y, HudArt.Icon.Heart, HpGrowthColor, s.MaxHp.ToString(), "HP");
+            y = StatRow(x, y, HudArt.Icon.Sword, new Color(1f, 0.6f, 0.35f), s.Damage.ToString(), "damage");
+            y = StatRow(x, y, HudArt.Icon.Target, new Color(0.9f, 0.85f, 0.5f), s.Range.ToString(), s.Range == 1 ? "range (next to it)" : "range");
+            y = StatRow(x, y, HudArt.Icon.Boot, new Color(0.6f, 0.8f, 1f), s.Moves.ToString(), s.Moves == 1 ? "move a turn" : "moves a turn");
+            y = StatRow(x, y, HudArt.Icon.Diamond, new Color(1f, 0.85f, 0.25f), s.MaxAp.ToString(), "AP a turn");
+            y = StatRow(x, y, HudArt.Icon.Weight, new Color(0.75f, 0.75f, 0.8f), s.Weight.ToString().ToLowerInvariant(), "weight");
 
-            // Level growth: a level is one technique learned, up to the size of the line's pool.
+            // Level growth as a strip: one cell per level, marked where damage (or a mine) comes.
             y += 10;
             _section.normal.textColor = GoldColor;
             GUI.Label(new Rect(x, y, inner, 18), "LEVEL GROWTH", _section);
             y += 20;
             var maxLevel = Technique.All.Count(t => t.Line == s);
-            var growth = new System.Collections.Generic.List<string> { $"Every level: +{Growth.HpPerLevel(s)} max HP" };
             var damageLevels = Growth.DamageLevels(s);
-            growth.Add(damageLevels.Count > 0 ? $"+1 damage at level {string.Join(", ", damageLevels)}" : "No damage growth");
-            if (Growth.MineLevel(s) > 0)
-                growth.Add($"+1 mine on the board at level {Growth.MineLevel(s)}");
-            growth.Add($"At level {maxLevel} (every technique): HP {s.MaxHp + Growth.Hp(s, maxLevel)}, damage {s.Damage + Growth.Damage(s, maxLevel)}");
-            _cardText.normal.textColor = TextColor;
-            foreach (var line in growth)
+            var mineLevel = Growth.MineLevel(s);
+            const float cellGap = 2f, cellHeight = 34f;
+            var cell = (inner - cellGap * (maxLevel - 1)) / maxLevel;
+            var number = new GUIStyle(_cardTag) { alignment = TextAnchor.UpperCenter, fontStyle = FontStyle.Bold };
+            for (var level = 1; level <= maxLevel; level++)
             {
-                var h = _cardText.CalcHeight(new GUIContent(line), inner);
-                GUI.Label(new Rect(x, y, inner, h), line, _cardText);
-                y += h + 3;
+                var c = new Rect(x + (level - 1) * (cell + cellGap), y, cell, cellHeight);
+                GUI.DrawTexture(c, HudArt.Solid(new Color(0.18f, 0.18f, 0.22f)));
+                // Every level: HP (green strip at the bottom).
+                GUI.DrawTexture(new Rect(c.x, c.yMax - 4, c.width, 4), HudArt.Solid(HpGrowthColor));
+                number.normal.textColor = DimText;
+                GUI.Label(new Rect(c.x, c.y + 1, c.width, 14), level.ToString(), number);
+                if (damageLevels.Contains(level) && Event.current.type == EventType.Repaint)
+                {
+                    var old = GUI.color;
+                    GUI.color = new Color(1f, 0.6f, 0.35f);
+                    GUI.DrawTexture(new Rect(c.center.x - 6, c.y + 15, 12, 12), HudArt.IconTexture(HudArt.Icon.Sword));
+                    GUI.color = old;
+                }
+                else if (level == mineLevel)
+                    GUI.DrawTexture(new Rect(c.center.x - 4, c.y + 17, 8, 8), HudArt.Solid(new Color(0.6f, 0.8f, 1f)));
             }
 
+            y += cellHeight + 6;
+            var legend = $"Every level +{Growth.HpPerLevel(s)} max HP (green)";
+            if (damageLevels.Count > 0)
+                legend += ", sword: +1 damage";
+            if (mineLevel > 0)
+                legend += ", blue: +1 mine on the board";
+            legend += $". At level {maxLevel}: HP {s.MaxHp + Growth.Hp(s, maxLevel)}, damage {s.Damage + Growth.Damage(s, maxLevel)}.";
             _cardTag.normal.textColor = DimText;
-            GUI.Label(new Rect(x, y + 2, inner, 30), "A unit goes up a level each time it learns a new technique.", _cardTag);
+            var legendHeight = _cardTag.CalcHeight(new GUIContent(legend), inner);
+            GUI.Label(new Rect(x, y, inner, legendHeight), legend, _cardTag);
+            y += legendHeight + 4;
+            GUI.Label(new Rect(x, y, inner, 30), "A unit goes up a level each time it learns a new technique.", _cardTag);
         }
 
-        /// <summary>Every skill the unit can have: its starting kit, then its line's techniques (common, then rare).</summary>
+        /// <summary>
+        /// Every skill the unit can have: its starting kit, then its line's techniques, common before rare, each one
+        /// that needs another right under it when both are in the same column.
+        /// </summary>
         private static (System.Collections.Generic.List<DetailSkill> passive, System.Collections.Generic.List<DetailSkill> active) DetailSkills(UnitStats s)
         {
             var passive = new System.Collections.Generic.List<DetailSkill>();
@@ -883,7 +951,9 @@ namespace ArmyRoguelike.View
                 active.Add(new DetailSkill { Name = name, Tags = tags, Text = Capitalise(text), Color = StartColor });
             }
 
-            foreach (var t in Technique.All.Where(t => t.Line == s).OrderBy(t => t.Rarity))
+            var line = Technique.All.Where(t => t.Line == s).OrderBy(t => t.Rarity).ToList();
+            bool IsActive(Technique t) => t.Action.HasValue;
+            DetailSkill Make(Technique t, bool indented)
             {
                 var rare = t.Rarity == TechniqueRarity.Rare;
                 var tags = rare ? "Rare" : "Common";
@@ -891,28 +961,66 @@ namespace ArmyRoguelike.View
                     tags += $"  ·  {Battle.ActionCost(t.Action.Value)} AP  ·  cooldown {Battle.Cooldown(t.Action.Value)}";
                 if (t.Requires != null)
                     tags += $"  ·  needs {t.Requires.Name}";
-                var skill = new DetailSkill { Name = t.Name, Tags = tags, Text = Capitalise(t.Description), Color = rare ? RareColor : TextColor };
-                (t.Action.HasValue ? active : passive).Add(skill);
+                return new DetailSkill
+                {
+                    Name = t.Name, Tags = tags, Text = Capitalise(t.Description), Requires = t.Requires?.Name,
+                    Color = rare ? RareColor : TextColor, Indented = indented,
+                };
             }
 
+            // Roots first (no requirement, or one in the other column), each followed by what it unlocks in its column.
+            void Add(Technique t, bool indented)
+            {
+                (IsActive(t) ? active : passive).Add(Make(t, indented));
+                foreach (var child in line.Where(c => c.Requires == t && IsActive(c) == IsActive(t)))
+                    Add(child, true);
+            }
+
+            foreach (var t in line.Where(t => t.Requires == null || IsActive(t.Requires) != IsActive(t)))
+                Add(t, false);
             return (passive, active);
         }
 
-        private float SkillHeight(DetailSkill skill, float width) =>
-            20 + _cardTag.CalcHeight(new GUIContent(skill.Tags), width - 16) + 2 + KeywordText.Height(skill.Text, _cardText, width - 16) + 14;
+        private const float Indent = 18f;
+
+        private float SkillHeight(DetailSkill skill, float width)
+        {
+            var inner = width - (skill.Indented ? Indent : 0) - 16;
+            return 20 + _cardTag.CalcHeight(new GUIContent(skill.Tags), inner) + 2 + KeywordText.Height(skill.Text, _cardText, inner) + 14;
+        }
 
         private float SkillColumnHeight(System.Collections.Generic.List<DetailSkill> skills, float width) =>
             22 + skills.Sum(k => SkillHeight(k, width) + 6);
 
-        private void DrawSkillColumn(Rect r, string title, System.Collections.Generic.List<DetailSkill> skills)
+        private void DrawSkillColumn(Rect r, string title, System.Collections.Generic.List<DetailSkill> skills, System.Collections.Generic.List<DetailSkill> all)
         {
             _section.normal.textColor = GoldColor;
             GUI.Label(new Rect(r.x, r.y, r.width, 18), $"{title}  ({skills.Count})", _section);
+            var hovered = all.FirstOrDefault(k => k.Name == _hoveredSkill);
             var y = r.y + 22;
+            var parentY = y;
             foreach (var skill in skills)
             {
                 var h = SkillHeight(skill, r.width);
-                var card = new Rect(r.x, y, r.width, h);
+                var indent = skill.Indented ? Indent : 0f;
+                var card = new Rect(r.x + indent, y, r.width - indent, h);
+                if (card.Contains(Event.current.mousePosition))
+                    _hoveredSkillNext = skill.Name;
+
+                // Hovering a skill lights up it, what it needs and what needs it.
+                var linked = hovered != null && (skill == hovered || skill.Name == hovered.Requires || skill.Requires == hovered.Name);
+                if (linked)
+                    GUI.DrawTexture(new Rect(card.x - 2, card.y - 2, card.width + 4, card.height + 4), HudArt.Solid(GoldColor));
+                if (skill.Indented)
+                {
+                    // Connector from the skill above.
+                    var line = new Color(0.4f, 0.4f, 0.45f);
+                    GUI.DrawTexture(new Rect(r.x + 6, parentY, 2, y + 12 - parentY), HudArt.Solid(line));
+                    GUI.DrawTexture(new Rect(r.x + 6, y + 11, Indent - 6, 2), HudArt.Solid(line));
+                }
+                else
+                    parentY = y + h;
+
                 GUI.DrawTexture(card, HudArt.Solid(HudArt.CardColor));
                 GUI.DrawTexture(new Rect(card.x, card.y, 3f, card.height), HudArt.Solid(skill.Color));
                 var x = card.x + 10;
@@ -926,6 +1034,8 @@ namespace ArmyRoguelike.View
                 _cardText.normal.textColor = TextColor;
                 KeywordText.Draw(new Rect(x, ty, inner, card.yMax - ty), skill.Text, _cardText);
                 y += h + 6;
+                if (skill.Indented)
+                    parentY = y - 6;
             }
         }
 
@@ -941,6 +1051,9 @@ namespace ArmyRoguelike.View
                 GUI.Label(new Rect(x + 14, r.y + 2, width + 4, 18), name, _cardTag);
                 x += 14 + width + 20;
             }
+
+            _cardTag.normal.textColor = DimText;
+            GUI.Label(new Rect(x, r.y + 2, r.xMax - x, 18), "Hover a skill to light up what it needs and unlocks.  ← → switch hero", _cardTag);
         }
 
         /// <summary>

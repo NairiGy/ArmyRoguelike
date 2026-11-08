@@ -1856,7 +1856,7 @@ namespace ArmyRoguelike.View
             foreach (var action in actions)
                 height = Mathf.Max(height, title.CalcHeight(new GUIContent(Abilities.Name(action)), inner - 28f) +
                                            cost.CalcHeight(new GUIContent("x"), inner) +
-                                           KeywordText.Height(Capitalise(Abilities.Describe(action)), text, inner) + 30f);
+                                           KeywordText.Height(Capitalise(Abilities.Short(action)), text, inner) + 30f);
             var y = ReferenceHeight - Margin - height;
 
             for (var i = 0; i < actions.Count; i++)
@@ -1896,7 +1896,7 @@ namespace ArmyRoguelike.View
                     : Battle.CooldownFor(_selected, action) == 0 ? $"<color={ActionColor}>{CardCost(_selected, action)} AP  ·  once per battle</color>"
                     : $"<color={ActionColor}>{CardCost(_selected, action)} AP  ·  cooldown {Battle.CooldownFor(_selected, action)}</color>";
                 GUILayout.Label(status, cost);
-                KeywordText.LayoutLabel(Capitalise(Abilities.Describe(action)), text, inner);
+                KeywordText.LayoutLabel(Capitalise(Abilities.Short(action)), text, inner);
                 GUILayout.EndArea();
                 GUI.color = old;
             }

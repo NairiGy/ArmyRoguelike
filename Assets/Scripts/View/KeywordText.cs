@@ -77,6 +77,7 @@ namespace ArmyRoguelike.View
         {
             public string Text;
             public Keyword? Keyword;
+            public bool Number;
         }
 
         /// <summary>Lays the text out (and draws it when <paramref name="rect"/> is set); returns its height.</summary>
@@ -91,6 +92,8 @@ namespace ArmyRoguelike.View
                 padding = new RectOffset(), margin = new RectOffset(), overflow = new RectOffset(), clipping = TextClipping.Overflow,
             };
             plain.normal.textColor = style.normal.textColor;
+            var number = new GUIStyle(plain) { fontStyle = FontStyle.Bold };
+            number.normal.textColor = Color.white;
             var lit = new GUIStyle(plain);
             lit.normal.textColor = KeywordColor;
             var lineHeight = plain.CalcSize(new GUIContent("Ag")).y;
@@ -112,7 +115,7 @@ namespace ArmyRoguelike.View
 
                 var w = 0f;
                 foreach (var piece in word)
-                    w += plain.CalcSize(new GUIContent(piece.Text)).x;
+                    w += (piece.Number ? number : plain).CalcSize(new GUIContent(piece.Text)).x;
                 if (x > 0f && x + w > width)
                 {
                     x = 0f;
@@ -121,13 +124,13 @@ namespace ArmyRoguelike.View
 
                 foreach (var piece in word)
                 {
-                    var pw = plain.CalcSize(new GUIContent(piece.Text)).x;
+                    var pw = (piece.Number ? number : plain).CalcSize(new GUIContent(piece.Text)).x;
                     if (rect.HasValue)
                     {
                         var r = new Rect(rect.Value.x + x, rect.Value.y + y, pw, lineHeight);
                         if (draw)
                         {
-                            GUI.Label(r, piece.Text, piece.Keyword.HasValue ? lit : plain);
+                            GUI.Label(r, piece.Text, piece.Keyword.HasValue ? lit : piece.Number ? number : plain);
                             if (piece.Keyword.HasValue)
                                 GUI.DrawTexture(new Rect(r.x, r.yMax - 2f, r.width, 1f), HudArt.Solid(new Color(KeywordColor.r, KeywordColor.g, KeywordColor.b, 0.5f)));
                         }
@@ -149,6 +152,46 @@ namespace ArmyRoguelike.View
         }
 
         /// <summary>
+        /// Adds a run of plain text to a word, split so numbers ("2", "+2", "2-4", "x2") are pieces of their own and
+        /// stand out.
+        /// </summary>
+        private static void AddPlain(List<Piece> word, string text)
+        {
+            var at = 0;
+            var i = 0;
+            while (i < text.Length)
+            {
+                var start = i;
+                if ((text[i] == '+' || text[i] == '-' || text[i] == 'x') && i + 1 < text.Length && char.IsDigit(text[i + 1]) &&
+                    (i == 0 || !char.IsLetterOrDigit(text[i - 1])))
+                    i++;
+                if (i < text.Length && char.IsDigit(text[i]))
+                {
+                    while (i < text.Length && char.IsDigit(text[i]))
+                        i++;
+                    // A range: "2-4".
+                    if (i + 1 < text.Length && text[i] == '-' && char.IsDigit(text[i + 1]))
+                    {
+                        i++;
+                        while (i < text.Length && char.IsDigit(text[i]))
+                            i++;
+                    }
+
+                    if (start > at)
+                        word.Add(new Piece { Text = text.Substring(at, start - at) });
+                    word.Add(new Piece { Text = text.Substring(start, i - start), Number = true });
+                    at = i;
+                    continue;
+                }
+
+                i = start + 1;
+            }
+
+            if (at < text.Length)
+                word.Add(new Piece { Text = text.Substring(at) });
+        }
+
+        /// <summary>
         /// The text as words, each split into pieces at keyword edges ("(pinned)." is "(", "pinned", ")."). A
         /// keyword of several words is one word. Null stands for a line break.
         /// </summary>
@@ -165,7 +208,7 @@ namespace ArmyRoguelike.View
                 {
                     if (plain.Length > 0)
                     {
-                        word.Add(new Piece { Text = plain.ToString() });
+                        AddPlain(word, plain.ToString());
                         plain.Clear();
                     }
 
@@ -180,7 +223,7 @@ namespace ArmyRoguelike.View
                 {
                     if (plain.Length > 0)
                     {
-                        word.Add(new Piece { Text = plain.ToString() });
+                        AddPlain(word, plain.ToString());
                         plain.Clear();
                     }
 
@@ -196,7 +239,7 @@ namespace ArmyRoguelike.View
             }
 
             if (plain.Length > 0)
-                word.Add(new Piece { Text = plain.ToString() });
+                AddPlain(word, plain.ToString());
             if (word.Count > 0)
                 yield return word;
         }

@@ -21,6 +21,11 @@ namespace ArmyRoguelike.View
             Push,
             Bolt,
             Skull,
+            Heart,
+            Target,
+            Boot,
+            Diamond,
+            Weight,
         }
 
         public static readonly Color PanelColor = new Color(0.07f, 0.07f, 0.09f, 0.94f);
@@ -170,6 +175,31 @@ namespace ArmyRoguelike.View
                     Line(tex, 20, 29, 10, 16, 4f);
                     Line(tex, 10, 16, 21, 16, 4f);
                     Line(tex, 21, 16, 11, 3, 4f);
+                    break;
+                // Stat icons (placeholders, 2026-11-08): HP, range, moves, AP, weight.
+                case Icon.Heart:
+                    Ring(tex, 11, 20, 0f, 7f);
+                    Ring(tex, 21, 20, 0f, 7f);
+                    for (var x = 4; x <= 28; x++)
+                        Line(tex, 16, 4, x, 19, 1.6f);
+                    break;
+                case Icon.Target:
+                    Ring(tex, 16, 16, 10f, 13.5f);
+                    Ring(tex, 16, 16, 0f, 4.5f);
+                    break;
+                case Icon.Boot:
+                    Line(tex, 12, 28, 12, 9, 7f);
+                    Line(tex, 12, 7, 27, 7, 6f);
+                    break;
+                case Icon.Diamond:
+                    for (var y = 0; y < IconSize; y++)
+                    for (var x = 0; x < IconSize; x++)
+                        if (Mathf.Abs(x - 15.5f) + Mathf.Abs(y - 15.5f) <= 12f)
+                            tex.SetPixel(x, y, Color.white);
+                    break;
+                case Icon.Weight:
+                    Ring(tex, 16, 12, 0f, 10f);
+                    Ring(tex, 16, 25, 3.5f, 6.5f);
                     break;
                 case Icon.Skull:
                     Ring(tex, 16, 19, 0f, 11f);
