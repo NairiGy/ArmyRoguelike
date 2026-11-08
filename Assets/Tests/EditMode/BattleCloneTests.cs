@@ -27,8 +27,8 @@ namespace ArmyRoguelike.Tests
         private static List<ArmyMember> FullArmy() => new List<ArmyMember>
         {
             new ArmyMember(UnitStats.Warrior, null, Technique.Sweep, Technique.Guard, Technique.ShieldUp, Technique.Battlecry, Technique.Taunt, Technique.ThrowShield, Technique.ZocStrike),
-            new ArmyMember(UnitStats.Archer, null, Technique.OpeningShot, Technique.SnareTrap, Technique.CoveringFire, Technique.FireArrow, Technique.Kick, Technique.Vantage),
-            new ArmyMember(UnitStats.Rogue, null, Technique.Poison, Technique.Riposte, Technique.Dodge, Technique.SmokeBomb, Technique.Shadowstep, Technique.ThrowingKnife, Technique.Rupture, Technique.IntoShadows),
+            new ArmyMember(UnitStats.Archer, null, Technique.OpeningShot, Technique.SnareTrap, Technique.CoveringFire, Technique.FireArrow, Technique.Kick, Technique.Vantage, Technique.MarkTarget, Technique.DeathMark),
+            new ArmyMember(UnitStats.Rogue, null, Technique.Poison, Technique.Riposte, Technique.Dodge, Technique.SmokeBomb, Technique.Shadowstep, Technique.ThrowingKnife, Technique.Rupture, Technique.IntoShadows, Technique.Isolate),
             new ArmyMember(UnitStats.Apprentice, null, Technique.Fireball, Technique.Burning, Technique.Chill, Technique.Ward, Technique.IceWall),
             new ArmyMember(UnitStats.Sapper, null, Technique.Barricade, Technique.Turret, Technique.Detonate, Technique.ThrowBomb),
         };

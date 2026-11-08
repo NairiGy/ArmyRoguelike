@@ -33,30 +33,31 @@ namespace ArmyRoguelike.Tests
         // ---------- Pools ----------
 
         [Test]
-        public void Pools_TwelveEach_AboutOneThirdRare_WithVolleyAndRipostePlusParked()
+        public void Pools_ThirteenEach_AboutOneThirdRare_WithParkedOnesLeftOut()
         {
-            foreach (var line in new[] { UnitStats.Archer, UnitStats.Rogue })
+            foreach (var (line, rares) in new[] { (UnitStats.Archer, 6), (UnitStats.Rogue, 5) })
             {
                 var offered = Technique.All.Where(t => t.Line == line).ToList();
-                Assert.AreEqual(12, offered.Count, line.Name);
-                Assert.AreEqual(5, offered.Count(t => t.Rarity == TechniqueRarity.Rare), line.Name);
+                Assert.AreEqual(13, offered.Count, line.Name);
+                Assert.AreEqual(rares, offered.Count(t => t.Rarity == TechniqueRarity.Rare), line.Name);
                 Assert.Greater(offered.Count(t => t.Action.HasValue), 3, line.Name + " has actions");
                 Assert.Greater(offered.Count(t => !t.Action.HasValue), 3, line.Name + " has passives");
             }
 
             Assert.IsFalse(Technique.All.Contains(Technique.Volley));
+            Assert.IsFalse(Technique.All.Contains(Technique.SpikedSnares));
             Assert.IsFalse(Technique.All.Contains(Technique.RipostePlus));
         }
 
         [Test]
-        public void Chains_SpikedSnaresSuppressingFireAndRuptureNeedTheirRoot()
+        public void Chains_DeathMarkSuppressingFireAndRuptureNeedTheirRoot()
         {
             var archer = M(UnitStats.Archer);
-            Assert.IsFalse(Technique.SpikedSnares.CanLearn(archer));
+            Assert.IsFalse(Technique.DeathMark.CanLearn(archer));
             Assert.IsFalse(Technique.SuppressingFire.CanLearn(archer));
-            archer.Learn(Technique.SnareTrap);
+            archer.Learn(Technique.MarkTarget);
             archer.Learn(Technique.Pierce);
-            Assert.IsTrue(Technique.SpikedSnares.CanLearn(archer));
+            Assert.IsTrue(Technique.DeathMark.CanLearn(archer));
             Assert.IsTrue(Technique.SuppressingFire.CanLearn(archer));
 
             var rogue = M(UnitStats.Rogue);
@@ -226,7 +227,70 @@ namespace ArmyRoguelike.Tests
             Assert.IsFalse(Enemy(rocky, 1).IsSnared, "behind the rock");
         }
 
+        [Test]
+        public void MarkTarget_IsFree_AndTheNextHitByAnyoneDealsMore_Once()
+        {
+            var b = Setup(new[] { M(UnitStats.Archer, Technique.MarkTarget), M(UnitStats.Warrior) }, new[] { P(3, 0), P(4, 2) },
+                new[] { E(UnitStats.Brute, 3, 2) });
+            var archer = Player(b, 0);
+            var warrior = Player(b, 1);
+            var brute = Enemy(b);
+            Assert.IsNotNull(b.PlayerUseAction(archer, ActionKind.MarkTarget, brute.Pos));
+            Assert.IsTrue(brute.Marked);
+            Assert.AreEqual(archer.MaxAp, archer.Ap, "free");
+            Assert.IsFalse(b.CanUseAction(archer, ActionKind.MarkTarget, brute.Pos), "once on cooldown");
+            b.EndUnitTurn(archer);
+
+            var plain = b.DamageAgainst(warrior, brute);
+            Assert.AreEqual(plain + Battle.MarkBonus, b.PredictHpLoss(warrior, brute, out _), "the preview counts it");
+            var events = b.PlayerAttack(warrior, brute);
+            Assert.AreEqual(UnitStats.Brute.MaxHp - plain - Battle.MarkBonus, brute.Hp);
+            Assert.IsFalse(brute.Marked, "used up");
+            Assert.IsTrue(events.OfType<EffectEvent>().Any(e => e.Kind == EffectKind.Mark));
+        }
+
+        [Test]
+        public void DeathMark_AMarkedKillMarksItsNeighbours()
+        {
+            var b = Setup(new[] { M(UnitStats.Archer, Technique.MarkTarget, Technique.DeathMark) }, new[] { P(3, 0) },
+                new[] { E(UnitStats.Wolf, 3, 2), E(UnitStats.Wolf, 4, 2), E(UnitStats.Wolf, 3, 3), E(UnitStats.Wolf, 6, 6) });
+            var archer = Player(b);
+            var target = Enemy(b, 0);
+            b.PlayerUseAction(archer, ActionKind.MarkTarget, target.Pos);
+            target.Hp = 1;
+            b.PlayerAttack(archer, target);
+            Assert.IsFalse(target.IsAlive);
+            Assert.IsTrue(Enemy(b, 1).Marked);
+            Assert.IsTrue(Enemy(b, 2).Marked);
+            Assert.IsFalse(Enemy(b, 3).Marked, "not next to it");
+            Assert.IsTrue(Enemy(b, 1).MarkSpreads, "and spreads again");
+        }
+
         // ---------- Rogue ----------
+
+        [Test]
+        public void Isolate_HitsEnemiesWithNoAllyNextToThem()
+        {
+            var b = Setup(new[] { M(UnitStats.Rogue, Technique.Isolate) }, new[] { P(3, 1) },
+                new[] { E(UnitStats.Brute, 3, 2), E(UnitStats.Wolf, 6, 6) });
+            var rogue = Player(b);
+            var brute = Enemy(b);
+            Assert.IsTrue(b.IsExposed(brute));
+            var alone = b.DamageAgainst(rogue, brute);
+            Enemy(b, 1).Pos = P(4, 2);
+            Assert.IsFalse(b.IsExposed(brute));
+            Assert.AreEqual(alone - Battle.IsolateBonus, b.DamageAgainst(rogue, brute));
+        }
+
+        [Test]
+        public void Shadowstep_NotAfterWalking()
+        {
+            var b = Setup(new[] { M(UnitStats.Rogue, Technique.Shadowstep) }, new[] { P(0, 0) }, new[] { E(UnitStats.Wolf, 2, 2), Far });
+            var rogue = Player(b);
+            Assert.IsTrue(b.CanUseAction(rogue, ActionKind.Shadowstep, P(2, 1)), "in reach before walking");
+            b.PlayerMove(rogue, P(1, 0));
+            Assert.IsFalse(b.CanUseAction(rogue, ActionKind.Shadowstep, P(2, 1)));
+        }
 
         [Test]
         public void RogueBase_SixHp()

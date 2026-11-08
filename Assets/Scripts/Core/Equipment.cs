@@ -60,6 +60,8 @@ namespace ArmyRoguelike.Core
                 case Ability.CheapShot: return "Cheap Shot";
                 case Ability.Elusive: return "Elusive";
                 case Ability.IntoShadows: return "Into the Shadows";
+                case Ability.DeathMark: return "Death Mark";
+                case Ability.Isolate: return "Isolate";
                 case Ability.Pincer: return "Pincer";
                 case Ability.KillRefund: return "Momentum";
                 case Ability.Poison: return "Poison";
@@ -125,6 +127,8 @@ namespace ArmyRoguelike.Core
                 case Ability.SpikedSnares: return $"its snares deal {Battle.SpikedSnareDamage} damage instead of {Battle.SnareDamage}";
                 case Ability.CheapShot: return $"+{Battle.CheapShotBonus} damage to enemies that can't move (pinned or slowed)";
                 case Ability.Elusive: return "ignores zone of control: leaving an enemy's reach doesn't use up its moves";
+                case Ability.DeathMark: return "its marks spread: when a marked enemy dies, every enemy next to it is marked";
+                case Ability.Isolate: return $"+{Battle.IsolateBonus} damage to exposed enemies (no ally of theirs next to them)";
                 case Ability.IntoShadows: return "a kill hides it until your next turn: enemies can't target or attack it (area blasts still hit)";
                 case Ability.Pincer: return $"+{Battle.PincerBonus} damage if an ally stands on the far side of the target";
                 case Ability.KillRefund: return "a kill gives its action back and 1 move: it can attack again or walk on";
@@ -213,6 +217,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Shadowstep: return "Shadowstep";
                 case ActionKind.SmokeBomb: return "Smoke Bomb";
                 case ActionKind.Rupture: return "Rupture";
+                case ActionKind.MarkTarget: return "Mark Target";
                 default: return action.ToString();
             }
         }
@@ -236,6 +241,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.ThrowingKnife: return $"{Battle.KnifeDamage} damage (plus its damage bonuses) to an enemy 2-{Battle.KnifeRange} tiles away, needs line of sight. Carries Poison, Cheap Shot and the Vanish bonus";
                 case ActionKind.Shadowstep: return $"teleport to a free tile next to an enemy within {Battle.ShadowstepRange}, ignoring rocks and zone of control. Free, before it acts, but it can't walk afterwards: it can still attack";
                 case ActionKind.SmokeBomb: return $"smoke the tile and the 4 next to it, up to {Battle.SmokeRange} tiles away: every ally there (itself too) is hidden until your next turn, as with Vanish (its first attack while hidden deals +{Battle.VanishBonus})";
+                case ActionKind.MarkTarget: return $"mark an enemy in shot range: the next hit on it, by anyone and from anything but poison or fire, deals +{Battle.MarkBonus}, then the mark is gone. Free, before it acts: it can still move and attack";
                 case ActionKind.Rupture: return $"strike a poisoned enemy next to it: first its poison bursts, {Battle.PoisonDamage} damage for every turn of poison left, then the strike (which poisons again)";
                 case ActionKind.Blink: return $"teleport to a free tile within {Battle.BlinkRange}, ignoring rocks and zone of control. Free, before it acts: it can still move and attack";
                 case ActionKind.Fireball: return $"{Battle.FireballDamage} damage to everyone on the tile and the 4 next to it, up to {Battle.FireballRange} tiles away";

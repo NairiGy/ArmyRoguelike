@@ -95,6 +95,12 @@ namespace ArmyRoguelike.Core
         /// <summary>The +2 of its first attack while hidden is spent (set again by each Vanish or Smoke Bomb).</summary>
         public bool AmbushUsed { get; internal set; }
 
+        /// <summary>Marked (Mark Target): the next hit on it deals +2, then the mark is gone.</summary>
+        public bool Marked { get; internal set; }
+
+        /// <summary>The mark came from a Death Mark archer: if it dies marked, its neighbours are marked too.</summary>
+        public bool MarkSpreads { get; internal set; }
+
         /// <summary>Invisible: enemies can't target or attack it, though area blasts still hit it.</summary>
         public bool IsHidden => HiddenTurns > 0;
 
@@ -186,7 +192,7 @@ namespace ArmyRoguelike.Core
                 IsMercenary = IsMercenary, Escaped = Escaped, Fell = Fell, Favored = Favored, PackHp = PackHp,
                 BannerAp = BannerAp, BannerMoves = BannerMoves, LeftPile = LeftPile, PileGone = PileGone,
                 ShieldUpTurns = ShieldUpTurns, TauntTurns = TauntTurns, BattlecryTurns = BattlecryTurns, TempHp = TempHp,
-                ShieldThrown = ShieldThrown, ZocStrikeUsed = ZocStrikeUsed, AmbushUsed = AmbushUsed,
+                ShieldThrown = ShieldThrown, ZocStrikeUsed = ZocStrikeUsed, AmbushUsed = AmbushUsed, Marked = Marked, MarkSpreads = MarkSpreads,
             };
             foreach (var cooldown in _cooldowns)
                 c._cooldowns.Add(cooldown.Key, cooldown.Value);

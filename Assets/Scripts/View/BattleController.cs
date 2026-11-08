@@ -1081,6 +1081,9 @@ namespace ArmyRoguelike.View
                             DamagePopup.Spawn(at, "Shield thrown!", DamagePopup.DamageColor, 44);
                             target.RefreshHp(status.Target.Hp);
                             break;
+                        case StatusKind.Mark:
+                            DamagePopup.Spawn(at, "Marked", DamagePopup.AbilityColor, 44);
+                            break;
                         case StatusKind.Poison:
                             DamagePopup.Spawn(at, "Poisoned", DamagePopup.AbilityColor, 44);
                             break;
@@ -1277,6 +1280,9 @@ namespace ArmyRoguelike.View
                     break;
                 case EffectKind.ZocStrike:
                     DamagePopup.Spawn(at, "Placeholder!", DamagePopup.AbilityColor, 44);
+                    break;
+                case EffectKind.Mark:
+                    DamagePopup.Spawn(at, $"Mark +{effect.Amount}", DamagePopup.DamageColor, 40);
                     break;
                 case EffectKind.CoveringFire:
                     DamagePopup.Spawn(at, "Covering fire!", DamagePopup.AbilityColor, 44);
@@ -2128,6 +2134,8 @@ namespace ArmyRoguelike.View
                 lines.Add($"Hidden until your next turn: enemies can't target it" + (u.AmbushUsed ? "" : $" (+{Battle.VanishBonus} on its next attack)"));
             if (u.IsSlowed)
                 lines.Add("Slowed: can't move");
+            if (u.Marked)
+                lines.Add($"Marked: the next hit on it deals +{Battle.MarkBonus}");
             if (u.PoisonTurns > 0)
                 lines.Add($"Poisoned ({u.PoisonTurns} more)");
             if (u.CarryingLoot > 0)
@@ -2222,6 +2230,8 @@ namespace ArmyRoguelike.View
                 status.Add("pinned (can't move)");
             if (u.IsHidden)
                 status.Add("hidden until your next turn");
+            if (u.Marked)
+                status.Add("marked");
             if (u.IsSlowed)
                 status.Add("slowed");
             if (u.PoisonTurns > 0)

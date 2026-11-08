@@ -102,6 +102,9 @@ namespace ArmyRoguelike.Core
         /// <summary>Its snares deal 3 damage instead of 1.</summary>
         SpikedSnares,
 
+        /// <summary>A marked enemy that dies passes its mark to every enemy next to it.</summary>
+        DeathMark,
+
         // ---------- Rogue line ----------
 
         /// <summary>+3 damage if an ally stands on the far side of the target.</summary>
@@ -130,6 +133,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>A kill hides it until your next turn (as Vanish, without the ambush bonus).</summary>
         IntoShadows,
+
+        /// <summary>+2 damage against exposed enemies (no ally of theirs next to them).</summary>
+        Isolate,
 
         // ---------- Mage line ----------
 
@@ -284,6 +290,7 @@ namespace ArmyRoguelike.Core
         Shadowstep,
         SmokeBomb,
         Rupture,
+        MarkTarget,
 
         // Enemy actions: never in a unit's Actions list (the AI uses them), but they share the cooldown table.
         Slam,

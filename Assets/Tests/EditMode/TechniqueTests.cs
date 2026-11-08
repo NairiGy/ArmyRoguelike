@@ -92,7 +92,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Catalog_EveryRequirementIsInTheSameLine()
         {
-            Assert.AreEqual(47, Technique.All.Count);
+            Assert.AreEqual(49, Technique.All.Count);
             foreach (var t in Technique.All.Where(t => t.Requires != null))
                 Assert.AreEqual(t.Line, t.Requires.Line, t.Name);
             Assert.AreEqual(Technique.All.Count, Technique.All.Select(t => t.Name).Distinct().Count(), "unique names");

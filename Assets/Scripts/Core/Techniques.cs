@@ -97,8 +97,10 @@ namespace ArmyRoguelike.Core
         public static readonly Technique Prey = P(UnitStats.Archer, Ability.PreyOnSnared, Rare);
         public static readonly Technique CoveringFire = Act(UnitStats.Archer, ActionKind.CoveringFire, Rare);
         public static readonly Technique SuppressingFire = Act(UnitStats.Archer, ActionKind.SuppressingFire, Rare, Pierce);
+        public static readonly Technique MarkTarget = Act(UnitStats.Archer, ActionKind.MarkTarget);
+        public static readonly Technique DeathMark = P(UnitStats.Archer, Ability.DeathMark, Rare, MarkTarget);
 
-        // Parked Archer skill: its rule still works, but it isn't in All, so no run offers it.
+        // Parked Archer skills: their rules still work, but they aren't in All, so no run offers them.
         public static readonly Technique Volley = P(UnitStats.Archer, Ability.Volley, Rare);
 
         // ---------- Rogue ----------
@@ -115,6 +117,7 @@ namespace ArmyRoguelike.Core
         public static readonly Technique SmokeBomb = Act(UnitStats.Rogue, ActionKind.SmokeBomb, Rare);
         public static readonly Technique Rupture = Act(UnitStats.Rogue, ActionKind.Rupture, Rare, Poison);
         public static readonly Technique IntoShadows = P(UnitStats.Rogue, Ability.IntoShadows, Rare);
+        public static readonly Technique Isolate = P(UnitStats.Rogue, Ability.Isolate);
 
         // Parked Rogue skill: its rule still works, but it isn't in All, so no run offers it.
         public static readonly Technique RipostePlus = P(UnitStats.Rogue, Ability.CounterAll, Rare, Riposte);
@@ -143,8 +146,8 @@ namespace ArmyRoguelike.Core
         public static readonly IReadOnlyList<Technique> All = new[]
         {
             Sweep, ShieldUp, ThrowShield, Vanguard, Charge, Battlecry, Taunt, ZocStrike,
-            SteadyAimPlus, LongShot, Vantage, Kick, SnareTrap, SpikedSnares, FireArrow, Pierce, OpeningShot, Prey, CoveringFire, SuppressingFire,
-            Pincer, Riposte, Poison, CheapShot, Elusive, ThrowingKnife, Shadowstep, Momentum, Dodge, SmokeBomb, Rupture, IntoShadows,
+            SteadyAimPlus, LongShot, Vantage, Kick, SnareTrap, FireArrow, MarkTarget, Pierce, OpeningShot, Prey, CoveringFire, SuppressingFire, DeathMark,
+            Pincer, Riposte, Poison, CheapShot, Elusive, ThrowingKnife, Shadowstep, Isolate, Momentum, Dodge, SmokeBomb, Rupture, IntoShadows,
             Fireball, Chill, Ward, Burning, Concussive, IceWall, Shatter, WideWard, Mend,
             BigMines, Barricade, ThrowBomb, BlastProof, Turret, Detonate,
         };

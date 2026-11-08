@@ -200,6 +200,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>The Archer's Covering Fire: <see cref="EffectEvent.Unit"/> shoots an enemy walking into its sight.</summary>
         CoveringFire,
+
+        /// <summary>A hit used up the mark on <see cref="EffectEvent.Unit"/> for <see cref="EffectEvent.Amount"/> more damage.</summary>
+        Mark,
     }
 
     /// <summary>A unit left the board, e.g. a cutpurse escaping with stolen gold.</summary>
@@ -326,6 +329,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Throw Shield: stronger and faster for the battle, <see cref="StatusEvent.Amount"/> HP lost.</summary>
         ThrowShield,
+
+        /// <summary>Marked (Mark Target, Death Mark): the next hit on it deals <see cref="StatusEvent.Amount"/> more.</summary>
+        Mark,
     }
 
     /// <summary>A status or support effect was put on a unit by an action or a hit.</summary>

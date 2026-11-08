@@ -195,6 +195,12 @@ namespace ArmyRoguelike.Core
         /// <summary>Smoke Bomb: range of the centre tile.</summary>
         public const int SmokeRange = 3;
 
+        /// <summary>Mark Target: extra damage on the next hit of a marked enemy.</summary>
+        public const int MarkBonus = 2;
+
+        /// <summary>Isolate: bonus damage against an exposed enemy (no ally of its own next to it).</summary>
+        public const int IsolateBonus = 2;
+
         /// <summary>Blink (mages): teleport range in steps.</summary>
         public const int BlinkRange = 3;
 
@@ -223,7 +229,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Special actions cost the unit's one AP, except Blink and Vanish: free, but only before it has acted.</summary>
         public static int ActionCost(ActionKind action) =>
-            action == ActionKind.Blink || action == ActionKind.Vanish || action == ActionKind.ThrowShield || action == ActionKind.Shadowstep ? 0 : action == ActionKind.PlaceMine ? MineCost : AttackCost;
+            action == ActionKind.Blink || action == ActionKind.Vanish || action == ActionKind.ThrowShield || action == ActionKind.Shadowstep || action == ActionKind.MarkTarget ? 0 : action == ActionKind.PlaceMine ? MineCost : AttackCost;
 
         /// <summary>
         /// Cooldown of every action in the unit's own turns *(placeholders)*: used now, ready again this many turns
@@ -872,6 +878,8 @@ namespace ArmyRoguelike.Core
                 damage += CheapShotBonus;
             if (attacker.Has(Ability.LongShot) && Distance(attacker, target) >= LongShotRange)
                 damage += LongShotBonus;
+            if (attacker.Has(Ability.Isolate) && IsExposed(target))
+                damage += IsolateBonus;
             if (attacker.Has(Ability.Shatter) && target.IsSlowed)
                 damage *= 2;
             if (attacker.IsHidden && !attacker.AmbushUsed)
@@ -908,6 +916,8 @@ namespace ArmyRoguelike.Core
                 if (i > 0 && attacker.Has(Ability.FirstShotDouble) && !attacker.HasStruck(target))
                     amount /= 2;
                 amount = FavoredAmount(attacker, target, amount, DamageKind.Attack);
+                if (i == 0 && target.Marked && amount > 0)
+                    amount += MarkBonus;
                 if (IsShielded(target))
                     amount = Math.Max(1, amount - 1);
                 if (target.Has(Ability.Tough))
@@ -976,6 +986,8 @@ namespace ArmyRoguelike.Core
             if ((target.Has(Ability.LuckyCharm) && !target.LastStandUsed) || (target.IsObjective && target.Team == Team.Enemy && source.Team == target.Team))
                 return false;
             amount = FavoredAmount(source, target, amount, kind);
+            if (kind != DamageKind.Tick && target.Marked && source.Team != target.Team)
+                amount += MarkBonus;
             if (IsShielded(target))
                 amount = Math.Max(1, amount - 1);
             if (target.Has(Ability.Tough))
@@ -984,6 +996,10 @@ namespace ArmyRoguelike.Core
                 amount = Math.Max(1, amount - ShieldUpReduction);
             return amount - target.Shield - target.MoonShield - target.TempHp >= target.Hp;
         }
+
+        /// <summary>Exposed (the Rogue's keyword): no living unit of its own side stands next to it.</summary>
+        public bool IsExposed(Unit unit) =>
+            !_units.Any(u => u != unit && u.IsPlaced && u.IsAlive && u.Team == unit.Team && Distance(u, unit) == 1);
 
         /// <summary>An ally of the attacker stands on the far side of a 1x1 target.</summary>
         public bool IsPinched(Unit attacker, Unit target)
@@ -1331,12 +1347,14 @@ namespace ArmyRoguelike.Core
                 case ActionKind.ThrowingKnife:
                     return target != null && target.Team != unit.Team && !target.IsHidden && CanThrowKnife(unit, target);
                 case ActionKind.Shadowstep:
-                    return unit.Size == 1 && steps >= 1 && steps <= ShadowstepRange && CanStand(unit, tile) &&
+                    return unit.Size == 1 && !unit.MovedThisTurn && steps >= 1 && steps <= ShadowstepRange && CanStand(unit, tile) &&
                            _units.Any(e => e.IsPlaced && e.IsAlive && e.Team != unit.Team && Distance(tile, 1, e) == 1);
                 case ActionKind.SmokeBomb:
                     return steps <= SmokeRange && PlusArea(tile).Any(p => UnitAt(p) is Unit u && u.Team == unit.Team && !u.IsObjective);
                 case ActionKind.Rupture:
                     return target != null && target.Team != unit.Team && target.PoisonTurns > 0 && unit.Size == 1 && Distance(unit, target) == 1;
+                case ActionKind.MarkTarget:
+                    return target != null && target.Team != unit.Team && !target.IsHidden && !target.Marked && CanHitFrom(unit, unit.Pos, target);
                 default:
                     return false;
             }
@@ -1528,6 +1546,14 @@ namespace ArmyRoguelike.Core
                         events.Add(new StatusEvent(unit, ally, StatusKind.Vanish, VanishTurns));
                     }
 
+                    break;
+                }
+                case ActionKind.MarkTarget:
+                {
+                    var target = UnitAt(tile);
+                    target.Marked = true;
+                    target.MarkSpreads = unit.Has(Ability.DeathMark);
+                    events.Add(new StatusEvent(unit, target, StatusKind.Mark, MarkBonus));
                     break;
                 }
                 case ActionKind.Rupture:
@@ -2701,6 +2727,16 @@ namespace ArmyRoguelike.Core
                 }
             }
 
+            // Marked (the Archer's keyword): the next hit from the other side, of any kind but ticks, deals more and uses it up.
+            var spreadMark = false;
+            if (hostile && kind != DamageKind.Tick && target.Marked && amount > 0)
+            {
+                amount += MarkBonus;
+                target.Marked = false;
+                spreadMark = target.MarkSpreads;
+                after.Add(new EffectEvent(EffectKind.Mark, target, MarkBonus, target.Hp, source));
+            }
+
             if (IsShielded(target))
                 amount = Math.Max(1, amount - 1);
             if (target.Has(Ability.Tough))
@@ -2793,6 +2829,15 @@ namespace ArmyRoguelike.Core
 
             if (!target.IsAlive)
             {
+                // Death Mark: the mark jumps to every unit of the dead one's side next to it.
+                if (spreadMark)
+                    foreach (var near in _units.Where(u => u != target && u.IsPlaced && u.IsAlive && u.Team == target.Team && !u.Marked && Distance(u, target) == 1).ToList())
+                    {
+                        near.Marked = true;
+                        near.MarkSpreads = true;
+                        after.Add(new StatusEvent(source ?? target, near, StatusKind.Mark, MarkBonus));
+                    }
+
                 BreakPackBond(target, after);
                 // Soul Harvest: one of your units dying while a harvester stands leaves a bone pile it can raise.
                 if (target.Team == Team.Player && !target.IsSummon && !target.IsObjective && !target.Stats.LeavesRemains &&
