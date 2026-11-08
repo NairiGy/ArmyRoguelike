@@ -89,6 +89,15 @@ namespace ArmyRoguelike.View
                     return (Icon.Hold, Abilities.Name(Ability.Grasp), ControlColor);
                 case IntentKind.BullRush:
                     return (Icon.Push, Abilities.Name(Ability.BullRush), HarmColor);
+                // Demons (placeholder icons, reusing the existing set).
+                case IntentKind.Hellswap:
+                    return (Icon.Push, Abilities.Name(Ability.Hellswap), ControlColor);
+                case IntentKind.RendingBlow:
+                    return (Icon.Sword, Abilities.Name(Ability.RendingBlow), HarmColor);
+                case IntentKind.SoulContract:
+                    return (Icon.Eye, Abilities.Name(Ability.SoulContract), HarmColor);
+                case IntentKind.FireBreath:
+                    return (Icon.Burst, Abilities.Name(Ability.FireBreath), HarmColor);
                 default:
                     return (enemy.Range > 1 ? Icon.Arrow : Icon.Sword, Abilities.AttackName(enemy.Stats), HarmColor);
             }

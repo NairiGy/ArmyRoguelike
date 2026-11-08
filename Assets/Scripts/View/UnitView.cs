@@ -235,6 +235,10 @@ namespace ArmyRoguelike.View
         private static readonly Color LootColor = new Color(1f, 0.82f, 0.1f);
         private static readonly Color FavoredColor = new Color(1f, 0.45f, 0.15f);
 
+        // Demons (placeholders): dark red = Fury, black-red = under a Soul Contract.
+        private static readonly Color FuryColor = new Color(0.75f, 0.05f, 0.05f);
+        private static readonly Color ContractColor = new Color(0.3f, 0f, 0.05f);
+
         private readonly List<SpriteRenderer> _statusIcons = new List<SpriteRenderer>();
 
         /// <summary>
@@ -261,6 +265,10 @@ namespace ArmyRoguelike.View
                     colors.Add(PoisonColor);
                 if (Unit.Favored)
                     colors.Add(FavoredColor);
+                if (Unit.Fury > 0)
+                    colors.Add(FuryColor);
+                if (Unit.ContractBy != null)
+                    colors.Add(ContractColor);
             }
 
             while (_statusIcons.Count < colors.Count)

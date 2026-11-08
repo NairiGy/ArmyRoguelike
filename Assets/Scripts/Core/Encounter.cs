@@ -276,6 +276,23 @@ namespace ArmyRoguelike.Core
                 return plan;
             }) { Pool = 2 };
 
+        public static readonly Encounter Demons = new Encounter("Demons", "Hellmouth",
+            "A mirrored pair of rocks; the Demon holds the enemies' front row with an imp on each side, the Devil behind it and the Fiend on a flank.", false, UnitStats.Imp,
+            (rng, _) =>
+            {
+                var plan = new Plan();
+                MirroredPair(plan, rng, 2 + rng.Next(2));
+                var demon = P(1 + rng.Next(4), 4);
+                plan.Enemies.Add((UnitStats.Demon, demon));
+                plan.Enemies.Add((UnitStats.Imp, P(demon.X - 1, 4)));
+                plan.Enemies.Add((UnitStats.Imp, P(demon.X + 1, 4)));
+                plan.Enemies.Add((UnitStats.Devil, P(demon.X, 5)));
+                // The Fiend on the flank furthest from the Demon.
+                var fiend = FreeTiles(plan, rng, 4, 5).OrderByDescending(t => Math.Abs(t.X - demon.X)).ThenBy(t => t.Y).First();
+                plan.Enemies.Add((UnitStats.Fiend, fiend));
+                return plan;
+            }) { Pool = 2 };
+
         // ---------- Ritual ----------
 
         /// <summary>Moon Shrine: enemy turns to survive, and when waves arrive (after these enemy turns, 2 each).</summary>
@@ -376,7 +393,7 @@ namespace ArmyRoguelike.Core
             });
 
         /// <summary>The factions Act 1 battles are drawn from; each appears at most once per run.</summary>
-        public static readonly IReadOnlyList<Encounter> Regular = new[] { Wolves, Goblins, Bandits, Elementals };
+        public static readonly IReadOnlyList<Encounter> Regular = new[] { Wolves, Goblins, Bandits, Elementals, Demons };
 
         // ---------- Elites: harder rematches of the factions (more of the same enemies) ----------
 
@@ -451,8 +468,24 @@ namespace ArmyRoguelike.Core
                 return plan;
             });
 
+        public static readonly Encounter EliteDemons = Elite(Demons,
+            "A mirrored pair of rocks; two Demons on the front row with the imps between or beside them, the Devil behind, the Fiend in a back corner.",
+            (rng, _) =>
+            {
+                var plan = new Plan();
+                MirroredPair(plan, rng, 2 + rng.Next(2));
+                var left = 1 + rng.Next(2);
+                plan.Enemies.Add((UnitStats.Demon, P(left, 4)));
+                plan.Enemies.Add((UnitStats.Demon, P(left + 2, 4)));
+                plan.Enemies.Add((UnitStats.Imp, P(left + 1, 4)));
+                plan.Enemies.Add((UnitStats.Imp, P(rng.Next(2) == 0 ? left - 1 : left + 3, 4)));
+                plan.Enemies.Add((UnitStats.Devil, P(left + 1, 5)));
+                plan.Enemies.Add((UnitStats.Fiend, P(rng.Next(2) == 0 ? 0 : Size - 1, 5)));
+                return plan;
+            });
+
         /// <summary>The elite version of each faction, in the same order as <see cref="Regular"/>.</summary>
-        public static readonly IReadOnlyList<Encounter> Elites = new[] { EliteWolves, EliteGoblins, EliteBandits, EliteElementals };
+        public static readonly IReadOnlyList<Encounter> Elites = new[] { EliteWolves, EliteGoblins, EliteBandits, EliteElementals, EliteDemons };
 
         /// <summary>The elite version of a faction.</summary>
         public static Encounter EliteOf(Encounter faction) => Elites.First(e => e.Base == faction);

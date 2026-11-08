@@ -38,6 +38,20 @@ namespace ArmyRoguelike.Core
 
         /// <summary>A brute about to hit and shove its target 1 tile.</summary>
         BullRush,
+
+        // Demons
+
+        /// <summary>An imp about to trade places with its target; the target lands on <see cref="Intent.Tile"/>.</summary>
+        Hellswap,
+
+        /// <summary>A demon paying its own HP for a much harder hit on its target.</summary>
+        RendingBlow,
+
+        /// <summary>A devil signing a contract on its target: HP lost next enemy turn unless the Devil is hurt first.</summary>
+        SoulContract,
+
+        /// <summary>A fiend breathing fire down a line at its target, from <see cref="Intent.Tile"/>.</summary>
+        FireBreath,
     }
 
     /// <summary>What an enemy plans to do next, for the hover display.</summary>
@@ -92,6 +106,14 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Raises bone piles, keeps its distance and fires bolts.</summary>
         Necromancer,
+
+        // Demons
+
+        /// <summary>Swaps one of your units next to its allies when it can, otherwise like Advance.</summary>
+        Imp,
+
+        /// <summary>Keeps its distance, signs Soul Contracts and strikes with its trident.</summary>
+        Devil,
     }
 
     /// <summary>
@@ -110,6 +132,10 @@ namespace ArmyRoguelike.Core
         {
             if (stats.CanRaise)
                 return EnemyBehaviour.Necromancer;
+            if (stats.Has(Ability.SoulContract))
+                return EnemyBehaviour.Devil;
+            if (stats.Has(Ability.Hellswap))
+                return EnemyBehaviour.Imp;
             if (stats.StealsGold > 0)
                 return EnemyBehaviour.Thief;
             if (stats.CanBomb)
@@ -332,6 +358,17 @@ namespace ArmyRoguelike.Core
             if (ShouldHowl(battle, enemy))
                 return new Intent(IntentKind.Howl, enemy);
 
+            // Demons.
+            if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Imp && AsIfItsTurn(battle, enemy, 0, () => ChooseHellswap(battle, enemy)) is var swap && swap.HasValue)
+                return new Intent(IntentKind.Hellswap, swap.Value.target, swap.Value.from);
+            if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Devil && AsIfItsTurn(battle, enemy, 0, () => ChooseContract(battle, enemy)) is Unit signee)
+                return new Intent(IntentKind.SoulContract, signee);
+            if (enemy.Has(Ability.FireBreath) && AsIfItsTurn(battle, enemy, 0, () => ChooseBreath(battle, enemy)) is var breath && breath.HasValue)
+                return new Intent(IntentKind.FireBreath, breath.Value.target, breath.Value.from);
+            if (enemy.Has(Ability.RendingBlow) && battle.Ready(enemy, ActionKind.RendingBlow) && enemy.Hp > Battle.RendingBlowCost &&
+                CanReachToAttack(battle, enemy, target))
+                return new Intent(IntentKind.RendingBlow, target);
+
             if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Shooter && !CanReachToAttack(battle, enemy, target) &&
                 battle.Ready(enemy, ActionKind.Overwatch))
                 return new Intent(IntentKind.Overwatch, target);
@@ -418,6 +455,12 @@ namespace ArmyRoguelike.Core
                 case EnemyBehaviour.Elemental:
                     ElementalTurn(battle, enemy, events);
                     break;
+                case EnemyBehaviour.Imp:
+                    ImpTurn(battle, enemy, events);
+                    break;
+                case EnemyBehaviour.Devil:
+                    DevilTurn(battle, enemy, events);
+                    break;
                 case EnemyBehaviour.PackLeader:
                     if (ShouldHowl(battle, enemy))
                         events.AddRange(battle.DoHowl(enemy));
@@ -467,6 +510,24 @@ namespace ArmyRoguelike.Core
                 {
                     events.AddRange(battle.DoGrasp(enemy, target));
                     continue;
+                }
+
+                if (battle.CanRendingBlow(enemy, target))
+                {
+                    events.AddRange(battle.DoRendingBlow(enemy, target));
+                    continue;
+                }
+
+                // Fire Breath beats a strike (same damage, plus a second unit and the burning), from here or a tile it can reach.
+                if (enemy.Has(Ability.FireBreath) && ChooseBreath(battle, enemy) is var breath && breath.HasValue)
+                {
+                    if (breath.Value.from != enemy.Pos && battle.DoMove(enemy, breath.Value.from) is var walk && walk != null)
+                        events.AddRange(walk);
+                    if (battle.CanFireBreath(enemy, breath.Value.target))
+                    {
+                        events.AddRange(battle.DoFireBreath(enemy, breath.Value.target));
+                        continue;
+                    }
                 }
 
                 if (battle.CanAttack(enemy, target))
@@ -520,6 +581,174 @@ namespace ArmyRoguelike.Core
 
                 if (!Approach(battle, elemental, target, Battle.AttackCost, events))
                     return;
+            }
+        }
+
+        // ---------- Demons ----------
+
+        /// <summary>Devils keep at least this many tiles from your units, like the Necromancer.</summary>
+        public const int DevilComfortDistance = 2;
+
+        /// <summary>
+        /// Runs a check as if the unit stood on another tile, then puts it back. The board is tiny and nothing else
+        /// changes, so this is the cheapest way to ask "from there, could it...?".
+        /// </summary>
+        private static T AsIfStandingAt<T>(Unit unit, GridPos tile, System.Func<T> check)
+        {
+            var original = unit.Pos;
+            unit.Pos = tile;
+            try
+            {
+                return check();
+            }
+            finally
+            {
+                unit.Pos = original;
+            }
+        }
+
+        /// <summary>Its own tile (cost 0) and every tile it can still walk to this turn.</summary>
+        private static List<(GridPos tile, int cost)> StandingSpots(Battle battle, Unit unit)
+        {
+            var spots = new List<(GridPos, int)> { (unit.Pos, 0) };
+            spots.AddRange(battle.GetReachable(unit).OrderBy(kv => kv.Value).ThenBy(kv => kv.Key.Y).ThenBy(kv => kv.Key.X).Select(kv => (kv.Key, kv.Value)));
+            return spots;
+        }
+
+        /// <summary>
+        /// The Hellswap an imp would make now: from its tile or one it can walk to that is next to another fighting ally,
+        /// swap with one of your units that isn't already in an enemy's reach, so your unit lands next to that ally. Ranged
+        /// units first (they least want to be in melee), then the tile next to the most allies, then the weakest unit,
+        /// then the shortest walk. Null if none.
+        /// </summary>
+        public static (Unit target, GridPos from)? ChooseHellswap(Battle battle, Unit imp)
+        {
+            if (!imp.Has(Ability.Hellswap) || imp.Ap < Battle.AttackCost || !battle.Ready(imp, ActionKind.Hellswap) || imp.Size != 1)
+                return null;
+            (Unit target, GridPos from)? best = null;
+            (int ranged, int allies, int hp, int cost, int id) bestScore = default;
+            foreach (var (tile, cost) in StandingSpots(battle, imp))
+            {
+                var allies = battle.Living(imp.Team).Count(a => a != imp && !a.IsObjective && a.Stats.Damage > 0 && Battle.Distance(tile, 1, a) == 1);
+                if (allies == 0)
+                    continue;
+                foreach (var u in AsIfStandingAt(imp, tile, () => Aimable(battle, imp)
+                             .Where(u => battle.CanHellswap(imp, u) && !battle.EngagedBy(u, u.Pos).Any()).ToList()))
+                {
+                    var score = (u.IsRanged ? 0 : 1, -allies, u.Hp, cost, u.Id);
+                    if (best == null || score.CompareTo(bestScore) < 0)
+                    {
+                        best = (u, tile);
+                        bestScore = score;
+                    }
+                }
+            }
+
+            return best;
+        }
+
+        /// <summary>
+        /// The unit a devil would sign a Soul Contract on now: one the contract would kill first, then the hardest hitter,
+        /// then the weakest. Null if none in range.
+        /// </summary>
+        public static Unit ChooseContract(Battle battle, Unit devil) =>
+            Aimable(battle, devil)
+                .Where(u => battle.CanSignContract(devil, u))
+                .OrderBy(u => u.Hp <= Battle.ContractDamage ? 0 : 1)
+                .ThenByDescending(u => battle.EffectiveDamage(u))
+                .ThenBy(u => u.Hp)
+                .ThenBy(u => u.Id)
+                .FirstOrDefault();
+
+        /// <summary>
+        /// The Fire Breath a fiend would use now, from its tile or one it can walk to: the one that hits the most of your
+        /// units, then the shortest walk. Null if it can't breathe at anyone this turn.
+        /// </summary>
+        public static (Unit target, GridPos from)? ChooseBreath(Battle battle, Unit fiend)
+        {
+            if (!fiend.Has(Ability.FireBreath) || fiend.Ap < Battle.AttackCost || !battle.Ready(fiend, ActionKind.FireBreath))
+                return null;
+            (Unit target, GridPos from)? best = null;
+            (int hits, int cost, int id) bestScore = default;
+            foreach (var (tile, cost) in StandingSpots(battle, fiend))
+            {
+                foreach (var (u, hits) in AsIfStandingAt(fiend, tile, () => Aimable(battle, fiend)
+                             .Where(u => battle.CanFireBreath(fiend, u))
+                             .Select(u => (u, battle.FireBreathVictims(fiend, u).Count(v => !v.IsObjective))).ToList()))
+                {
+                    var score = (-hits, cost, u.Id);
+                    if (hits > 0 && (best == null || score.CompareTo(bestScore) < 0))
+                    {
+                        best = (u, tile);
+                        bestScore = score;
+                    }
+                }
+            }
+
+            return best;
+        }
+
+        /// <summary>Hellswap first if it has a good one (walking to the tile it swaps from), then like Walk up and hit.</summary>
+        private static void ImpTurn(Battle battle, Unit imp, List<BattleEvent> events)
+        {
+            if (ChooseHellswap(battle, imp) is var swap && swap.HasValue)
+            {
+                if (swap.Value.from != imp.Pos && battle.DoMove(imp, swap.Value.from) is var walk && walk != null)
+                    events.AddRange(walk);
+                if (!battle.IsOver && imp.IsAlive && battle.CanHellswap(imp, swap.Value.target))
+                    events.AddRange(battle.DoHellswap(imp, swap.Value.target));
+            }
+
+            MeleeTurn(battle, imp, events);
+        }
+
+        /// <summary>
+        /// Back away from anyone next to it, then sign a Soul Contract if one is ready, else strike with the trident,
+        /// else walk up to where it can strike or sign one (never closer than its comfort distance).
+        /// </summary>
+        private static void DevilTurn(Battle battle, Unit devil, List<BattleEvent> events)
+        {
+            var retreated = false;
+            var advanced = false;
+            while (!battle.IsOver && devil.IsAlive)
+            {
+                var target = ChooseTarget(battle, devil);
+                if (target != null && !retreated && Battle.Distance(devil, target) < DevilComfortDistance)
+                {
+                    retreated = true;
+                    if (Retreat(battle, devil, events))
+                        continue;
+                }
+
+                var signee = ChooseContract(battle, devil);
+                if (signee != null)
+                {
+                    events.AddRange(battle.DoSoulContract(devil, signee));
+                    continue;
+                }
+
+                if (target == null)
+                    return;
+
+                if (battle.CanAttack(devil, target))
+                {
+                    events.AddRange(battle.DoAttack(devil, target));
+                    continue;
+                }
+
+                if (!advanced)
+                {
+                    advanced = true;
+                    var contractReady = devil.Has(Ability.SoulContract) && battle.Ready(devil, ActionKind.SoulContract);
+                    if (AdvanceToRange(battle, devil, target, DevilComfortDistance, Battle.AttackCost,
+                            tile => battle.CanHitFrom(devil, tile, target) ||
+                                    (contractReady && Aimable(battle, devil).Any(u => !u.IsObjective && u.ContractBy == null &&
+                                                                                    Battle.Distance(tile, devil.Size, u) <= Battle.ContractRange)),
+                            events))
+                        continue;
+                }
+
+                return;
             }
         }
 

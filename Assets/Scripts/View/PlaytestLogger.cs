@@ -309,6 +309,14 @@ namespace ArmyRoguelike.View
                         friendlyFire = fall.Pusher != null && fall.Pusher.Team == fall.Unit.Team,
                     });
                     break;
+                case SwapEvent swap:
+                    // Hellswap: "from" is where the imp stood (your unit lands there), "to" where your unit stood.
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = swap.Caster.Team.ToString(), unit = Name(swap.Caster), type = "hellswap", target = Name(swap.Target),
+                        fromX = swap.CasterFrom.X, fromY = swap.CasterFrom.Y, toX = swap.TargetFrom.X, toY = swap.TargetFrom.Y,
+                    });
+                    break;
                 case SummonEvent summon:
                     _log.actions.Add(new ActionEntry
                     {
@@ -348,6 +356,7 @@ namespace ArmyRoguelike.View
                 case EffectKind.CoveringFire: return "covering fire";
                 case EffectKind.Mark: return "mark";
                 case EffectKind.Crush: return "crush";
+                case EffectKind.Fury: return "fury";
                 default: return "guard";
             }
         }

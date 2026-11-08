@@ -371,11 +371,52 @@ namespace ArmyRoguelike.View
                     Fill(tex, 7, 14, 8, 22);
                     Fill(tex, 23, 14, 24, 22);
                     break;
+                // Demons (placeholders until the painted statues are imported): horns on every one.
+                case UnitKind.Imp:
+                    Horns(tex);
+                    // Bat wings spread on both sides.
+                    for (var i = 0; i < 6; i++)
+                    {
+                        Fill(tex, 4 + i, 22 + i, 10, 22 + i);
+                        Fill(tex, 22, 22 + i, 28 - i, 22 + i);
+                    }
+
+                    break;
+                case UnitKind.Demon:
+                    Horns(tex);
+                    // Broad shoulders.
+                    Fill(tex, 6, 24, 26, 30);
+                    break;
+                case UnitKind.Devil:
+                    Horns(tex);
+                    // Trident on the right: a shaft with three prongs.
+                    Fill(tex, 25, 10, 25, 44);
+                    Fill(tex, 23, 44, 27, 44);
+                    Fill(tex, 23, 44, 23, 48);
+                    Fill(tex, 25, 44, 25, 49);
+                    Fill(tex, 27, 44, 27, 48);
+                    break;
+                case UnitKind.Fiend:
+                    Horns(tex);
+                    // Spines down the back.
+                    for (var y = 12; y <= 30; y += 4)
+                        Fill(tex, 22, y, 24, y + 1);
+                    break;
             }
 
             Shade(tex, w, h);
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 4f / h), PixelsPerUnit);
+        }
+
+        /// <summary>Two short horns rising from the figure's head (demon placeholders).</summary>
+        private static void Horns(Texture2D tex)
+        {
+            for (var i = 0; i < 4; i++)
+            {
+                Fill(tex, 11 - i, 40 + i, 12 - i, 40 + i);
+                Fill(tex, 20 + i, 40 + i, 21 + i, 40 + i);
+            }
         }
 
         /// <summary>Four-legged wolf on a plinth. The pack leader gets a mane crest.</summary>

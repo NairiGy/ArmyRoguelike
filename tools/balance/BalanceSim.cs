@@ -41,8 +41,8 @@ public static class BalanceSim
 
     private static readonly Encounter[] Fights =
     {
-        Encounter.Wolves, Encounter.Goblins, Encounter.Bandits, Encounter.Elementals,
-        Encounter.EliteWolves, Encounter.EliteGoblins, Encounter.EliteBandits, Encounter.EliteElementals,
+        Encounter.Wolves, Encounter.Goblins, Encounter.Bandits, Encounter.Elementals, Encounter.Demons,
+        Encounter.EliteWolves, Encounter.EliteGoblins, Encounter.EliteBandits, Encounter.EliteElementals, Encounter.EliteDemons,
         Encounter.Giant, Encounter.Necromancer, Encounter.MoonShrine, Encounter.BreakRitual,
     };
 
@@ -241,7 +241,7 @@ public static class BalanceSim
     private static void SmartReport(TextWriter o, int seeds)
     {
         var drafts = AllDrafts();
-        var factions = Fights.Take(4).ToArray();
+        var factions = Fights.Take(Encounter.Regular.Count).ToArray();
         var levels = new[] { 0, 1, 2, 3 };
         var stuck = new Dictionary<string, int>();
 
@@ -273,7 +273,7 @@ public static class BalanceSim
             o.WriteLine("- none");
         o.WriteLine();
 
-        o.WriteLine("## Drafts: win rate over the four factions");
+        o.WriteLine("## Drafts: win rate over the regular factions");
         o.WriteLine();
         o.WriteLine("| Draft | L0 | L1 | L2 |");
         o.WriteLine("|---|---|---|---|");
@@ -398,7 +398,7 @@ public static class BalanceSim
         }
 
         var drafts = AllDrafts();
-        var factions = Fights.Take(4).ToArray();
+        var factions = Fights.Take(Encounter.Regular.Count).ToArray();
         using (var o = new StreamWriter(outPath))
         {
             o.WriteLine("# Balance report");
@@ -424,7 +424,7 @@ public static class BalanceSim
             }
             o.WriteLine();
 
-            o.WriteLine("## Drafts: Greedy win rate over the four factions");
+            o.WriteLine("## Drafts: Greedy win rate over the regular factions");
             o.WriteLine();
             o.WriteLine("| Draft | L0 | L2 | L4 |");
             o.WriteLine("|---|---|---|---|");

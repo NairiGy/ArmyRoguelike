@@ -170,6 +170,8 @@ public static class GamepediaWriter
                  {
                      (Ability.Caltrops, ActionKind.Caltrops), (Ability.Overwatch, ActionKind.Overwatch), (Ability.BullRush, ActionKind.BullRush),
                      (Ability.Upheaval, ActionKind.Upheaval), (Ability.Grasp, ActionKind.Grasp), (Ability.CorpseBlast, ActionKind.CorpseBlast),
+                     (Ability.Hellswap, ActionKind.Hellswap), (Ability.RendingBlow, ActionKind.RendingBlow),
+                     (Ability.SoulContract, ActionKind.SoulContract), (Ability.FireBreath, ActionKind.FireBreath),
                  })
             if (e.Has(ability))
                 lines.Add($"<b>{Esc(Abilities.Name(ability))}</b> ({cost} AP, cooldown {Battle.Cooldown(kind)}): {Esc(Abilities.Describe(ability))}.");
@@ -261,6 +263,10 @@ public static class GamepediaWriter
         html.Append("<table><tr><th>Shows</th><th>When (checked in this order)</th><th>On the board</th></tr>");
         html.Append("<tr><td>Flee</td><td>It carries stolen gold.</td><td>The enemies' back row, where it will escape.</td></tr>");
         html.Append("<tr><td>Howl</td><td>It can howl, and the extra move would let at least one wolf bite this turn that otherwise couldn't (two if the leader could bite itself).</td><td>Every wolf.</td></tr>");
+        html.Append("<tr><td>Hellswap</td><td>An imp with Hellswap ready and a swap that drops one of your units next to a fighting ally (see the Imp routine).</td><td>The target, and the tile it will land on.</td></tr>");
+        html.Append($"<tr><td>Soul Contract</td><td>A devil with Soul Contract ready and one of your units within {Battle.ContractRange} tiles without a contract.</td><td>The target, with an arrow.</td></tr>");
+        html.Append("<tr><td>Fire Breath</td><td>A fiend with Fire Breath ready that can breathe at one of your units this turn, from its tile or one it can walk to.</td><td>The target, and the tile it breathes from.</td></tr>");
+        html.Append($"<tr><td>Rending Blow</td><td>It has Rending Blow ready, more than {Battle.RendingBlowCost} HP, and can reach its target to attack this turn.</td><td>The target, with an arrow.</td></tr>");
         html.Append("<tr><td>Fling</td><td>A goblin that can't reach anyone to strike this turn, with a bomb, mine or unacted goblin next to it and one of your units 2-3 tiles away.</td><td>The target, the goblin to be thrown and its landing tile.</td></tr>");
         html.Append("<tr><td>Grasp</td><td>It grasps, Grasp is ready, it can reach its target to attack this turn, and the target is ranged or Swift and not already held.</td><td>The target, with an arrow.</td></tr>");
         html.Append($"<tr><td>Upheaval</td><td>It has Upheaval ready, can't reach its target to strike this turn, and the target is within {Battle.UpheavalRange} tiles plus its moves. It may still pick a nearer unit once it has walked.</td><td>The target, with an arrow.</td></tr>");
@@ -289,6 +295,8 @@ public static class GamepediaWriter
             case EnemyBehaviour.Elemental: return "Elemental";
             case EnemyBehaviour.Shooter: return "Shooter";
             case EnemyBehaviour.Necromancer: return "Necromancer";
+            case EnemyBehaviour.Imp: return "Imp";
+            case EnemyBehaviour.Devil: return "Devil";
             default: throw new ArgumentOutOfRangeException(nameof(b), b, "Add a name and steps for this behaviour to the gamepedia.");
         }
     }
@@ -309,7 +317,9 @@ public static class GamepediaWriter
                 return new[]
                 {
                     $"If it can hit its {target} from where it stands: attack, or Bull Rush instead when it has it ready (Bandit Brute), " +
-                    "or Grasp instead when it has it ready and the target is ranged or Swift and not already held (Skeleton).",
+                    "or Grasp instead when it has it ready and the target is ranged or Swift and not already held (Skeleton), " +
+                    $"or Rending Blow instead when it has it ready and more than {Battle.RendingBlowCost} HP (Demon).",
+                    "Fire Breath when it has it ready (Fiend): from its tile or one it can walk to, at whichever of your units puts the most of them in the line; it beats a strike.",
                     $"Otherwise {approach} to it.",
                 };
             case EnemyBehaviour.Shooter:
@@ -370,6 +380,21 @@ public static class GamepediaWriter
                     "Otherwise, if any bone pile it can raise is in range and free: raise them all, your fallen included (Soul Harvest).",
                     "If it can hit the target from where it stands: fire a bolt.",
                     $"Otherwise {range} for a bolt (once a turn), with a comfort distance of {EnemyAI.NecromancerComfortDistance}. It never walks closer than that to shoot.",
+                };
+            case EnemyBehaviour.Imp:
+                return new[]
+                {
+                    "Imps act before the other enemies (after any howl), so the unit they swap in meets demons that still have their turn.",
+                    $"If Hellswap is ready: from its tile or one it can walk to that is next to a fighting ally, swap with one of your units 2-{Battle.HellswapRange} tiles away that isn't already in an enemy's reach, so your unit lands next to that ally. Ranged units first, then the tile next to the most allies, then the weakest unit, then the shortest walk.",
+                    "Otherwise like Walk up and hit.",
+                };
+            case EnemyBehaviour.Devil:
+                return new[]
+                {
+                    $"If its {target} is closer than {EnemyAI.DevilComfortDistance} tiles: {retreat} (once a turn).",
+                    $"If Soul Contract is ready and one of your units is within {Battle.ContractRange} tiles: sign it on the unit it would kill first, else the hardest hitter, else the weakest.",
+                    "If it can hit the target from where it stands: strike with the trident (Long Reach).",
+                    $"Otherwise {range} for a strike, or for a contract when one is ready (once a turn), with a comfort distance of {EnemyAI.DevilComfortDistance}.",
                 };
             default:
                 throw new ArgumentOutOfRangeException(nameof(b), b, "Add a name and steps for this behaviour to the gamepedia.");

@@ -32,6 +32,12 @@ namespace ArmyRoguelike.Core
         Shard,
         Shrine,
         Totem,
+
+        // Demons
+        Imp,
+        Demon,
+        Devil,
+        Fiend,
     }
 
     /// <summary>How far pushes move a unit, relative to the push's distance.</summary>
@@ -273,6 +279,31 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Its HP falls in phases: it can lose at most one phase a round, and each new phase changes how it fights.</summary>
         StoneHeart,
+        // ---------- Demons ----------
+
+        /// <summary>Burning ground doesn't hurt it.</summary>
+        Hellborn,
+
+        /// <summary>When it dies, the nearest other demon within a few tiles gains Fury (+1 damage each, for the fight).</summary>
+        BloodOffering,
+
+        /// <summary>Its action can be Hellswap: it trades places with one of your units within 3 tiles.</summary>
+        Hellswap,
+
+        /// <summary>Gains 1 Fury whenever a unit next to it dies, friend or foe.</summary>
+        Bloodlust,
+
+        /// <summary>Its action can be Rending Blow: it pays some of its own HP for a much harder hit.</summary>
+        RendingBlow,
+
+        /// <summary>Its action can be Soul Contract: one of your units loses HP next enemy turn unless the Devil is hit first.</summary>
+        SoulContract,
+
+        /// <summary>A melee attacker takes 1 damage (like Thorns).</summary>
+        Spines,
+
+        /// <summary>Its action can be Fire Breath: 2 tiles in a straight line take damage and burn.</summary>
+        FireBreath,
     }
 
     /// <summary>A special action a unit can spend AP on besides its basic attack. Every one has a cooldown.</summary>
@@ -331,6 +362,12 @@ namespace ArmyRoguelike.Core
         Upheaval,
         Grasp,
         CorpseBlast,
+
+        // Demons
+        Hellswap,
+        RendingBlow,
+        SoulContract,
+        FireBreath,
     }
 
     /// <summary>
@@ -617,9 +654,37 @@ namespace ArmyRoguelike.Core
             Role = "Lobs a bomb onto a unit 2-3 tiles away; it explodes on that tile at the start of the next enemy turn. Keeps its distance, and blows up when it dies.",
         };
 
+        // ---------- Demons (see docs/night/demons.md) ----------
+
+        /// <summary>Swaps one of your units into the demons' reach. Feeds Fury to a demon when it dies.</summary>
+        public static readonly UnitStats Imp = new UnitStats(UnitKind.Imp, "Imp", 5, 2, 1, 1)
+        {
+            Weight = Weight.Small, Abilities = A(Ability.Swift, Ability.Hellborn, Ability.BloodOffering, Ability.Hellswap),
+            Role = "Trades places with one of your units, dropping it next to the demons. When it dies, the nearest demon grows stronger.",
+        };
+
+        public static readonly UnitStats Demon = new UnitStats(UnitKind.Demon, "Demon", 14, 3, 1, 1)
+        {
+            Weight = Weight.Huge, Abilities = A(Ability.Hellborn, Ability.Bloodlust, Ability.RendingBlow),
+            Role = "Pays its own blood for crushing blows, and grows stronger from every death next to it.",
+        };
+
+        /// <summary>Its trident is a Long Reach strike (2 tiles in a straight line).</summary>
+        public static readonly UnitStats Devil = new UnitStats(UnitKind.Devil, "Devil", 10, 2, 2, 1)
+        {
+            Abilities = A(Ability.LongReach, Ability.Hellborn, Ability.SoulContract),
+            Role = "Signs a contract on one of your units: hit the Devil before its next turn, or the contract takes its HP.",
+        };
+
+        public static readonly UnitStats Fiend = new UnitStats(UnitKind.Fiend, "Fiend", 7, 2, 1, 1)
+        {
+            Weight = Weight.Small, Abilities = A(Ability.Swift, Ability.Hellborn, Ability.Spines, Ability.FireBreath),
+            Role = "Fast and spiny: breathes fire down a line of your units and leaves the ground burning.",
+        };
+
         public static readonly IReadOnlyList<UnitStats> Enemies = new[]
         {
-            Wolf, PackLeader, Goblin, GoblinBomber, Cutpurse, Crossbowman, Brute, Elemental, Shard, Skeleton, Necromancer, Ogre, Totem,
+            Wolf, PackLeader, Goblin, GoblinBomber, Cutpurse, Crossbowman, Brute, Elemental, Shard, Imp, Demon, Devil, Fiend, Skeleton, Necromancer, Ogre, Totem,
         };
     }
 }
