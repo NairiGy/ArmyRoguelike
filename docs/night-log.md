@@ -58,7 +58,7 @@ Each entry: what was done or tried, and why. Scrapped and reverted ideas stay in
 - **09:23** The three builders finished: **Archer and Rogue** 13 techniques each (Archer owns *Marked*, Rogue owns *Exposed*;
   the Rogue has 6 HP and a Vanish that lasts the enemy turn), **Mage** 13 and **Sapper** 12 (Mage owns *Slowed*, Sapper owns
   *Rubble*: low heaps that block walking but not shots, and crush what's pushed into them), and the **Demons** (Imp, Demon, Devil,
-  Fiend: Fury, Hellswap, Rending Blow, Soul Contract, Fire Breath; pool 2, with an elite). Their designs are in .
+  Fiend: Fury, Hellswap, Rending Blow, Soul Contract, Fire Breath; pool 2, with an elite). Their designs are in `docs/night/`.
   59 techniques in all, up from 34.
 - **09:23** Four reviewer subagents in parallel: one code reviewer per branch and one player/exploit reviewer. Then merged the three
   branches into `feature/night-fun`, resolving the conflicts by hand (most were both sides adding enum values or cases). One real
