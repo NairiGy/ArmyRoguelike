@@ -977,10 +977,10 @@ namespace ArmyRoguelike.Core
         private static bool RockWallsOff(Battle battle, Unit thrower, Unit target)
         {
             var rock = battle.RockTileFor(thrower, target);
-            if (rock == null || !DistanceField(battle, thrower, target).ContainsKey(thrower.Pos))
+            if (rock == null || !DistanceField(battle, thrower, target, false).ContainsKey(thrower.Pos))
                 return false;
             battle.Board.AddObstacle(rock.Value);
-            var cut = !DistanceField(battle, thrower, target).ContainsKey(thrower.Pos);
+            var cut = !DistanceField(battle, thrower, target, false).ContainsKey(thrower.Pos);
             battle.Board.RemoveObstacle(rock.Value);
             return cut;
         }
@@ -1247,36 +1247,57 @@ namespace ArmyRoguelike.Core
 
         /// <summary>
         /// Walking distance, around obstacles but through units, from every anchor tile to the nearest
-        /// anchor where this unit would stand next to the target.
+        /// anchor where this unit would stand next to the target. With <paramref name="throughBreakable"/>, rubble and
+        /// barricades count as walkable at <see cref="BreakCost"/> extra steps each, so an enemy walled off by them walks
+        /// up and breaks its way through (it attacks one in its reach when it has nobody to hit).
         /// </summary>
-        private static Dictionary<GridPos, int> DistanceField(Battle battle, Unit enemy, Unit target)
+        private static Dictionary<GridPos, int> DistanceField(Battle battle, Unit enemy, Unit target, bool throughBreakable = true)
         {
+            bool Breakable(GridPos c) => throughBreakable && (battle.IsRubble(c) || battle.IsBarricade(c));
+
             bool Walkable(GridPos anchor) =>
-                Battle.Footprint(anchor, enemy.Size).All(c => battle.Board.InBounds(c) && !battle.Board.IsObstacle(c));
+                Battle.Footprint(anchor, enemy.Size).All(c => battle.Board.InBounds(c) && (!battle.Board.IsObstacle(c) || Breakable(c)));
+
+            int Extra(GridPos anchor) => Battle.Footprint(anchor, enemy.Size).Count(Breakable) * BreakCost;
 
             var distance = new Dictionary<GridPos, int>();
-            var frontier = new Queue<GridPos>();
+            var open = new List<GridPos>();
             foreach (var p in battle.Board.AllTiles())
             {
                 if (!Walkable(p) || Battle.Distance(p, enemy.Size, target) != 1)
                     continue;
-                distance[p] = 0;
-                frontier.Enqueue(p);
+                distance[p] = Extra(p);
+                open.Add(p);
             }
 
-            while (frontier.Count > 0)
+            // Dijkstra (steps cost 1, or more onto rubble and barricades); the board is tiny, so a linear scan will do.
+            var closed = new HashSet<GridPos>();
+            while (open.Count > 0)
             {
-                var p = frontier.Dequeue();
+                var p = open[0];
+                foreach (var o in open)
+                    if (distance[o] < distance[p])
+                        p = o;
+                open.Remove(p);
+                if (!closed.Add(p))
+                    continue;
                 foreach (var n in p.Neighbours())
                 {
-                    if (distance.ContainsKey(n) || !Walkable(n))
+                    if (closed.Contains(n) || !Walkable(n))
                         continue;
-                    distance[n] = distance[p] + 1;
-                    frontier.Enqueue(n);
+                    // Cost of the step out of n towards p: what it takes to stand on p next.
+                    var c = distance[p] + 1 + Extra(n);
+                    if (distance.TryGetValue(n, out var old) && old <= c)
+                        continue;
+                    distance[n] = c;
+                    open.Add(n);
                 }
             }
 
             return distance;
         }
+
+        /// <summary>Extra steps the pathing counts for a rubble or barricade tile on the way (it has to be broken first).</summary>
+        private const int BreakCost = 2;
     }
 }

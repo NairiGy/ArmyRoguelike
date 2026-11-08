@@ -116,7 +116,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Shatter_EveryAllyHitsSlowedEnemiesHarder()
         {
-            var b = Setup(new[] { M(UnitStats.Apprentice, Technique.Shatter), M(UnitStats.Warrior) }, new[] { P(3, 1), P(2, 2) },
+            var b = Setup(new[] { M(UnitStats.Apprentice, Technique.Chill, Technique.Shatter), M(UnitStats.Warrior) }, new[] { P(3, 1), P(2, 2) },
                 new[] { E(UnitStats.Brute, 3, 2), Far });
             var warrior = Player(b, 1);
             var brute = Enemy(b);
@@ -316,6 +316,66 @@ namespace ArmyRoguelike.Tests
             b.EndUnitTurn(sapper);
             var events = b.EndPlayerTurn();
             Assert.IsTrue(events.OfType<TickEvent>().Any(t => t.Cause == "spikes" && t.Hit.Target == Enemy(b) && t.Hit.Damage == Battle.SpikeDamage));
+        }
+
+        // ---------- Review fixes (2026-11-08) ----------
+
+        [Test]
+        public void Rubble_AWalledOffMeleeEnemyWalksUpAndBreaksIt()
+        {
+            // A wall of rocks across row 3 with rubble in the only gap: the brute's only route is through the rubble.
+            var rocks = Enumerable.Range(0, 8).Where(x => x != 3).Select(x => P(x, 3)).ToArray();
+            var b = Setup(new[] { M(UnitStats.Sapper, Technique.CaveIn) }, new[] { P(3, 1) }, new[] { E(UnitStats.Brute, 3, 5) }, rocks);
+            var sapper = Player(b);
+            b.PlayerUseAction(sapper, ActionKind.CaveIn, P(3, 3));
+            b.EndUnitTurn(sapper);
+            b.EndPlayerTurn();
+            Assert.AreEqual(P(3, 4), Enemy(b).Pos, "it walks up to the rubble");
+            Assert.IsFalse(b.IsRubble(P(3, 3)), "and breaks it");
+        }
+
+        [Test]
+        public void BonePile_UnderRubbleCantBeRaised()
+        {
+            var b = Setup(new[] { M(UnitStats.Sapper, Technique.CaveIn) }, new[] { P(3, 1) },
+                new[] { E(UnitStats.Necromancer, 3, 6), E(UnitStats.Skeleton, 3, 3) });
+            var necro = Enemy(b, 0);
+            var pile = Enemy(b, 1);
+            pile.Hp = 0;
+            necro.Ap = 1;
+            Assert.IsTrue(pile.IsRemains);
+            Assert.IsTrue(b.CanRaise(necro, pile));
+            Assert.IsFalse(b.CanUseAction(Player(b), ActionKind.CaveIn, P(3, 3)), "Cave-In won't drop on a pile");
+            // Rubble that lands there another way (the board directly) still buries it.
+            b.Board.AddLowObstacle(P(3, 3));
+            Assert.IsFalse(b.CanRaise(necro, pile));
+        }
+
+        [Test]
+        public void FrostNova_IgnoresHiddenEnemies()
+        {
+            var b = Setup(new[] { M(UnitStats.Apprentice) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far });
+            Enemy(b).HiddenTurns = 1;
+            Assert.IsFalse(b.CanUseAction(Player(b), ActionKind.FrostNova, P(3, 1)));
+        }
+
+        [Test]
+        public void Hook_BatteringRamDoesNotAddDamageToAPull()
+        {
+            var b = Setup(new[] { M(UnitStats.Sapper, Technique.Hook) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 4), Far });
+            b.AddBanner(Banner.BatteringRam);
+            b.PlayerUseAction(Player(b), ActionKind.Hook, P(3, 4));
+            Assert.AreEqual(P(3, 2), Enemy(b).Pos);
+            Assert.AreEqual(UnitStats.Wolf.MaxHp, Enemy(b).Hp);
+        }
+
+        [Test]
+        public void Shatter_NeedsChill()
+        {
+            var mage = new ArmyMember(UnitStats.Apprentice);
+            Assert.IsFalse(mage.Learn(Technique.Shatter));
+            Assert.IsTrue(mage.Learn(Technique.Chill));
+            Assert.IsTrue(mage.Learn(Technique.Shatter));
         }
     }
 }

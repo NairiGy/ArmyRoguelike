@@ -1459,7 +1459,7 @@ namespace ArmyRoguelike.Core
                 foreach (var anchor in routes.Keys.Where(a => Footprint(a, unit.Size).Any(_stormMarks.Contains)).ToList())
                     routes.Remove(anchor);
             // Burning ground (the Mage's keyword): enemies walk through it but never stop on it.
-            if (unit.Team == Team.Enemy && _burning.Count > 0)
+            if (unit.Team == Team.Enemy && _burning.Count > 0 && !unit.Has(Ability.Hellborn))
                 foreach (var anchor in routes.Keys.Where(a => Footprint(a, unit.Size).Any(_burning.ContainsKey)).ToList())
                     routes.Remove(anchor);
             return routes;
@@ -1503,7 +1503,7 @@ namespace ArmyRoguelike.Core
                     var dir = StraightDirection(from, cell);
                     if (dir == null || from.StepsTo(cell) > attacker.Range)
                         continue;
-                    if (from.StepsTo(cell) == 1 || !Board.IsObstacle(from + dir.Value))
+                    if (from.StepsTo(cell) == 1 || !Board.IsRock(from + dir.Value))
                         return true;
                 }
 
@@ -1617,7 +1617,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.PlaceMine:
                     return MinesOf(unit) < MaxMinesFor(unit) && steps >= 1 && steps <= MineRange && IsFree(tile) && !HasHazard(tile);
                 case ActionKind.FrostNova:
-                    return tile == unit.Pos && AdjacentFoes(unit).Any(u => !u.IsObjective);
+                    return tile == unit.Pos && AdjacentFoes(unit).Any(u => !u.IsObjective && !u.IsHidden);
                 case ActionKind.Firewall:
                     return steps >= 1 && steps <= FirewallRange && !Board.IsObstacle(tile) && !IsShroudedFrom(tile, unit.Team);
                 case ActionKind.Blizzard:
@@ -2027,7 +2027,7 @@ namespace ArmyRoguelike.Core
         private void FrostNova(Unit caster, List<BattleEvent> events)
         {
             events.Add(new StatusEvent(caster, caster, StatusKind.FrostNova, 0));
-            foreach (var foe in AdjacentFoes(caster).Where(u => !u.IsObjective).OrderBy(u => u.Id).ToList())
+            foreach (var foe in AdjacentFoes(caster).Where(u => !u.IsObjective && !u.IsHidden).OrderBy(u => u.Id).ToList())
             {
                 if (!foe.IsAlive || IsOver || foe.Has(Ability.Colossus))
                     continue;
@@ -2410,7 +2410,8 @@ namespace ArmyRoguelike.Core
             if (unit.Pos != start)
                 events.Add(new PushEvent(unit, pusher, start, unit.Pos, null));
 
-            if (IsRamming(pusher) && unit.IsAlive)
+            // Battering Ram is for pushes, not the Grappling Hook's pull (the one push with a set distance).
+            if (IsRamming(pusher) && unit.IsAlive && distance == null)
             {
                 var after = new List<BattleEvent>();
                 events.Add(new TickEvent("ram", Damage(unit, Core.Banners.RamDamage, pusher, DamageKind.Collision, after), pusher));
@@ -2427,7 +2428,7 @@ namespace ArmyRoguelike.Core
         public bool CanRaise(Unit raiser, Unit remains) =>
             !IsOver && raiser.IsAlive && raiser.Stats.CanRaise && raiser.Ap >= raiser.Stats.RaiseCost && Ready(raiser, ActionKind.Raise) &&
             remains != null && IsRaisableBy(raiser, remains) &&
-            Distance(raiser, remains) <= raiser.Stats.RaiseRange && UnitAt(remains.Pos) == null;
+            Distance(raiser, remains) <= raiser.Stats.RaiseRange && UnitAt(remains.Pos) == null && !Board.IsObstacle(remains.Pos);
 
         /// <summary>A bone pile the raiser can bring back: one of its own side's, or a fallen unit of yours with Soul Harvest.</summary>
         private static bool IsRaisableBy(Unit raiser, Unit remains) =>
@@ -3341,12 +3342,12 @@ namespace ArmyRoguelike.Core
         {
             UseUp(raiser, ActionKind.Raise);
             var piles = new List<Unit> { remains };
-            piles.AddRange(RaisablePiles(raiser).Where(r => r != remains && Distance(raiser, r) <= raiser.Stats.RaiseRange && UnitAt(r.Pos) == null)
+            piles.AddRange(RaisablePiles(raiser).Where(r => r != remains && Distance(raiser, r) <= raiser.Stats.RaiseRange && UnitAt(r.Pos) == null && !Board.IsObstacle(r.Pos))
                 .OrderBy(r => Distance(raiser, r)).ThenBy(r => r.Id));
             var events = new List<BattleEvent>();
             foreach (var pile in piles)
             {
-                if (UnitAt(pile.Pos) != null)
+                if (UnitAt(pile.Pos) != null || Board.IsObstacle(pile.Pos))
                     continue;
                 if (pile.Team != raiser.Team)
                 {

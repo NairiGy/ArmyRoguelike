@@ -169,3 +169,19 @@ Reading (6 seeds, so ±15% noise): level 0 got better for both (base kits: Frost
 - Enemies don't use Transpose-style knowledge: they can't see mines, so pulling them over mines always works. Intended (the Sapper's whole fantasy), but watch the logs.
 - The design note's Mage and Sapper sections, `docs/tasks.md` (art rows above), `CLAUDE.md` status and the gamepedia export are left to the lead, as instructed. `GamepediaWriter` text is updated, so a re-export picks everything up.
 - The old "Mage line, Blink" and "Sapper line: unchanged" lines in the design note's "Small board, one move" section are now out of date.
+
+## Review fixes (after the merge into `feature/night-fun`, 2026-11-08)
+
+Merged `feature/night-fun` into this branch first (fast-forward), then:
+
+1. **Rubble no longer walls melee enemies in for good.** `EnemyAI.DistanceField` now runs over rubble and barricades at 2 extra steps each (Dijkstra instead of a plain flood), so a walled-off enemy walks up to the rubble or barricade on its route and, having nobody to hit, breaks it with the existing barricade fallback. The Giant's "would this boulder wall me in" check still treats them as solid (`throughBreakable: false`).
+2. **Pierce and Long Reach past rubble:** Long Reach in `CanHitFrom` now checks `Board.IsRock` (the strike lines already did after the merge).
+3. **Bone piles under rubble can't be raised:** `CanRaise` and `DoRaise` refuse piles under any obstacle. (Cave-In already refused to drop on a pile.)
+4. **Frost Nova ignores hidden enemies** (both the check and the effect).
+5. **Hellborn demons may stop on burning ground:** the "enemies never stop on it" filter in `GetReachable` skips units with `Hellborn`.
+6. **Card costs:** the hover card's action list uses the same cost and cooldown as the action card (Quick Fuse, unused Twincast). `Abilities.ActionsOf` and `GameBootstrap.Describe` describe unit *types*, where the plain cost is right, so they stay.
+7. **Bot and Twincast:** SmartBot no longer ends a unit's turn after an attack while a Twincast cast is still free and usable. (A spell first already left the AP for the attack.)
+8. **Battering Ram and Grappling Hook:** the ram's extra damage is skipped on the hook's pull (the only push with a set distance).
+9. **Shatter needs Chill again** (rare, +2 kept). Why a requirement rather than +1: without the chain it was a single rare pick that lifted the whole army's damage on everything Frost Nova touched from the first fight; with Chill first it costs two picks and only comes online when the mage slows something every turn, which is the build it is meant for. +1 would have made it a dull rare that nobody picks over Blizzard or Twincast. The Archer/Rogue builder's cap on stacking bonuses covers the rest. Mage chains are now 4 of 13.
+
+New tests in `MageSapperKitTests`: a walled-off brute walks up and breaks rubble, a buried pile can't be raised, Frost Nova ignores hidden enemies, the ram doesn't hit hook pulls, Shatter needs Chill.

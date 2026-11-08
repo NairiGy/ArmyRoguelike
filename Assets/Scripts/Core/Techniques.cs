@@ -136,7 +136,7 @@ namespace ArmyRoguelike.Core
         // Ice
         public static readonly Technique Chill = P(UnitStats.Apprentice, Ability.Chill);
         public static readonly Technique IceWall = Act(UnitStats.Apprentice, ActionKind.IceWall);
-        public static readonly Technique Shatter = P(UnitStats.Apprentice, Ability.Shatter, Rare);
+        public static readonly Technique Shatter = P(UnitStats.Apprentice, Ability.Shatter, Rare, Chill);
         public static readonly Technique Blizzard = Act(UnitStats.Apprentice, ActionKind.Blizzard, Rare);
 
         // Arcane
