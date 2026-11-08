@@ -131,8 +131,9 @@ ul.plain li.divider { list-style: none; margin-left: -18px; }
 #tip .tip-name { font-family: var(--display); font-size: 17px; }
 tr.flash td { animation: flash 1.6s ease-out; }
 .role { display: inline-block; font-size: 12px; font-weight: 600; padding: 0 7px; border-radius: 3px; background: var(--bg); border: 1px solid var(--line); color: var(--fg); white-space: nowrap; }
-.scores { display: inline-flex; gap: 3px; margin-top: 4px; }
-.sc { font-family: var(--mono); font-size: 11px; font-weight: 500; width: 18px; height: 18px; line-height: 16px; text-align: center; border-radius: 3px; border: 1px solid currentColor; }
+.scores { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
+.sc { font-size: 12px; font-weight: 500; padding: 0 6px; line-height: 18px; border-radius: 3px; border: 1px solid currentColor; white-space: nowrap; }
+.sc b { font-weight: 600; }
 .sc.good { color: var(--good); } .sc.warn { color: var(--muted); border-style: dotted; } .sc.bad { color: var(--bad); background: var(--hurts-bg); }
 .sc.pow { color: var(--makes); background: var(--makes-bg); } .sc.fair { color: var(--muted); border-style: dotted; } .sc.low { color: var(--uses); background: var(--uses-bg); }
 .verdict { font-size: 13px; margin-top: 4px; }
@@ -662,7 +663,7 @@ const SCORE_CLASS = { g: "good", o: "warn", w: "bad", "+": "pow", "=": "fair", "
 const rolePill = r => r ? `<span class="role" title="${esc(ROLES[r].meaning)}">${ROLES[r].label}</span>` : "";
 function scoreDots(s) {
   return `<span class="scores">${CRITERIA.map(([c, name], i) =>
-    `<span class="sc ${SCORE_CLASS[s[i]]}" title="${name}: ${SCORE_WORD[s[i]]}">${c}</span>`).join("")}</span>`;
+    `<span class="sc ${SCORE_CLASS[s[i]]}" title="${esc(CRITERIA[i][2])}">${name}: <b>${SCORE_WORD[s[i]]}</b></span>`).join("")}</span>`;
 }
 
 const heroOf = e => HEROES.includes(e.owner) ? e.owner : null;
@@ -977,9 +978,9 @@ function renderJudge() {
   const judged = ENT.filter(judgeOf);
   document.getElementById("roles").innerHTML = "<tr><th>Role</th><th>Meaning</th><th>Entries</th></tr>" +
     Object.entries(ROLES).map(([r, v]) => `<tr><td>${rolePill(r)}</td><td class="note">${v.meaning}</td><td class="num">${roleCount(judged, r).length}</td></tr>`).join("");
-  document.getElementById("criteria").innerHTML = "<tr><th></th><th>Criterion</th><th>Question</th></tr>" +
-    CRITERIA.map(([c, name, q]) => `<tr><td><span class="sc good">${c}</span></td><td><b>${name}</b></td><td class="note">${q}</td></tr>`).join("") +
-    `<tr><td></td><td colspan="2" class="note">Scores: <span class="sc good">g</span> good, <span class="sc warn">o</span> ok, <span class="sc bad">w</span> weak. Power: <span class="sc pow">+</span> strong, <span class="sc fair">=</span> fair, <span class="sc low">-</span> weak.</td></tr>`;
+  document.getElementById("criteria").innerHTML = "<tr><th>Criterion</th><th>Question</th></tr>" +
+    CRITERIA.map(([c, name, q]) => `<tr><td><b>${name}</b></td><td class="note">${q}</td></tr>`).join("") +
+    `<tr><td colspan="2" class="note">Each entry scores <span class="sc good">good</span> <span class="sc warn">ok</span> or <span class="sc bad">weak</span> on the first four, and <span class="sc pow">strong</span> <span class="sc fair">fair</span> or <span class="sc low">weak</span> on Power.</td></tr>`;
 
   const roles = Object.keys(ROLES).filter(r => r !== "condition" && r !== "counter");
   const owners = [...new Set(ENT.map(e => e.owner))].filter(o => ENT.some(e => e.owner === o && roles.includes((judgeOf(e) || [])[0])));
@@ -1005,12 +1006,12 @@ function renderJudge() {
   }));
 
   const groups = [
-    ["No real decision (D weak)", e => judgeOf(e)[2][0] === "w"],
-    ["No board effect (B weak)", e => judgeOf(e)[2][1] === "w"],
-    ["Nothing pushes back (A weak)", e => judgeOf(e)[2][2] === "w"],
-    ["Hard to read (R weak)", e => judgeOf(e)[2][3] === "w"],
-    ["Possibly too strong (P +)", e => judgeOf(e)[2][4] === "+"],
-    ["Weak for what it asks (P -)", e => judgeOf(e)[2][4] === "-"],
+    ["No real decision (Decision: weak)", e => judgeOf(e)[2][0] === "w"],
+    ["No board effect (Board: weak)", e => judgeOf(e)[2][1] === "w"],
+    ["Nothing pushes back (Answer: weak)", e => judgeOf(e)[2][2] === "w"],
+    ["Hard to read (Readability: weak)", e => judgeOf(e)[2][3] === "w"],
+    ["Possibly too strong (Power: strong)", e => judgeOf(e)[2][4] === "+"],
+    ["Weak for what it asks (Power: weak)", e => judgeOf(e)[2][4] === "-"],
   ];
   document.getElementById("flags").innerHTML = groups.map(([title, f]) => {
     const es = judged.filter(f);
