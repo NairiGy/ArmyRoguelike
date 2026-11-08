@@ -231,6 +231,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Its action can be Corpse Blast: a bone pile in range explodes in a 3x3.</summary>
         CorpseBlast,
+
+        /// <summary>Its HP falls in phases: it can lose at most one phase a round, and each new phase changes how it fights.</summary>
+        StoneHeart,
     }
 
     /// <summary>A special action a unit can spend AP on besides its basic attack. Every one has a cooldown.</summary>
@@ -458,7 +461,7 @@ namespace ArmyRoguelike.Core
         public static readonly UnitStats Necromancer =
             new UnitStats(UnitKind.Necromancer, "Necromancer", 14, 4, 3, 1)
             {
-                IsBoss = true, RaiseCost = 1, RaiseRange = 4, Abilities = A(Ability.SoulHarvest, Ability.CorpseBlast),
+                IsBoss = true, RaiseCost = 1, RaiseRange = 4, Abilities = A(Ability.SoulHarvest, Ability.CorpseBlast, Ability.StoneHeart),
                 Role = "Boss. Brings raised versions of the factions you beat this act, and raises your fallen against you. One action a turn: blows up a bone pile " +
                        "your units stand on or next to, raises every bone pile within 4 tiles at once, or fires a bolt. Keeps 2 tiles away, walks up to bolt range and shoots (needs line of sight).",
             };
@@ -466,8 +469,8 @@ namespace ArmyRoguelike.Core
         /// <summary>Act 1 boss (the ogre). Its basic attack is the club smash, which hits everyone adjacent.</summary>
         public static readonly UnitStats Ogre = new UnitStats(UnitKind.Ogre, "Giant", 36, 5, 1, 1)
         {
-            IsBoss = true, Size = 2, Weight = Weight.Huge, AreaMelee = true, ThrowCost = 1, ThrowDamage = 4, ThrowRange = 4, Slams = true, Abilities = A(Ability.Colossus, Ability.Wrath),
-            Role = "Boss, 2x2. One action a turn, two at half HP. Slam: 3 damage to each of your units within 2 tiles, then shoves them 1 tile away. Smash hits every adjacent unit. " +
+            IsBoss = true, Size = 2, Weight = Weight.Huge, AreaMelee = true, ThrowCost = 1, ThrowDamage = 4, ThrowRange = 4, Slams = true, Abilities = A(Ability.Colossus, Ability.Wrath, Ability.StoneHeart),
+            Role = "Boss, 2x2. One action a turn, two from its second phase; rocks fall in its last. Slam: 3 damage to each of your units within 2 tiles, then shoves them 1 tile away. Smash hits every adjacent unit. " +
                    "Or throws a boulder 2-4 tiles away that stays as a rock. Nothing pins, slows or pushes it.",
         };
 

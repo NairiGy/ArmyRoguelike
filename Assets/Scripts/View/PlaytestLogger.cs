@@ -43,6 +43,9 @@ namespace ArmyRoguelike.View
             _log.omens = battle.Omens.Select(o => Omens.Name(o.omen, o.side == Team.Player)).ToList();
             _log.banners = battle.Banners.Select(Banners.Name).ToList();
             _log.battlefield = battle.Field.HasValue ? Battlefields.Name(battle.Field.Value) : "";
+            var champion = battle.Champion;
+            _log.champion = champion == null ? "" : $"{Champions.Name(champion.Affix)} {champion.Stats.Name}";
+            _log.bossMaxHp = battle.Units.Where(u => u.Stats.IsBoss).Select(u => u.MaxHp).DefaultIfEmpty(0).Max();
             _log.ritualTurns = battle.RitualTurns;
             _log.summonTurn = battle.SummonTurn;
         }
@@ -628,6 +631,10 @@ namespace ArmyRoguelike.View
             /// "favored" (the unit picked), explosions with note "lightning", and "favored" on hits a favored unit dealt.
             /// </summary>
             public string battlefield;
+
+            /// <summary>The fight's champion as "Armored Bandit Brute" ("" for none), and the boss's max HP after scaling to the army's levels (0: no boss). Statuses "phase" (amount = the new phase) and "rockfall" mark Stone Heart; explosions "rockfall" and "vengeful".</summary>
+            public string champion = "";
+            public int bossMaxHp;
 
             /// <summary>Blessings and curses in play this battle.</summary>
             public List<string> omens = new List<string>();

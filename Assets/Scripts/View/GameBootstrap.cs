@@ -678,6 +678,12 @@ namespace ArmyRoguelike.View
                     if (node.Field.HasValue)
                         label += $"  ·  {Battlefields.Name(node.Field.Value)}";
                     var rule = node.Field.HasValue ? $"{Battlefields.Name(node.Field.Value)}: {Battlefields.Describe(node.Field.Value)}" : "";
+                    if (node.Champion != Affix.None)
+                    {
+                        label += $"  ·  {Champions.Name(node.Champion)} champion";
+                        rule += (rule.Length > 0 ? "\n" : "") + Champions.Rule(node.Champion);
+                    }
+
                     // Tooltips only work on enabled controls, so future steps stay enabled but ignore clicks.
                     GUI.enabled = current || (!past && node.Field.HasValue);
                     var oldColor = GUI.color;
@@ -705,6 +711,7 @@ namespace ArmyRoguelike.View
             GUILayout.Label("? = something unexpected. Shops sell techniques, items, a recruit, and help forgetting a technique. Every won fight offers a technique pick.");
             GUILayout.Label("Moon Shrine: defend it for 5 enemy turns to earn a blessing. If it breaks, you take a curse.");
             GUILayout.Label("Break the Ritual: smash 3 totems before enemy turn 4 to earn a technique pick. If the summoning completes, you take a curse.");
+            GUILayout.Label($"From step {Champions.FirstStep + 1}, battles and elites bring a champion (hover the node). A statue that falls in a fight is cracked: -{Run.CrackHp} max HP until a shop mends it, and {Run.CracksToShatter} cracks shatter it for good. Bosses grow with your army's levels and fall in {Core.Battle.BossPhases} phases, one a round at most.");
             GUILayout.Label("Battle: a faction you haven't beaten (a rematch once you've met them all). Elite: a harder rematch of a faction you beat; its pick has a rare technique. Battles and elites show their faction when you reach their step.");
             GUILayout.EndScrollView();
             GUILayout.Space(4);

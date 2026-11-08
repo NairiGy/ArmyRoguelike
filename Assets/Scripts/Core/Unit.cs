@@ -157,6 +157,20 @@ namespace ArmyRoguelike.Core
         /// <summary>Fortune's Favored: deals double damage until the next player turn.</summary>
         public bool Favored { get; internal set; }
 
+        /// <summary>A champion's extra rule (None for everyone else). See <see cref="Champions"/>.</summary>
+        public Affix Affix { get; internal set; }
+
+        public bool IsChampion => Affix != Affix.None;
+
+        /// <summary>Max HP added in this battle: a champion's, or a boss scaled to the army's levels.</summary>
+        public int ExtraHp { get; internal set; }
+
+        /// <summary>Stone Heart (bosses): its phase, 1 to <see cref="Battle.BossPhases"/>.</summary>
+        public int BossPhase { get; internal set; } = 1;
+
+        /// <summary>Stone Heart: HP it can't drop below until your next turn (0 = none); the next phase starts there.</summary>
+        public int PhaseFloor { get; internal set; }
+
         public Unit(int id, Team team, UnitStats stats, ArmyMember member = null, Unit summoner = null)
         {
             Id = id;
@@ -184,6 +198,7 @@ namespace ArmyRoguelike.Core
                 BannerAp = BannerAp, BannerMoves = BannerMoves, LeftPile = LeftPile, PileGone = PileGone,
                 ShieldUpTurns = ShieldUpTurns, TauntTurns = TauntTurns, BattlecryTurns = BattlecryTurns, TempHp = TempHp,
                 ShieldThrown = ShieldThrown, ZocStrikeUsed = ZocStrikeUsed,
+                Affix = Affix, ExtraHp = ExtraHp, BossPhase = BossPhase, PhaseFloor = PhaseFloor,
             };
             foreach (var cooldown in _cooldowns)
                 c._cooldowns.Add(cooldown.Key, cooldown.Value);
@@ -201,11 +216,11 @@ namespace ArmyRoguelike.Core
         public Equipment Equipment => Member?.Equipment;
 
         // Stats after run-long bonuses.
-        public int MaxHp => Math.Max(1, Stats.MaxHp + (Member?.BonusMaxHp ?? 0) + (Member?.LevelHp ?? 0) - (Member?.Cracks ?? 0) * Run.CrackHp + PackHp);
+        public int MaxHp => Math.Max(1, Stats.MaxHp + (Member?.BonusMaxHp ?? 0) + (Member?.LevelHp ?? 0) - (Member?.Cracks ?? 0) * Run.CrackHp + PackHp + ExtraHp);
 
         /// <summary>Max HP from a Pack Leader's Pack Bond: +1 while one lives, -1 once the last one dies.</summary>
         public int PackHp { get; internal set; }
-        public int BaseDamage => Math.Max(1, Stats.Damage + (Member?.BonusDamage ?? 0) + (Member?.LevelDamage ?? 0) + (ShieldThrown ? Battle.ThrowShieldDamage : 0));
+        public int BaseDamage => Math.Max(1, Stats.Damage + (Member?.BonusDamage ?? 0) + (Member?.LevelDamage ?? 0) + (ShieldThrown ? Battle.ThrowShieldDamage : 0) + (Affix == Affix.Mighty ? Champions.MightyDamage : 0));
 
         /// <summary>Attack range in steps. Long Reach makes it 2 (still melee).</summary>
         public int Range => Math.Max(Has(Ability.LongReach) ? 2 : 1, Stats.Range);
@@ -216,11 +231,11 @@ namespace ArmyRoguelike.Core
 
         public int BannerMoves { get; internal set; }
 
-        /// <summary>Wrath (the Giant): at half HP or less it gets one more AP each turn.</summary>
-        public bool InWrath => Has(Ability.Wrath) && IsAlive && Hp * 2 <= MaxHp;
+        /// <summary>Wrath (the Giant): from its second phase (Stone Heart), or at half HP without one, it gets one more AP each turn.</summary>
+        public bool InWrath => Has(Ability.Wrath) && IsAlive && (Has(Ability.StoneHeart) ? BossPhase >= 2 : Hp * 2 <= MaxHp);
 
         /// <summary>Tiles per turn: the type's moves (1, or 2 with Swift), plus 1 for Spring Boots and 1 for Third Wheel.</summary>
-        public int MaxMoves => Stats.Moves + (Stats.Moves > 0 ? (Has(Ability.SpringBoots) ? 1 : 0) + BannerMoves + (BattlecryTurns > 0 ? Battle.BattlecryMoves : 0) + (ShieldThrown ? Battle.ThrowShieldMoves : 0) : 0);
+        public int MaxMoves => Stats.Moves + (Stats.Moves > 0 ? (Has(Ability.SpringBoots) ? 1 : 0) + BannerMoves + (BattlecryTurns > 0 ? Battle.BattlecryMoves : 0) + (ShieldThrown ? Battle.ThrowShieldMoves : 0) + (Affix == Affix.Fleet ? Champions.FleetMoves : 0) : 0);
 
         public int Size => Stats.Size;
 

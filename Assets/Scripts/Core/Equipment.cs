@@ -93,6 +93,7 @@ namespace ArmyRoguelike.Core
                 case Ability.Wrath: return "Wrath";
                 case Ability.SoulHarvest: return "Soul Harvest";
                 case Ability.CorpseBlast: return "Corpse Blast";
+                case Ability.StoneHeart: return "Stone Heart";
                 default: return "";
             }
         }
@@ -150,9 +151,10 @@ namespace ArmyRoguelike.Core
                 case Ability.Upheaval: return $"the ground bursts up under one of your units within {Battle.UpheavalRange} tiles (no line of sight needed): {Battle.UpheavalDamage} damage, and it is thrown 1 tile away from the caster ({Battle.CollisionDamage} more if blocked)";
                 case Ability.Grasp: return "grabs a unit next to it: no damage, but it can't move on its next turn";
                 case Ability.Colossus: return "can't be pushed, pinned, slowed or grasped";
-                case Ability.Wrath: return "at half HP or less it gets 2 actions a turn instead of 1 (each still has its cooldown)";
+                case Ability.Wrath: return "from its second phase it gets 2 actions a turn instead of 1 (each still has its cooldown)";
                 case Ability.SoulHarvest: return "while it is on the board your units that die leave a bone pile; raising one brings it back on its side as a Bone version with only its basic attack";
                 case Ability.CorpseBlast: return $"a bone pile within its raise range explodes for {Battle.CorpseBlastDamage} damage in the 3x3 around it, friend or foe; the pile is used up";
+                case Ability.StoneHeart: return $"its HP falls in {Battle.BossPhases} phases, and it loses at most one a round: damage past the next phase is lost until your next turn. Each new phase changes how it fights (Giant: 2 actions a turn, then falling rocks on your units' tiles each round; Necromancer: {Battle.PhaseSkeletons} skeletons climb onto the roof). Its max HP grows by {Battle.BossHpPerLevel} for every level in your army";
                 default: return "";
             }
         }

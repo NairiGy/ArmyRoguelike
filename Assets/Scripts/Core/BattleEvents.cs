@@ -306,6 +306,12 @@ namespace ArmyRoguelike.Core
         /// <summary>Wrath (the Giant): it dropped to half HP and now gets two actions a turn (Source and Target are the same unit).</summary>
         Wrath,
 
+        /// <summary>Stone Heart: a boss entered a new phase; <see cref="StatusEvent.Amount"/> is the phase number (Source and Target are the same unit).</summary>
+        Phase,
+
+        /// <summary>The Giant's last phase: rocks will fall on this unit's tile at the end of the enemy turn.</summary>
+        Rockfall,
+
         /// <summary>Grasp (skeletons): held in place, can't move on its next turn.</summary>
         Grasp,
 

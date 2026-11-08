@@ -34,6 +34,9 @@ namespace ArmyRoguelike.Tests
                 }
 
                 e.Hp = 1;
+                // Skip a boss's Stone Heart phases for the test.
+                e.BossPhase = Battle.BossPhases;
+                e.PhaseFloor = 0;
                 var killer = players[0];
                 killer.Ap = 99;
                 killer.Pos = new GridPos(e.Pos.X, e.Pos.Y - 1);

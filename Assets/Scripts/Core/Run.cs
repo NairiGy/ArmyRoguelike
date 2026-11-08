@@ -155,6 +155,9 @@ namespace ArmyRoguelike.Core
         /// <summary>The fight's battlefield rule, known from the start of the run. Null for scenario fights and other nodes.</summary>
         public Battlefield? Field { get; internal set; }
 
+        /// <summary>Battle and elite nodes in the later part of the act: the affix of the fight's champion (None for no champion).</summary>
+        public Affix Champion { get; internal set; }
+
         public MapNode(NodeKind kind, Encounter encounter = null)
         {
             Kind = kind;
@@ -308,6 +311,11 @@ namespace ArmyRoguelike.Core
             _startBanners.AddRange(Core.Banners.All.OrderBy(_ => bannerRng.Next()).Take(Core.Banners.StartChoices));
             _fieldRng = new Random(seed ^ 0x2545f491);
             AssignFields();
+            // And its own for champions, so adding them changed nothing else a seed gives.
+            var championRng = new Random(seed ^ 0x27d4eb2d);
+            for (var step = Champions.FirstStep; step < _map.Count; step++)
+                foreach (var node in _map[step].Where(n => n.Kind == NodeKind.Battle || n.Kind == NodeKind.Elite))
+                    node.Champion = Champions.All[championRng.Next(Champions.All.Count)];
         }
 
         // ---------- Battlefields ----------
@@ -603,6 +611,10 @@ namespace ArmyRoguelike.Core
                 CurrentBattle.AddOmen(curse, Team.Enemy);
             foreach (var banner in _banners)
                 CurrentBattle.AddBanner(banner);
+            if (!IsAmbush && CurrentNode != null)
+                CurrentBattle.MakeChampion(CurrentNode.Champion);
+            if (CurrentEncounter.IsBoss)
+                CurrentBattle.StrengthenBosses(Army.Sum(m => m.Level) * Core.Battle.BossHpPerLevel);
             CurrentBattle.SetField(CurrentField);
             return CurrentBattle;
         }
@@ -700,7 +712,7 @@ namespace ArmyRoguelike.Core
         public int LastStolen { get; private set; }
 
         /// <summary>Gold a victory in the current battle would pay with this many survivors.</summary>
-        public int RewardFor(int survivors) => GoldFor(survivors) + (IsAmbush ? AmbushBonusGold : 0);
+        public int RewardFor(int survivors) => GoldFor(survivors) + (IsAmbush ? AmbushBonusGold : 0) + (!IsAmbush && CurrentNode != null && CurrentNode.Champion != Affix.None ? Champions.BonusGold : 0);
 
         /// <summary>Call once the current battle is over. Returns the gold earned (0 for a defeat).</summary>
         public int FinishBattle()

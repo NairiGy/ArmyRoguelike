@@ -357,7 +357,7 @@ public static class GamepediaWriter
             case EnemyBehaviour.Giant:
                 return new[]
                 {
-                    $"With its action (two actions a turn at half HP or less, Wrath; it loops until both are spent): smash or slam, whichever deals more in total (slam needs 2 or more of your units within 2 tiles; {Battle.SlamDamage} damage to each), ties going to smash.",
+                    $"With its action (two actions a turn from its second phase, Wrath; it loops until both are spent): smash or slam, whichever deals more in total (slam needs 2 or more of your units within 2 tiles; {Battle.SlamDamage} damage to each), ties going to smash.",
                     "Or, with nobody close enough for either: throw a boulder at its target if it is 2 to throw-range tiles away and the rock wouldn't wall the Giant off from it.",
                     $"Without an action to take: {approach} to the {target}, then try again.",
                 };

@@ -496,15 +496,126 @@ namespace ArmyRoguelike.Core
                 var hits = new List<Hit>();
                 var after = new List<BattleEvent>();
                 var victim = UnitAt(tile);
+                var rocks = _rockfall.Contains(tile);
                 if (victim != null)
-                    hits.Add(Damage(victim, Battlefields.StormDamage, null, DamageKind.Blast, after));
-                events.Add(new ExplosionEvent("lightning", null, tile, new[] { tile }, hits, 0));
+                    hits.Add(Damage(victim, rocks ? RockfallDamage : Battlefields.StormDamage, null, DamageKind.Blast, after));
+                events.Add(new ExplosionEvent(rocks ? "rockfall" : "lightning", null, tile, new[] { tile }, hits, 0));
                 events.AddRange(after);
                 CheckEnd();
             }
 
             _stormMarks.Clear();
+            _rockfall.Clear();
         }
+
+        // ---------- Champions and boss phases ----------
+
+        /// <summary>Stone Heart: a boss's HP is split into this many phases.</summary>
+        public const int BossPhases = 3;
+
+        /// <summary>A boss's extra max HP for each level of the army (all levels added up).</summary>
+        public const int BossHpPerLevel = 1;
+
+        /// <summary>Giant, last phase: tiles under this many of your units are marked each round; falling rocks hit them at the end of the enemy turn.</summary>
+        public const int RockfallMarks = 2;
+        public const int RockfallDamage = 3;
+
+        /// <summary>Necromancer, each new phase: skeletons that climb onto the roof's edge.</summary>
+        public const int PhaseSkeletons = 2;
+
+        private readonly HashSet<GridPos> _rockfall = new HashSet<GridPos>();
+
+        /// <summary>The champion of this fight, or null.</summary>
+        public Unit Champion => _units.FirstOrDefault(u => u.IsChampion);
+
+        /// <summary>
+        /// Makes the toughest enemy (most max HP; not a boss or an objective) this fight's champion, with the affix and
+        /// <see cref="Champions.ExtraHp"/> max HP. Call before the battle starts.
+        /// </summary>
+        public Unit MakeChampion(Affix affix)
+        {
+            if (affix == Affix.None)
+                return null;
+            var unit = _units.Where(u => u.Team == Team.Enemy && !u.IsObjective && !u.Stats.IsBoss && u.IsAlive)
+                .OrderByDescending(u => u.MaxHp).ThenBy(u => u.Id).FirstOrDefault();
+            if (unit == null)
+                return null;
+            unit.Affix = affix;
+            unit.ExtraHp += Champions.ExtraHp;
+            unit.Hp = unit.MaxHp;
+            return unit;
+        }
+
+        /// <summary>Gives the bosses extra max HP (scaled to the army's levels by the run). Call before the battle starts.</summary>
+        public void StrengthenBosses(int extraHp)
+        {
+            foreach (var boss in _units.Where(u => u.Stats.IsBoss && u.IsAlive))
+            {
+                boss.ExtraHp += extraHp;
+                boss.Hp = boss.MaxHp;
+            }
+        }
+
+        /// <summary>Stone Heart: the HP at which the boss's next phase starts (0 in its last phase).</summary>
+        public static int NextPhaseHp(Unit boss) =>
+            boss.BossPhase >= BossPhases ? 0 : (int)Math.Ceiling(boss.MaxHp * (BossPhases - boss.BossPhase) / (double)BossPhases);
+
+        /// <summary>Start of your turn: each Stone Heart boss can't drop below its next phase until your next turn.</summary>
+        private void SetPhaseFloors()
+        {
+            foreach (var boss in Living(Team.Enemy).Where(u => u.Has(Ability.StoneHeart)))
+                boss.PhaseFloor = NextPhaseHp(boss);
+        }
+
+        /// <summary>A boss reached its phase floor: the next phase starts, and the rest of this round's damage stops there.</summary>
+        private void EnterPhase(Unit boss, List<BattleEvent> after)
+        {
+            boss.BossPhase++;
+            after.Add(new StatusEvent(boss, boss, StatusKind.Phase, boss.BossPhase));
+            if (boss.Has(Ability.SoulHarvest))
+                SpawnEdgeUnits(UnitStats.Raised(UnitStats.Skeleton), PhaseSkeletons, after);
+        }
+
+        /// <summary>Puts new units of the enemy side on free edge tiles as far as possible from your units. They act from the next enemy turn.</summary>
+        private void SpawnEdgeUnits(UnitStats stats, int count, List<BattleEvent> events)
+        {
+            var arrived = new List<Unit>();
+            for (var i = 0; i < count; i++)
+            {
+                var tile = Board.AllTiles()
+                    .Where(p => (p.X == 0 || p.Y == 0 || p.X == Board.Width - 1 || p.Y == Board.Height - 1) && IsFree(p) && !HasHazard(p) && RemainsAt(p) == null)
+                    .OrderByDescending(p => Living(Team.Player).Select(u => p.StepsTo(u.Pos)).DefaultIfEmpty(99).Min())
+                    .ThenBy(p => p.Y).ThenBy(p => p.X).Cast<GridPos?>().FirstOrDefault();
+                if (!tile.HasValue)
+                    break;
+                var unit = new Unit(_nextId++, Team.Enemy, stats) { Pos = tile.Value, IsPlaced = true, IsDone = true };
+                _units.Add(unit);
+                arrived.Add(unit);
+            }
+
+            if (arrived.Count > 0)
+                events.Add(new ReinforceEvent(arrived));
+        }
+
+        /// <summary>Giant in its last phase: marks the tiles under some of your units for falling rocks (start of your turn).</summary>
+        private void MarkRockfall(List<BattleEvent> events)
+        {
+            if (IsOver || !Living(Team.Enemy).Any(u => u.Has(Ability.StoneHeart) && u.Has(Ability.Wrath) && u.BossPhase >= BossPhases))
+                return;
+            var pool = Living(Team.Player).Where(u => !u.IsObjective).OrderBy(_ => Rng.Next(1000)).Take(RockfallMarks).ToList();
+            foreach (var unit in pool)
+            {
+                var tile = unit.Pos;
+                if (_stormMarks.Contains(tile))
+                    continue;
+                _stormMarks.Add(tile);
+                _rockfall.Add(tile);
+                events.Add(new StatusEvent(unit, unit, StatusKind.Rockfall, 0));
+            }
+        }
+
+        /// <summary>Whether a marked tile is for falling rocks (Giant) rather than lightning (Storm).</summary>
+        public bool IsRockfallMark(GridPos tile) => _rockfall.Contains(tile);
 
         /// <summary>Fortune's Favored doubles what a favored unit deals to the other side (attacks and blasts, not collisions).</summary>
         private static int FavoredAmount(Unit source, Unit target, int amount, DamageKind kind) =>
@@ -623,6 +734,7 @@ namespace ArmyRoguelike.Core
             copy._omens.AddRange(_omens);
             copy._sunMarks.AddRange(_sunMarks);
             copy._stormMarks.AddRange(_stormMarks);
+            copy._rockfall.UnionWith(_rockfall);
             copy._banners.UnionWith(_banners);
             copy._deployZone = _deployZone == null ? null : new HashSet<GridPos>(_deployZone);
             copy._nextId = _nextId;
@@ -860,6 +972,8 @@ namespace ArmyRoguelike.Core
                     amount = Math.Max(1, amount - 1);
                 if (target.Has(Ability.Tough))
                     amount = Math.Max(1, amount - 1);
+                if (target.Affix == Affix.Armored)
+                    amount = Math.Max(1, amount - Champions.ArmoredReduction);
                 if (target.ShieldUpTurns > 0)
                     amount = Math.Max(1, amount - ShieldUpReduction);
                 if (dodge)
@@ -920,6 +1034,8 @@ namespace ArmyRoguelike.Core
                 amount = Math.Max(1, amount - 1);
             if (target.Has(Ability.Tough))
                 amount = Math.Max(1, amount - 1);
+            if (target.Affix == Affix.Armored)
+                amount = Math.Max(1, amount - Champions.ArmoredReduction);
             if (target.ShieldUpTurns > 0)
                 amount = Math.Max(1, amount - ShieldUpReduction);
             return amount - target.Shield - target.MoonShield - target.TempHp >= target.Hp;
@@ -2444,6 +2560,8 @@ namespace ArmyRoguelike.Core
                 amount = Math.Max(1, amount - 1);
             if (target.Has(Ability.Tough))
                 amount = Math.Max(1, amount - 1);
+            if (target.Affix == Affix.Armored)
+                amount = Math.Max(1, amount - Champions.ArmoredReduction);
             if (target.ShieldUpTurns > 0)
                 amount = Math.Max(1, amount - ShieldUpReduction);
 
@@ -2490,8 +2608,19 @@ namespace ArmyRoguelike.Core
                 after.Add(new EffectEvent(EffectKind.LastStand, target, 0, 1, target));
             }
 
+            // Stone Heart: a boss can lose at most one phase a round; the damage past it is lost.
+            var phaseStarts = false;
+            if (target.Has(Ability.StoneHeart) && target.PhaseFloor > 0 && hp <= target.PhaseFloor)
+            {
+                phaseStarts = target.Hp > target.PhaseFloor;
+                hp = target.PhaseFloor;
+                amount = Math.Max(0, target.Hp - hp);
+            }
+
             var wasInWrath = target.InWrath;
             target.Hp = Math.Max(0, hp);
+            if (phaseStarts)
+                EnterPhase(target, after);
             if (!wasInWrath && target.InWrath)
                 after.Add(new StatusEvent(target, target, StatusKind.Wrath, 0));
 
@@ -2539,6 +2668,17 @@ namespace ArmyRoguelike.Core
 
                 if (target.Has(Ability.PowderKeg))
                     Explode(target.Pos, PowderKegDamage, "powder keg", target, after);
+
+                // A Vengeful champion hits back at everyone of the other side next to it as it dies.
+                if (target.Affix == Affix.Vengeful && !target.Fell)
+                {
+                    var hits = new List<Hit>();
+                    var blast = new List<BattleEvent>();
+                    foreach (var foe in _units.Where(u => u.Team != target.Team && u.IsAlive && u.IsPlaced && !u.IsObjective && Distance(target, u) == 1).ToList())
+                        hits.Add(Damage(foe, Champions.VengefulDamage, target, DamageKind.Blast, blast));
+                    after.Add(new ExplosionEvent("vengeful", target, target.Pos, BlastArea(target.Pos), hits, 0));
+                    after.AddRange(blast);
+                }
             }
 
             if (!target.IsAlive && target.Stats.SplitsInto != null)
@@ -2756,10 +2896,20 @@ namespace ArmyRoguelike.Core
                 }
             }
 
+            // Regenerating champions heal as their side's turn starts.
+            foreach (var u in Living(team).Where(u => u.Affix == Affix.Regenerating && u.Hp < u.MaxHp).ToList())
+            {
+                var healed = Math.Min(Champions.RegenHeal, u.MaxHp - u.Hp);
+                u.Hp += healed;
+                events.Add(new EffectEvent(EffectKind.Heal, u, healed, u.Hp, u));
+            }
+
             if (team == Team.Player)
             {
                 ApplyOmens(events);
                 ApplyField(events);
+                MarkRockfall(events);
+                SetPhaseFloors();
             }
 
             CheckEnd();

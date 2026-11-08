@@ -937,6 +937,9 @@ namespace ArmyRoguelike.View
                 }
                 case ExplosionEvent blast:
                 {
+                    if (blast.Cause == "rockfall" || blast.Cause == "vengeful")
+                        DamagePopup.Spawn(IsoMath.GridToWorld(blast.Center) + Vector3.up * 0.9f, blast.Cause == "rockfall" ? "Rockfall!" : "Vengeance!", DamagePopup.DamageColor, 44);
+
                     // A sun beam leaves any mine or bomb on its tile alone.
                     if (blast.Cause == "lightning")
                     {
@@ -1042,6 +1045,12 @@ namespace ArmyRoguelike.View
                             break;
                         case StatusKind.Wrath:
                             DamagePopup.Spawn(at, "Wrath! 2 actions a turn", DamagePopup.DamageColor, 48);
+                            break;
+                        case StatusKind.Phase:
+                            DamagePopup.Spawn(at, PhaseText(status.Target, status.Amount), DamagePopup.DamageColor, 48);
+                            break;
+                        case StatusKind.Rockfall:
+                            DamagePopup.Spawn(at, "Rocks above!", DamagePopup.DamageColor, 40);
                             break;
                         case StatusKind.Vanish:
                             // Placeholder look: the statue turns see-through (see the "Art needed" table).
@@ -2065,6 +2074,16 @@ namespace ArmyRoguelike.View
             }
         }
 
+        /// <summary>The popup for a boss entering a Stone Heart phase.</summary>
+        private static string PhaseText(Unit boss, int phase)
+        {
+            if (boss.Has(Ability.SoulHarvest))
+                return $"Phase {phase}! The dead climb the walls";
+            if (boss.Has(Ability.Wrath))
+                return phase >= Battle.BossPhases ? $"Phase {phase}! The roof cracks: rocks fall" : $"Phase {phase}!";
+            return $"Phase {phase}!";
+        }
+
         private static string Capitalise(string text) =>
             string.IsNullOrEmpty(text) ? text : char.ToUpperInvariant(text[0]) + text.Substring(1);
 
@@ -2096,8 +2115,12 @@ namespace ArmyRoguelike.View
                 lines.Add($"Shield thrown: +{Battle.ThrowShieldDamage} damage, +{Battle.ThrowShieldMoves} move");
             if (u.Favored)
                 lines.Add($"Favored by fortune: {Battlefields.FavoredMultiplier}x damage this round");
+            if (u.IsChampion)
+                lines.Add($"Champion ({Champions.Name(u.Affix)}): +{Champions.ExtraHp} max HP, {Champions.Describe(u.Affix)}");
+            if (u.Has(Ability.StoneHeart))
+                lines.Add($"Stone Heart: phase {u.BossPhase} of {Battle.BossPhases}" + (Battle.NextPhaseHp(u) > 0 ? $"; can't drop below {Math.Max(u.PhaseFloor, Battle.NextPhaseHp(u))} HP this round" : "; last phase"));
             if (Battle.OnStormMark(u))
-                lines.Add($"On a storm mark: lightning strikes for {Battlefields.StormDamage} after the enemy turn");
+                lines.Add(Battle.IsRockfallMark(u.Pos) ? $"Under falling rocks: {Battle.RockfallDamage} damage after the enemy turn unless it moves" : $"On a storm mark: lightning strikes for {Battlefields.StormDamage} after the enemy turn");
             if (u.Team == Team.Player && Battle.Phase == Phase.PlayerTurn && u.ActedThisTurn && !u.IsDone)
                 lines.Add("Has acted: can't move again this turn");
             if (u.IsSnared)

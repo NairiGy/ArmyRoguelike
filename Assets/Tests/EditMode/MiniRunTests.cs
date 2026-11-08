@@ -63,6 +63,9 @@ namespace ArmyRoguelike.Tests
                 }
 
                 e.Hp = 1;
+                // Skip a boss's Stone Heart phases for the test.
+                e.BossPhase = Battle.BossPhases;
+                e.PhaseFloor = 0;
                 var killer = players[0];
                 killer.Ap = 99;
                 // Teleport next to the enemy for the test and hit it once.
@@ -961,12 +964,12 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Wrath_GiantActsTwiceAtHalfHp()
+        public void Wrath_GiantActsTwiceFromItsSecondPhase()
         {
             var b = Started(Army(UnitStats.Warrior), new[] { new GridPos(3, 1) }, new[] { (UnitStats.Ogre, new GridPos(3, 4)) });
             var warrior = Player(b);
             var giant = Enemy(b);
-            giant.Hp = giant.MaxHp / 2 + 1;
+            giant.Hp = Battle.NextPhaseHp(giant) + 1;
             warrior.Pos = new GridPos(3, 3);
             var hit = b.PlayerAttack(warrior, giant);
             Assert.IsTrue(hit.OfType<StatusEvent>().Any(s => s.Kind == StatusKind.Wrath));
@@ -999,6 +1002,8 @@ namespace ArmyRoguelike.Tests
             var rogue = Player(b);
             Enemy(b, 1).Hp = 0;
             Enemy(b, 0).Hp = UnitStats.Rogue.Damage;
+            Enemy(b, 0).BossPhase = Battle.BossPhases;
+            Enemy(b, 0).PhaseFloor = 0;
             b.PlayerAttack(rogue, Enemy(b, 0));
             Assert.AreEqual(Phase.Victory, b.Phase);
         }
