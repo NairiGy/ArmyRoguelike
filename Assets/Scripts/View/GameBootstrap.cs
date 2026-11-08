@@ -759,6 +759,9 @@ namespace ArmyRoguelike.View
 
         private Vector2 _detailScroll;
 
+        /// <summary>The mouse in the skill list's own coordinates (see <see cref="DrawHeroDetail"/>).</summary>
+        private Vector2 _detailMouse;
+
         /// <summary>The skill under the pointer last frame: it and the skills it needs or unlocks get a gold edge.</summary>
         private string _hoveredSkill;
         private string _hoveredSkillNext;
@@ -834,11 +837,18 @@ namespace ArmyRoguelike.View
             const float columnGap = 14f, scrollBar = 16f;
             var column = (skills.width - scrollBar - columnGap) * 0.5f;
             var contentHeight = Mathf.Max(SkillColumnHeight(passive, column), SkillColumnHeight(active, column)) + 30;
+            // Inside a scroll view under the scaled GUI.matrix, Unity scales the mouse position again, so hovers
+            // landed on the skill below. Work it out from the position outside the view instead.
+            var outerMouse = e.mousePosition;
+            var overList = skills.Contains(outerMouse);
             _detailScroll = GUI.BeginScrollView(skills, _detailScroll, new Rect(0, 0, skills.width - scrollBar, contentHeight));
+            _detailMouse = overList ? outerMouse - skills.position + _detailScroll : new Vector2(-9999f, -9999f);
+            KeywordText.MouseOverride = _detailMouse;
             DrawLegend(new Rect(0, 0, skills.width - scrollBar, 20));
             var all = passive.Concat(active).ToList();
             DrawSkillColumn(new Rect(0, 26, column, contentHeight - 26), "PASSIVE", passive, all);
             DrawSkillColumn(new Rect(column + columnGap, 26, column, contentHeight - 26), "ACTIVE", active, all);
+            KeywordText.MouseOverride = null;
             GUI.EndScrollView();
             GUILayout.EndArea();
         }
@@ -1005,7 +1015,7 @@ namespace ArmyRoguelike.View
                 var h = SkillHeight(skill, r.width);
                 var indent = skill.Indented ? Indent : 0f;
                 var card = new Rect(r.x + indent, y, r.width - indent, h);
-                if (card.Contains(Event.current.mousePosition))
+                if (card.Contains(_detailMouse))
                     _hoveredSkillNext = skill.Name;
 
                 // Hovering a skill lights up it, what it needs and what needs it.

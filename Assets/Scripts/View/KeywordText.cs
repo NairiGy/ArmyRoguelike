@@ -15,6 +15,12 @@ namespace ArmyRoguelike.View
         /// <summary>The colour of keywords in a text (placeholder for the art chat).</summary>
         public static readonly Color KeywordColor = new Color(1f, 0.82f, 0.45f);
 
+        /// <summary>
+        /// The mouse position to hit-test words against, set while drawing inside a scroll view, where Unity's own
+        /// position is off under a scaled GUI.matrix. Null = use the event's.
+        /// </summary>
+        public static Vector2? MouseOverride;
+
         private static Keyword? _hovered;
         private static int _hoveredFrame = -1;
 
@@ -99,7 +105,7 @@ namespace ArmyRoguelike.View
             var lineHeight = plain.CalcSize(new GUIContent("Ag")).y;
             var space = plain.CalcSize(new GUIContent("a a")).x - plain.CalcSize(new GUIContent("aa")).x;
             var draw = rect.HasValue && Event.current.type == EventType.Repaint;
-            var mouse = Event.current.mousePosition;
+            var mouse = MouseOverride ?? Event.current.mousePosition;
 
             var x = 0f;
             var y = 0f;
