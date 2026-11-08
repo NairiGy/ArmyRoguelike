@@ -1,5 +1,7 @@
 # Archer and Rogue redesign (night of 2026-11-08, not playtested)
 
+> Build notes from the night pass, kept as written. It was merged into `main` on 2026-11-08, so "main is unchanged" and branch names below are history. Some rules changed since (for example slowed is now "move or act, not both"); the design note and the gamepedia hold the current rules.
+
 Built on branch `claude/archer-rogue-pools-721626` while the user slept, following the Warrior redesign (commit `ad60a93`). Goals from the lead: each line ends with 10-12 offered techniques (far more than a run learns), a mix of passives and actions, about 2/3 common, a few `Requires` chains, and skills that pay off on statuses other lines also create (pinned, slowed, poisoned, burning, pushed, hidden). Every number, cooldown and rarity below is Claude's placeholder; nothing was played by a human.
 
 For the lead to merge: the design-note section, the `docs/tasks.md` rows (art table below), CLAUDE.md's status line and the gamepedia re-export are left to you. `TechniqueTests.Catalog` now expects 49 techniques in `Technique.All`; the other pool sessions change that number too.

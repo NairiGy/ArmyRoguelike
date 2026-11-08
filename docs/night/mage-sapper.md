@@ -1,5 +1,7 @@
 # Mage and Sapper redesign (night pass, 2026-11-08, not playtested)
 
+> Build notes from the night pass, kept as written. It was merged into `main` on 2026-11-08, so "main is unchanged" and branch names below are history. Some rules changed since (for example slowed is now "move or act, not both"); the design note and the gamepedia hold the current rules.
+
 Built overnight on branch `claude/mage-sapper-pools-f7250b` while the user slept, following the Warrior redesign
 (`ad60a93`). Every number, cooldown and rarity here is a placeholder. Nothing was playtested; the bot sim numbers are at
 the end.

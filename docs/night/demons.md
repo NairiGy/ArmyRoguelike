@@ -1,5 +1,7 @@
 # Demons (night pass, 2026-11-08, not playtested)
 
+> Build notes from the night pass, kept as written. It was merged into `main` on 2026-11-08, so "main is unchanged" and branch names below are history. Some rules changed since (for example slowed is now "move or act, not both"); the design note and the gamepedia hold the current rules.
+
 A fifth regular faction, built on branch `claude/demon-faction-ba3c9c` for the overnight fun pass. The art is already
 painted (`Assets/Art/Experiment/Source/{imp,demon,devil,fiend}_noground__*.png`); until the art chat runs
 Tools → Art → Import Statues, the four units use code-drawn placeholder figures with horns.

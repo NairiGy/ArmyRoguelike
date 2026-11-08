@@ -1,5 +1,7 @@
 # Night log, 2026-11-08 (branch `feature/night-fun`)
 
+> Build notes from the night pass, kept as written. It was merged into `main` on 2026-11-08, so "main is unchanged" and branch names below are history. Some rules changed since (for example slowed is now "move or act, not both"); the design note and the gamepedia hold the current rules.
+
 The user asked for the game to be made more fun and interesting overnight, with Claude choosing what to change
 (core rules included, on this branch only), placeholder visuals, and as much as possible. Helpers: builder sessions
 in their own worktrees, reviewer subagents (player, exploit hunter, code), game research, bot sims.
