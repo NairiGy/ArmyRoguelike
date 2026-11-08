@@ -454,6 +454,26 @@ Decided with the user 2026-11-01. A balance chat owns the numbers: it changes th
 - **First number pass (2026-11-01, from the smart bot, not playtested):** Elemental 10 to 8 HP and Shard 5 to 4 HP (hardest faction by far); Crossbowman 3 to 2 damage (two shots could kill a 5 HP unit on turn 1); Goblin 5 HP and 2 damage to 6 and 3, Elite Goblins 3 to 4 goblins (even the elite was a 100% win); Break the Ritual 4 to 6 turns (bot 11% at level 1). Bot win rate at levels 0 / 1 / 2 before and after: Elementals 11 / 30 / 64 to 22 / 61 / 80, Bandit Camp 30 / 82 / 94 to 59 / 88 / 98, Goblin Bombers 100 / 100 / 100 to 99 / 100 / 100, Elite Goblins 100 / 100 / 100 to 48 / 94 / 100, Break the Ritual 2 / 11 / 34 to 26 / 50 / 75.
 - **Playtest 2026-11-04 (5 played runs, 17 fights; 2 of 5 first fights won, both runs past the first fight won):** Goblin back to 2 damage, keeping 6 HP. At 3 damage, flinging and striking took 8 HP off a Warrior on turn 1, and a favored goblin killed an Archer on turn 1, which breaks the luck rule. The bot had this fight at 99%: at level 0 it is far stronger than a player (bot 93-99% where the player won about half), so early fights are tuned from playtests, not from the bot. Break the Ritual at 6 turns landed well (won on turns 5 and 6). The late game was easy as the bot predicted: a Third Wheel run rated 1, killing the Giant in 3 turns for 1 damage taken.
 
+## Night pass (2026-11-08, branch `feature/night-fun`, not playtested)
+
+The user asked Claude to make the game more fun and interesting overnight, with full design freedom on a branch. Everything here is Claude's design with placeholder numbers and visuals. The timeline (including what was tried and dropped) is in `docs/night-log.md`; the per-line designs are in `docs/night/`. `main` is unchanged.
+
+**Run structure (lead)**
+- **Cracks:** an army statue that falls in a fight you win (or a lost scenario) gets a crack: -1 max HP until mended. The 3rd crack shatters it, and it leaves the army with its techniques and item. Shops mend a crack for 10 gold. Scars (from the Cracked Altar) are cracks that can't be mended. Why: deaths cost only gold, so a run was decided by step 4 and the rest had no tension (Into the Breach's grid, Darkest Dungeon's injuries).
+- **Events with a price:** Stonemason (mends every crack, or +1 max HP with none), Cracked Altar (a rare technique for a scar; from step 5), Sculptor (give up a technique you choose for a random rare of the line, no level; from step 5), Hooded Stranger (30 gold for a curse).
+- **Champions:** from step 6, every battle and elite node has one, its affix shown on the node. The toughest enemy gets +3 max HP and Armored (-1 damage taken), Vengeful (2 to adjacent foes on death), Regenerating (+2 HP a turn), Mighty (+1 damage) or Fleet (+1 move). +5 gold. `Core/Champion.cs`.
+- **Stone Heart (bosses):** HP falls in 3 phases; damage past the next phase is lost until your next turn, so a boss takes at least 3 rounds. Entering a phase makes the boss **Enraged** (one extra action next turn). Giant: Wrath (2 actions) from phase 2, falling rocks on 2 of your units' tiles each round in phase 3 (marked a turn ahead, like storm marks). Necromancer: 2 skeletons climb onto the edge at each new phase. Bosses get +1 max HP per army level and **never fall** (Edge of the World, holes).
+- **Crumbling Roof** (6th battlefield): collisions and deaths fracture the tile under the unit; the 2nd fracture opens a hole. A unit on it, or pushed into one, falls and dies. Holes block walking, not shots, and give no cover. Candidate for the game's identity rule if it plays well.
+- **Hone** (shop service, 12 gold): one action's cooldown is 1 turn shorter for that unit for the run (actions with cooldown 2+, once each).
+
+**Unit lines (builders, see `docs/night/archer-rogue.md` and `docs/night/mage-sapper.md`)**
+- 59 techniques (was 34): Warrior 8, Archer 13, Rogue 13, Mage 13, Sapper 12. Each line owns a keyword other lines read: Archer **Marked** (next hit from anyone deals more), Rogue **Exposed** (an enemy with no ally next to it), Mage **Slowed** (Frost Nova in the base kit, Chill, Blizzard), Sapper **Rubble** (low heaps that block walking but not shots, and crush what's pushed into them). Rogue base kit: 6 HP, and Vanish lasts through the enemy turn.
+- **Board:** `IsObstacle` = can't stand there (rock, rubble, hole); `IsRock` = blocks sight and gives cover (not rubble or holes).
+
+**Demons (5th faction, pool 2, see `docs/night/demons.md`):** Imp, Demon, Devil and Fiend, with Fury (+1 damage per point), Blood Offering, Hellswap, Rending Blow, Soul Contract, Spines and Fire Breath. Each has its own AI and intents, plus an elite and a raised version for the Necromancer. Statue art exists but isn't imported yet.
+
+**Open after the night:** playtest everything; the Loser banner now combines with cracks (a death is +1 HP and +1 damage for a crack that costs 10 to mend; the user's call); review fixes still landing from the builders (see the log).
+
 ## Test mode (for testing only)
 
 - Editor and dev builds only: a "Test battle" button on the draft screen opens a setup screen.

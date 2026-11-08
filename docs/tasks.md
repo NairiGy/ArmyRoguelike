@@ -49,6 +49,13 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 | Battlefields | What's On His Mind?: something that says intents are hidden | Nothing: hovering an enemy just shows no intent | Needed (maybe a "?" badge) |
 | Warrior redesign | Shield Up, Battlecry, Taunt and Throw Shield on the statue; temporary HP on the HP bar; Sweep; Charge with enemies knocked aside; the Placeholder attack; the extra Vanguard row | Text popups and hover-card lines, no status pips. Sweep uses the normal area attack, Charge the normal walk, hit and push; the Vanguard row uses the zone highlight | Needed |
 | Run end | The run-end screen with its "serious run / just testing" and 1-5 difficulty answers; the "Abandon run" button on the map | Plain IMGUI buttons with a "> " on the chosen answer (`DrawRunEnd`, `DrawMap` in `GameBootstrap`) | Needed |
+| Night pass: cracks | Cracks on a statue (1, 2, scars), a shatter when the 3rd crack breaks it; the Mend and Hone cards | Text only: "N cracks" on the member cards and map army list, a note after the battle, IMGUI chip cards (`DrawMendCard`, `DrawHoneCard` in `GameBootstrap`) | Needed |
+| Night pass: champions | A champion look (crown, glow?) and an icon per affix (Armored, Vengeful, Regenerating, Mighty, Fleet) on the statue and the map node | "· Armored champion" after the node label, a hover-card line, "Vengeance!" popup, the normal heal popup | Needed |
+| Night pass: Stone Heart | The boss's phase (3 pips or a cracked heart), the phase change, Enraged, falling rocks marked and landing | "Phase N!" popups, the storm-mark highlight and bolt badge for rockfall marks, "Rocks above!" / "Rockfall!" popups, the normal explosion | Needed |
+| Night pass: Crumbling Roof | Fractured tiles (1 fracture), holes in the roof, a unit falling through; the scene could look old and broken | Dark brown tile tint for fractures, near-black tile for holes (`BoardView.SyncTiles`), the edge-fall slide and crumble | Needed |
+| Night pass: Archer and Rogue | Snare, Covering Fire, Fire Arrow, Suppressing Fire, Kick, Smoke Bomb, Shadowstep, Throwing Knife, Rupture, Mark Target / Death Mark, Into the Shadows (full list in `docs/night/archer-rogue.md`) | Tile tints, popups and the normal lunge, shot and slide | Needed |
+| Night pass: Mage and Sapper | Rubble (a low heap), Crush, Frost Nova, Firewall, Blizzard, Searing Bolt, Transpose, Grappling Hook, Demolish, Spiked Barricades, Twincast, Cave-In (full list in `docs/night/mage-sapper.md`) | Rubble is the rock block tinted and squashed; popups and tile flashes for the rest | Needed |
+| Night pass: Demons | Import the four statues (Tools → Art → Import Statues; heights are set), Hellswap, Rending Blow, Soul Contract sigil, Fire Breath, Fury pips, intent icons (`docs/night/demons.md`) | Code-drawn horned figures (`PlaceholderArt.MakeFigure`), popups, reused icons | Needed |
 
 ### Other visual work
 
@@ -141,6 +148,16 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [x] UI: Storm should show clearly where lightning will hit. A pale highlight exists (`StormMarkColor`) but didn't read in play. Done: stronger highlight and a pulsing bolt badge on the tile; move highlights used to paint over it.
 - [x] UI: summoning scenario needs a clearer sign of when it completes (today only a HUD text line). Done: a top-centre countdown panel with a pip per turn, red on the last one.
 - [x] UI: icon over a unit when the current action would kill it (today only "-N kills" on the hover card). Done: a red skull for the basic attack (including walk-and-attack), Pinning Shot and Fireball; other actions show none yet.
+
+### Night pass (2026-11-08, branch `feature/night-fun`)
+
+- [x] Cracks, four events with a price, champions, Stone Heart boss phases, Crumbling Roof, Hone (lead); Archer, Rogue, Mage and Sapper pools to 59 techniques, Demons faction (builders). See "Night pass" in the design note and `docs/night-log.md`. Tests pass; nothing played.
+- [ ] Playtest a bundle on `feature/night-fun`, then decide what to merge into `main` (user).
+- [ ] The Loser banner with cracks: a death gives +1 HP and +1 damage for a crack that costs 10 to mend. User's call (Loser was left uncapped on purpose).
+- [ ] What's On His Mind? hides every intent, including the demons' swap-then-hit and pushes into holes: maybe still show intents that move your units (exploit review).
+- [ ] Enemies can't see mines, snares or Covering Fire tiles and walk into them. With more traps in the pools (Quick Fuse mines every turn, Snare Trap) this may be "win without playing". Watch it in a playtest.
+- [ ] Too many statuses for a 6x6 board (Marked, Exposed, Pinned, Slowed, Hidden, Burning, rubble, snares, smoke, fractures, Fury, Contract, Champion...): judge readability in play; a keyword glossary or tooltips are likely needed.
+- [ ] Still missing for a "full" game (exploit review): acts 2-3, difficulty levels, unlocks, onboarding, save/continue.
 
 ## Balance (balance chat)
 
