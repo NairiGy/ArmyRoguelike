@@ -172,7 +172,9 @@ public static class SmartBot
         // A free action, or a kill that gave the AP back, leaves the unit able to go on.
         if (battle.IsOver || !unit.IsAlive)
             return true;
-        if (!plan.Free && !(acted && unit.Ap > 0))
+        // Twincast: an attack first still leaves a free spell, so the unit isn't done yet.
+        var twincastLeft = unit.Has(Ability.Twincast) && !unit.TwincastUsed && unit.Actions.Any(a => battle.ActionTargets(unit, a).Count > 0);
+        if (!plan.Free && !(acted && (unit.Ap > 0 || twincastLeft)))
             battle.EndUnitTurn(unit);
         return true;
     }

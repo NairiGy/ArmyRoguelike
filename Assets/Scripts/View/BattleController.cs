@@ -2069,10 +2069,12 @@ namespace ArmyRoguelike.View
             rows.Add(($"<color={ActionColor}>ACTIONS</color>", section, 10f));
             var actions = Abilities.ActionsOf(u.Stats, Battle.EffectiveDamage(u));
             foreach (var technique in TechniquesOf(u).Where(t => t.Action.HasValue))
-                actions.Add((technique.Name, Battle.ActionCost(technique.Action.Value), technique.Action, technique.Description));
-            foreach (var (action, cost, kind, text) in actions)
+                actions.Add((technique.Name, CardCost(u, technique.Action.Value), technique.Action, technique.Description));
+            foreach (var (action, baseCost, kind, text) in actions)
             {
-                var cooldown = kind.HasValue ? $"  ·  cooldown {Battle.CooldownIn(kind.Value)}" : "";
+                // The same cost the action card shows: Quick Fuse and an unused Twincast make it free.
+                var cost = kind.HasValue && u.HasAction(kind.Value) ? CardCost(u, kind.Value) : baseCost;
+                var cooldown = kind.HasValue ? $"  ·  cooldown {Battle.CooldownFor(u, kind.Value)}" : "";
                 var left = kind.HasValue ? u.CooldownLeft(kind.Value) : 0;
                 var ready = left > 0 ? $"   <color={NextColor}>ready in {left} turn{(left == 1 ? "" : "s")}</color>" : "";
                 rows.Add(($"<b><color=white>{action}</color></b>   <color={ActionColor}><size=13>{cost} AP{cooldown}</size></color>{ready}", name, 2f));
