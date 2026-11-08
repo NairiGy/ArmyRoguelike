@@ -201,6 +201,12 @@ namespace ArmyRoguelike.Core
         /// <summary>Isolate: bonus damage against an exposed enemy (no ally of its own next to it).</summary>
         public const int IsolateBonus = 2;
 
+        /// <summary>Into the Shadows: turns between two hides (a kill this turn, then again 3 turns later at the earliest).</summary>
+        public const int IntoShadowsCooldown = 3;
+
+        /// <summary>Most extra damage one hit can get from the conditional flat bonuses (Pincer, Prey, Cheap Shot, Long Shot, Isolate, Shatter, ambush).</summary>
+        public const int MaxConditionalBonus = 4;
+
         /// <summary>Blink (mages): teleport range in steps.</summary>
         public const int BlinkRange = 3;
 
@@ -331,13 +337,14 @@ namespace ArmyRoguelike.Core
                 case ActionKind.FireArrow:
                 case ActionKind.SuppressingFire:
                 case ActionKind.Shadowstep:
-                case ActionKind.SmokeBomb:
                 case ActionKind.Firewall:
                 case ActionKind.Blizzard:
                 case ActionKind.Demolish:
                 case ActionKind.Hellswap:
                 case ActionKind.SoulContract:
                     return 3;
+                case ActionKind.SmokeBomb:
+                    return 4;
                 // Once per battle instead.
                 case ActionKind.ThrowShield:
                     return 0;
@@ -1167,23 +1174,15 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>Damage of an attack on this particular target: Pincer, Prey, Shatter (any of your units on a slowed enemy) and the opening shot.</summary>
-        public int DamageAgainst(Unit attacker, Unit target)
+        public int DamageAgainst(Unit attacker, Unit target) => DamageFrom(attacker, target, EffectiveDamage(attacker));
+
+        /// <summary>
+        /// The target bonuses on top of a base damage: the conditional flat bonuses (at most
+        /// <see cref="MaxConditionalBonus"/> in total), Wolf Bite's chain, then the opening shot's double.
+        /// </summary>
+        private int DamageFrom(Unit attacker, Unit target, int damage)
         {
-            var damage = EffectiveDamage(attacker);
-            if (attacker.Has(Ability.Pincer) && IsPinched(attacker, target))
-                damage += PincerBonus;
-            if (target.IsSnared && Living(attacker.Team).Any(u => u.Has(Ability.PreyOnSnared)))
-                damage += PreyBonus;
-            if (attacker.Has(Ability.CheapShot) && (target.IsSnared || target.IsSlowed))
-                damage += CheapShotBonus;
-            if (attacker.Has(Ability.LongShot) && Distance(attacker, target) >= LongShotRange)
-                damage += LongShotBonus;
-            if (attacker.Has(Ability.Isolate) && IsExposed(target))
-                damage += IsolateBonus;
-            if (target.IsSlowed && Living(attacker.Team).Any(u => u.Has(Ability.Shatter)))
-                damage += ShatterBonus;
-            if (attacker.IsHidden && !attacker.AmbushUsed)
-                damage += VanishBonus;
+            damage += ConditionalBonus(attacker, target);
             if (attacker.Has(Ability.WolfBite))
                 damage += BiteChain;
             if (attacker.Has(Ability.FirstShotDouble) && !attacker.HasStruck(target))
@@ -1260,7 +1259,9 @@ namespace ArmyRoguelike.Core
             var target = UnitAt(tile);
             if ((action == ActionKind.Kick && FixedHitKills(target, ActionDamage(unit, target, KickDamage), unit, DamageKind.Attack)) ||
                 (action == ActionKind.ThrowingKnife && FixedHitKills(target, ActionDamage(unit, target, KnifeDamage), unit, DamageKind.Attack)) ||
-                (action == ActionKind.FireArrow && FixedHitKills(target, DamageAgainst(unit, target), unit, DamageKind.Attack)))
+                (action == ActionKind.FireArrow && FixedHitKills(target, DamageAgainst(unit, target), unit, DamageKind.Attack)) ||
+                (action == ActionKind.Rupture && (FixedHitKills(target, target.PoisonTurns * PoisonDamage, unit, DamageKind.Tick) ||
+                                                   FixedHitKills(target, target.PoisonTurns * PoisonDamage + DamageAgainst(unit, target), unit, DamageKind.Attack))))
                 kills.Add(target);
             if (action == ActionKind.SuppressingFire)
                 kills.AddRange(SuppressLine(unit, tile).Select(UnitAt).Where(u => u != null && u.Team != unit.Team && !u.IsObjective).Distinct()
@@ -1389,6 +1390,9 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>Immobile, pinned or slowed units can't move, and nobody moves again after spending AP that turn.</summary>
+        /// <summary>Pinned or slowed on its own turn: it can't move, and Blink and Shadowstep are blocked like a move.</summary>
+        public static bool IsHeld(Unit unit) => unit.RootedThisTurn || unit.SlowedThisTurn;
+
         public bool CanMove(Unit unit) => !unit.Has(Ability.Immobile) && !unit.RootedThisTurn && (!unit.ActedThisTurn || unit.Has(Ability.LightFingers));
 
         /// <summary>Pays for an attack or action. Once a unit has spent AP it can't move for the rest of the turn.</summary>
@@ -1641,7 +1645,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Vanish:
                     return tile == unit.Pos && !unit.IsHidden;
                 case ActionKind.Blink:
-                    return unit.Size == 1 && steps >= 1 && steps <= BlinkRange && CanStand(unit, tile);
+                    return unit.Size == 1 && !IsHeld(unit) && steps >= 1 && steps <= BlinkRange && CanStand(unit, tile);
                 case ActionKind.Fireball:
                     return steps >= 1 && steps <= FireballRange && !IsShroudedFrom(tile, unit.Team);
                 case ActionKind.IceWall:
@@ -1671,10 +1675,10 @@ namespace ArmyRoguelike.Core
                 case ActionKind.ThrowingKnife:
                     return target != null && target.Team != unit.Team && !target.IsHidden && CanThrowKnife(unit, target);
                 case ActionKind.Shadowstep:
-                    return unit.Size == 1 && !unit.MovedThisTurn && steps >= 1 && steps <= ShadowstepRange && CanStand(unit, tile) &&
+                    return unit.Size == 1 && !IsHeld(unit) && !unit.MovedThisTurn && steps >= 1 && steps <= ShadowstepRange && CanStand(unit, tile) &&
                            _units.Any(e => e.IsPlaced && e.IsAlive && e.Team != unit.Team && Distance(tile, 1, e) == 1);
                 case ActionKind.SmokeBomb:
-                    return steps <= SmokeRange && PlusArea(tile).Any(p => UnitAt(p) is Unit u && u.Team == unit.Team && !u.IsObjective);
+                    return target != null && target.Team == unit.Team && !target.IsObjective && Distance(unit, target) <= SmokeRange;
                 case ActionKind.Rupture:
                     return target != null && target.Team != unit.Team && target.PoisonTurns > 0 && unit.Size == 1 && Distance(unit, target) == 1;
                 case ActionKind.MarkTarget:
@@ -1798,7 +1802,7 @@ namespace ArmyRoguelike.Core
                 {
                     var target = UnitAt(tile);
                     var dir = StraightDirection(unit.Pos, Cells(target).First(c => c.StepsTo(unit.Pos) == 1)).Value;
-                    ActionHit(unit, target, ActionDamage(unit, target, KickDamage), events);
+                    ActionHit(unit, target, ActionDamage(unit, target, KickDamage), events, "kick");
                     Push(target, dir, unit, events);
                     break;
                 }
@@ -1810,7 +1814,7 @@ namespace ArmyRoguelike.Core
                 {
                     var target = UnitAt(tile);
                     var cells = Cells(target).Where(p => !Board.IsObstacle(p)).ToList();
-                    ActionHit(unit, target, DamageAgainst(unit, target), events);
+                    ActionHit(unit, target, DamageAgainst(unit, target), events, "fire arrow");
                     foreach (var p in cells)
                     {
                         _burning[p] = BurnRounds;
@@ -1850,7 +1854,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.ThrowingKnife:
                 {
                     var target = UnitAt(tile);
-                    ActionHit(unit, target, ActionDamage(unit, target, KnifeDamage), events);
+                    ActionHit(unit, target, ActionDamage(unit, target, KnifeDamage), events, "throwing knife");
                     break;
                 }
                 case ActionKind.Shadowstep:
@@ -1864,12 +1868,13 @@ namespace ArmyRoguelike.Core
                 }
                 case ActionKind.SmokeBomb:
                 {
-                    var area = PlusArea(tile);
+                    // The thrower and at most one ally (the one aimed at). Neither gets the ambush +2 from the smoke.
                     events.Add(new TileEvent("smoke", tile, true, unit));
-                    foreach (var ally in Living(unit.Team).Where(u => !u.IsObjective && Cells(u).Any(area.Contains)).ToList())
+                    foreach (var ally in new[] { unit, UnitAt(tile) }.Distinct().ToList())
                     {
+                        if (!ally.IsHidden)
+                            ally.AmbushUsed = true;
                         ally.HiddenTurns = Math.Max(ally.HiddenTurns, VanishTurns);
-                        ally.AmbushUsed = false;
                         events.Add(new StatusEvent(unit, ally, StatusKind.Vanish, VanishTurns));
                     }
 
@@ -1892,7 +1897,7 @@ namespace ArmyRoguelike.Core
                     events.Add(new TickEvent("rupture", Damage(target, burst, unit, DamageKind.Tick, after), unit));
                     events.AddRange(after);
                     if (target.IsAlive && !IsOver)
-                        ActionHit(unit, target, DamageAgainst(unit, target), events);
+                        ActionHit(unit, target, DamageAgainst(unit, target), events, "rupture");
                     else
                         unit.AttackedThisTurn = true;
                     break;
@@ -2163,14 +2168,14 @@ namespace ArmyRoguelike.Core
         /// A single-target hit from an action (Kick, Fire Arrow, Throwing Knife, Rupture): counts as an attack for
         /// Poison, Chill, Momentum and the like, and spends a hidden unit's ambush bonus.
         /// </summary>
-        private Hit ActionHit(Unit unit, Unit target, int amount, List<BattleEvent> events)
+        private Hit ActionHit(Unit unit, Unit target, int amount, List<BattleEvent> events, string via)
         {
             var after = new List<BattleEvent>();
             var hit = Damage(target, amount, unit, DamageKind.Attack, after);
             unit.AttackedThisTurn = true;
             unit.MarkStruck(target);
             SpendAmbush(unit);
-            events.Add(new AttackEvent(unit, hit.Target, hit.Damage, hit.HpAfter));
+            events.Add(new AttackEvent(unit, hit.Target, hit.Damage, hit.HpAfter, via));
             events.AddRange(after);
             return hit;
         }
@@ -2184,7 +2189,31 @@ namespace ArmyRoguelike.Core
 
         /// <summary>An action's own base damage in place of the unit's attack damage; bonuses to its damage still count.</summary>
         private int ActionDamage(Unit unit, Unit target, int baseDamage) =>
-            Math.Max(1, DamageAgainst(unit, target) - unit.Stats.Damage + baseDamage);
+            DamageFrom(unit, target, Math.Max(1, EffectiveDamage(unit) - unit.Stats.Damage + baseDamage));
+
+        /// <summary>
+        /// Pincer, Prey, Cheap Shot, Long Shot, Isolate, Shatter and the hidden ambush, added up and capped at
+        /// <see cref="MaxConditionalBonus"/> so stacked conditions can't one-shot anything.
+        /// </summary>
+        public int ConditionalBonus(Unit attacker, Unit target)
+        {
+            var bonus = 0;
+            if (attacker.Has(Ability.Pincer) && IsPinched(attacker, target))
+                bonus += PincerBonus;
+            if (target.IsSnared && Living(attacker.Team).Any(u => u.Has(Ability.PreyOnSnared)))
+                bonus += PreyBonus;
+            if (attacker.Has(Ability.CheapShot) && (target.IsSnared || target.IsSlowed))
+                bonus += CheapShotBonus;
+            if (attacker.Has(Ability.LongShot) && Distance(attacker, target) >= LongShotRange)
+                bonus += LongShotBonus;
+            if (attacker.Has(Ability.Isolate) && IsExposed(target))
+                bonus += IsolateBonus;
+            if (target.IsSlowed && Living(attacker.Team).Any(u => u.Has(Ability.Shatter)))
+                bonus += ShatterBonus;
+            if (attacker.IsHidden && !attacker.AmbushUsed)
+                bonus += VanishBonus;
+            return Math.Min(bonus, MaxConditionalBonus);
+        }
 
         /// <summary>Sweep: the unit's attack damage to the target and the enemies on both sides of it.</summary>
         private void Sweep(Unit unit, Unit target, List<BattleEvent> events)
@@ -2761,7 +2790,7 @@ namespace ArmyRoguelike.Core
                 var hit = Damage(unit, DamageAgainst(watcher, unit), watcher, DamageKind.Attack, after);
                 watcher.MarkStruck(unit);
                 SpendAmbush(watcher);
-                events.Add(new AttackEvent(watcher, hit.Target, hit.Damage, hit.HpAfter));
+                events.Add(new AttackEvent(watcher, hit.Target, hit.Damage, hit.HpAfter, "covering fire"));
                 events.AddRange(after);
                 watcher = null;
             }
@@ -3403,12 +3432,12 @@ namespace ArmyRoguelike.Core
             }
 
             // Marked (the Archer's keyword): the next hit from the other side, of any kind but ticks, deals more and uses it up.
-            var spreadMark = false;
+            // Death Mark spreads whenever a marked unit dies, whatever killed it (ticks and friendly fire too).
+            var spreadMark = target.Marked && target.MarkSpreads;
             if (hostile && kind != DamageKind.Tick && target.Marked && amount > 0)
             {
                 amount += MarkBonus;
                 target.Marked = false;
-                spreadMark = target.MarkSpreads;
                 after.Add(new EffectEvent(EffectKind.Mark, target, MarkBonus, target.Hp, source));
             }
 
@@ -3506,9 +3535,12 @@ namespace ArmyRoguelike.Core
                     after.Add(new EffectEvent(EffectKind.Refund, source, KillRefundAp, source.Hp, source));
                 }
 
-                // Into the Shadows: a kill hides the killer until its side's next turn, with no ambush bonus.
-                if (source.Has(Ability.IntoShadows) && kind == DamageKind.Attack && !source.IsHidden)
+                // Into the Shadows: a kill hides the killer until its side's next turn, with no ambush bonus, at most
+                // once every few turns.
+                if (source.Has(Ability.IntoShadows) && kind == DamageKind.Attack && !source.IsHidden &&
+                    TurnNumber - source.ShadowsTurn >= IntoShadowsCooldown)
                 {
+                    source.ShadowsTurn = TurnNumber;
                     source.HiddenTurns = VanishTurns;
                     source.AmbushUsed = true;
                     after.Add(new StatusEvent(source, source, StatusKind.Vanish, VanishTurns));
@@ -3688,6 +3720,13 @@ namespace ArmyRoguelike.Core
         /// </summary>
         private void BeginTurn(Team team, List<BattleEvent> events)
         {
+            // The other side's turn is over: a pin or slow that held it this turn no longer counts (Prey, Cheap Shot, Shatter).
+            foreach (var u in _units.Where(u => u.Team != team))
+            {
+                u.RootedThisTurn = false;
+                u.SlowedThisTurn = false;
+            }
+
             if (team == Team.Enemy)
             {
                 StrikeSunMarks(events);

@@ -448,7 +448,7 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(normal + Battle.ShatterBonus, b.DamageAgainst(glacier, brute));
             b.EndUnitTurn(glacier);
             b.EndPlayerTurn();
-            Assert.IsTrue(brute.SlowedThisTurn);
+            Assert.IsFalse(brute.IsSlowed, "the slow held it for its own turn only, not into yours");
             Assert.AreEqual(P(3, 2), brute.Pos, "chilled: it couldn't move");
         }
 

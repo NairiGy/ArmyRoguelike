@@ -135,3 +135,19 @@ Reading: the bot picks techniques at random and plans one round ahead, so this c
 - No human playtest; numbers are placeholders. Watch in the logs: Vanish uptime (the Rogue may become hard to kill with Smoke Bomb + Into the Shadows + Dodge), how often Covering Fire fires, and whether Snare Trap is placed where enemies walk.
 - The enemy AI doesn't account for Covering Fire tiles or the new Vanish (it just sees fewer targets). Intent lines don't predict an enemy being stopped by a snare or a covering shot.
 - The gamepedia isn't re-exported (the lead does it); `GamepediaWriter`'s rules list mentions the new hidden rule, snares and Covering Fire.
+
+## Review fixes (after the merge into `feature/night-fun`)
+
+Reviewers' findings, fixed on this branch after merging `feature/night-fun` back in:
+
+1. **Into the Shadows** hides the Rogue at most once every 3 turns (`Battle.IntoShadowsCooldown`, `Unit.ShadowsTurn`). Before, a kill every turn kept it untargetable for good.
+2. **Smoke Bomb** is aimed at one ally within 3 (or itself) and hides only the Rogue and that ally, with no ambush +2 for either. Cooldown 4 (was 3, plus area, ambush for everyone).
+3. **Pins and slows stop counting when the held unit's turn ends.** `RootedThisTurn` and `SlowedThisTurn` used to stay set through your next turn, so Prey, Cheap Shot and Shatter paid out on two of your turns. Now `BeginTurn` clears them for the side whose turn just ended. An enemy is "pinned" during your turn only if it will be held on its coming turn (`SnareTurns`/`SlowNext`), which is also what the hover card shows. `KitTests.Chill_...` was updated to match.
+4. **Conditional flat bonuses are capped at +4 per hit** (`Battle.MaxConditionalBonus`, summed in `Battle.ConditionalBonus`): Pincer, Prey, Cheap Shot, Long Shot, Isolate, Shatter and the hidden ambush. Wolf Bite and the Mark are outside the cap.
+5. **Rupture** has a kill preview in `ActionKills` (the burst alone, or burst plus strike).
+6. **Death Mark** spreads whenever a marked enemy dies, whatever killed it (ticks and friendly fire too). A fall off the edge doesn't go through `Damage`, so it doesn't spread.
+7. **Action damage order:** `ActionDamage` puts the action's base and the unit's own bonuses first, then the target bonuses, then Opening Shot's double (`DamageFrom`). A Kick with Opening Shot now doubles the kick (4 with Steady Aim) instead of the attack (5). This also applies to the Warrior's Shield Bash and Charge, which share `ActionDamage`.
+8. **Blink and Shadowstep are blocked while pinned or slowed** (`Battle.IsHeld`), like walking.
+9. **Logs:** `AttackEvent.Via` names the action behind a hit, and battle logs write it as the action's `type` (`kick`, `fire arrow`, `throwing knife`, `rupture`, `covering fire`) instead of `attack`. The summaries count them as damage like attacks.
+
+New tests in `ArcherRogueKitTests` cover each of these. Not re-simulated after the fixes.

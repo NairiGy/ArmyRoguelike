@@ -95,6 +95,9 @@ namespace ArmyRoguelike.Core
         /// <summary>The +2 of its first attack while hidden is spent (set again by each Vanish or Smoke Bomb).</summary>
         public bool AmbushUsed { get; internal set; }
 
+        /// <summary>Into the Shadows: the turn it last hid after a kill (it hides again only 3 turns later).</summary>
+        public int ShadowsTurn { get; internal set; } = -100;
+
         /// <summary>Marked (Mark Target): the next hit on it deals +2, then the mark is gone.</summary>
         public bool Marked { get; internal set; }
 
@@ -219,7 +222,7 @@ namespace ArmyRoguelike.Core
                 IsMercenary = IsMercenary, Escaped = Escaped, Fell = Fell, Favored = Favored, PackHp = PackHp,
                 BannerAp = BannerAp, BannerMoves = BannerMoves, LeftPile = LeftPile, PileGone = PileGone,
                 ShieldUpTurns = ShieldUpTurns, TauntTurns = TauntTurns, BattlecryTurns = BattlecryTurns, TempHp = TempHp,
-                ShieldThrown = ShieldThrown, ZocStrikeUsed = ZocStrikeUsed, AmbushUsed = AmbushUsed, Marked = Marked, MarkSpreads = MarkSpreads, TwincastUsed = TwincastUsed, Fury = Fury,
+                ShieldThrown = ShieldThrown, ZocStrikeUsed = ZocStrikeUsed, AmbushUsed = AmbushUsed, ShadowsTurn = ShadowsTurn, Marked = Marked, MarkSpreads = MarkSpreads, TwincastUsed = TwincastUsed, Fury = Fury,
                 Affix = Affix, ExtraHp = ExtraHp, BossPhase = BossPhase, PhaseFloor = PhaseFloor, Enraged = Enraged,
             };
             foreach (var cooldown in _cooldowns)

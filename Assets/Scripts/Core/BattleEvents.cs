@@ -60,12 +60,16 @@ namespace ArmyRoguelike.Core
         public readonly int Damage;
         public readonly int TargetHpAfter;
 
-        public AttackEvent(Unit attacker, Unit target, int damage, int targetHpAfter)
+        /// <summary>The action that made the hit ("kick", "fire arrow", "throwing knife", "rupture", "covering fire"), or null for a basic attack.</summary>
+        public readonly string Via;
+
+        public AttackEvent(Unit attacker, Unit target, int damage, int targetHpAfter, string via = null)
         {
             Attacker = attacker;
             Target = target;
             Damage = damage;
             TargetHpAfter = targetHpAfter;
+            Via = via;
         }
 
         public override Unit Actor => Attacker;

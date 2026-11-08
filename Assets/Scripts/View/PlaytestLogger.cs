@@ -99,7 +99,7 @@ namespace ArmyRoguelike.View
                     break;
                 case AttackEvent attack:
                 {
-                    var entry = HitEntry(turn, attack.Attacker, "attack", new Hit(attack.Target, attack.Damage, attack.TargetHpAfter));
+                    var entry = HitEntry(turn, attack.Attacker, attack.Via ?? "attack", new Hit(attack.Target, attack.Damage, attack.TargetHpAfter));
                     entry.autoApproach = autoApproach;
                     _log.actions.Add(entry);
                     break;
@@ -519,6 +519,11 @@ namespace ArmyRoguelike.View
                             raised.timesRaised++;
                         break;
                     case "attack":
+                    case "kick":
+                    case "fire arrow":
+                    case "throwing knife":
+                    case "rupture":
+                    case "covering fire":
                     case "smash":
                     case "boulder":
                     case "fling":
