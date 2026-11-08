@@ -596,26 +596,26 @@ namespace ArmyRoguelike.Core
         // ---------- Demons (see docs/night/demons.md) ----------
 
         /// <summary>Swaps one of your units into the demons' reach. Feeds Fury to a demon when it dies.</summary>
-        public static readonly UnitStats Imp = new UnitStats(UnitKind.Imp, "Imp", 4, 2, 1, 1)
+        public static readonly UnitStats Imp = new UnitStats(UnitKind.Imp, "Imp", 5, 2, 1, 1)
         {
             Weight = Weight.Small, Abilities = A(Ability.Swift, Ability.Hellborn, Ability.BloodOffering, Ability.Hellswap),
             Role = "Trades places with one of your units, dropping it next to the demons. When it dies, the nearest demon grows stronger.",
         };
 
-        public static readonly UnitStats Demon = new UnitStats(UnitKind.Demon, "Demon", 12, 3, 1, 1)
+        public static readonly UnitStats Demon = new UnitStats(UnitKind.Demon, "Demon", 14, 3, 1, 1)
         {
             Weight = Weight.Huge, Abilities = A(Ability.Hellborn, Ability.Bloodlust, Ability.RendingBlow),
             Role = "Pays its own blood for crushing blows, and grows stronger from every death next to it.",
         };
 
         /// <summary>Its trident is a Long Reach strike (2 tiles in a straight line).</summary>
-        public static readonly UnitStats Devil = new UnitStats(UnitKind.Devil, "Devil", 9, 2, 2, 1)
+        public static readonly UnitStats Devil = new UnitStats(UnitKind.Devil, "Devil", 10, 2, 2, 1)
         {
             Abilities = A(Ability.LongReach, Ability.Hellborn, Ability.SoulContract),
             Role = "Signs a contract on one of your units: hit the Devil before its next turn, or the contract takes its HP.",
         };
 
-        public static readonly UnitStats Fiend = new UnitStats(UnitKind.Fiend, "Fiend", 6, 2, 1, 1)
+        public static readonly UnitStats Fiend = new UnitStats(UnitKind.Fiend, "Fiend", 7, 2, 1, 1)
         {
             Weight = Weight.Small, Abilities = A(Ability.Swift, Ability.Hellborn, Ability.Spines, Ability.FireBreath),
             Role = "Fast and spiny: breathes fire down a line of your units and leaves the ground burning.",

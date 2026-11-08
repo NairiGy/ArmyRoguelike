@@ -469,7 +469,7 @@ namespace ArmyRoguelike.Core
             });
 
         public static readonly Encounter EliteDemons = Elite(Demons,
-            "A mirrored pair of rocks; two Demons on the front row with the imps between or beside them, the Devil behind, a Fiend on each flank.",
+            "A mirrored pair of rocks; two Demons on the front row with the imps between or beside them, the Devil behind, the Fiend in a back corner.",
             (rng, _) =>
             {
                 var plan = new Plan();
@@ -480,8 +480,7 @@ namespace ArmyRoguelike.Core
                 plan.Enemies.Add((UnitStats.Imp, P(left + 1, 4)));
                 plan.Enemies.Add((UnitStats.Imp, P(rng.Next(2) == 0 ? left - 1 : left + 3, 4)));
                 plan.Enemies.Add((UnitStats.Devil, P(left + 1, 5)));
-                plan.Enemies.Add((UnitStats.Fiend, P(0, 5)));
-                plan.Enemies.Add((UnitStats.Fiend, P(Size - 1, 5)));
+                plan.Enemies.Add((UnitStats.Fiend, P(rng.Next(2) == 0 ? 0 : Size - 1, 5)));
                 return plan;
             });
 

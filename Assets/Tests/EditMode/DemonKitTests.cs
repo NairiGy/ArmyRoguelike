@@ -73,6 +73,7 @@ namespace ArmyRoguelike.Tests
             var b = Setup(new[] { M(UnitStats.Rogue) }, new[] { P(2, 2) }, new[] { E(UnitStats.Imp, 2, 3), E(UnitStats.Demon, 4, 4) });
             var imp = Enemy(b, 0);
             var demon = Enemy(b, 1);
+            imp.Hp = 1;
             var events = b.PlayerAttack(Player(b), imp);
             Assert.IsFalse(imp.IsAlive);
             Assert.AreEqual(Battle.OfferingFury, demon.Fury);
@@ -84,6 +85,7 @@ namespace ArmyRoguelike.Tests
         public void BloodOffering_DemonTooFarAway_GetsNothing()
         {
             var b = Setup(new[] { M(UnitStats.Rogue) }, new[] { P(0, 2) }, new[] { E(UnitStats.Imp, 0, 3), E(UnitStats.Demon, 5, 5) });
+            Enemy(b, 0).Hp = 1;
             b.PlayerAttack(Player(b), Enemy(b, 0));
             Assert.AreEqual(0, Enemy(b, 1).Fury);
         }
@@ -94,6 +96,7 @@ namespace ArmyRoguelike.Tests
         public void Bloodlust_ADeathNextToTheDemonFeedsIt_StackingWithTheOffering()
         {
             var b = Setup(new[] { M(UnitStats.Rogue) }, new[] { P(2, 2) }, new[] { E(UnitStats.Imp, 2, 3), E(UnitStats.Demon, 3, 3) });
+            Enemy(b, 0).Hp = 1;
             b.PlayerAttack(Player(b), Enemy(b, 0));
             Assert.AreEqual(Battle.OfferingFury + Battle.BloodlustFury, Enemy(b, 1).Fury);
         }
@@ -243,7 +246,7 @@ namespace ArmyRoguelike.Tests
                 Assert.AreEqual(2, Count(Encounter.EliteDemons, UnitStats.Demon), $"seed {seed}");
                 Assert.AreEqual(2, Count(Encounter.EliteDemons, UnitStats.Imp), $"seed {seed}");
                 Assert.AreEqual(1, Count(Encounter.EliteDemons, UnitStats.Devil), $"seed {seed}");
-                Assert.AreEqual(2, Count(Encounter.EliteDemons, UnitStats.Fiend), $"seed {seed}");
+                Assert.AreEqual(1, Count(Encounter.EliteDemons, UnitStats.Fiend), $"seed {seed}");
             }
 
             Assert.AreEqual(2, Encounter.Demons.Pool);
