@@ -36,8 +36,7 @@ namespace ArmyRoguelike.View
         private MeshRenderer _labelRenderer;
         private SpriteRenderer _labelPlate;
         private SpriteRenderer _barBack;
-        private SpriteRenderer _barFill;
-        private SpriteRenderer _barLoss;
+        private readonly List<SpriteRenderer> _hpPieces = new List<SpriteRenderer>();
         private int _shownHp;
         private int _previewLoss;
         private bool _barsVisible = true;
@@ -128,9 +127,6 @@ namespace ArmyRoguelike.View
             }
 
             _barBack = MakeBar("HpBack", new Color(0.1f, 0.1f, 0.1f, 0.85f), top + 0.08f);
-            _barFill = MakeBar("HpFill", unit.Team == Team.Player ? new Color(0.35f, 0.8f, 0.4f) : new Color(0.85f, 0.3f, 0.25f), top + 0.08f);
-            _barLoss = MakeBar("HpLoss", LossPreviewColor, top + 0.08f);
-            _barLoss.enabled = false;
 
             transform.localScale = Vector3.one * BattleScenery.UnitScale;
             SetGridPosition(unit.Pos);
@@ -171,29 +167,50 @@ namespace ArmyRoguelike.View
             if (_labelRenderer != null)
                 _labelRenderer.sortingOrder = order + 2;
             _barBack.sortingOrder = order + 3;
-            _barFill.sortingOrder = order + 4;
-            _barLoss.sortingOrder = order + 4;
+            foreach (var piece in _hpPieces)
+                piece.sortingOrder = order + 4;
         }
 
+        /// <summary>The gap between two HP pieces (world units), shrunk for units with a lot of HP.</summary>
+        private const float PieceGap = 0.008f;
+
+        private static readonly Color LossPreviewColor = new Color(1f, 0.85f, 0.75f, 0.8f);
+        private static readonly Color EmptyPieceColor = new Color(0.24f, 0.24f, 0.26f, 0.9f);
+        private Color FillColor => Unit.Team == Team.Player ? new Color(0.35f, 0.8f, 0.4f) : new Color(0.85f, 0.3f, 0.25f);
+
+        /// <summary>
+        /// The HP bar in pieces, one per point of max HP: filled for HP left, pale and pulsing for HP the hovered
+        /// attack would take off, dark for HP lost.
+        /// </summary>
         public void RefreshHp(int hp)
         {
             _shownHp = Mathf.Max(0, hp);
-            var frac = (float)_shownHp / Unit.MaxHp;
-            var loss = Mathf.Min(_previewLoss, _shownHp);
-            var left = (float)(_shownHp - loss) / Unit.MaxHp;
+            var max = Mathf.Max(1, Unit.MaxHp);
+            var keep = _shownHp - Mathf.Min(_previewLoss, _shownHp);
             var width = BarWidth * BarScale;
+            var gap = Mathf.Min(PieceGap, width / max * 0.3f);
+            var size = (width - gap * (max - 1)) / max;
             var y = _barBack.transform.localPosition.y;
-            var t = _barFill.transform;
-            t.localScale = new Vector3(width * left, BarHeight, 1f);
-            t.localPosition = new Vector3(-width * (1f - left) * 0.5f, y, 0f);
-            // The HP a planned attack would take off: a pale chunk at the end of the fill.
-            _barLoss.enabled = _barsVisible && loss > 0;
-            _barLoss.transform.localScale = new Vector3(width * (frac - left), BarHeight, 1f);
-            _barLoss.transform.localPosition = new Vector3(-width * 0.5f + width * (left + frac) * 0.5f, y, 0f);
-            ShowCracks(1f - frac);
-        }
+            while (_hpPieces.Count < max)
+            {
+                var piece = MakeBar("HpPiece", Color.white, y);
+                piece.sortingOrder = _barBack.sortingOrder + 1;
+                _hpPieces.Add(piece);
+            }
 
-        private static readonly Color LossPreviewColor = new Color(1f, 0.85f, 0.75f, 0.8f);
+            for (var i = 0; i < _hpPieces.Count; i++)
+            {
+                var piece = _hpPieces[i];
+                piece.enabled = _barsVisible && i < max;
+                if (i >= max)
+                    continue;
+                piece.transform.localScale = new Vector3(size, BarHeight, 1f);
+                piece.transform.localPosition = new Vector3(-width * 0.5f + size * 0.5f + i * (size + gap), y, 0f);
+                piece.color = i < keep ? FillColor : i < _shownHp ? LossPreviewColor : EmptyPieceColor;
+            }
+
+            ShowCracks(1f - (float)Mathf.Min(_shownHp, max) / max);
+        }
 
         /// <summary>
         /// Shows the HP the selected unit's attack would take off as a pale, pulsing chunk at the end of the
@@ -319,7 +336,7 @@ namespace ArmyRoguelike.View
                     continue;
                 icon.color = colors[i];
                 icon.transform.localPosition = new Vector3(x + i * 0.09f, y, 0f);
-                icon.sortingOrder = _barFill.sortingOrder + 1;
+                icon.sortingOrder = _barBack.sortingOrder + 2;
             }
         }
 
@@ -360,7 +377,7 @@ namespace ArmyRoguelike.View
                     continue;
                 pip.transform.localPosition = new Vector3(left + i * PipSpacing, y, 0f);
                 pip.color = i < keep ? PipFull : i < ap ? PipSpend : PipEmpty;
-                pip.sortingOrder = _barFill.sortingOrder + 1;
+                pip.sortingOrder = _barBack.sortingOrder + 2;
             }
         }
 
@@ -436,8 +453,14 @@ namespace ArmyRoguelike.View
             transform.localScale = Vector3.one * BattleScenery.UnitScale;
             ShedDust();
             UpdateWake();
-            if (_barLoss.enabled)
-                _barLoss.color = new Color(LossPreviewColor.r, LossPreviewColor.g, LossPreviewColor.b, 0.55f + 0.35f * Mathf.Sin(Time.unscaledTime * 6f));
+            if (_previewLoss > 0 && _barsVisible)
+            {
+                // The pieces the hovered attack would take off pulse.
+                var pulse = new Color(LossPreviewColor.r, LossPreviewColor.g, LossPreviewColor.b, 0.55f + 0.35f * Mathf.Sin(Time.unscaledTime * 6f));
+                var max = Mathf.Min(Unit.MaxHp, _hpPieces.Count);
+                for (var i = Mathf.Max(0, _shownHp - _previewLoss); i < Mathf.Min(_shownHp, max); i++)
+                    _hpPieces[i].color = pulse;
+            }
         }
 
         // ---------- Idle life ----------
@@ -782,8 +805,7 @@ namespace ArmyRoguelike.View
         {
             _barsVisible = visible;
             _barBack.enabled = visible;
-            _barFill.enabled = visible;
-            _barLoss.enabled = visible && _previewLoss > 0;
+            RefreshHp(_shownHp);
             if (!visible)
             {
                 HideAp();

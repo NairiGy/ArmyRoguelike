@@ -2302,6 +2302,10 @@ namespace ArmyRoguelike.View
                     var frac = u.MaxHp > 0 ? Mathf.Clamp01((float)u.Hp / u.MaxHp) : 0f;
                     var fill = u.Team == Team.Player ? new Color(0.3f, 0.62f, 0.34f) : new Color(0.7f, 0.25f, 0.21f);
                     GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * frac, bar.height), HudArt.Solid(fill));
+                    // In pieces, one per point of max HP, like the bar over the statue.
+                    var gap = HudArt.Solid(HudArt.PanelColor);
+                    for (var i = 1; i < u.MaxHp; i++)
+                        GUI.DrawTexture(new Rect(bar.x + bar.width * i / u.MaxHp - 1f, bar.y, 2f, bar.height), gap);
                     GUI.Label(bar, $"{u.Hp} / {u.MaxHp}", Styles.BarText);
                 }
 

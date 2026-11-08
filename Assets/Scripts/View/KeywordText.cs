@@ -84,7 +84,13 @@ namespace ArmyRoguelike.View
         {
             if (string.IsNullOrEmpty(text))
                 return 0f;
-            var plain = new GUIStyle(style) { wordWrap = false, richText = false, padding = new RectOffset(), margin = new RectOffset() };
+            // A bare label with the text's font, so a button style's background isn't drawn behind every word.
+            var plain = new GUIStyle(GUI.skin.label)
+            {
+                font = style.font, fontSize = style.fontSize, fontStyle = style.fontStyle, wordWrap = false, richText = false,
+                padding = new RectOffset(), margin = new RectOffset(), overflow = new RectOffset(), clipping = TextClipping.Overflow,
+            };
+            plain.normal.textColor = style.normal.textColor;
             var lit = new GUIStyle(plain);
             lit.normal.textColor = KeywordColor;
             var lineHeight = plain.CalcSize(new GUIContent("Ag")).y;
