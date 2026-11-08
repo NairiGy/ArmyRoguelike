@@ -52,3 +52,30 @@ Each entry: what was done or tried, and why. Scrapped and reverted ideas stay in
   (`tools/dev.sh sim 10 fights "Giant,Necromancer,Elite Elementals,Elite Wolf Pack"`) and give bosses more teeth if they are
   still won about 100% of the time; check the three builder branches (archer-rogue, mage-sapper, demons), review them with reviewer
   subagents, and merge them into `feature/night-fun`; then docs (design note, tasks, CLAUDE.md, gamepedia) and the visual timeline page.
+- **09:23** Resumed after the usage limit. Boss sim at fixed levels (the bot): Giant 15 / 54 / 80 / 96% at levels 0-3, Necromancer
+  0 / 4 / 17 / 42%. So bosses aren't trivial at a fixed level; whole runs win them because the army reaches them at about
+  level 3 with 4 units.
+- **09:23** The three builders finished: **Archer and Rogue** 13 techniques each (Archer owns *Marked*, Rogue owns *Exposed*;
+  the Rogue has 6 HP and a Vanish that lasts the enemy turn), **Mage** 13 and **Sapper** 12 (Mage owns *Slowed*, Sapper owns
+  *Rubble*: low heaps that block walking but not shots, and crush what's pushed into them), and the **Demons** (Imp, Demon, Devil,
+  Fiend: Fury, Hellswap, Rending Blow, Soul Contract, Fire Breath; pool 2, with an elite). Their designs are in .
+  59 techniques in all, up from 34.
+- **09:23** Four reviewer subagents in parallel: one code reviewer per branch and one player/exploit reviewer. Then merged the three
+  branches into `feature/night-fun`, resolving the conflicts by hand (most were both sides adding enum values or cases). One real
+  overlap: holes and rubble are both "obstacles that don't block sight", so `Board.IsRock` now means "blocks sight and gives cover".
+  Tests: 282, then 303, then 322 after each merge.
+- **09:23** Fixes from the player/exploit review (lead's systems): **bosses never fall** (one push could kill the Necromancer and
+  skip all of Stone Heart); a boss that enters a new phase is **Enraged**, one extra action on its next turn, so a phase
+  threatens and doesn't just soak damage (the reviewer: "being robbed for playing well"); the **Sculptor** gives no level (it
+  was a swap plus a free level); **Altar cracks are scars** that can't be mended; **mending costs 10** (was 6); Altar and
+  Sculptor only from step 5 (rares before step 4 broke the balance rule). Floor cracks are now called **fractures**, so "crack" means one
+  thing. A test helper that teleported its attacker onto the goblins' rock ridge was fixed.
+- **09:23** **Hone** (lead): a shop service, 12 gold, takes 1 turn off one action's cooldown for that unit for the run. Why:
+  cheap depth that works with every action, old and new, and gives gold a use late in the act.
+- **09:23** Sent each builder its code review to fix on its own branch, synced with the night branch: Archer/Rogue (Into the
+  Shadows and Smoke Bomb near-permanent hiding, pins and slows lasting a turn too long, a +4 cap on stacking flat bonuses, a Rogue
+  could reach 17-20 damage), Mage/Sapper (rubble walls melee enemies in for good because the AI can't path through it,
+  Pierce stopping at rubble, raising inside rubble), Demons (intents that miss the Devil's walk-up contract and the Fire
+  Breath line, an uncapped Fury that one-shots with Fortune's Favored).
+- **Flag for the user:** the Loser banner with cracks. A death gives +1 HP and +1 damage, the crack takes 1 HP back and costs 10 to
+  mend. Dying is now nearly free growth again. Left as is (the user chose an uncapped Loser); decide in the morning.
