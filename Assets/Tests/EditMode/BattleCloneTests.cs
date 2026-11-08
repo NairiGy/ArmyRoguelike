@@ -29,8 +29,10 @@ namespace ArmyRoguelike.Tests
             new ArmyMember(UnitStats.Warrior, null, Technique.Sweep, Technique.Guard, Technique.ShieldUp, Technique.Battlecry, Technique.Taunt, Technique.ThrowShield, Technique.ZocStrike),
             new ArmyMember(UnitStats.Archer, null, Technique.OpeningShot),
             new ArmyMember(UnitStats.Rogue, null, Technique.Poison, Technique.Riposte, Technique.Dodge),
-            new ArmyMember(UnitStats.Apprentice, null, Technique.Fireball, Technique.Burning, Technique.Chill, Technique.Ward, Technique.IceWall),
-            new ArmyMember(UnitStats.Sapper, null, Technique.Barricade, Technique.Turret, Technique.Detonate, Technique.ThrowBomb),
+            new ArmyMember(UnitStats.Apprentice, null, Technique.Fireball, Technique.Burning, Technique.Chill, Technique.Ward, Technique.IceWall,
+                Technique.Firewall, Technique.SearingBolt, Technique.Blizzard, Technique.Transpose, Technique.Twincast),
+            new ArmyMember(UnitStats.Sapper, null, Technique.Barricade, Technique.Turret, Technique.Detonate, Technique.ThrowBomb,
+                Technique.CaveIn, Technique.Hook, Technique.Demolish, Technique.QuickFuse, Technique.Incendiary, Technique.SpikedBarricades),
         };
 
         private static Battle Placed(Encounter encounter, Battlefield? field, int seed)
