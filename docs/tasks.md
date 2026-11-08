@@ -157,6 +157,8 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 - [ ] What's On His Mind? hides every intent, including the demons' swap-then-hit and pushes into holes: maybe still show intents that move your units (exploit review).
 - [ ] Enemies can't see mines, snares or Covering Fire tiles and walk into them. With more traps in the pools (Quick Fuse mines every turn, Snare Trap) this may be "win without playing". Watch it in a playtest.
 - [ ] Too many statuses for a 6x6 board (Marked, Exposed, Pinned, Slowed, Hidden, Burning, rubble, snares, smoke, fractures, Fury, Contract, Champion...): judge readability in play; a keyword glossary or tooltips are likely needed.
+- [ ] Playtest 2026-11-08 (3 runs on the night branch, first fights 2 won / 1 lost, each with deaths): states are too hard to read (user, to fix in a UI chat). Seen: the Rogue walked into two wolves on turn 2 believing it was still hidden. Vanish now lasts only until your next turn, and the only signs of the reveal are a small "Revealed" popup and the statue turning solid. The hover card and the Vanish card should say how long hiding lasts and whether the unit is visible now.
+- [ ] The Mage has no escape since the night pass (Blink was parked and Frost Nova took its slot). A 5 HP unit with no way out died in melee on turn 3. Gameplay decision: Blink back in the base kit, or a self-push on Frost Nova.
 - [ ] Still missing for a "full" game (exploit review): acts 2-3, difficulty levels, unlocks, onboarding, save/continue.
 
 ## Balance (balance chat)
