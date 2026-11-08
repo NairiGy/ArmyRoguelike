@@ -156,7 +156,11 @@ namespace ArmyRoguelike.View
             // Test battles only: L strikes the hovered tile with lightning, to try the effect (visual only).
             if (_context.Test && keyboard != null && keyboard.lKey.wasPressedThisFrame && _hovered.HasValue)
                 StartCoroutine(LightningStrike.Strike(_board.transform, _hovered.Value));
+            // Left-click chooses (selects a unit, opens a card); right-click acts (move, attack, use the aimed action).
             var clicked = !_busy && !_confirmEndTurn && Mouse.current.leftButton.wasPressedThisFrame && _hovered.HasValue;
+            var ordered = !_busy && !_confirmEndTurn && Mouse.current.rightButton.wasPressedThisFrame && _hovered.HasValue;
+            if (clicked)
+                OpenCardFor(_hoveredUnit);
 
             _intent.Hide();
             HideAllIntents();
@@ -168,7 +172,7 @@ namespace ArmyRoguelike.View
                     UpdatePlacement(clicked);
                     break;
                 case Phase.PlayerTurn when !_busy:
-                    UpdatePlayerTurn(clicked);
+                    UpdatePlayerTurn(clicked, ordered);
                     break;
                 default:
                     _board.ClearHighlights();
@@ -304,7 +308,7 @@ namespace ArmyRoguelike.View
             }
 
             _action = action;
-            _hint = $"{Abilities.Name(action)}: click a yellow tile. Press its key again to cancel.";
+            _hint = $"{Abilities.Name(action)}: right-click a yellow tile. Press its key again or Esc to cancel.";
         }
 
         private void UseAction(ActionKind action, GridPos tile)
@@ -320,16 +324,49 @@ namespace ArmyRoguelike.View
             StartCoroutine(PlayPlayerAction(events));
         }
 
-        private void UpdatePlayerTurn(bool clicked)
+        private void UpdatePlayerTurn(bool clicked, bool ordered)
         {
             if (clicked)
-                HandlePlayerClick(_hovered.Value);
+                HandlePlayerChoose();
+            else if (ordered)
+                HandlePlayerOrder(_hovered.Value);
             if (_busy || Battle.Phase != Phase.PlayerTurn)
                 return;
             DrawPlayerHighlights();
         }
 
-        private void HandlePlayerClick(GridPos tile)
+        /// <summary>
+        /// Left-click: selects one of your units, or (on an enemy) only opens its card, keeping your selection.
+        /// Empty ground drops the selection and the aim, unless the selected unit is mid-turn.
+        /// </summary>
+        private void HandlePlayerChoose()
+        {
+            var target = _hoveredUnit;
+            if (target != null && target.Team == Team.Player)
+            {
+                if (target.IsObjective)
+                    _hint = $"The {target.Stats.Name} can't act. Keep it standing until the ritual completes.";
+                else if (target == _selected)
+                    return;
+                else if (Battle.CanAct(target))
+                    Select(target);
+                else if (target.IsDone)
+                    _hint = $"{target.Stats.Name} has finished its turn.";
+                else if (Battle.ActiveUnit != null)
+                    _hint = $"Finish the {Battle.ActiveUnit.Stats.Name}'s turn first (Done).";
+                return;
+            }
+
+            if (target != null)
+                return;
+
+            _action = null;
+            if (_selected != null && Battle.ActiveUnit != _selected)
+                Select(null);
+        }
+
+        /// <summary>Right-click: the selected unit uses the aimed action there, or attacks, or walks there.</summary>
+        private void HandlePlayerOrder(GridPos tile)
         {
             var target = _hoveredUnit;
 
@@ -344,20 +381,13 @@ namespace ArmyRoguelike.View
                 return;
             }
 
-            if (target != null && target.Team == Team.Player)
+            if (_selected == null)
             {
-                if (target.IsObjective)
-                    _hint = $"The {target.Stats.Name} can't act. Keep it standing until the ritual completes.";
-                else if (Battle.CanAct(target))
-                    Select(target);
-                else if (target.IsDone)
-                    _hint = $"{target.Stats.Name} has finished its turn.";
-                else if (Battle.ActiveUnit != null)
-                    _hint = $"Finish the {Battle.ActiveUnit.Stats.Name}'s turn first (Done).";
+                _hint = "Left-click a statue to select it first.";
                 return;
             }
 
-            if (_selected == null)
+            if (target != null && target.Team == Team.Player)
                 return;
 
             if (target != null && Battle.CanAttack(_selected, target))
@@ -421,12 +451,7 @@ namespace ArmyRoguelike.View
                 _hint = _selected.Ap < Battle.AttackCost
                     ? $"Attacking needs {Battle.AttackCost} AP."
                     : "Too far to walk up and attack this turn.";
-                return;
             }
-
-            // Clicking elsewhere drops the selection, unless that unit is mid-turn.
-            if (Battle.ActiveUnit != _selected)
-                Select(null);
         }
 
         private void Record(List<BattleEvent> events, bool autoApproach = false)
@@ -445,7 +470,10 @@ namespace ArmyRoguelike.View
             _action = null;
             if (_selected != null)
                 _board.ViewOf(_selected)?.SetSelected(true);
-            _hint = unit == null ? "Click a statue to select it." : "Click a blue tile to move or a red one to attack.";
+            _hint = unit == null ? "Click a statue to select it." : "Right-click a blue tile to move or a red one to attack.";
+            // The selected unit's card shows, unless another unit's card is open.
+            _cardUnit = null;
+            _cardHidden = false;
         }
 
         private IEnumerator PlayPlayerAction(List<BattleEvent> events)
@@ -1758,24 +1786,17 @@ namespace ArmyRoguelike.View
         {
             var playerTurn = Battle.Phase == Phase.PlayerTurn && !_busy;
 
-            // Top-left: turn and the selected unit.
+            // Top-left: turn, and the selected unit's AP and moves (its card shows the rest).
             var info = $"{Header}\nTurn {Battle.TurnNumber}: {(playerTurn ? "your turn" : "enemy turn")}{RitualLine}{OmenLine}";
             var apLine = "";
             if (_selected != null)
             {
-                info += "\n" + UnitLine(_selected);
                 var cost = playerTurn ? PreviewCost() : 0;
                 var moves = playerTurn ? PreviewMoves() : 0;
                 apLine = cost > 0 ? $"AP {_selected.Ap} / {_selected.MaxAp}   this action: -{cost} -> {_selected.Ap - cost} left"
                     : $"AP {_selected.Ap} / {_selected.MaxAp}";
                 apLine += _selected.ActedThisTurn ? "   Moves: none (acted)"
                     : moves > 0 ? $"   Moves {_selected.Moves} / {_selected.MaxMoves} (-{moves})" : $"   Moves {_selected.Moves} / {_selected.MaxMoves}";
-                var abilities = AbilityLines(_selected);
-                if (abilities.Length > 0)
-                    info += "\n" + abilities;
-                var engaged = EngagedLine(_selected);
-                if (engaged.Length > 0)
-                    info += "\n" + engaged;
             }
 
             var style = TextStyle;
@@ -1867,7 +1888,7 @@ namespace ArmyRoguelike.View
                 GUILayout.Space(28f);
                 GUILayout.Label($"<color=white>{Abilities.Name(action)}</color>", title);
                 GUILayout.EndHorizontal();
-                var status = aiming ? $"<color={ActionColor}>Aiming: click a yellow tile</color>"
+                var status = aiming ? $"<color={ActionColor}>Aiming: right-click a yellow tile</color>"
                     : cooldown > 0 ? $"<color={NextColor}>Ready in {cooldown} turn{(cooldown == 1 ? "" : "s")}</color>"
                     : !usable ? $"<color={DimColor}>No target in reach</color>"
                     : Battle.CooldownFor(_selected, action) == 0 ? $"<color={ActionColor}>{CardCost(_selected, action)} AP  ·  once per battle</color>"
@@ -1989,10 +2010,10 @@ namespace ArmyRoguelike.View
                     return $"Your mine: an enemy stepping here sets it off ({Battle.MineAt(p).Damage} damage to whoever stands on this tile).";
                 if (Battle.IsBarricade(p))
                     return $"Barricade: {Battle.BarricadeHpAt(p)}/{Battle.BarricadeHp} HP. Blocks paths and shots; either side can attack it, and it breaks at 0." +
-                           (_selected != null && Battle.CanAttackBarricade(_selected, p) ? $"\nClick: attack it for {Battle.EffectiveDamage(_selected)} ({Battle.AttackCost} AP)." : "");
+                           (_selected != null && Battle.CanAttackBarricade(_selected, p) ? $"\nRight-click: attack it for {Battle.EffectiveDamage(_selected)} ({Battle.AttackCost} AP)." : "");
                 if (Battle.IsRubble(p))
                     return $"Rubble: blocks walking but not shots, and gives no cover. A unit pushed into it is crushed for {Battle.CollisionDamage + Battle.CrushDamage} and the rubble breaks. One hit clears it." +
-                           (_selected != null && Battle.CanAttackBarricade(_selected, p) ? $"\nClick: clear it ({Battle.AttackCost} AP)." : "");
+                           (_selected != null && Battle.CanAttackBarricade(_selected, p) ? $"\nRight-click: clear it ({Battle.AttackCost} AP)." : "");
                 if (Battle.BurningTiles.TryGetValue(p, out var burnRounds))
                     return $"Burning ground ({burnRounds} round(s) left): {Battle.BurnDamage} damage to whoever starts a turn here. Enemies walk through it but never stop on it.";
                 if (Battle.RemainsAt(p) is Unit bones)
@@ -2030,24 +2051,46 @@ namespace ArmyRoguelike.View
         private static readonly Color BadChip = new Color(0.38f, 0.13f, 0.1f);
         private static readonly Color PlainChip = new Color(0.22f, 0.22f, 0.25f);
 
-        /// <summary>The unit whose card is open: right-click a unit; right-click the ground or Esc closes it.</summary>
+        /// <summary>
+        /// The unit whose card is open when it isn't the selected one: left-click any unit. Without it the selected
+        /// unit's card shows, unless Esc hid it (<see cref="_cardHidden"/>, until the next selection).
+        /// </summary>
         private Unit _cardUnit;
+        private bool _cardHidden;
+
+        /// <summary>The unit whose card shows now, or null.</summary>
+        private Unit CardUnit => _cardUnit ?? (_cardHidden ? null : _selected);
 
         /// <summary>The description of the keyword under the pointer on the card, drawn last, beside it.</summary>
         private string _cardTooltip;
         private Rect _cardTooltipAnchor;
 
-        /// <summary>Opens, switches or closes the unit card on a right-click; Esc closes it.</summary>
+        /// <summary>A left-click on the board: opens that unit's card, or closes the open one on empty ground.</summary>
+        private void OpenCardFor(Unit unit)
+        {
+            if (unit != null && unit.IsObjective)
+                return;
+            _cardUnit = unit;
+            _cardHidden = false;
+        }
+
+        /// <summary>Esc cancels the aimed action, or else closes the card.</summary>
         private void UpdateCardInput(Keyboard keyboard)
         {
-            if (Mouse.current.rightButton.wasPressedThisFrame && !IsOverHud(Mouse.current.position.ReadValue()))
+            if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
             {
-                var target = _hoveredUnit != null && !_hoveredUnit.IsObjective ? _hoveredUnit : null;
-                _cardUnit = target == _cardUnit ? null : target;
+                if (_action.HasValue)
+                {
+                    _hint = $"{Abilities.Name(_action.Value)} cancelled.";
+                    _action = null;
+                }
+                else
+                {
+                    _cardUnit = null;
+                    _cardHidden = true;
+                }
             }
 
-            if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
-                _cardUnit = null;
             if (_cardUnit != null && !_cardUnit.IsAlive)
                 _cardUnit = null;
         }
@@ -2059,7 +2102,7 @@ namespace ArmyRoguelike.View
         private float DrawUnitCard()
         {
             _cardTooltip = null;
-            var u = _cardUnit;
+            var u = CardUnit;
             if (u == null || !u.IsAlive)
                 return 0f;
 
@@ -2512,49 +2555,6 @@ namespace ArmyRoguelike.View
                 default:
                     return $"attack the {name}";
             }
-        }
-
-        private string UnitLine(Unit u)
-        {
-            var item = u.Equipment != null ? $"  [{u.Equipment.Name}]" : "";
-            var level = u.Member != null ? $"  level {u.Member.Level}" : "";
-            return $"{u.Stats.Name}{level}  HP {u.Hp}/{u.MaxHp}  DMG {Battle.EffectiveDamage(u)}  RNG {u.Range}  MV {u.MaxMoves}{item}";
-        }
-
-        private static string AbilityLines(Unit u)
-        {
-            var lines = new List<string>();
-            foreach (var ability in u.Stats.Abilities)
-                lines.Add($"{Abilities.Name(ability)}: {Abilities.Describe(ability)}");
-            foreach (var technique in TechniquesOf(u))
-                lines.Add($"{technique.Name}: {technique.Description}");
-            var itemAbility = u.Equipment?.Ability ?? Ability.None;
-            if (itemAbility != Ability.None)
-                lines.Add($"{Abilities.Name(itemAbility)} ({u.Equipment.Name}): {Abilities.Describe(itemAbility)}");
-            var status = new List<string>();
-            if (u.Shield > 0)
-                status.Add($"shield {u.Shield}");
-            if (u.TempHp > 0)
-                status.Add($"temporary HP {u.TempHp}");
-            if (u.ShieldUpTurns > 0)
-                status.Add("shield up");
-            if (u.IsTaunting)
-                status.Add("taunting");
-            if (u.ShieldThrown)
-                status.Add("shield thrown");
-            if (u.IsSnared)
-                status.Add("pinned (can't move)");
-            if (u.IsHidden)
-                status.Add("hidden until your next turn");
-            if (u.Marked)
-                status.Add("marked");
-            if (u.IsSlowed)
-                status.Add("slowed");
-            if (u.PoisonTurns > 0)
-                status.Add($"poisoned ({u.PoisonTurns} more)");
-            if (status.Count > 0)
-                lines.Add("Status: " + string.Join(", ", status));
-            return string.Join("\n", lines);
         }
     }
 }

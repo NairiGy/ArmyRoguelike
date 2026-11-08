@@ -554,6 +554,7 @@ public static class GamepediaWriter
         html.Append("<li>Hidden units (Vanish, Smoke Bomb, Into the Shadows) can't be targeted or attacked by enemies until your next turn, though area blasts still hit them. Attacking doesn't reveal them; the first attack while hidden deals +2.</li>");
         html.Append("<li>Snares (Snare Trap) are hidden from enemies: the first enemy to walk onto one stops, takes damage and is pinned. Covering Fire shoots the first enemy that walks onto a tile the archer can shoot at, and stops it there.</li>");
         html.Append("<li>Hover any enemy to see what it plans to do next.</li>");
+        html.Append("<li>Controls: left-click chooses (selects one of your units, or opens any unit's card; hover a name on the card for what it does), right-click acts (move, attack, or use the aimed action). Esc cancels an aimed action or closes the card.</li>");
         html.Append("</ul></section>");
     }
 
