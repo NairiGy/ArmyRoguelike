@@ -1387,7 +1387,10 @@ namespace ArmyRoguelike.Core
                 return null;
             ActiveUnit = unit;
             var events = new List<BattleEvent>();
+            var twincast = TwincastFree(unit, action);
             UseUp(unit, action);
+            if (twincast)
+                events.Add(new StatusEvent(unit, unit, StatusKind.Twincast, 0));
             switch (action)
             {
                 case ActionKind.PlaceMine:

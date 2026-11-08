@@ -101,7 +101,7 @@ public static class SmartBot
     {
         var id = unit.Id;
 
-        foreach (var action in unit.Actions.Where(a => Battle.ActionCost(a) == 0))
+        foreach (var action in unit.Actions.Where(a => Battle.CostOf(unit, a) == 0))
             foreach (var tile in battle.ActionTargets(unit, action))
                 yield return Rate(battle, new Plan { UnitId = id, Action = action, Tile = tile, Free = true }, depth);
 
@@ -121,7 +121,7 @@ public static class SmartBot
             foreach (var foe in moved.Living(Team.Enemy).Where(e => moved.CanAct(self) && moved.CanAttack(self, e)).Select(e => e.Id).ToList())
                 yield return Rate(battle, new Plan { UnitId = id, Move = start, AttackId = foe }, depth);
 
-            foreach (var action in self.Actions.Where(a => Battle.ActionCost(a) > 0).ToList())
+            foreach (var action in self.Actions.Where(a => Battle.CostOf(self, a) > 0).ToList())
                 foreach (var tile in Worthwhile(moved, self, action))
                     yield return Rate(battle, new Plan { UnitId = id, Move = start, Action = action, Tile = tile }, depth);
         }
@@ -131,7 +131,7 @@ public static class SmartBot
     private static IEnumerable<GridPos> Worthwhile(Battle battle, Unit unit, ActionKind action)
     {
         var tiles = battle.ActionTargets(unit, action);
-        if (action != ActionKind.Fireball && action != ActionKind.ThrowBomb)
+        if (action != ActionKind.Fireball && action != ActionKind.ThrowBomb && action != ActionKind.Blizzard && action != ActionKind.Firewall && action != ActionKind.CaveIn)
             return tiles;
         var foes = battle.Living(Team.Enemy).ToList();
         return tiles.Where(t => foes.Any(f => Battle.Distance(t, 1, f) <= 1));

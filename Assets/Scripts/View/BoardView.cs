@@ -141,6 +141,9 @@ namespace ArmyRoguelike.View
 
         private static readonly Color IceTint = new Color(0.7f, 0.9f, 1f, 0.9f);
         private static readonly Color BarricadeTint = new Color(0.8f, 0.58f, 0.36f);
+
+        // Placeholder for the art chat: rubble is a low, grey-brown block (see docs/night/mage-sapper.md).
+        private static readonly Color RubbleTint = new Color(0.55f, 0.5f, 0.45f);
         private static readonly Color BurnTint = new Color(1f, 0.35f, 0.1f, 0.45f);
 
         private readonly Dictionary<GridPos, SpriteRenderer> _rocks = new Dictionary<GridPos, SpriteRenderer>();
@@ -169,7 +172,8 @@ namespace ArmyRoguelike.View
         {
             var ice = Battle.Ice.ContainsKey(p);
             var barricade = Battle.IsBarricade(p);
-            var painted = !ice && !barricade && _rockArt != null && _rockArt.Length > 0;
+            var rubble = Battle.IsRubble(p);
+            var painted = !ice && !barricade && !rubble && _rockArt != null && _rockArt.Length > 0;
             // Painted rocks get a soft shadow so they sit on the floor instead of blending into it.
             var shadow = rock.transform.Find("Shadow")?.GetComponent<SpriteRenderer>();
             if (painted && shadow == null)
@@ -189,12 +193,15 @@ namespace ArmyRoguelike.View
                 rock.sprite = _rockArt[Variant(p, _rockArt.Length)];
                 rock.sharedMaterial = BattleScenery.PerTexture(_rockArtMaterial, rock.sprite.texture);
                 rock.color = _rockArtColor;
+                rock.transform.localScale = Vector3.one;
                 return;
             }
 
             rock.sprite = PlaceholderArt.Rock;
             rock.sharedMaterial = _spriteMaterial;
-            rock.color = ice ? IceTint : barricade ? BarricadeTint : _rockTint;
+            rock.color = ice ? IceTint : barricade ? BarricadeTint : rubble ? RubbleTint : _rockTint;
+            // Rubble sits low: a squashed block, so it reads as a heap rather than a wall.
+            rock.transform.localScale = rubble ? new Vector3(1f, 0.55f, 1f) : Vector3.one;
         }
 
         /// <summary>A stable pseudo-random pick per tile, so the board looks the same every frame.</summary>

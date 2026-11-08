@@ -332,6 +332,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Grappling Hook: the target is about to be pulled towards the sapper.</summary>
         Hooked,
+
+        /// <summary>Twincast: this action cost no AP (Source and Target are the same unit).</summary>
+        Twincast,
     }
 
     /// <summary>A status or support effect was put on a unit by an action or a hit.</summary>
