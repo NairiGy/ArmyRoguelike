@@ -182,6 +182,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Stone Heart: HP it can't drop below until your next turn (0 = none); the next phase starts there.</summary>
         public int PhaseFloor { get; internal set; }
+
+        /// <summary>Stone Heart: entered a new phase this round, so it gets one extra action on its next turn.</summary>
+        public bool Enraged { get; internal set; }
         // ---------- Demons ----------
 
         /// <summary>Fury (demons): +1 damage per point for the rest of the battle, from Blood Offering and Bloodlust.</summary>
@@ -217,7 +220,7 @@ namespace ArmyRoguelike.Core
                 BannerAp = BannerAp, BannerMoves = BannerMoves, LeftPile = LeftPile, PileGone = PileGone,
                 ShieldUpTurns = ShieldUpTurns, TauntTurns = TauntTurns, BattlecryTurns = BattlecryTurns, TempHp = TempHp,
                 ShieldThrown = ShieldThrown, ZocStrikeUsed = ZocStrikeUsed, AmbushUsed = AmbushUsed, Marked = Marked, MarkSpreads = MarkSpreads, TwincastUsed = TwincastUsed, Fury = Fury,
-                Affix = Affix, ExtraHp = ExtraHp, BossPhase = BossPhase, PhaseFloor = PhaseFloor,
+                Affix = Affix, ExtraHp = ExtraHp, BossPhase = BossPhase, PhaseFloor = PhaseFloor, Enraged = Enraged,
             };
             foreach (var cooldown in _cooldowns)
                 c._cooldowns.Add(cooldown.Key, cooldown.Value);

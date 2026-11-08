@@ -1329,7 +1329,7 @@ namespace ArmyRoguelike.View
                     var altar = _run.AltarTechnique;
                     if (altar != null)
                     {
-                        GUILayout.Label($"Power seeps from a split in the stone. A statue that lays its hands on it learns a rare technique, but takes a crack (-{Run.CrackHp} max HP until mended; {Run.CracksToShatter} cracks shatter it).\n" + Describe(altar));
+                        GUILayout.Label($"Power seeps from a split in the stone. A statue that lays its hands on it learns a rare technique, but takes a scar: a crack that can never be mended (-{Run.CrackHp} max HP; {Run.CracksToShatter} cracks shatter it).\n" + Describe(altar));
                         foreach (var member in _run.Army)
                         {
                             var m = member;

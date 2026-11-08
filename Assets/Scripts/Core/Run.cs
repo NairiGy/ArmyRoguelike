@@ -24,6 +24,9 @@ namespace ArmyRoguelike.Core
         /// </summary>
         public int Cracks { get; internal set; }
 
+        /// <summary>Cracks that can't be mended (from the Cracked Altar); they count towards shattering like any other.</summary>
+        public int Scars { get; internal set; }
+
         private readonly List<Technique> _techniques = new List<Technique>();
 
         /// <summary>The techniques it knows, in the order learned.</summary>
@@ -44,12 +47,12 @@ namespace ArmyRoguelike.Core
         /// Learns a technique, going up a level if it never knew it before. False if it can't learn it (line,
         /// requirement, known).
         /// </summary>
-        public bool Learn(Technique technique)
+        public bool Learn(Technique technique, bool levelUp = true)
         {
             if (!technique.CanLearn(this))
                 return false;
             _techniques.Add(technique);
-            if (_everLearned.Add(technique))
+            if (_everLearned.Add(technique) && levelUp)
                 Level++;
             return true;
         }
@@ -244,7 +247,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Cracks: max HP lost per crack, the crack that shatters a statue for good, and a shop's price to mend one.</summary>
         public const int CrackHp = 1;
         public const int CracksToShatter = 3;
-        public const int MendPrice = 6;
+        public const int MendPrice = 10;
 
         /// <summary>Map steps (0-based) where both choices are fights, so every run has at least this many before the boss.</summary>
         public static readonly IReadOnlyList<int> FightSteps = new[] { 0, 3, 5, 7, 9 };
@@ -808,7 +811,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Army members whose last crack shattered them after the last battle; they left the army.</summary>
         public IReadOnlyList<ArmyMember> LastShattered => _lastShattered;
 
-        public bool CanMend(ArmyMember member) => State == RunState.Shop && Army.Contains(member) && member.Cracks > 0 && Gold >= MendPrice;
+        public bool CanMend(ArmyMember member) => State == RunState.Shop && Army.Contains(member) && member.Cracks > member.Scars && Gold >= MendPrice;
 
         /// <summary>Shop service: pays to mend one of a member's cracks.</summary>
         public bool Mend(ArmyMember member)
@@ -940,8 +943,22 @@ namespace ArmyRoguelike.Core
 
         private void RollEvent()
         {
-            var kinds = (EventKind[])Enum.GetValues(typeof(EventKind));
-            CurrentEvent = kinds[_rng.Next(kinds.Length)];
+            // The Cracked Altar and the Sculptor hand out rares, so they wait for the second half of the act.
+            var kinds = ((EventKind[])Enum.GetValues(typeof(EventKind)))
+                .Where(k => StepIndex >= LateEventStep || (k != EventKind.Altar && k != EventKind.Sculptor)).ToArray();
+            SetUpEvent(kinds[_rng.Next(kinds.Length)]);
+        }
+
+        /// <summary>For tests: turns the current ? node into this event.</summary>
+        internal void ForceEvent(EventKind kind)
+        {
+            State = RunState.Event;
+            SetUpEvent(kind);
+        }
+
+        private void SetUpEvent(EventKind kind)
+        {
+            CurrentEvent = kind;
             CartTechnique = null;
             CartItem = null;
             if (CurrentEvent == EventKind.AbandonedCart)
@@ -1089,8 +1106,11 @@ namespace ArmyRoguelike.Core
         public const int MasonHp = 1;
         public const int BargainGold = 30;
 
+        /// <summary>Map step (0-based) from which the Cracked Altar and the Sculptor can appear.</summary>
+        public const int LateEventStep = 4;
+
         /// <summary>Any crack in the army for the Stonemason to mend.</summary>
-        public bool ArmyHasCracks => Army.Any(m => m.Cracks > 0);
+        public bool ArmyHasCracks => Army.Any(m => m.Cracks > m.Scars);
 
         /// <summary>
         /// Stonemason: mends every crack in the army for free. With no cracks to mend, it reinforces
@@ -1106,9 +1126,9 @@ namespace ArmyRoguelike.Core
             }
             else if (ArmyHasCracks)
             {
-                var mended = Army.Sum(m => m.Cracks);
+                var mended = Army.Sum(m => m.Cracks - m.Scars);
                 foreach (var m in Army)
-                    m.Cracks = 0;
+                    m.Cracks = m.Scars;
                 EventOutcome = $"The mason fills {mended} crack{(mended == 1 ? "" : "s")} with fresh mortar. Good as new.";
             }
             else
@@ -1147,6 +1167,7 @@ namespace ArmyRoguelike.Core
                 if (!CanTakeAltar(member))
                     return false;
                 member.Cracks++;
+                member.Scars++;
                 member.Learn(AltarTechnique);
                 EventOutcome = $"The altar splits the {member.Stats.Name}'s stone, and {AltarTechnique.Name} pours into the crack.";
             }
@@ -1184,7 +1205,8 @@ namespace ArmyRoguelike.Core
                 var pool = SculptPool(member, given);
                 var into = pool[_rng.Next(pool.Count)];
                 member.Forget(given);
-                member.Learn(into);
+                // A swap, not a gift: the new technique gives no level.
+                member.Learn(into, levelUp: false);
                 SculptedInto = into;
                 EventOutcome = $"The sculptor chips away the {member.Stats.Name}'s {given.Name} and carves {into.Name} in its place.";
             }

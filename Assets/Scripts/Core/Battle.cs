@@ -552,7 +552,7 @@ namespace ArmyRoguelike.Core
         /// </summary>
         public bool WouldFall(Unit unit, GridPos dir, Unit pusher)
         {
-            if (!(EdgeKills || RoofCrumbles) || !unit.IsAlive || unit.IsObjective || unit.Has(Ability.Colossus) || unit.Size > 1)
+            if (!(EdgeKills || RoofCrumbles) || !unit.IsAlive || unit.IsObjective || unit.Stats.IsBoss || unit.Has(Ability.Colossus) || unit.Size > 1)
                 return false;
             var p = unit.Pos;
             for (var step = 0; step < PushDistance(unit, pusher); step++)
@@ -621,7 +621,7 @@ namespace ArmyRoguelike.Core
                 pile.PileGone = true;
             events.Add(new TileEvent("hole", p, true, null));
             var victim = UnitAt(p);
-            if (victim != null && victim.IsAlive && victim.Size == 1 && !victim.IsObjective && !victim.Has(Ability.Colossus))
+            if (victim != null && victim.IsAlive && victim.Size == 1 && !victim.IsObjective && !victim.Stats.IsBoss && !victim.Has(Ability.Colossus))
                 DropIntoHole(victim, null, p, p, events);
         }
 
@@ -767,6 +767,7 @@ namespace ArmyRoguelike.Core
         private void EnterPhase(Unit boss, List<BattleEvent> after)
         {
             boss.BossPhase++;
+            boss.Enraged = true;
             after.Add(new StatusEvent(boss, boss, StatusKind.Phase, boss.BossPhase));
             if (boss.Has(Ability.SoulHarvest))
                 SpawnEdgeUnits(UnitStats.Raised(UnitStats.Skeleton), PhaseSkeletons, after);
@@ -2308,7 +2309,7 @@ namespace ArmyRoguelike.Core
             {
                 var from = unit.Pos;
                 var to = from + dir;
-                if (EdgeKills && unit.Size == 1 && !Board.InBounds(to))
+                if (EdgeKills && unit.Size == 1 && !unit.Stats.IsBoss && !Board.InBounds(to))
                 {
                     if (from != start)
                         events.Add(new PushEvent(unit, pusher, start, from, null));
@@ -2317,7 +2318,7 @@ namespace ArmyRoguelike.Core
                 }
 
                 // Crumbling Roof: pushed into a hole, it falls (huge units aren't pushed in the first place).
-                if (unit.Size == 1 && Board.IsHole(to))
+                if (unit.Size == 1 && !unit.Stats.IsBoss && Board.IsHole(to))
                 {
                     if (from != start)
                         events.Add(new PushEvent(unit, pusher, start, from, null));
@@ -3766,6 +3767,11 @@ namespace ArmyRoguelike.Core
             foreach (var u in Living(team))
             {
                 u.Ap = u.MaxAp + Math.Min(u.Ap, MaxCarriedAp);
+                if (u.Enraged && team == Team.Enemy)
+                {
+                    u.Ap++;
+                    u.Enraged = false;
+                }
                 u.SlowedThisTurn = u.SlowNext > 0;
                 u.SlowNext = 0;
                 u.Moves = u.SlowedThisTurn ? 0 : u.MaxMoves;

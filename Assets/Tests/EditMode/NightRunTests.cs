@@ -39,7 +39,7 @@ namespace ArmyRoguelike.Tests
                 e.PhaseFloor = 0;
                 var killer = players[0];
                 killer.Ap = 99;
-                killer.Pos = new GridPos(e.Pos.X, e.Pos.Y - 1);
+                killer.Pos = e.Pos.Neighbours().Where(p => b.IsFree(p)).DefaultIfEmpty(new GridPos(e.Pos.X, e.Pos.Y - 1)).First();
                 b.PlayerAttack(killer, e);
             }
 
@@ -60,8 +60,10 @@ namespace ArmyRoguelike.Tests
                 run.SkipReward();
                 before?.Invoke(run);
                 run.ChooseNode(ev);
-                if (run.CurrentEvent == kind)
-                    return run;
+                if (run.State != RunState.Event)
+                    continue;
+                run.ForceEvent(kind);
+                return run;
             }
 
             Assert.Fail($"no seed with {kind} at step 2");
@@ -161,6 +163,7 @@ namespace ArmyRoguelike.Tests
             Assert.IsTrue(run.TakeAltar(taker));
             Assert.IsTrue(taker.Knows(altar));
             Assert.AreEqual(1, taker.Cracks);
+            Assert.AreEqual(1, taker.Scars, "an altar crack is a scar");
         }
 
         [Test]
@@ -176,7 +179,34 @@ namespace ArmyRoguelike.Tests
             Assert.AreEqual(TechniqueRarity.Rare, run.SculptedInto.Rarity);
             Assert.AreEqual(UnitStats.Warrior, run.SculptedInto.Line);
             Assert.IsTrue(warrior.Knows(run.SculptedInto));
-            Assert.AreEqual(level + 1, warrior.Level);
+            Assert.AreEqual(level, warrior.Level, "a swap gives no level");
+        }
+
+        [Test]
+        public void Scars_CantBeMended()
+        {
+            var run = RunAtEvent(EventKind.Mason, r => { r.Army[0].Cracks = 2; r.Army[0].Scars = 1; });
+            Assert.IsTrue(run.VisitMason(null));
+            Assert.AreEqual(1, run.Army[0].Cracks, "the mason leaves the scar");
+        }
+
+        [Test]
+        public void AltarAndSculptor_NeverBeforeStepFive()
+        {
+            for (var seed = 0; seed < 300; seed++)
+            {
+                var run = NewRun(seed);
+                var ev = run.Map[1].ToList().FindIndex(n => n.Kind == NodeKind.Event);
+                if (ev < 0)
+                    continue;
+                run.ChooseNode(0);
+                WinCurrentBattle(run, 3);
+                run.FinishBattle();
+                run.SkipReward();
+                run.ChooseNode(ev);
+                Assert.AreNotEqual(EventKind.Altar, run.CurrentEvent);
+                Assert.AreNotEqual(EventKind.Sculptor, run.CurrentEvent);
+            }
         }
 
         [Test]

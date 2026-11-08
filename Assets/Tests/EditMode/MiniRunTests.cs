@@ -69,11 +69,11 @@ namespace ArmyRoguelike.Tests
                 var killer = players[0];
                 killer.Ap = 99;
                 // Teleport next to the enemy for the test and hit it once.
-                killer.Pos = new GridPos(e.Pos.X, e.Pos.Y - 1);
+                killer.Pos = e.Pos.Neighbours().Where(p => b.IsFree(p)).DefaultIfEmpty(new GridPos(e.Pos.X, e.Pos.Y - 1)).First();
                 b.PlayerAttack(killer, e);
             }
 
-            Assert.AreEqual(Phase.Victory, b.Phase);
+            Assert.AreEqual(Phase.Victory, b.Phase, $"{run.CurrentEncounter?.Name}: {string.Join(", ", b.Living(Team.Enemy).Select(e => e.ToString()))}");
         }
 
         /// <summary>A run whose second map step offers a shop, after winning the first battle with all units.</summary>
@@ -975,7 +975,7 @@ namespace ArmyRoguelike.Tests
             Assert.IsTrue(hit.OfType<StatusEvent>().Any(s => s.Kind == StatusKind.Wrath));
             Assert.AreEqual(2, giant.MaxAp);
             var events = b.EndPlayerTurn();
-            Assert.AreEqual(2, events.OfType<SmashEvent>().Count(), "two smashes in one turn");
+            Assert.AreEqual(3, events.OfType<SmashEvent>().Count(), "two smashes for Wrath, one more for entering the phase (Enraged)");
         }
 
         [Test]
