@@ -17,6 +17,7 @@ Where things are written down:
 - [docs/design-note.md](docs/design-note.md): what has been decided and why, current rules only. Keep it updated when design decisions change. Replaced rules are in [docs/design-history.md](docs/design-history.md).
 - [docs/tasks.md](docs/tasks.md): open tasks across all topics. Read it at the start of a session and update it when you finish or find work.
 - [docs/gamepedia.html](docs/gamepedia.html): every unit, ability, item, enemy and rule with its numbers, generated from the game data. Numbers are right there, not in the design note.
+- [docs/synergy-map.html](docs/synergy-map.html) ([published](https://claude.ai/artifact/BCBjEq3EFMuN1tZi1sLoyw)): every hero skill, item and rule tagged by the theme keywords it makes, uses or hurts; hero-pair synergies, theme health, rule duplicates and holes.
 
 ## Tech
 
@@ -38,7 +39,7 @@ Where things are written down:
 - Banners on the roof (`View/BannerView.cs`): one painted pole and one grey cloth in `Assets/Art/Banners/Resources/Banners`, made from the blank painting by `tools/make_banner_layers.ps1`; `BannerCloth.shader` colours the cloth through each banner's ramp and moves it in the wind.
 - Effects playground (`View/FxPlayground.cs`): F1 in a test battle plays any effect on the hovered tile or unit, plays each sound, sets the volumes and locks a sound to one variant. Try auditions a sound: its real effect on a unit with each variant in turn, Y / N verdicts saved to `Playtests/sound-review.txt`. `UnitView.Restore` stands a statue back up after the death demo.
 - `Assets/Tests/EditMode`: NUnit tests for Core.
-- `tools/dev.sh compile|test|wiki|sim`: compile, run the tests, write a text-only gamepedia and play bot battles for a balance report (`tools/balance/`, see "Balance" in the design note) with Unity's bundled compiler, with the Editor open or closed. See `tools/README.md`. The Pipeline package (`com.unity.pipeline`) lets `unity status` / `unity command` drive an open Editor.
+- `tools/dev.sh compile|test|wiki|synergy|sim`: compile, run the tests, write a text-only gamepedia, refresh the synergy map's texts and play bot battles for a balance report (`tools/balance/`, see "Balance" in the design note) with Unity's bundled compiler, with the Editor open or closed. See `tools/README.md`. The Pipeline package (`com.unity.pipeline`) lets `unity status` / `unity command` drive an open Editor.
 - `Playtests/` (git-ignored): a JSON log per battle (`PlaytestLogger`) and per run (`RunLogger`), each stamped with its git commit and dirty flags; run logs also hold the player's `runTag` and `difficultyRating`. F9 in game saves a marker with a board snapshot. Read these to summarize playtests instead of asking the user for numbers. Battles skipped with the debug Win button are marked `skipped`.
 - The scene stays nearly empty. `GameBootstrap` builds the run at runtime, and placeholder art is generated in code (`PlaceholderArt`). Unit types with a painted statue sprite use it instead.
 
@@ -56,6 +57,7 @@ Where things are written down:
 - Ask about unknowns rather than guessing.
 - Keep `PlaytestLogger` and `RunLogger` up to date whenever gameplay changes: log whatever new data is needed to judge it. The user reports how it feels; the logs cover the numbers.
 - Keep the gamepedia current: after changing units, abilities, items, enemies or rules, re-export it (Tools → Export Gamepedia, or the batch method when the editor is closed) and commit `docs/gamepedia.html`.
+- Keep the synergy map current the same way: after changing a hero skill, item, banner, battlefield, omen or champion affix, run `tools/dev.sh synergy` (it copies the game's rule texts in and lists anything new, renamed or removed), add or retag those entries in [docs/synergy-map.html](docs/synergy-map.html) (makes / uses / hurts), mark fixed rule duplicates or holes "(fixed date)", commit it, and republish it to its link with the Artifact tool.
 - Update this file when the project's structure or status changes.
 
 ## Working across chats

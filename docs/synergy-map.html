@@ -117,7 +117,17 @@ ul.plain li.divider { list-style: none; margin-left: -18px; }
 #tip { position: fixed; z-index: 50; max-width: min(340px, calc(100vw - 16px)); background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; box-shadow: 0 6px 24px rgba(0,0,0,.18); pointer-events: none; display: grid; gap: 6px; font-size: 13px; }
 #tip p { margin: 0; }
 #tip[hidden] { display: none; }
-.own { color: var(--c); font-weight: 600; font-size: 12px; white-space: nowrap; }.own::before, .kdot { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 5px; vertical-align: 1px; }.kdot { margin-right: 4px; }.own.big { font-size: 13px; }.hero-card { border-top: 3px solid var(--c); }.hero-card h4 { color: var(--c); }.kw { font-weight: 600; color: var(--c); }
+.own { color: var(--c); font-weight: 600; font-size: 12px; white-space: nowrap; }
+.own::before, .kdot { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 5px; vertical-align: 1px; }
+.kdot { margin-right: 4px; }
+.own.big { font-size: 13px; }
+.hero-card { border-top: 3px solid var(--c); }
+.hero-card h4 { color: var(--c); }
+.kw { font-weight: 600; color: var(--c); }
+.kwtip, .herotip { cursor: pointer; }
+.herotip:hover, .kw.kwtip:hover { text-decoration: underline dotted; text-underline-offset: 3px; }
+.chip.kwtip:hover { box-shadow: 0 0 0 1px var(--muted); }
+.kwtip:focus-visible, .herotip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 #tip .tip-name { font-family: var(--display); font-size: 17px; }
 tr.flash td { animation: flash 1.6s ease-out; }
 @keyframes flash { from { background: var(--makes-bg); } to { background: transparent; } }
@@ -129,11 +139,11 @@ tr.flash td { animation: flash 1.6s ease-out; }
     <h1>Hero Synergy Map</h1>
     <p class="sub">Every hero skill, item, banner, battlefield, omen and champion affix, tagged by the theme keywords it makes, uses or hurts. Synergies are counted from those tags: a link is one hero <em>making</em> a keyword that another (or the same) hero <em>uses</em>. Rule texts come straight from the game data (<span class="num">tools/dev.sh synergy</span> refreshes them); numbers are placeholders.</p>
     <div class="legend">
-      <span><span class="chip M">M push</span> makes it</span>
-      <span><span class="chip U">U push</span> uses it (payoff)</span>
-      <span><span class="chip H">H still</span> hurts it (anti-synergy)</span>
-      <span><span class="chip U">U wall!</span> the ! means it only uses its own (e.g. its own barricades), so it links inside the kit only</span>
-      <span><button type="button" class="ent" data-id="0">Underlined names</button>: hover for what it does, click to open it in All entities</span>
+      <span><span class="chip M kwtip" tabindex="0" data-kw="push" data-role="M">M push</span> makes it</span>
+      <span><span class="chip U kwtip" tabindex="0" data-kw="push" data-role="U">U push</span> uses it (payoff)</span>
+      <span><span class="chip H kwtip" tabindex="0" data-kw="still" data-role="H">H still</span> hurts it (anti-synergy)</span>
+      <span><span class="chip U kwtip" tabindex="0" data-kw="wall" data-role="U">U wall!</span> the ! means it only uses its own (e.g. its own barricades), so it links inside the kit only</span>
+      <span><button type="button" class="ent" data-id="0">Underlined names</button>, keyword chips and hero names: hover for a card, click to list them in All entities</span>
     </div>
   </header>
 
@@ -434,6 +444,23 @@ const GAME_TEXTS = {
   "Champion|Regenerating": { text: "Heals 2 at the start of its turn", meta: "" },
   "Champion|Mighty": { text: "+1 damage", meta: "" },
   "Champion|Fleet": { text: "+1 move", meta: "" },
+  "Keyword|pinned": { text: "Can't move on its next turn.", meta: "" },
+  "Keyword|slowed": { text: "On its next turn it can move or act, not both: walking costs it the attack, and acting ends its moves.", meta: "" },
+  "Keyword|marked": { text: "The next hit on it, by anyone and from anything but poison or fire, deals +2. Then the mark is gone.", meta: "" },
+  "Keyword|exposed": { text: "No ally of its own stands next to it.", meta: "" },
+  "Keyword|hidden": { text: "Until your next turn, enemies can't target or attack it (area damage still hits). Attacking doesn't reveal it.", meta: "" },
+  "Keyword|burning": { text: "Burning ground: 1 damage to whoever starts a turn on it. Enemies walk through it but never stop on it.", meta: "" },
+  "Keyword|wall": { text: "A rock (crystals, tombstones and boulders too), ice or a barricade: blocks walking and shots, and gives cover. Rubble and holes are not walls.", meta: "" },
+  "Keyword|rubble": { text: "A low heap: blocks walking but not shots, and gives no cover. A unit pushed into it is crushed for 4 and the rubble breaks. One hit clears it.", meta: "" },
+  "Keyword|blast": { text: "An explosion: a mine, a bomb, Demolish, Detonate, a Powder Keg or a Corpse Blast. It hurts everyone in its area, either side, and sets off any mine or bomb inside it.", meta: "" },
+  "Keyword|poison": { text: "2 damage at the start of the target's turn, 2 times.", meta: "" },
+  "Keyword|push": { text: "A medium unit moves 1 tile, a small one 2, a huge one not at all. If it slams into a wall, a unit or the edge, it stops and takes 2. An enemy pushed onto a mine sets it off.", meta: "" },
+  "Keyword|zone of control": { text: "Stepping out of a tile next to an enemy uses up all remaining moves, for both sides.", meta: "" },
+  "Keyword|line of sight": { text: "Walls block shots. Bombs, boulders and fireballs are lobbed over them.", meta: "" },
+  "Keyword|fury": { text: "+1 damage per Fury for the rest of the fight, 3 at most.", meta: "" },
+  "Keyword|swift": { text: "2 moves a turn instead of 1.", meta: "" },
+  "Keyword|shield": { text: "Absorbs damage before HP. Enemies go for an unshielded unit they can reach first, and hit a shield only when there is none.", meta: "" },
+  "Keyword|free": { text: "Costs no AP. Use it before the unit acts: it can still move and attack afterwards.", meta: "" },
 };
 /* GAME TEXTS END */
 
@@ -499,14 +526,18 @@ const HERO_VAR = { Warrior: "--h-warrior", Archer: "--h-archer", Rogue: "--h-rog
 const KW_HERO = { push: "Warrior", guard: "Warrior", pinned: "Archer", marked: "Archer", still: "Archer", exposed: "Rogue", hidden: "Rogue", poison: "Rogue", kill: "Rogue", slowed: "Mage", burning: "Mage", wall: "Sapper", blast: "Sapper" };
 const heroVar = owner => HERO_VAR[owner] || "--h-other";
 const kwVar = k => heroVar(KW_HERO[k]);
-const heroName = h => `<span style="color:var(${heroVar(h)})">${h}</span>`;
-const ownerTag = (owner, big) => `<span class="own${big ? " big" : ""}" style="--c:var(${heroVar(owner)})">${owner}</span>`;
-const chip = (r, k, self) => `<span class="chip ${r}"><i class="kdot" style="--c:var(${kwVar(k)})"></i>${r} ${k}${self ? "!" : ""}</span>`;
+const heroName = h => `<span class="herotip" tabindex="0" data-hero="${h}" style="color:var(${heroVar(h)})">${h}</span>`;
+const ownerTag = (owner, big) => HERO_VAR[owner]
+  ? `<span class="own herotip${big ? " big" : ""}" tabindex="0" data-hero="${owner}" style="--c:var(${heroVar(owner)})">${owner}</span>`
+  : `<span class="own${big ? " big" : ""}" style="--c:var(${heroVar(owner)})">${owner}</span>`;
+const heroLabel = h => `<span class="herotip" tabindex="0" data-hero="${h}">${h}</span>`;
+const chip = (r, k, self) => `<span class="chip ${r} kwtip" tabindex="0" data-kw="${k}" data-role="${r}"><i class="kdot" style="--c:var(${kwVar(k)})"></i>${r} ${k}${self ? "!" : ""}</span>`;
 const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
 function heat(n) { return n === 0 ? "--heat0" : n <= 2 ? "--heat1" : n <= 4 ? "--heat2" : n <= 7 ? "--heat3" : "--heat4"; }
 
 // A skill, item or rule name that shows its card on hover and opens its row in "All entities" on click.
+const TIP_SEL = ".ent, .kwtip, .herotip";
 const entLink = e => `<button type="button" class="ent" data-id="${e.id}">${esc(e.name)}</button>`;
 // The hand-written links name things by text; link them when the name is an entity of that owner.
 const nameLink = (name, owner) => {
@@ -521,10 +552,43 @@ function tipHtml(e) {
     (tags ? `<div>${tags}</div>` : "") + (e.note ? `<p class="note">${esc(e.note)}</p>` : "");
 }
 
-function showTip(btn) {
-  const e = ENT[+btn.dataset.id], tip = document.getElementById("tip");
-  if (!e) return;
-  tip.innerHTML = tipHtml(e);
+const ROLE_TEXT = { M: "Makes it: this entry creates the keyword's situation.", U: "Uses it: the payoff that gets stronger with it.", H: "Hurts it: an anti-synergy that works against it." };
+
+function kwTipHtml(k, role) {
+  const kw = KEYWORDS[k], game = GAME_TEXTS["Keyword|" + k], hero = KW_HERO[k];
+  const { mk, us, hu, status } = themeInfo(k);
+  const themeOf = HEROES.filter(h => HERO_THEMES[h].some(([x]) => x === k));
+  const kind = kw.exists ? "game keyword" : "design tag, not in the game";
+  return `<div class="tip-name" style="color:var(${kwVar(k)})">${kw.label}</div>` +
+    `<div class="tag">${kind}${themeOf.length ? " · theme of " + themeOf.map(h => ownerTag(h)).join(" ") : hero ? " · leans " + ownerTag(hero) : ""}</div>` +
+    (role ? `<p><span class="chip ${role}">${role}</span> ${ROLE_TEXT[role]}</p>` : "") +
+    `<p>${esc(game ? game.text : kw.meaning)}</p>` +
+    (game && kw.meaning ? `<p class="note">On the map: ${esc(kw.meaning)}</p>` : "") +
+    `<p class="tag">${mk.length} make it · ${us.length} use it · ${hu.length} hurt it · <span class="pill ${status[0]}">${status[1]}</span></p>` +
+    `<p class="tag">Click to list everything tagged with it.</p>`;
+}
+
+function heroTipHtml(hero) {
+  const skills = ENT.filter(e => e.owner === hero);
+  const partners = HEROES.filter(h => h !== hero).map(h => [h, new Set(links(hero, h).map(l => l.k)).size + bridges(hero, h).length]);
+  partners.sort((a, b) => b[1] - a[1]);
+  const inKit = new Set(links(hero, hero).map(l => l.k)).size + bridges(hero, hero).length;
+  return `<div class="tip-name" style="color:var(${heroVar(hero)})">${hero}</div>` +
+    `<div class="tag">${skills.length} entries on the map · ${inKit} links in its own kit</div>` +
+    `<p>Themes: ${HERO_THEMES[hero].map(([k, role]) => `<i class="kdot" style="--c:var(${kwVar(k)})"></i>${KEYWORDS[k].label} <span class="tag">(${role})</span>`).join(", ")}</p>` +
+    `<p>Links with: ${partners.map(([h, n]) => `${ownerTag(h)} ${n}`).join(" · ")}</p>` +
+    `<p class="tag">Click to list its entries.</p>`;
+}
+
+function showTip(el) {
+  const tip = document.getElementById("tip");
+  let html = null;
+  if (el.dataset.id !== undefined && ENT[+el.dataset.id]) html = tipHtml(ENT[+el.dataset.id]);
+  else if (el.dataset.kw && KEYWORDS[el.dataset.kw]) html = kwTipHtml(el.dataset.kw, el.dataset.role);
+  else if (el.dataset.hero) html = heroTipHtml(el.dataset.hero);
+  if (!html) return;
+  const btn = el;
+  tip.innerHTML = html;
   tip.style.left = "0px";
   tip.style.top = "0px";
   tip.hidden = false;
@@ -537,6 +601,17 @@ function showTip(btn) {
 }
 
 function hideTip() { document.getElementById("tip").hidden = true; }
+
+// Click on a keyword or hero: "All entities" filtered by it.
+function openFilter(kind, value) {
+  hideTip();
+  document.getElementById("f-owner").value = kind === "hero" ? value : "";
+  document.getElementById("f-key").value = kind === "kw" ? value : "";
+  document.getElementById("f-text").value = "";
+  renderEntities();
+  showView("all");
+  scrollTo({ top: document.getElementById("view-all").offsetTop - 60, behavior: "auto" });
+}
 
 function openEntity(id) {
   const e = ENT[id];
@@ -586,7 +661,7 @@ function renderDetail() {
   h += `<p class="note"><span class="pill ${verdict[0]}">${verdict[1]}</span> &nbsp;${n} link${n === 1 ? "" : "s"} counted (one per keyword, plus hand-written ones)</p><div class="links" style="margin-top:14px">`;
   for (const [k, ls] of Object.entries(byKey)) {
     const pairs = ls.map(l => `${entLink(l.maker)} ${ownerTag(l.maker.owner)} → ${entLink(l.user)} ${ownerTag(l.user.owner)}`);
-    h += `<div class="link"><span class="chip K"><i class="kdot" style="--c:var(${kwVar(k)})"></i>${KEYWORDS[k].label}</span><div>${[...new Set(pairs)].join("<br>")}</div></div>`;
+    h += `<div class="link"><span class="chip K kwtip" tabindex="0" data-kw="${k}"><i class="kdot" style="--c:var(${kwVar(k)})"></i>${KEYWORDS[k].label}</span><div>${[...new Set(pairs)].join("<br>")}</div></div>`;
   }
   for (const [x, y, what, to, why] of B) {
     h += `<div class="link"><span class="chip K">by hand</span><div>${nameLink(what, x)} ${ownerTag(x)} → ${nameLink(to, y)} ${ownerTag(y)}</div><div class="why">${why}</div></div>`;
@@ -601,26 +676,43 @@ function renderDetail() {
   document.getElementById("pair-detail").innerHTML = h;
 }
 
+// Who makes, uses and hurts a keyword, and whether the theme is healthy.
+function themeInfo(k) {
+  const list = r => ENT.filter(e => e.tags.some(t => t.r === r && t.k === k));
+  const mk = list("M"), us = list("U"), hu = list("H");
+  const heroes = new Set([...mk, ...us].map(heroOf).filter(Boolean));
+  let status = ["good", "healthy"];
+  if (!mk.length) status = ["bad", "no producer"];
+  else if (!us.length) status = ["bad", "no payoff"];
+  else if (heroes.size < 2) status = ["warn", "one hero only"];
+  else if (us.every(e => e.tags.some(t => t.k === k && t.self))) status = ["warn", "payoff only for itself"];
+  return { mk, us, hu, heroes, status };
+}
+
+// A keyword name that shows its card on hover and filters "All entities" by it on click.
+const kwLabel = k => `<span class="kwtip kw" tabindex="0" data-kw="${k}" style="--c:var(${kwVar(k)})"><i class="kdot" style="--c:var(${kwVar(k)})"></i>${KEYWORDS[k].label}</span>`;
+
 function renderThemes() {
   document.getElementById("hero-themes").innerHTML = HEROES.map(hero =>
-    `<div class="hero-card" style="--c:var(${heroVar(hero)})"><h4>${hero}</h4>${HERO_THEMES[hero].map(([k, role]) =>
-      `<div class="k"><span class="tag">${role}:</span> <i class="kdot" style="--c:var(${kwVar(k)})"></i>${KEYWORDS[k].exists ? KEYWORDS[k].label : "<b>" + KEYWORDS[k].label + "</b>"}</div>`).join("")}</div>`).join("");
+    `<div class="hero-card" style="--c:var(${heroVar(hero)})"><h4>${heroLabel(hero)}</h4>${HERO_THEMES[hero].map(([k, role]) =>
+      `<div class="k"><span class="tag">${role}:</span> ${kwLabel(k)}</div>`).join("")}</div>`).join("");
 
   let h = "<tr><th>Keyword</th><th>Meaning</th><th>Makes it</th><th>Uses it</th><th>Hurts it</th><th>Status</th></tr>";
   for (const [k, kw] of Object.entries(KEYWORDS)) {
-    const list = r => ENT.filter(e => e.tags.some(t => t.r === r && t.k === k));
     const fmt = es => es.length ? es.map(e => `${entLink(e)} ${ownerTag(e.owner)}`).join("<br>") : `<span class="note">none</span>`;
-    const mk = list("M"), us = list("U"), hu = list("H");
-    const heroes = new Set([...mk, ...us].map(heroOf).filter(Boolean));
-    let status = ["good", "healthy"];
-    if (!mk.length) status = ["bad", "no producer"];
-    else if (!us.length) status = ["bad", "no payoff"];
-    else if (heroes.size < 2) status = ["warn", "one hero only"];
-    else if (us.every(e => e.tags.some(t => t.k === k && t.self))) status = ["warn", "payoff only for itself"];
-    h += `<tr class="theme-row"><td><span class="kw" style="--c:var(${kwVar(k)})"><i class="kdot" style="--c:var(${kwVar(k)})"></i>${kw.label}</span>${kw.exists ? "" : '<div class="tag">new</div>'}</td><td class="note">${kw.meaning}</td><td>${fmt(mk)}</td><td>${fmt(us)}</td><td>${fmt(hu)}</td><td><span class="pill ${status[0]}">${status[1]}</span></td></tr>`;
+    const { mk, us, hu, status } = themeInfo(k);
+    h += `<tr class="theme-row"><td>${kwLabel(k)}${kw.exists ? "" : '<div class="tag">design tag, not in the game</div>'}</td><td class="note">${kw.meaning}</td><td>${fmt(mk)}</td><td>${fmt(us)}</td><td>${fmt(hu)}</td><td><span class="pill ${status[0]}" title="${STATUS_HELP[status[1]]}">${status[1]}</span></td></tr>`;
   }
   document.getElementById("themes").innerHTML = h;
 }
+
+const STATUS_HELP = {
+  "healthy": "Has producers and payoffs, across at least two heroes.",
+  "no producer": "Something uses it, but nothing makes it.",
+  "no payoff": "Things make it, but nothing rewards it.",
+  "one hero only": "Producers and payoffs all belong to one hero.",
+  "payoff only for itself": "Every payoff only reads the unit's own effect, so it never links two heroes.",
+};
 
 function renderEntities() {
   const o = document.getElementById("f-owner").value, k = document.getElementById("f-key").value, q = document.getElementById("f-text").value.trim().toLowerCase();
@@ -695,11 +787,12 @@ function init() {
   document.getElementById("f-owner").innerHTML = `<option value="">Every owner</option>` + owners.map(o => `<option>${o}</option>`).join("");
   document.getElementById("f-key").innerHTML = `<option value="">Every keyword</option>` + Object.entries(KEYWORDS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("");
   ["f-owner", "f-key", "f-text"].forEach(id => document.getElementById(id).addEventListener("input", renderEntities));
-  document.addEventListener("mouseover", ev => { const b = ev.target.closest && ev.target.closest(".ent"); if (b) showTip(b); });
-  document.addEventListener("mouseout", ev => { const b = ev.target.closest && ev.target.closest(".ent"); if (b && !b.contains(ev.relatedTarget)) hideTip(); });
-  document.addEventListener("focusin", ev => { if (ev.target.classList && ev.target.classList.contains("ent")) showTip(ev.target); });
-  document.addEventListener("focusout", ev => { if (ev.target.classList && ev.target.classList.contains("ent")) hideTip(); });
-  document.addEventListener("click", ev => { const b = ev.target.closest && ev.target.closest(".ent"); if (b) openEntity(+b.dataset.id); });
+  document.addEventListener("mouseover", ev => { const b = ev.target.closest && ev.target.closest(TIP_SEL); if (b && !b.closest("#tip")) showTip(b); });
+  document.addEventListener("mouseout", ev => { const b = ev.target.closest && ev.target.closest(TIP_SEL); if (b && !b.contains(ev.relatedTarget)) hideTip(); });
+  document.addEventListener("focusin", ev => { if (ev.target.matches && ev.target.matches(TIP_SEL)) showTip(ev.target); });
+  document.addEventListener("focusout", ev => { if (ev.target.matches && ev.target.matches(TIP_SEL)) hideTip(); });
+  document.addEventListener("click", ev => { const b = ev.target.closest && ev.target.closest(TIP_SEL); if (!b || b.closest("#tip")) return; if (b.classList.contains("ent")) openEntity(+b.dataset.id); else if (b.dataset.kw) openFilter("kw", b.dataset.kw); else if (b.dataset.hero) openFilter("hero", b.dataset.hero); });
+  document.addEventListener("keydown", ev => { const b = ev.target; if ((ev.key === "Enter" || ev.key === " ") && b.matches && b.matches(".kwtip, .herotip")) { ev.preventDefault(); b.click(); } });
   document.addEventListener("keydown", ev => { if (ev.key === "Escape") hideTip(); });
   window.addEventListener("scroll", hideTip, { passive: true });
   document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));

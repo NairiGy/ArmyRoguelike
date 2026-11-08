@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using ArmyRoguelike.Core;
 
 // Fills docs/synergy-map.html with the game's own rule texts, so the map's hover cards say exactly what the game
@@ -53,6 +54,10 @@ public static class Program
         foreach (var affix in Champions.All)
             texts.Add(($"Champion|{Champions.Name(affix)}", Upper(Champions.Describe(affix)), ""));
 
+        // Keyword meanings, keyed by the page's keyword ids (the name in lower case: "pinned", "wall").
+        foreach (var keyword in Keywords.All)
+            texts.Add(($"Keyword|{Keywords.Name(keyword).ToLowerInvariant()}", Keywords.Describe(keyword), ""));
+
         var block = new StringBuilder();
         block.AppendLine(Start);
         block.AppendLine("const GAME_TEXTS = {");
@@ -73,8 +78,30 @@ public static class Program
         page = page.Substring(0, from) + block + page.Substring(to + End.Length);
         File.WriteAllText(path, page, new UTF8Encoding(false));
         Console.WriteLine($"wrote {texts.Count} game texts into {path}");
+
+        // The map's own entries (the E table: ["Name", "Owner", ...]) against the game's, so a new or renamed skill,
+        // item or rule gets noticed.
+        var table = page.Substring(page.IndexOf("const E = [", StringComparison.Ordinal));
+        table = table.Substring(0, table.IndexOf("\n];", StringComparison.Ordinal));
+        var onPage = new HashSet<string>(Regex.Matches(table, "^\\s*\\[\"([^\"]+)\", \"([^\"]+)\",", RegexOptions.Multiline)
+            .Cast<Match>().Select(m => $"{m.Groups[2].Value}|{m.Groups[1].Value}"));
+        var inGame = texts.Select(t => t.key).Where(k => !k.StartsWith("Keyword|")).ToList();
+        var notOnMap = inGame.Where(k => !onPage.Contains(k) && !Ignored.Contains(k)).ToList();
+        var notInGame = onPage.Where(k => !inGame.Contains(k) && !k.StartsWith("Keyword|")).ToList();
+        if (notOnMap.Count > 0)
+            Console.WriteLine("In the game but not on the map (add and tag them): " + string.Join(", ", notOnMap));
+        if (notInGame.Count > 0)
+            Console.WriteLine("On the map but not in the game (renamed or removed?): " + string.Join(", ", notInGame));
+        if (notOnMap.Count == 0 && notInGame.Count == 0)
+            Console.WriteLine("Every game entry is on the map.");
         return 0;
     }
+
+    /// <summary>Game entries the map leaves out on purpose: they make, use or hurt no theme.</summary>
+    private static readonly HashSet<string> Ignored = new HashSet<string>
+    {
+        "Sapper|Mines", "Omen|Sun (curse)", "Omen|Night (curse)", "Omen|Moon (curse)",
+    };
 
     private static string ActionMeta(int cost, ActionKind? kind)
     {
