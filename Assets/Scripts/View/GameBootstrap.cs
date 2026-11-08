@@ -452,7 +452,12 @@ namespace ArmyRoguelike.View
             var scale = Screen.height / ReferenceHeight;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
             var width = Screen.width / scale;
+            DrawScreen(width);
+            KeywordText.DrawTooltip(width, ReferenceHeight);
+        }
 
+        private void DrawScreen(float width)
+        {
             if (_testMode)
             {
                 DrawTestSetup(width);
@@ -500,6 +505,26 @@ namespace ArmyRoguelike.View
         }
 
         private static GUIStyle Title => new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+
+        /// <summary>A plain word-wrapped label, for rule texts drawn with <see cref="KeywordText"/>.</summary>
+        private static GUIStyle WrapLabel => new GUIStyle(GUI.skin.label) { wordWrap = true };
+
+        /// <summary>
+        /// A full-width button in GUILayout flow whose text shows its keywords (hover one for its meaning). Sized to
+        /// the text, or at least <paramref name="minHeight"/>. True when clicked.
+        /// </summary>
+        private static bool KeywordButton(string text, GUIStyle style, float width, float minHeight = 0f)
+        {
+            var pad = style.padding;
+            var inner = width - pad.horizontal;
+            var height = Mathf.Max(minHeight, KeywordText.Height(text, style, inner) + pad.vertical);
+            var rect = GUILayoutUtility.GetRect(width, height, GUILayout.ExpandWidth(true));
+            var clicked = GUI.Button(rect, GUIContent.none, style);
+            var textStyle = new GUIStyle(style);
+            textStyle.normal.textColor = GUI.enabled ? style.normal.textColor : new Color(style.normal.textColor.r, style.normal.textColor.g, style.normal.textColor.b, 0.5f);
+            KeywordText.Draw(new Rect(rect.x + pad.left, rect.y + pad.top, rect.width - pad.horizontal, rect.height - pad.vertical), text, textStyle);
+            return clicked;
+        }
 
         private void DrawArmy()
         {
@@ -613,7 +638,7 @@ namespace ArmyRoguelike.View
             {
                 var picked = _draftPicks.Contains(unit);
                 var style = new GUIStyle(GUI.skin.button) { alignment = TextAnchor.UpperLeft, wordWrap = true };
-                if (GUILayout.Button((picked ? "[X] " : "[  ] ") + Describe(unit), style))
+                if (KeywordButton((picked ? "[X] " : "[  ] ") + Describe(unit), style, w - 40))
                     Do(() => ToggleDraftPick(unit));
             }
 
@@ -701,8 +726,12 @@ namespace ArmyRoguelike.View
                 GUILayout.EndHorizontal();
             }
 
-            GUILayout.Label(string.IsNullOrEmpty(GUI.tooltip) ? "Every battle, elite and boss has a battlefield rule, named on its node. Hover one, or a banner, to read it." : GUI.tooltip,
-                new GUIStyle(GUI.skin.label) { wordWrap = true });
+            // The hovered node's or banner's rule, with its keywords explained underneath (the pointer is on the node).
+            var tip = string.IsNullOrEmpty(GUI.tooltip) ? "Every battle, elite and boss has a battlefield rule, named on its node. Hover one, or a banner, to read it." : GUI.tooltip;
+            KeywordText.LayoutLabel(tip, WrapLabel, w - 12);
+            var glossary = string.IsNullOrEmpty(GUI.tooltip) ? "" : KeywordText.Glossary(GUI.tooltip);
+            if (glossary.Length > 0)
+                GUILayout.Label(glossary, new GUIStyle(WrapLabel) { fontSize = 11 });
             GUILayout.Space(8);
             // The army and the help scroll, so a big army can't push the button below off the panel.
             _mapScroll = GUILayout.BeginScrollView(_mapScroll, GUILayout.ExpandHeight(true));
@@ -806,7 +835,7 @@ namespace ArmyRoguelike.View
 
         /// <summary>Height of an offer card: name, tag line, rule text and the price row.</summary>
         private float OfferHeight(string tags, string text, float width) =>
-            8 + 22 + _cardTag.CalcHeight(new GUIContent(tags), width - 20) + 4 + _cardText.CalcHeight(new GUIContent(text), width - 20) + 30;
+            8 + 22 + _cardTag.CalcHeight(new GUIContent(tags), width - 20) + 4 + KeywordText.Height(text, _cardText, width - 20) + 30;
 
         private void DrawOffer(Rect r, string name, string tags, string text, int price, bool selected, Action select)
         {
@@ -824,7 +853,8 @@ namespace ArmyRoguelike.View
             var tagHeight = _cardTag.CalcHeight(new GUIContent(tags), inner);
             Label(new Rect(x, y, inner, tagHeight), tags, _cardTag, DimText);
             y += tagHeight + 4;
-            Label(new Rect(x, y, inner, r.yMax - 28 - y), text, _cardText, TextColor);
+            _cardText.normal.textColor = TextColor;
+            KeywordText.Draw(new Rect(x, y, inner, r.yMax - 28 - y), text, _cardText);
             Price(r, price);
             GUI.color = old;
         }
@@ -837,7 +867,7 @@ namespace ArmyRoguelike.View
         {
             var textWidth = width - 20 - BannerArtWidth - 10;
             var text = 8 + 22 + _cardTag.CalcHeight(new GUIContent(BannerTag), textWidth) + 4 +
-                       _cardText.CalcHeight(new GUIContent(Banners.Describe(banner)), textWidth) + (price.HasValue ? 30 : 8);
+                       KeywordText.Height(Banners.Describe(banner), _cardText, textWidth) + (price.HasValue ? 30 : 8);
             return Mathf.Max(126f, text);
         }
 
@@ -859,7 +889,8 @@ namespace ArmyRoguelike.View
             var tagHeight = _cardTag.CalcHeight(new GUIContent(BannerTag), inner);
             Label(new Rect(x, y, inner, tagHeight), BannerTag, _cardTag, DimText);
             y += tagHeight + 4;
-            Label(new Rect(x, y, inner, r.yMax - (price.HasValue ? 28 : 8) - y), Banners.Describe(banner), _cardText, TextColor);
+            _cardText.normal.textColor = TextColor;
+            KeywordText.Draw(new Rect(x, y, inner, r.yMax - (price.HasValue ? 28 : 8) - y), Banners.Describe(banner), _cardText);
             if (price.HasValue)
                 Price(r, price.Value);
             GUI.color = old;
@@ -876,7 +907,8 @@ namespace ArmyRoguelike.View
             var y = r.yMax - pad - textHeight + 8;
             Label(new Rect(r.x + pad, y, r.width - pad * 2, 30), Banners.Name(banner), _bannerName, Color.white);
             y += 34;
-            Label(new Rect(r.x + pad, y, r.width - pad * 2, r.yMax - pad - y), Banners.Describe(banner), _bannerRule, TextColor);
+            _bannerRule.normal.textColor = TextColor;
+            KeywordText.Draw(new Rect(r.x + pad, y, r.width - pad * 2, r.yMax - pad - y), Banners.Describe(banner), _bannerRule);
         }
 
         /// <summary>A row of offer cards, three to a row's width so cards keep their size as they sell.</summary>
@@ -1218,7 +1250,7 @@ namespace ArmyRoguelike.View
             {
                 case EventKind.WanderingRecruit:
                     GUILayout.Label($"A Wandering {_run.EventRecruit.Name}", Title);
-                    GUILayout.Label("A dusty statue offers to join you.\n" + Describe(_run.EventRecruit));
+                    KeywordText.LayoutLabel("A dusty statue offers to join you.\n" + Describe(_run.EventRecruit), WrapLabel, w - 12);
                     if (_run.Army.Count < _run.ArmyLimit)
                     {
                         if (GUILayout.Button($"Welcome aboard (the {_run.EventRecruit.Name} joins)", GUILayout.Height(32)))
@@ -1244,7 +1276,7 @@ namespace ArmyRoguelike.View
                     var cart = _run.CartTechnique;
                     if (cart != null)
                     {
-                        GUILayout.Label("Inside, an old training manual:\n" + Describe(cart));
+                        KeywordText.LayoutLabel("Inside, an old training manual:\n" + Describe(cart), WrapLabel, w - 12);
                         GUILayout.Label("Who learns it?");
                         DrawLearners(cart, cart.CanLearn, taker =>
                         {
@@ -1373,7 +1405,7 @@ namespace ArmyRoguelike.View
                     var altar = _run.AltarTechnique;
                     if (altar != null)
                     {
-                        GUILayout.Label($"Power seeps from a split in the stone. A statue that lays its hands on it learns a rare technique, but takes a scar: a crack that can never be mended (-{Run.CrackHp} max HP; {Run.CracksToShatter} cracks shatter it).\n" + Describe(altar));
+                        KeywordText.LayoutLabel($"Power seeps from a split in the stone. A statue that lays its hands on it learns a rare technique, but takes a scar: a crack that can never be mended (-{Run.CrackHp} max HP; {Run.CracksToShatter} cracks shatter it).\n" + Describe(altar), WrapLabel, w - 12);
                         foreach (var member in _run.Army)
                         {
                             var m = member;
@@ -1476,7 +1508,7 @@ namespace ArmyRoguelike.View
             foreach (var omen in _run.BlessingChoices)
             {
                 var pick = omen;
-                if (GUILayout.Button($"{Omens.Name(omen, true)}\n{Omens.Describe(omen, true)}", style, GUILayout.Height(70)))
+                if (KeywordButton($"{Omens.Name(omen, true)}\n{Omens.Describe(omen, true)}", style, w - 12, 70f))
                     Do(() =>
                     {
                         if (!_run.ChooseBlessing(pick))
@@ -1508,7 +1540,7 @@ namespace ArmyRoguelike.View
             foreach (var technique in _run.RewardOffers)
             {
                 var marker = technique == _selectedReward ? "> " : "";
-                if (GUILayout.Button(marker + Describe(technique), style))
+                if (KeywordButton(marker + Describe(technique), style, w - 12))
                     _selectedReward = technique;
             }
 
@@ -1582,7 +1614,7 @@ namespace ArmyRoguelike.View
             {
                 var pick = unit;
                 GUI.enabled = _run.CanHire(unit);
-                if (GUILayout.Button($"Hire: {Describe(unit)}", style))
+                if (KeywordButton($"Hire: {Describe(unit)}", style, w - 12))
                     Do(() => HireMerc(pick));
                 GUI.enabled = true;
             }

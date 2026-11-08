@@ -24,7 +24,7 @@ A single-player roguelike army-builder. You lead a small squad of living statues
 ## Code layout
 
 - `Assets/Scripts/Core`: rules in pure C#, with no Unity references (`ArmyRoguelike.Core` assembly).
-  - `UnitStats.cs`: every unit type (and its weight). `Techniques.cs`: the techniques units learn and the per-line growth per level. `Equipment.cs`: items, plus names and rule text for abilities and actions. `Banner.cs`: banners, their numbers and rule text. `Battlefield.cs`: battlefields (one rule per fight), their numbers and rule text.
+  - `UnitStats.cs`: every unit type (and its weight). `Techniques.cs`: the techniques units learn and the per-line growth per level. `Equipment.cs`: items, plus names and rule text for abilities and actions. `Banner.cs`: banners, their numbers and rule text. `Battlefield.cs`: battlefields (one rule per fight), their numbers and rule text. `Keywords.cs`: the keywords rule texts name without explaining, their meanings, and finding them in a text (`View/KeywordText.cs` draws texts with them highlighted and explained on hover).
   - `Battle.cs`: board, AP, movement, attacks, special actions, statuses and tiles. All damage goes through one `Damage` method so abilities apply to every source. `Battle.Clone()` makes an exact copy for bots looking ahead (`SeededRng.cs` is its copyable random generator). Actions return the events they caused, which the view animates.
   - `EnemyAI.cs`: enemy behaviour and the intent shown on hover. `Run.cs`: draft, map, technique picks, shop and events. `Encounter.cs`: factions, bosses and their layout templates.
   - `AssemblyInfo.cs` lets the tests set internal state directly.

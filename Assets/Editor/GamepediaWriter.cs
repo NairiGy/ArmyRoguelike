@@ -23,7 +23,7 @@ public static class GamepediaWriter
         html.Append("Re-export with <b>Tools → Export Gamepedia</b>.</p>");
         html.Append("<nav><a href=\"#units\">Units &amp; techniques</a><a href=\"#enemies\">Enemies</a><a href=\"#enemy-ai\">Enemy AI</a><a href=\"#encounters\">Encounters</a>");
         html.Append("<a href=\"#items\">Items</a><a href=\"#actions\">Actions</a><a href=\"#abilities\">Abilities</a>");
-        html.Append("<a href=\"#run\">Run &amp; map</a><a href=\"#rules\">Battle rules</a></nav></header><main>");
+        html.Append("<a href=\"#run\">Run &amp; map</a><a href=\"#rules\">Battle rules</a><a href=\"#keywords\">Keywords</a></nav></header><main>");
 
         Units(html);
         Enemies(html);
@@ -34,6 +34,7 @@ public static class GamepediaWriter
         AbilitiesSection(html);
         RunSection(html);
         Rules(html);
+        KeywordsSection(html);
 
         html.Append("</main></body></html>");
         _image = null;
@@ -555,6 +556,15 @@ public static class GamepediaWriter
         html.Append("<li>Snares (Snare Trap) are hidden from enemies: the first enemy to walk onto one stops, takes damage and is pinned. Covering Fire shoots the first enemy that walks onto a tile the archer can shoot at, and stops it there.</li>");
         html.Append("<li>Hover any enemy to see what it plans to do next.</li>");
         html.Append("<li>Controls: left-click chooses (selects one of your units, or opens any unit's card; hover a name on the card for what it does), right-click acts (move, attack, or use the aimed action). Esc cancels an aimed action or closes the card.</li>");
+        html.Append("</ul></section>");
+    }
+
+    /// <summary>Every keyword the rule texts name without explaining (the game shows these on hover).</summary>
+    private static void KeywordsSection(StringBuilder html)
+    {
+        html.Append("<section id=\"keywords\"><h2>Keywords</h2><p>Rule texts use these words without explaining them; in the game, hovering one shows its meaning.</p><ul>");
+        foreach (var k in Keywords.All)
+            html.Append($"<li><b>{Esc(Keywords.Name(k))}</b>: {Esc(Keywords.Describe(k))}</li>");
         html.Append("</ul></section>");
     }
 

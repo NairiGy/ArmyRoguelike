@@ -1572,6 +1572,7 @@ namespace ArmyRoguelike.View
 
             DrawBannerHover();
             DrawCardTooltip();
+            KeywordText.DrawTooltip(GuiWidth, ReferenceHeight);
 
             if (_markerNote != null && Time.unscaledTime < _markerNoteUntil)
                 GUI.Box(new Rect(Margin, ReferenceHeight - 80, 180, 30), _markerNote);
@@ -1846,7 +1847,8 @@ namespace ArmyRoguelike.View
 
             var title = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 16, fontStyle = FontStyle.Bold, wordWrap = true };
             var cost = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 13 };
-            var text = new GUIStyle(GUI.skin.label) { richText = true, fontSize = 13, wordWrap = true };
+            var text = new GUIStyle(GUI.skin.label) { fontSize = 13, wordWrap = true };
+            text.normal.textColor = new Color(0.9f, 0.89f, 0.85f);
             var inner = width - 2 * 10f;
 
             // Every card gets the height of the tallest, so the row lines up.
@@ -1854,7 +1856,7 @@ namespace ArmyRoguelike.View
             foreach (var action in actions)
                 height = Mathf.Max(height, title.CalcHeight(new GUIContent(Abilities.Name(action)), inner - 28f) +
                                            cost.CalcHeight(new GUIContent("x"), inner) +
-                                           text.CalcHeight(new GUIContent(Capitalise(Abilities.Describe(action))), inner) + 30f);
+                                           KeywordText.Height(Capitalise(Abilities.Describe(action)), text, inner) + 30f);
             var y = ReferenceHeight - Margin - height;
 
             for (var i = 0; i < actions.Count; i++)
@@ -1894,7 +1896,7 @@ namespace ArmyRoguelike.View
                     : Battle.CooldownFor(_selected, action) == 0 ? $"<color={ActionColor}>{CardCost(_selected, action)} AP  ·  once per battle</color>"
                     : $"<color={ActionColor}>{CardCost(_selected, action)} AP  ·  cooldown {Battle.CooldownFor(_selected, action)}</color>";
                 GUILayout.Label(status, cost);
-                GUILayout.Label($"<color={TextColor}>{Capitalise(Abilities.Describe(action))}</color>", text);
+                KeywordText.LayoutLabel(Capitalise(Abilities.Describe(action)), text, inner);
                 GUILayout.EndArea();
                 GUI.color = old;
             }
@@ -2307,22 +2309,33 @@ namespace ArmyRoguelike.View
             }
         }
 
-        /// <summary>The hovered keyword's description, beside the card (on top of everything).</summary>
+        /// <summary>
+        /// The hovered name's description beside the card (on top of everything), with its keywords highlighted and
+        /// explained underneath, since the pointer can't reach into this box.
+        /// </summary>
         private void DrawCardTooltip()
         {
             if (string.IsNullOrEmpty(_cardTooltip))
                 return;
             const float pad = 8f;
-            var style = new GUIStyle(GUI.skin.label) { richText = true, wordWrap = true, fontSize = 14, padding = new RectOffset() };
+            var inner = TooltipWidth - 2 * pad;
+            var style = new GUIStyle(GUI.skin.label) { wordWrap = true, fontSize = 14, padding = new RectOffset() };
             style.normal.textColor = new Color(0.92f, 0.9f, 0.86f);
-            var height = style.CalcHeight(new GUIContent(_cardTooltip), TooltipWidth - 2 * pad) + 2 * pad;
-            // To the left of the card, level with the keyword.
+            var gloss = new GUIStyle(style) { fontSize = 12 };
+            gloss.normal.textColor = new Color(0.72f, 0.71f, 0.68f);
+            var glossary = KeywordText.Glossary(_cardTooltip);
+            var textHeight = KeywordText.Height(_cardTooltip, style, inner);
+            var glossHeight = glossary.Length > 0 ? gloss.CalcHeight(new GUIContent(glossary), inner) + 6f : 0f;
+            var height = textHeight + glossHeight + 2 * pad;
+            // To the left of the card, level with the name.
             var x = Mathf.Max(Margin, GuiWidth - CardWidth - Margin - TooltipWidth - 6f);
             var y = Mathf.Clamp(_cardTooltipAnchor.y - pad, Margin, ReferenceHeight - height - Margin);
             var rect = new Rect(x, y, TooltipWidth, height);
             GUI.Box(rect, GUIContent.none, HudArt.PanelStyle(HudArt.CardColor, 0));
             GUI.DrawTexture(new Rect(rect.xMax - 2f, rect.y, 2f, rect.height), HudArt.Solid(new Color(1f, 0.85f, 0.4f)));
-            GUI.Label(new Rect(rect.x + pad, rect.y + pad, rect.width - 2 * pad, rect.height - 2 * pad), _cardTooltip, style);
+            KeywordText.Draw(new Rect(rect.x + pad, rect.y + pad, inner, textHeight), _cardTooltip, style);
+            if (glossary.Length > 0)
+                GUI.Label(new Rect(rect.x + pad, rect.y + pad + textHeight + 6f, inner, glossHeight), glossary, gloss);
         }
 
         /// <summary>The techniques a unit has learned (none for enemies and summons).</summary>
