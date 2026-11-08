@@ -150,7 +150,7 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Vanish_EnemiesIgnoreIt_UntilItAttacksWithABonus()
+        public void Vanish_AttackGetsTheBonus_AndStaysHiddenThroughTheEnemyTurn()
         {
             var b = Setup(new[] { M(UnitStats.Rogue), M(UnitStats.Warrior) }, new[] { P(3, 1), P(0, 0) }, new[] { E(UnitStats.Brute, 3, 2) });
             var rogue = Player(b, 0);
@@ -158,28 +158,28 @@ namespace ArmyRoguelike.Tests
             var brute = Enemy(b);
             b.PlayerUseAction(rogue, ActionKind.Vanish, rogue.Pos);
             Assert.IsTrue(rogue.IsHidden);
+
+            var normal = b.EffectiveDamage(rogue);
+            var hit = b.PlayerAttack(rogue, brute).OfType<AttackEvent>().First();
+            Assert.AreEqual(normal + Battle.VanishBonus, hit.Damage, "the ambush bonus");
+            Assert.IsTrue(rogue.IsHidden, "attacking doesn't reveal it");
+            Assert.AreEqual(normal, b.DamageAgainst(rogue, brute), "the bonus is spent");
+
             Assert.AreEqual(warrior, EnemyAI.ChooseTarget(b, brute), "the hidden rogue next to it is ignored");
             Assert.IsFalse(b.CanAttack(brute, rogue));
             b.EndUnitTurn(rogue);
             brute.SnareTurns = 1; // keeps it next to the rogue
             b.EndPlayerTurn();
-            Assert.AreEqual(rogue.MaxHp, rogue.Hp);
-            Assert.IsTrue(rogue.IsHidden, "still hidden after one enemy turn");
-
-            var normal = b.EffectiveDamage(rogue);
-            var hit = b.PlayerAttack(rogue, brute).OfType<AttackEvent>().First();
-            Assert.AreEqual(normal + Battle.VanishBonus, hit.Damage, "the reveal bonus");
-            Assert.IsFalse(rogue.IsHidden, "attacking reveals it");
+            Assert.AreEqual(rogue.MaxHp, rogue.Hp, "the enemy turn passed it by");
+            Assert.IsFalse(rogue.IsHidden, "it shows again at your next turn");
         }
 
         [Test]
-        public void Vanish_WearsOffAfterTwoEnemyTurns()
+        public void Vanish_WearsOffAtYourNextTurn()
         {
             var b = Setup(new[] { M(UnitStats.Rogue) }, new[] { P(0, 0) }, new[] { Far });
             var rogue = Player(b);
             b.PlayerUseAction(rogue, ActionKind.Vanish, rogue.Pos);
-            b.EndPlayerTurn();
-            Assert.IsTrue(rogue.IsHidden);
             var events = b.EndPlayerTurn();
             Assert.IsFalse(rogue.IsHidden);
             Assert.IsTrue(events.OfType<StatusEvent>().Any(s => s.Kind == StatusKind.Reveal));

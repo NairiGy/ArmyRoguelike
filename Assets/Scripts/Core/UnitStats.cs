@@ -93,6 +93,18 @@ namespace ArmyRoguelike.Core
         /// <summary>Shots hit the target and the 4 tiles next to it for 1 less damage, friend or foe.</summary>
         Volley,
 
+        /// <summary>+1 damage against targets 3 or more tiles away.</summary>
+        LongShot,
+
+        /// <summary>While next to a rock, ice or barricade: +1 range, and its shots ignore Behind Cover.</summary>
+        Vantage,
+
+        /// <summary>Its snares deal 3 damage instead of 1.</summary>
+        SpikedSnares,
+
+        /// <summary>A marked enemy that dies passes its mark to every enemy next to it.</summary>
+        DeathMark,
+
         // ---------- Rogue line ----------
 
         /// <summary>+3 damage if an ally stands on the far side of the target.</summary>
@@ -112,6 +124,18 @@ namespace ArmyRoguelike.Core
 
         /// <summary>The first hit each enemy turn deals 0 damage.</summary>
         Dodge,
+
+        /// <summary>+2 damage against enemies that can't move (pinned or slowed).</summary>
+        CheapShot,
+
+        /// <summary>Ignores zone of control, like Slippery.</summary>
+        Elusive,
+
+        /// <summary>A kill hides it until your next turn (as Vanish, without the ambush bonus).</summary>
+        IntoShadows,
+
+        /// <summary>+2 damage against exposed enemies (no ally of theirs next to them).</summary>
+        Isolate,
 
         // ---------- Mage line ----------
 
@@ -259,6 +283,18 @@ namespace ArmyRoguelike.Core
         Taunt,
         ThrowShield,
 
+        // Archer/Rogue night pool
+        Kick,
+        SnareTrap,
+        FireArrow,
+        CoveringFire,
+        SuppressingFire,
+        ThrowingKnife,
+        Shadowstep,
+        SmokeBomb,
+        Rupture,
+        MarkTarget,
+
         // Enemy actions: never in a unit's Actions list (the AI uses them), but they share the cooldown table.
         Slam,
         Boulder,
@@ -399,7 +435,7 @@ namespace ArmyRoguelike.Core
         public static readonly UnitStats Archer = Player(UnitKind.Archer, "Archer", "A", 6, 2, 3, 1,
             "Fragile ranged damage that likes to stand still.", A(Ability.SteadyAim), Do(ActionKind.PinningShot));
 
-        public static readonly UnitStats Rogue = Player(UnitKind.Rogue, "Rogue", "R", 5, 4, 1, 1,
+        public static readonly UnitStats Rogue = Player(UnitKind.Rogue, "Rogue", "R", 6, 4, 1, 1,
             "Fast, deadly, fragile. Slips out of sight.", A(Ability.Swift), Do(ActionKind.Vanish), Weight.Small);
 
         public static readonly UnitStats Apprentice = Player(UnitKind.Mage, "Mage Apprentice", "Ma", 5, 2, 3, 1,

@@ -380,10 +380,14 @@ public static class BalanceSim
         {
             // Quick check of chosen fights, for trying a number change: tools/dev.sh sim 10 fights "Elementals,Giant"
             var chosen = args.Length > 3 ? Fights.Where(f => args[3].Split(',').Contains(f.Name)).ToArray() : Fights;
+            // SIM_DRAFTS="A,R" keeps only the drafts with at least one of these unit labels.
+            var only = Environment.GetEnvironmentVariable("SIM_DRAFTS");
+            var fightDrafts = string.IsNullOrEmpty(only) ? AllDrafts()
+                : AllDrafts().Where(d => d.Any(s => only.Split(',').Contains(s.Label))).ToList();
             foreach (var fight in chosen)
                 Console.WriteLine($"{fight.Name,-22}" + string.Join("  ", new[] { 0, 1, 2, 3 }.Select(l =>
                 {
-                    var t = Sweep(AllDrafts(), new[] { fight }, seeds, Bot.Smart, l, null);
+                    var t = Sweep(fightDrafts, new[] { fight }, seeds, Bot.Smart, l, null);
                     return $"L{l} {t.WinRate,4} ({t.Timeouts,2} to, {t.AvgTurns,4}t)";
                 })));
             return 0;

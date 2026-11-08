@@ -66,6 +66,8 @@ namespace ArmyRoguelike.View
         private static readonly Color MineSpotColor = new Color(1f, 0.9f, 0.3f, 0.5f);
         private static readonly Color OverwatchColor = new Color(0.95f, 0.2f, 0.45f, 0.22f);
         private static readonly Color CaltropsColor = new Color(0.55f, 0.55f, 0.6f, 0.6f);
+        private static readonly Color CoverColor = new Color(0.3f, 0.75f, 0.95f, 0.2f);
+        private static readonly Color SnareColor = new Color(0.45f, 0.85f, 0.35f, 0.55f);
         // Zone of control, while one of your units is selected: tiles next to enemies (their reach), move tiles
         // that end the unit's movement early, and a dotted link to each enemy holding the selected unit.
         private static readonly Color EnemyReachColor = new Color(0.9f, 0.25f, 0.2f, 0.18f);
@@ -570,6 +572,12 @@ namespace ArmyRoguelike.View
                     if (action == ActionKind.Fireball || action == ActionKind.ThrowBomb)
                         foreach (var p in action == ActionKind.Fireball ? Battle.PlusArea(_hovered.Value) : Battle.BombArea(_hovered.Value))
                             _board.SetHighlight(p, BombZoneColor);
+                    if (action == ActionKind.SmokeBomb)
+                        foreach (var p in Battle.PlusArea(_hovered.Value))
+                            _board.SetHighlight(p, CoverColor);
+                    if (action == ActionKind.SuppressingFire)
+                        foreach (var p in Battle.SuppressLine(_selected, _hovered.Value))
+                            _board.SetHighlight(p, BombZoneColor);
                     _board.SetHighlight(_hovered.Value, HoverColor);
                 }
 
@@ -652,6 +660,11 @@ namespace ArmyRoguelike.View
                 _board.SetHighlight(p, OverwatchColor);
             foreach (var p in Battle.Caltrops)
                 _board.SetHighlight(p, CaltropsColor);
+            // Placeholders too: your archers' Covering Fire tiles and their hidden snares.
+            foreach (var p in Battle.CoverTiles)
+                _board.SetHighlight(p, CoverColor);
+            foreach (var p in Battle.Snares)
+                _board.SetHighlight(p, SnareColor);
         }
 
         // One intent line per enemy while Alt is held.
@@ -1077,6 +1090,9 @@ namespace ArmyRoguelike.View
                             DamagePopup.Spawn(at, "Shield thrown!", DamagePopup.DamageColor, 44);
                             target.RefreshHp(status.Target.Hp);
                             break;
+                        case StatusKind.Mark:
+                            DamagePopup.Spawn(at, "Marked", DamagePopup.AbilityColor, 44);
+                            break;
                         case StatusKind.Poison:
                             DamagePopup.Spawn(at, "Poisoned", DamagePopup.AbilityColor, 44);
                             break;
@@ -1273,6 +1289,12 @@ namespace ArmyRoguelike.View
                     break;
                 case EffectKind.ZocStrike:
                     DamagePopup.Spawn(at, "Placeholder!", DamagePopup.AbilityColor, 44);
+                    break;
+                case EffectKind.Mark:
+                    DamagePopup.Spawn(at, $"Mark +{effect.Amount}", DamagePopup.DamageColor, 40);
+                    break;
+                case EffectKind.CoveringFire:
+                    DamagePopup.Spawn(at, "Covering fire!", DamagePopup.AbilityColor, 44);
                     break;
                 case EffectKind.Steal:
                     DamagePopup.Spawn(at, $"Stole {effect.Amount} gold!", DamagePopup.DamageColor, 44);
@@ -1893,6 +1915,10 @@ namespace ArmyRoguelike.View
                     return $"Caltrops: a unit of yours stepping here takes {Battle.CaltropsDamage} and its movement ends.";
                 if (Battle.OverwatchTiles.Contains(p))
                     return "Overwatch: a crossbowman is aiming here. The first of your units to walk onto a marked tile is shot and stops.";
+                if (Battle.Snares.Contains(p))
+                    return "Your snare: the first enemy to walk onto it stops, takes damage and is pinned. Enemies can't see it.";
+                if (Battle.CoverTiles.Contains(p))
+                    return "Covering Fire: your archer is aiming here. The first enemy to walk onto a marked tile is shot and stops.";
                 if (Battle.MineAt(p) != null)
                     return $"Your mine: an enemy stepping here sets it off ({Battle.MineDamage} damage to everyone around, your units too).";
                 if (Battle.IsBarricade(p))
@@ -2130,9 +2156,11 @@ namespace ArmyRoguelike.View
             if (u.InWrath)
                 lines.Add("Wrath: 2 actions a turn");
             if (u.IsHidden)
-                lines.Add($"Vanished: enemies can't target it ({u.HiddenTurns} enemy turn(s) left, +{Battle.VanishBonus} on its next attack)");
+                lines.Add($"Hidden until your next turn: enemies can't target it" + (u.AmbushUsed ? "" : $" (+{Battle.VanishBonus} on its next attack)"));
             if (u.IsSlowed)
                 lines.Add("Slowed: can't move");
+            if (u.Marked)
+                lines.Add($"Marked: the next hit on it deals +{Battle.MarkBonus}");
             if (u.PoisonTurns > 0)
                 lines.Add($"Poisoned ({u.PoisonTurns} more)");
             if (u.CarryingLoot > 0)
@@ -2226,7 +2254,9 @@ namespace ArmyRoguelike.View
             if (u.IsSnared)
                 status.Add("pinned (can't move)");
             if (u.IsHidden)
-                status.Add($"vanished ({u.HiddenTurns} enemy turn(s) left)");
+                status.Add("hidden until your next turn");
+            if (u.Marked)
+                status.Add("marked");
             if (u.IsSlowed)
                 status.Add("slowed");
             if (u.PoisonTurns > 0)

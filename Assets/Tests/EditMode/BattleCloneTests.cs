@@ -27,8 +27,8 @@ namespace ArmyRoguelike.Tests
         private static List<ArmyMember> FullArmy() => new List<ArmyMember>
         {
             new ArmyMember(UnitStats.Warrior, null, Technique.Sweep, Technique.Guard, Technique.ShieldUp, Technique.Battlecry, Technique.Taunt, Technique.ThrowShield, Technique.ZocStrike),
-            new ArmyMember(UnitStats.Archer, null, Technique.OpeningShot),
-            new ArmyMember(UnitStats.Rogue, null, Technique.Poison, Technique.Riposte, Technique.Dodge),
+            new ArmyMember(UnitStats.Archer, null, Technique.OpeningShot, Technique.SnareTrap, Technique.CoveringFire, Technique.FireArrow, Technique.Kick, Technique.Vantage, Technique.MarkTarget, Technique.DeathMark),
+            new ArmyMember(UnitStats.Rogue, null, Technique.Poison, Technique.Riposte, Technique.Dodge, Technique.SmokeBomb, Technique.Shadowstep, Technique.ThrowingKnife, Technique.Rupture, Technique.IntoShadows, Technique.Isolate),
             new ArmyMember(UnitStats.Apprentice, null, Technique.Fireball, Technique.Burning, Technique.Chill, Technique.Ward, Technique.IceWall),
             new ArmyMember(UnitStats.Sapper, null, Technique.Barricade, Technique.Turret, Technique.Detonate, Technique.ThrowBomb),
         };
@@ -142,6 +142,8 @@ namespace ArmyRoguelike.Tests
             var turrets = 0;
             var piles = 0;
             var waves = 0;
+            var snares = 0;
+            var hidden = 0;
             Action<Battle> seen = c =>
             {
                 mines += c.Mines.Count;
@@ -160,6 +162,8 @@ namespace ArmyRoguelike.Tests
                 turrets += c.Units.Count(u => u.IsSummon);
                 piles += c.Units.Count(u => u.IsRemains);
                 waves += c.PendingWaves.Count;
+                snares += c.Snares.Count;
+                hidden += c.Units.Count(u => u.IsHidden);
             };
 
             foreach (var encounter in encounters)
@@ -171,7 +175,7 @@ namespace ArmyRoguelike.Tests
                      {
                          ("mines", mines), ("bombs", bombs), ("burning", burning), ("ice", ice), ("barricades", barricades), ("caltrops", caltrops),
                          ("overwatch", overwatch), ("storm", storm), ("sun", sun), ("shroud", shroud), ("favored", favored), ("poisoned", poisoned),
-                         ("cooldowns", cooldowns), ("turrets", turrets), ("piles", piles), ("waves", waves),
+                         ("cooldowns", cooldowns), ("turrets", turrets), ("piles", piles), ("waves", waves), ("snares", snares), ("hidden", hidden),
                      })
                 Assert.Greater(count, 0, $"no copy was made with {name} in play");
         }

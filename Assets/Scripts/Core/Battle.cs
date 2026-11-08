@@ -159,10 +159,47 @@ namespace ArmyRoguelike.Core
         /// <summary>Pinning Shot (archers): damage, and the target can't move on its next turn.</summary>
         public const int PinDamage = 1;
 
-        /// <summary>Vanish (rogues): enemy turns it stays hidden at most, and the bonus on the attack that reveals it.</summary>
-        public const int VanishTurns = 2;
+        /// <summary>Vanish (rogues): enemy turns it stays hidden (until your next turn), and the bonus on its first attack while hidden.</summary>
+        public const int VanishTurns = 1;
 
         public const int VanishBonus = 2;
+
+        // Archer/Rogue night pool (placeholders).
+
+        /// <summary>Long Shot: bonus damage against targets at least this many steps away.</summary>
+        public const int LongShotBonus = 1;
+        public const int LongShotRange = 3;
+
+        /// <summary>Vantage: extra range while next to a rock, ice or barricade.</summary>
+        public const int VantageRange = 1;
+
+        /// <summary>Kick: damage before the push (run-long damage bonuses add to it).</summary>
+        public const int KickDamage = 1;
+
+        /// <summary>Snare Trap: range, snares per archer, and damage to the enemy that walks onto one (Spiked Snares: more).</summary>
+        public const int SnareRange = 3;
+        public const int MaxSnares = 2;
+        public const int SnareDamage = 1;
+        public const int SpikedSnareDamage = 3;
+
+        /// <summary>Cheap Shot: bonus damage against an enemy that can't move.</summary>
+        public const int CheapShotBonus = 2;
+
+        /// <summary>Throwing Knife: base damage (in place of the attack's) and range (at least 2).</summary>
+        public const int KnifeDamage = 2;
+        public const int KnifeRange = 3;
+
+        /// <summary>Shadowstep: teleport range in steps.</summary>
+        public const int ShadowstepRange = 3;
+
+        /// <summary>Smoke Bomb: range of the centre tile.</summary>
+        public const int SmokeRange = 3;
+
+        /// <summary>Mark Target: extra damage on the next hit of a marked enemy.</summary>
+        public const int MarkBonus = 2;
+
+        /// <summary>Isolate: bonus damage against an exposed enemy (no ally of its own next to it).</summary>
+        public const int IsolateBonus = 2;
 
         /// <summary>Blink (mages): teleport range in steps.</summary>
         public const int BlinkRange = 3;
@@ -192,7 +229,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Special actions cost the unit's one AP, except Blink and Vanish: free, but only before it has acted.</summary>
         public static int ActionCost(ActionKind action) =>
-            action == ActionKind.Blink || action == ActionKind.Vanish || action == ActionKind.ThrowShield ? 0 : action == ActionKind.PlaceMine ? MineCost : AttackCost;
+            action == ActionKind.Blink || action == ActionKind.Vanish || action == ActionKind.ThrowShield || action == ActionKind.Shadowstep || action == ActionKind.MarkTarget ? 0 : action == ActionKind.PlaceMine ? MineCost : AttackCost;
 
         /// <summary>
         /// Cooldown of every action in the unit's own turns *(placeholders)*: used now, ready again this many turns
@@ -213,6 +250,10 @@ namespace ArmyRoguelike.Core
                 case ActionKind.ShieldUp:
                 case ActionKind.Battlecry:
                 case ActionKind.Taunt:
+                case ActionKind.FireArrow:
+                case ActionKind.SuppressingFire:
+                case ActionKind.Shadowstep:
+                case ActionKind.SmokeBomb:
                     return 3;
                 // Once per battle instead.
                 case ActionKind.ThrowShield:
@@ -256,6 +297,9 @@ namespace ArmyRoguelike.Core
         private readonly Dictionary<GridPos, Unit> _burnOwners = new Dictionary<GridPos, Unit>();
         private readonly Dictionary<GridPos, Unit> _caltrops = new Dictionary<GridPos, Unit>();
         private readonly Dictionary<Unit, HashSet<GridPos>> _overwatch = new Dictionary<Unit, HashSet<GridPos>>();
+
+        // The Archer's hidden snares, with the archer that set each one.
+        private readonly Dictionary<GridPos, Unit> _snares = new Dictionary<GridPos, Unit>();
         private int _nextId;
 
         // Ritual fights: where the player deploys (null = the back rows) and enemies still to arrive.
@@ -280,8 +324,16 @@ namespace ArmyRoguelike.Core
         /// <summary>Bandit caltrops on the board: a unit of yours stepping on them takes 1 and stops.</summary>
         public IReadOnlyCollection<GridPos> Caltrops => _caltrops.Keys;
 
+        /// <summary>The Archer's snares (Snare Trap): the first enemy to walk onto one stops, takes damage and is pinned. Enemies can't see them.</summary>
+        public IReadOnlyCollection<GridPos> Snares => _snares.Keys;
+
+        public int SnaresOf(Unit unit) => _snares.Values.Count(o => o == unit);
+
         /// <summary>Tiles watched by a crossbowman on overwatch (your next unit walking onto one gets shot).</summary>
-        public IEnumerable<GridPos> OverwatchTiles => _overwatch.Where(o => o.Key.IsAlive).SelectMany(o => o.Value).Distinct();
+        public IEnumerable<GridPos> OverwatchTiles => _overwatch.Where(o => o.Key.IsAlive && o.Key.Team == Team.Enemy).SelectMany(o => o.Value).Distinct();
+
+        /// <summary>Tiles your archers cover with Covering Fire (the next enemy walking onto one gets shot).</summary>
+        public IEnumerable<GridPos> CoverTiles => _overwatch.Where(o => o.Key.IsAlive && o.Key.Team == Team.Player).SelectMany(o => o.Value).Distinct();
 
         public Phase Phase { get; private set; } = Phase.Placement;
 
@@ -779,6 +831,8 @@ namespace ArmyRoguelike.Core
                 copy._caltrops.Add(caltrop.Key, Mapped(caltrop.Value));
             foreach (var watch in _overwatch)
                 copy._overwatch.Add(map[watch.Key], new HashSet<GridPos>(watch.Value));
+            foreach (var snare in _snares)
+                copy._snares.Add(snare.Key, Mapped(snare.Value));
             foreach (var shroud in _shroud)
                 copy._shroud.Add(shroud.Key, shroud.Value);
             foreach (var totem in _totems)
@@ -898,7 +952,7 @@ namespace ArmyRoguelike.Core
         /// <summary>A tile with no rock and no living unit. Bone piles, mines and bombs don't block.</summary>
         public bool IsFree(GridPos p) => Board.InBounds(p) && !Board.IsObstacle(p) && UnitAt(p) == null;
 
-        private bool HasHazard(GridPos p) => MineAt(p) != null || BombAt(p) != null || _caltrops.ContainsKey(p);
+        private bool HasHazard(GridPos p) => MineAt(p) != null || BombAt(p) != null || _caltrops.ContainsKey(p) || _snares.ContainsKey(p);
 
         /// <summary>Whether the unit could stand with its anchor on this tile.</summary>
         public bool CanStand(Unit unit, GridPos anchor)
@@ -987,9 +1041,15 @@ namespace ArmyRoguelike.Core
                 damage += PincerBonus;
             if (target.IsSnared && Living(attacker.Team).Any(u => u.Has(Ability.PreyOnSnared)))
                 damage += PreyBonus;
+            if (attacker.Has(Ability.CheapShot) && (target.IsSnared || target.IsSlowed))
+                damage += CheapShotBonus;
+            if (attacker.Has(Ability.LongShot) && Distance(attacker, target) >= LongShotRange)
+                damage += LongShotBonus;
+            if (attacker.Has(Ability.Isolate) && IsExposed(target))
+                damage += IsolateBonus;
             if (attacker.Has(Ability.Shatter) && target.IsSlowed)
                 damage *= 2;
-            if (attacker.IsHidden)
+            if (attacker.IsHidden && !attacker.AmbushUsed)
                 damage += VanishBonus;
             if (attacker.Has(Ability.WolfBite))
                 damage += BiteChain;
@@ -1023,6 +1083,8 @@ namespace ArmyRoguelike.Core
                 if (i > 0 && attacker.Has(Ability.FirstShotDouble) && !attacker.HasStruck(target))
                     amount /= 2;
                 amount = FavoredAmount(attacker, target, amount, DamageKind.Attack);
+                if (i == 0 && target.Marked && amount > 0)
+                    amount += MarkBonus;
                 if (IsShielded(target))
                     amount = Math.Max(1, amount - 1);
                 if (target.Has(Ability.Tough))
@@ -1062,6 +1124,14 @@ namespace ArmyRoguelike.Core
                 return kills;
             if (action == ActionKind.PinningShot && FixedHitKills(UnitAt(tile), PinDamage, unit, DamageKind.Attack))
                 kills.Add(UnitAt(tile));
+            var target = UnitAt(tile);
+            if ((action == ActionKind.Kick && FixedHitKills(target, ActionDamage(unit, target, KickDamage), unit, DamageKind.Attack)) ||
+                (action == ActionKind.ThrowingKnife && FixedHitKills(target, ActionDamage(unit, target, KnifeDamage), unit, DamageKind.Attack)) ||
+                (action == ActionKind.FireArrow && FixedHitKills(target, DamageAgainst(unit, target), unit, DamageKind.Attack)))
+                kills.Add(target);
+            if (action == ActionKind.SuppressingFire)
+                kills.AddRange(SuppressLine(unit, tile).Select(UnitAt).Where(u => u != null && u.Team != unit.Team && !u.IsObjective).Distinct()
+                    .Where(u => FixedHitKills(u, PinDamage, unit, DamageKind.Attack)));
             if (action == ActionKind.Fireball)
             {
                 var area = PlusArea(tile);
@@ -1085,6 +1155,8 @@ namespace ArmyRoguelike.Core
             if ((target.Has(Ability.LuckyCharm) && !target.LastStandUsed) || (target.IsObjective && target.Team == Team.Enemy && source.Team == target.Team))
                 return false;
             amount = FavoredAmount(source, target, amount, kind);
+            if (kind != DamageKind.Tick && target.Marked && source.Team != target.Team)
+                amount += MarkBonus;
             if (IsShielded(target))
                 amount = Math.Max(1, amount - 1);
             if (target.Has(Ability.Tough))
@@ -1095,6 +1167,10 @@ namespace ArmyRoguelike.Core
                 amount = Math.Max(1, amount - ShieldUpReduction);
             return amount - target.Shield - target.MoonShield - target.TempHp >= target.Hp;
         }
+
+        /// <summary>Exposed (the Rogue's keyword): no living unit of its own side stands next to it.</summary>
+        public bool IsExposed(Unit unit) =>
+            !_units.Any(u => u != unit && u.IsPlaced && u.IsAlive && u.Team == unit.Team && Distance(u, unit) == 1);
 
         /// <summary>An ally of the attacker stands on the far side of a 1x1 target.</summary>
         public bool IsPinched(Unit attacker, Unit target)
@@ -1119,7 +1195,7 @@ namespace ArmyRoguelike.Core
         public bool InEnemyReach(Unit unit, GridPos anchor) => EngagedBy(unit, anchor).Any();
 
         /// <summary>The enemies whose reach holds the unit standing here: stepping out of their reach uses up its remaining moves.</summary>
-        public IEnumerable<Unit> EngagedBy(Unit unit, GridPos anchor) => unit.Has(Ability.Slippery) ? Enumerable.Empty<Unit>() :
+        public IEnumerable<Unit> EngagedBy(Unit unit, GridPos anchor) => unit.Has(Ability.Slippery) || unit.Has(Ability.Elusive) ? Enumerable.Empty<Unit>() :
             _units.Where(u => u.IsPlaced && u.IsAlive && u.Team != unit.Team && !u.IsObjective && Distance(anchor, unit.Size, u) == 1);
 
         /// <summary>
@@ -1260,11 +1336,18 @@ namespace ArmyRoguelike.Core
             return path;
         }
 
+        /// <summary>Vantage: a ranged 1x1 unit with it standing next to a rock, ice or barricade.</summary>
+        public bool HasVantage(Unit unit, GridPos from) =>
+            unit.Has(Ability.Vantage) && unit.IsRanged && unit.Size == 1 && from.Neighbours().Any(n => Board.InBounds(n) && Board.IsRock(n));
+
+        /// <summary>The unit's attack range standing here: Vantage adds 1 next to a rock, ice or barricade.</summary>
+        public int RangeFrom(Unit unit, GridPos from) => unit.Range + (HasVantage(unit, from) ? VantageRange : 0);
+
         /// <summary>Whether the attacker's basic attack could hit the target from a given anchor, ignoring AP.</summary>
         public bool CanHitFrom(Unit attacker, GridPos from, Unit target)
         {
             var steps = Distance(from, attacker.Size, target);
-            if (steps < 1 || steps > attacker.Range)
+            if (steps < 1 || steps > RangeFrom(attacker, from))
                 return false;
 
             if (attacker.Has(Ability.LongReach))
@@ -1282,7 +1365,7 @@ namespace ArmyRoguelike.Core
                 return false;
             }
 
-            if (attacker.IsRanged && steps > 1 && InCover(target))
+            if (attacker.IsRanged && steps > 1 && InCover(target) && !HasVantage(attacker, from))
                 return false;
             if (attacker.IsRanged && steps > 1 && IsShroudedFrom(target, attacker.Team))
                 return false;
@@ -1422,9 +1505,54 @@ namespace ArmyRoguelike.Core
                     return tile == unit.Pos && _barricades.Any(b => b.owner == unit);
                 case ActionKind.Charge:
                     return CanChargeTo(unit, tile);
+                case ActionKind.Kick:
+                    return target != null && target.Team != unit.Team && !target.IsObjective && unit.Size == 1 && Distance(unit, target) == 1;
+                case ActionKind.SnareTrap:
+                    return SnaresOf(unit) < MaxSnares && steps >= 1 && steps <= SnareRange && IsFree(tile) && !HasHazard(tile);
+                case ActionKind.FireArrow:
+                    return target != null && target.Team != unit.Team && !target.IsHidden && CanHitFrom(unit, unit.Pos, target);
+                case ActionKind.CoveringFire:
+                    return tile == unit.Pos;
+                case ActionKind.SuppressingFire:
+                    return SuppressLine(unit, tile) is List<GridPos> line && line.Any(p => UnitAt(p) is Unit u && u.Team != unit.Team && !u.IsObjective);
+                case ActionKind.ThrowingKnife:
+                    return target != null && target.Team != unit.Team && !target.IsHidden && CanThrowKnife(unit, target);
+                case ActionKind.Shadowstep:
+                    return unit.Size == 1 && !unit.MovedThisTurn && steps >= 1 && steps <= ShadowstepRange && CanStand(unit, tile) &&
+                           _units.Any(e => e.IsPlaced && e.IsAlive && e.Team != unit.Team && Distance(tile, 1, e) == 1);
+                case ActionKind.SmokeBomb:
+                    return steps <= SmokeRange && PlusArea(tile).Any(p => UnitAt(p) is Unit u && u.Team == unit.Team && !u.IsObjective);
+                case ActionKind.Rupture:
+                    return target != null && target.Team != unit.Team && target.PoisonTurns > 0 && unit.Size == 1 && Distance(unit, target) == 1;
+                case ActionKind.MarkTarget:
+                    return target != null && target.Team != unit.Team && !target.IsHidden && !target.Marked && CanHitFrom(unit, unit.Pos, target);
                 default:
                     return false;
             }
+        }
+
+        /// <summary>
+        /// Suppressing Fire: the row or column from the unit through this tile, up to its range and stopped by rocks, if
+        /// the tile is on it; else null.
+        /// </summary>
+        public List<GridPos> SuppressLine(Unit unit, GridPos tile)
+        {
+            var dir = StraightDirection(unit.Pos, tile);
+            if (dir == null || unit.Size != 1)
+                return null;
+            var line = new List<GridPos>();
+            var range = RangeFrom(unit, unit.Pos);
+            for (var p = unit.Pos + dir.Value; Board.InBounds(p) && !Board.IsRock(p) && unit.Pos.StepsTo(p) <= range; p += dir.Value)
+                line.Add(p);
+            return line.Contains(tile) ? line : null;
+        }
+
+        /// <summary>Throwing Knife: an enemy 2 to <see cref="KnifeRange"/> steps away, in line of sight, not in cover or shrouded.</summary>
+        public bool CanThrowKnife(Unit unit, Unit target)
+        {
+            var steps = Distance(unit, target);
+            return steps >= 2 && steps <= KnifeRange && !InCover(target) && !IsShroudedFrom(target, unit.Team) &&
+                   Cells(unit).Any(a => Cells(target).Any(b => Board.HasLineOfSight(a, b)));
         }
 
         /// <summary>Every tile the action could be used on right now.</summary>
@@ -1507,8 +1635,112 @@ namespace ArmyRoguelike.Core
                     break;
                 case ActionKind.Vanish:
                     unit.HiddenTurns = VanishTurns;
+                    unit.AmbushUsed = false;
                     events.Add(new StatusEvent(unit, unit, StatusKind.Vanish, VanishTurns));
                     break;
+                case ActionKind.Kick:
+                {
+                    var target = UnitAt(tile);
+                    var dir = StraightDirection(unit.Pos, Cells(target).First(c => c.StepsTo(unit.Pos) == 1)).Value;
+                    ActionHit(unit, target, ActionDamage(unit, target, KickDamage), events);
+                    Push(target, dir, unit, events);
+                    break;
+                }
+                case ActionKind.SnareTrap:
+                    _snares[tile] = unit;
+                    events.Add(new TileEvent("snare", tile, true, unit));
+                    break;
+                case ActionKind.FireArrow:
+                {
+                    var target = UnitAt(tile);
+                    var cells = Cells(target).Where(p => !Board.IsObstacle(p)).ToList();
+                    ActionHit(unit, target, DamageAgainst(unit, target), events);
+                    foreach (var p in cells)
+                    {
+                        _burning[p] = BurnRounds;
+                        _burnOwners[p] = unit;
+                        events.Add(new TileEvent("burn", p, true, unit));
+                    }
+
+                    break;
+                }
+                case ActionKind.CoveringFire:
+                {
+                    var tiles = SightTiles(unit);
+                    _overwatch[unit] = new HashSet<GridPos>(tiles);
+                    events.Add(new OverwatchEvent(unit, tiles));
+                    break;
+                }
+                case ActionKind.SuppressingFire:
+                {
+                    var line = SuppressLine(unit, tile);
+                    var victims = line.Select(UnitAt).Where(u => u != null && u.Team != unit.Team && !u.IsObjective).Distinct().ToList();
+                    var after = new List<BattleEvent>();
+                    var hits = victims.Select(v => Damage(v, PinDamage, unit, DamageKind.Attack, after)).ToList();
+                    unit.AttackedThisTurn = true;
+                    foreach (var v in victims)
+                        unit.MarkStruck(v);
+                    SpendAmbush(unit);
+                    events.Add(new AreaAttackEvent(unit, "suppressing fire", tile, line, hits));
+                    events.AddRange(after);
+                    foreach (var v in victims.Where(v => v.IsAlive && !v.Has(Ability.Colossus)))
+                    {
+                        v.SnareTurns = 1;
+                        events.Add(new StatusEvent(unit, v, StatusKind.Pin, 1));
+                    }
+
+                    break;
+                }
+                case ActionKind.ThrowingKnife:
+                {
+                    var target = UnitAt(tile);
+                    ActionHit(unit, target, ActionDamage(unit, target, KnifeDamage), events);
+                    break;
+                }
+                case ActionKind.Shadowstep:
+                {
+                    var from = unit.Pos;
+                    unit.Pos = tile;
+                    unit.MovedThisTurn = true;
+                    unit.Moves = 0;
+                    events.Add(new MoveEvent(unit, from, new List<GridPos> { tile }));
+                    break;
+                }
+                case ActionKind.SmokeBomb:
+                {
+                    var area = PlusArea(tile);
+                    events.Add(new TileEvent("smoke", tile, true, unit));
+                    foreach (var ally in Living(unit.Team).Where(u => !u.IsObjective && Cells(u).Any(area.Contains)).ToList())
+                    {
+                        ally.HiddenTurns = Math.Max(ally.HiddenTurns, VanishTurns);
+                        ally.AmbushUsed = false;
+                        events.Add(new StatusEvent(unit, ally, StatusKind.Vanish, VanishTurns));
+                    }
+
+                    break;
+                }
+                case ActionKind.MarkTarget:
+                {
+                    var target = UnitAt(tile);
+                    target.Marked = true;
+                    target.MarkSpreads = unit.Has(Ability.DeathMark);
+                    events.Add(new StatusEvent(unit, target, StatusKind.Mark, MarkBonus));
+                    break;
+                }
+                case ActionKind.Rupture:
+                {
+                    var target = UnitAt(tile);
+                    var burst = target.PoisonTurns * PoisonDamage;
+                    target.PoisonTurns = 0;
+                    var after = new List<BattleEvent>();
+                    events.Add(new TickEvent("rupture", Damage(target, burst, unit, DamageKind.Tick, after), unit));
+                    events.AddRange(after);
+                    if (target.IsAlive && !IsOver)
+                        ActionHit(unit, target, DamageAgainst(unit, target), events);
+                    else
+                        unit.AttackedThisTurn = true;
+                    break;
+                }
                 case ActionKind.Blink:
                 {
                     var from = unit.Pos;
@@ -1627,6 +1859,29 @@ namespace ArmyRoguelike.Core
                         Explode(p, bomb.Damage, "bomb", bomb.Owner, events);
                 }
             }
+        }
+
+        /// <summary>
+        /// A single-target hit from an action (Kick, Fire Arrow, Throwing Knife, Rupture): counts as an attack for
+        /// Poison, Chill, Momentum and the like, and spends a hidden unit's ambush bonus.
+        /// </summary>
+        private Hit ActionHit(Unit unit, Unit target, int amount, List<BattleEvent> events)
+        {
+            var after = new List<BattleEvent>();
+            var hit = Damage(target, amount, unit, DamageKind.Attack, after);
+            unit.AttackedThisTurn = true;
+            unit.MarkStruck(target);
+            SpendAmbush(unit);
+            events.Add(new AttackEvent(unit, hit.Target, hit.Damage, hit.HpAfter));
+            events.AddRange(after);
+            return hit;
+        }
+
+        /// <summary>A hidden unit's first attack used its +2: it stays hidden, but later attacks don't get it.</summary>
+        private static void SpendAmbush(Unit unit)
+        {
+            if (unit.IsHidden)
+                unit.AmbushUsed = true;
         }
 
         /// <summary>An action's own base damage in place of the unit's attack damage; bonuses to its damage still count.</summary>
@@ -1994,11 +2249,8 @@ namespace ArmyRoguelike.Core
                 events.Add(new TileEvent("barricade", tile, false, attacker));
             }
 
-            if (attacker.IsHidden)
-            {
-                attacker.HiddenTurns = 0;
-                events.Add(new StatusEvent(attacker, attacker, StatusKind.Reveal, 0));
-            }
+            // Attacking doesn't reveal a hidden unit (Vanish lasts until your next turn); it only spends the +2.
+            SpendAmbush(attacker);
 
             return events;
         }
@@ -2105,15 +2357,21 @@ namespace ArmyRoguelike.Core
             if (path == null || path.Count == 0 || PathCost(unit, path) > unit.Moves)
                 return null;
 
+            // Enemies stop on the first mine, snare or tile one of your archers covers (Covering Fire).
             Mine triggered = null;
+            GridPos? snare = null;
+            Unit watcher = null;
             if (unit.Team == Team.Enemy)
             {
                 for (var i = 0; i < path.Count; i++)
                 {
                     if (!CanStand(unit, path[i]))
                         continue;
-                    triggered = Footprint(path[i], unit.Size).Select(MineAt).FirstOrDefault(m => m != null);
-                    if (triggered == null)
+                    var cells = Footprint(path[i], unit.Size).ToList();
+                    triggered = cells.Select(MineAt).FirstOrDefault(m => m != null);
+                    snare = cells.Where(_snares.ContainsKey).Cast<GridPos?>().FirstOrDefault();
+                    watcher = cells.Select(c => WatcherOf(c, unit)).FirstOrDefault(w => w != null);
+                    if (triggered == null && snare == null && watcher == null)
                         continue;
                     path = path.Take(i + 1).ToList();
                     break;
@@ -2122,7 +2380,6 @@ namespace ArmyRoguelike.Core
 
             // Your units stop on the first caltrops or watched tile on the way.
             var caltrop = false;
-            Unit watcher = null;
             if (unit.Team == Team.Player)
             {
                 for (var i = 0; i < path.Count; i++)
@@ -2160,6 +2417,39 @@ namespace ArmyRoguelike.Core
             if (triggered != null)
                 Explode(triggered.Tile, triggered.Damage, "mine", triggered.Owner, events);
 
+            if (snare.HasValue && unit.IsAlive)
+            {
+                // Snare Trap: it stops, takes the damage, and can't move on its next turn either.
+                var setter = _snares[snare.Value];
+                _snares.Remove(snare.Value);
+                unit.Moves = 0;
+                events.Add(new TileEvent("snare", snare.Value, false, null));
+                var after = new List<BattleEvent>();
+                var damage = setter != null && setter.Has(Ability.SpikedSnares) ? SpikedSnareDamage : SnareDamage;
+                events.Add(new TickEvent("snare", Damage(unit, damage, setter, DamageKind.Tick, after), setter));
+                events.AddRange(after);
+                if (unit.IsAlive && !unit.Has(Ability.Colossus))
+                {
+                    unit.SnareTurns = 1;
+                    events.Add(new StatusEvent(setter ?? unit, unit, StatusKind.Pin, 1));
+                }
+            }
+
+            if (unit.Team == Team.Enemy && watcher != null && unit.IsAlive && watcher.IsAlive)
+            {
+                // Covering Fire: one shot, the enemy stops there, and the archer stops watching.
+                _overwatch.Remove(watcher);
+                unit.Moves = 0;
+                events.Add(new EffectEvent(EffectKind.CoveringFire, watcher, 0, watcher.Hp, watcher));
+                var after = new List<BattleEvent>();
+                var hit = Damage(unit, DamageAgainst(watcher, unit), watcher, DamageKind.Attack, after);
+                watcher.MarkStruck(unit);
+                SpendAmbush(watcher);
+                events.Add(new AttackEvent(watcher, hit.Target, hit.Damage, hit.HpAfter));
+                events.AddRange(after);
+                watcher = null;
+            }
+
             if (caltrop)
             {
                 var dropper = _caltrops[unit.Pos];
@@ -2171,7 +2461,7 @@ namespace ArmyRoguelike.Core
                 events.AddRange(after);
             }
 
-            if (watcher != null && unit.IsAlive)
+            if (unit.Team == Team.Player && watcher != null && unit.IsAlive)
             {
                 // Overwatch: one shot, then it stops watching.
                 _overwatch.Remove(watcher);
@@ -2212,11 +2502,8 @@ namespace ArmyRoguelike.Core
                 struck.AddRange(Strike(attacker, target, events));
             attacker.AttackedThisTurn = true;
             attacker.MarkStruck(target);
-            if (attacker.IsHidden)
-            {
-                attacker.HiddenTurns = 0;
-                events.Add(new StatusEvent(attacker, attacker, StatusKind.Reveal, 0));
-            }
+            // Attacking doesn't reveal a hidden unit (Vanish lasts until your next turn); it only spends the +2.
+            SpendAmbush(attacker);
 
             if (attacker.Has(Ability.WolfBite))
                 BiteChain++;
@@ -2261,7 +2548,7 @@ namespace ArmyRoguelike.Core
             if (attacker.Has(Ability.Pierce) && dir != null)
             {
                 kind = "pierce";
-                for (var p = attacker.Pos + dir.Value; Board.InBounds(p) && !Board.IsRock(p) && attacker.Pos.StepsTo(p) <= attacker.Range; p += dir.Value)
+                for (var p = attacker.Pos + dir.Value; Board.InBounds(p) && !Board.IsRock(p) && attacker.Pos.StepsTo(p) <= RangeFrom(attacker, attacker.Pos); p += dir.Value)
                     line.Add(p);
             }
             else if (attacker.Has(Ability.LongReach) && dir != null)
@@ -2422,7 +2709,7 @@ namespace ArmyRoguelike.Core
             Board.AllTiles().Where(p =>
             {
                 var steps = Distance(p, 1, unit);
-                return steps >= 1 && steps <= unit.Range && !Board.IsObstacle(p) && !IsShroudedFrom(p, unit.Team) &&
+                return steps >= 1 && steps <= RangeFrom(unit, unit.Pos) && !Board.IsObstacle(p) && !IsShroudedFrom(p, unit.Team) &&
                        Cells(unit).Any(c => Board.HasLineOfSight(c, p));
             }).ToList();
 
@@ -2624,6 +2911,16 @@ namespace ArmyRoguelike.Core
                 }
             }
 
+            // Marked (the Archer's keyword): the next hit from the other side, of any kind but ticks, deals more and uses it up.
+            var spreadMark = false;
+            if (hostile && kind != DamageKind.Tick && target.Marked && amount > 0)
+            {
+                amount += MarkBonus;
+                target.Marked = false;
+                spreadMark = target.MarkSpreads;
+                after.Add(new EffectEvent(EffectKind.Mark, target, MarkBonus, target.Hp, source));
+            }
+
             if (IsShielded(target))
                 amount = Math.Max(1, amount - 1);
             if (target.Has(Ability.Tough))
@@ -2717,10 +3014,27 @@ namespace ArmyRoguelike.Core
                     source.ActedThisTurn = false;
                     after.Add(new EffectEvent(EffectKind.Refund, source, KillRefundAp, source.Hp, source));
                 }
+
+                // Into the Shadows: a kill hides the killer until its side's next turn, with no ambush bonus.
+                if (source.Has(Ability.IntoShadows) && kind == DamageKind.Attack && !source.IsHidden)
+                {
+                    source.HiddenTurns = VanishTurns;
+                    source.AmbushUsed = true;
+                    after.Add(new StatusEvent(source, source, StatusKind.Vanish, VanishTurns));
+                }
             }
 
             if (!target.IsAlive)
             {
+                // Death Mark: the mark jumps to every unit of the dead one's side next to it.
+                if (spreadMark)
+                    foreach (var near in _units.Where(u => u != target && u.IsPlaced && u.IsAlive && u.Team == target.Team && !u.Marked && Distance(u, target) == 1).ToList())
+                    {
+                        near.Marked = true;
+                        near.MarkSpreads = true;
+                        after.Add(new StatusEvent(source ?? target, near, StatusKind.Mark, MarkBonus));
+                    }
+
                 BreakPackBond(target, after);
                 // Soul Harvest: one of your units dying while a harvester stands leaves a bone pile it can raise.
                 if (target.Team == Team.Player && !target.IsSummon && !target.IsObjective && !target.Stats.LeavesRemains &&

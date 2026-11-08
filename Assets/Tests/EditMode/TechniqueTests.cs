@@ -79,20 +79,20 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Levels_ArcherReachesItsSecondDamageWithAllFiveTechniques()
+        public void Levels_ArcherGetsItsSecondDamageAtLevelSix()
         {
-            var archer = M(UnitStats.Archer, Technique.SteadyAimPlus, Technique.Pierce, Technique.OpeningShot, Technique.Prey);
-            Assert.AreEqual(1, archer.LevelDamage);
-            archer.Learn(Technique.Volley);
-            Assert.AreEqual(5, archer.Level);
-            Assert.AreEqual(2, archer.LevelDamage, "+1 at levels 3 and 5");
+            var archer = M(UnitStats.Archer, Technique.SteadyAimPlus, Technique.Pierce, Technique.OpeningShot, Technique.Prey, Technique.LongShot);
+            Assert.AreEqual(1, archer.LevelDamage, "level 5 still has one");
+            archer.Learn(Technique.Vantage);
+            Assert.AreEqual(6, archer.Level);
+            Assert.AreEqual(2, archer.LevelDamage, "+1 at levels 3 and 6");
             CollectionAssert.AreEqual(new[] { 3, 6 }, Growth.DamageLevels(UnitStats.Apprentice).ToArray(), "the Mage keeps 3 and 6");
         }
 
         [Test]
         public void Catalog_EveryRequirementIsInTheSameLine()
         {
-            Assert.AreEqual(34, Technique.All.Count);
+            Assert.AreEqual(49, Technique.All.Count);
             foreach (var t in Technique.All.Where(t => t.Requires != null))
                 Assert.AreEqual(t.Line, t.Requires.Line, t.Name);
             Assert.AreEqual(Technique.All.Count, Technique.All.Select(t => t.Name).Distinct().Count(), "unique names");

@@ -514,7 +514,8 @@ public static class GamepediaWriter
         html.Append($"<li>Push: a unit pushed into a rock, unit or the edge stops there and takes {Battle.CollisionDamage} damage. An enemy pushed onto a mine sets it off. <b>Weight</b>: a push moves a medium unit 1 tile, a small one 2 and a huge one none (no collision damage either); Battering Ram adds 1 tile to your pushes.</li>");
         html.Append($"<li>Poison: {Battle.PoisonDamage} damage at the start of the target's turn, {Battle.PoisonTurns} times. Burning ground: {Battle.BurnDamage} damage at the start of the turn of whoever stands on it.</li>");
         html.Append("<li>Pinned units (Pinning Shot) and slowed units (Chill) can't move on their next turn.</li>");
-        html.Append("<li>Vanished units (rogues) can't be targeted or attacked by enemies, though area blasts still hit them. Attacking reveals them.</li>");
+        html.Append("<li>Hidden units (Vanish, Smoke Bomb, Into the Shadows) can't be targeted or attacked by enemies until your next turn, though area blasts still hit them. Attacking doesn't reveal them; the first attack while hidden deals +2.</li>");
+        html.Append("<li>Snares (Snare Trap) are hidden from enemies: the first enemy to walk onto one stops, takes damage and is pinned. Covering Fire shoots the first enemy that walks onto a tile the archer can shoot at, and stops it there.</li>");
         html.Append("<li>Hover any enemy to see what it plans to do next.</li>");
         html.Append("</ul></section>");
     }
