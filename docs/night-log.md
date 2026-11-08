@@ -46,3 +46,9 @@ Each entry: what was done or tried, and why. Scrapped and reverted ideas stay in
   It ties pushes, weight and the Edge of the World together, and the board changes during the fight. Built as a battlefield
   first (a 6th one), so it can be judged in play before it becomes a rule everywhere. One slip on the way: a perl
   substitution put text at the top of `Battle.cs` (`\|` inside a `|`-delimited pattern); caught at once and repaired before compiling.
+- **03:40** Usage limit reached. Pausing here; the hourly watchdog resumes this session after the reset. State: lead work is
+  committed on `feature/night-fun` (cracks, events, champions, Stone Heart, Crumbling Roof), compile OK, 259 tests pass. Not
+  started yet: **Hone** (a shop service: -1 cooldown on one action for the run). Next when resumed: read the boss/elite sim
+  (`tools/dev.sh sim 10 fights "Giant,Necromancer,Elite Elementals,Elite Wolf Pack"`) and give bosses more teeth if they are
+  still won about 100% of the time; check the three builder branches (archer-rogue, mage-sapper, demons), review them with reviewer
+  subagents, and merge them into `feature/night-fun`; then docs (design note, tasks, CLAUDE.md, gamepedia) and the visual timeline page.
