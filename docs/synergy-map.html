@@ -26,6 +26,7 @@
   --heat2: #b5cbe2;
   --heat3: #8fb0d4;
   --heat4: #6a95c6;
+  --h-warrior: #b4472f; --h-archer: #3f7d32; --h-rogue: #7445a6; --h-mage: #2b6fb3; --h-sapper: #a0680c; --h-other: #64707c;
   --display: "Marcellus", "Trajan Pro", Georgia, serif;
   --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
@@ -36,6 +37,7 @@
     --makes: #8fbdf0; --makes-bg: #1f3350; --uses: #e2c46e; --uses-bg: #3a3118; --hurts: #f08f78; --hurts-bg: #43221b;
     --good: #6cc792; --warn: #e2b05a; --bad: #f08f78;
     --heat0: #1a1f2a; --heat1: #1f2c40; --heat2: #27405f; --heat3: #30578a; --heat4: #3c6fb0;
+    --h-warrior: #ef8a72; --h-archer: #8fcb7c; --h-rogue: #c19af0; --h-mage: #84b8f0; --h-sapper: #e8b65a; --h-other: #9aa5b5;
     color-scheme: dark;
   }
 }
@@ -44,9 +46,11 @@
   --makes: #8fbdf0; --makes-bg: #1f3350; --uses: #e2c46e; --uses-bg: #3a3118; --hurts: #f08f78; --hurts-bg: #43221b;
   --good: #6cc792; --warn: #e2b05a; --bad: #f08f78;
   --heat0: #1a1f2a; --heat1: #1f2c40; --heat2: #27405f; --heat3: #30578a; --heat4: #3c6fb0;
+  --h-warrior: #ef8a72; --h-archer: #8fcb7c; --h-rogue: #c19af0; --h-mage: #84b8f0; --h-sapper: #e8b65a; --h-other: #9aa5b5;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 14px; line-height: 1.5; }
 .wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 h1 { font-family: var(--display); font-weight: 400; font-size: 34px; letter-spacing: .02em; margin: 0; text-wrap: balance; }
@@ -113,6 +117,7 @@ ul.plain li.divider { list-style: none; margin-left: -18px; }
 #tip { position: fixed; z-index: 50; max-width: min(340px, calc(100vw - 16px)); background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; box-shadow: 0 6px 24px rgba(0,0,0,.18); pointer-events: none; display: grid; gap: 6px; font-size: 13px; }
 #tip p { margin: 0; }
 #tip[hidden] { display: none; }
+.own { color: var(--c); font-weight: 600; font-size: 12px; white-space: nowrap; }.own::before, .kdot { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 5px; vertical-align: 1px; }.kdot { margin-right: 4px; }.own.big { font-size: 13px; }.hero-card { border-top: 3px solid var(--c); }.hero-card h4 { color: var(--c); }.kw { font-weight: 600; color: var(--c); }
 #tip .tip-name { font-family: var(--display); font-size: 17px; }
 tr.flash td { animation: flash 1.6s ease-out; }
 @keyframes flash { from { background: var(--makes-bg); } to { background: transparent; } }
@@ -489,7 +494,14 @@ function hurts(a, b) {
   return out;
 }
 
-const chip = (r, k, self) => `<span class="chip ${r}">${r} ${k}${self ? "!" : ""}</span>`;
+// One colour per hero; a theme keyword wears the colour of the hero it belongs to.
+const HERO_VAR = { Warrior: "--h-warrior", Archer: "--h-archer", Rogue: "--h-rogue", Mage: "--h-mage", Sapper: "--h-sapper" };
+const KW_HERO = { push: "Warrior", guard: "Warrior", pinned: "Archer", marked: "Archer", still: "Archer", exposed: "Rogue", hidden: "Rogue", poison: "Rogue", kill: "Rogue", slowed: "Mage", burning: "Mage", wall: "Sapper", blast: "Sapper" };
+const heroVar = owner => HERO_VAR[owner] || "--h-other";
+const kwVar = k => heroVar(KW_HERO[k]);
+const heroName = h => `<span style="color:var(${heroVar(h)})">${h}</span>`;
+const ownerTag = (owner, big) => `<span class="own${big ? " big" : ""}" style="--c:var(${heroVar(owner)})">${owner}</span>`;
+const chip = (r, k, self) => `<span class="chip ${r}"><i class="kdot" style="--c:var(${kwVar(k)})"></i>${r} ${k}${self ? "!" : ""}</span>`;
 const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
 function heat(n) { return n === 0 ? "--heat0" : n <= 2 ? "--heat1" : n <= 4 ? "--heat2" : n <= 7 ? "--heat3" : "--heat4"; }
@@ -503,7 +515,7 @@ const nameLink = (name, owner) => {
 };
 
 function tipHtml(e) {
-  const meta = [e.owner, e.rarity, e.meta].filter(Boolean).join(" · ");
+  const meta = [ownerTag(e.owner), e.rarity, e.meta].filter(Boolean).join(" · ");
   const tags = e.tags.map(t => chip(t.r, t.k, t.self)).join("");
   return `<div class="tip-name">${esc(e.name)}</div><div class="tag">${meta}</div><p>${esc(e.effect)}</p>` +
     (tags ? `<div>${tags}</div>` : "") + (e.note ? `<p class="note">${esc(e.note)}</p>` : "");
@@ -546,9 +558,9 @@ let selected = ["Warrior", "Archer"];
 
 function renderMatrix() {
   const m = document.getElementById("matrix");
-  let h = "<tr><th></th>" + HEROES.map(x => `<th>${x}</th>`).join("") + "</tr>";
+  let h = "<tr><th></th>" + HEROES.map(x => `<th>${ownerTag(x, true)}</th>`).join("") + "</tr>";
   for (const a of HEROES) {
-    h += `<tr><th class="row">${a}</th>`;
+    h += `<tr><th class="row">${ownerTag(a, true)}</th>`;
     for (const b of HEROES) {
       const kws = new Set(links(a, b).map(l => l.k));
       const n = kws.size + bridges(a, b).length;
@@ -568,22 +580,22 @@ function renderDetail() {
   const L = links(a, b), B = bridges(a, b), H = hurts(a, b);
   const byKey = {};
   for (const l of L) (byKey[l.k] = byKey[l.k] || []).push(l);
-  let h = `<h2>${a === b ? a + ", inside its kit" : a + " and " + b}</h2>`;
+  let h = `<h2>${a === b ? heroName(a) + ", inside its kit" : heroName(a) + " and " + heroName(b)}</h2>`;
   const n = Object.keys(byKey).length + B.length;
   const verdict = n >= 4 ? ["good", "strong"] : n >= 2 ? ["warn", "medium"] : n === 1 ? ["bad", "weak"] : ["bad", "none"];
   h += `<p class="note"><span class="pill ${verdict[0]}">${verdict[1]}</span> &nbsp;${n} link${n === 1 ? "" : "s"} counted (one per keyword, plus hand-written ones)</p><div class="links" style="margin-top:14px">`;
   for (const [k, ls] of Object.entries(byKey)) {
-    const pairs = ls.map(l => `${entLink(l.maker)} <span class="tag">(${l.maker.owner})</span> → ${entLink(l.user)} <span class="tag">(${l.user.owner})</span>`);
-    h += `<div class="link"><span class="chip K">${KEYWORDS[k].label}</span><div>${[...new Set(pairs)].join("<br>")}</div></div>`;
+    const pairs = ls.map(l => `${entLink(l.maker)} ${ownerTag(l.maker.owner)} → ${entLink(l.user)} ${ownerTag(l.user.owner)}`);
+    h += `<div class="link"><span class="chip K"><i class="kdot" style="--c:var(${kwVar(k)})"></i>${KEYWORDS[k].label}</span><div>${[...new Set(pairs)].join("<br>")}</div></div>`;
   }
   for (const [x, y, what, to, why] of B) {
-    h += `<div class="link"><span class="chip K">by hand</span><div>${nameLink(what, x)} <span class="tag">(${x})</span> → ${nameLink(to, y)} <span class="tag">(${y})</span></div><div class="why">${why}</div></div>`;
+    h += `<div class="link"><span class="chip K">by hand</span><div>${nameLink(what, x)} ${ownerTag(x)} → ${nameLink(to, y)} ${ownerTag(y)}</div><div class="why">${why}</div></div>`;
   }
   if (!L.length && !B.length) h += `<p class="note">No links. This pair needs a designed bridge.</p>`;
   h += "</div>";
   if (H.length) {
     h += `<h3 style="margin-top:18px">Clashes</h3><div class="links">`;
-    for (const x of H) h += `<div class="link"><span class="chip H">H ${x.k}</span><div>${entLink(x.h)} <span class="tag">(${x.h.owner})</span> works against ${entLink(x.u)} <span class="tag">(${x.u.owner})</span></div></div>`;
+    for (const x of H) h += `<div class="link"><span class="chip H">H ${x.k}</span><div>${entLink(x.h)} ${ownerTag(x.h.owner)} works against ${entLink(x.u)} ${ownerTag(x.u.owner)}</div></div>`;
     h += "</div>";
   }
   document.getElementById("pair-detail").innerHTML = h;
@@ -591,13 +603,13 @@ function renderDetail() {
 
 function renderThemes() {
   document.getElementById("hero-themes").innerHTML = HEROES.map(hero =>
-    `<div class="hero-card"><h4>${hero}</h4>${HERO_THEMES[hero].map(([k, role]) =>
-      `<div class="k"><span class="tag">${role}:</span> ${KEYWORDS[k].exists ? KEYWORDS[k].label : "<b>" + KEYWORDS[k].label + "</b>"}</div>`).join("")}</div>`).join("");
+    `<div class="hero-card" style="--c:var(${heroVar(hero)})"><h4>${hero}</h4>${HERO_THEMES[hero].map(([k, role]) =>
+      `<div class="k"><span class="tag">${role}:</span> <i class="kdot" style="--c:var(${kwVar(k)})"></i>${KEYWORDS[k].exists ? KEYWORDS[k].label : "<b>" + KEYWORDS[k].label + "</b>"}</div>`).join("")}</div>`).join("");
 
   let h = "<tr><th>Keyword</th><th>Meaning</th><th>Makes it</th><th>Uses it</th><th>Hurts it</th><th>Status</th></tr>";
   for (const [k, kw] of Object.entries(KEYWORDS)) {
     const list = r => ENT.filter(e => e.tags.some(t => t.r === r && t.k === k));
-    const fmt = es => es.length ? es.map(e => `${entLink(e)} <span class="tag">${e.owner}</span>`).join("<br>") : `<span class="note">none</span>`;
+    const fmt = es => es.length ? es.map(e => `${entLink(e)} ${ownerTag(e.owner)}`).join("<br>") : `<span class="note">none</span>`;
     const mk = list("M"), us = list("U"), hu = list("H");
     const heroes = new Set([...mk, ...us].map(heroOf).filter(Boolean));
     let status = ["good", "healthy"];
@@ -605,7 +617,7 @@ function renderThemes() {
     else if (!us.length) status = ["bad", "no payoff"];
     else if (heroes.size < 2) status = ["warn", "one hero only"];
     else if (us.every(e => e.tags.some(t => t.k === k && t.self))) status = ["warn", "payoff only for itself"];
-    h += `<tr class="theme-row"><td><b>${kw.label}</b>${kw.exists ? "" : '<div class="tag">new</div>'}</td><td class="note">${kw.meaning}</td><td>${fmt(mk)}</td><td>${fmt(us)}</td><td>${fmt(hu)}</td><td><span class="pill ${status[0]}">${status[1]}</span></td></tr>`;
+    h += `<tr class="theme-row"><td><span class="kw" style="--c:var(${kwVar(k)})"><i class="kdot" style="--c:var(${kwVar(k)})"></i>${kw.label}</span>${kw.exists ? "" : '<div class="tag">new</div>'}</td><td class="note">${kw.meaning}</td><td>${fmt(mk)}</td><td>${fmt(us)}</td><td>${fmt(hu)}</td><td><span class="pill ${status[0]}">${status[1]}</span></td></tr>`;
   }
   document.getElementById("themes").innerHTML = h;
 }
@@ -615,7 +627,7 @@ function renderEntities() {
   const rows = ENT.filter(e => (!o || e.owner === o) && (!k || e.tags.some(t => t.k === k)) &&
     (!q || (e.name + " " + e.effect + " " + e.note).toLowerCase().includes(q)));
   let h = "<tr><th>Name</th><th>Owner</th><th>Rarity</th><th>Effect</th><th>Tags</th><th>Note</th></tr>";
-  for (const e of rows) h += `<tr id="ent-${e.id}"><td><b>${esc(e.name)}</b></td><td class="owner">${e.owner}</td><td class="rar">${e.rarity}</td><td>${esc(e.effect)}${e.meta ? `<div class="tag">${esc(e.meta)}</div>` : ""}</td><td>${e.tags.map(t => chip(t.r, t.k, t.self)).join("") || '<span class="note">none</span>'}</td><td class="note">${esc(e.note)}</td></tr>`;
+  for (const e of rows) h += `<tr id="ent-${e.id}"><td><b>${esc(e.name)}</b></td><td class="owner">${ownerTag(e.owner, true)}</td><td class="rar">${e.rarity}</td><td>${esc(e.effect)}${e.meta ? `<div class="tag">${esc(e.meta)}</div>` : ""}</td><td>${e.tags.map(t => chip(t.r, t.k, t.self)).join("") || '<span class="note">none</span>'}</td><td class="note">${esc(e.note)}</td></tr>`;
   document.getElementById("entities").innerHTML = h;
   document.getElementById("f-count").textContent = rows.length + " of " + ENT.length;
 }
