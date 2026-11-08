@@ -93,11 +93,11 @@ namespace ArmyRoguelike.View
                 case IntentKind.Hellswap:
                     return (Icon.Push, Abilities.Name(Ability.Hellswap), ControlColor);
                 case IntentKind.RendingBlow:
-                    return (Icon.Sword, Abilities.Name(Ability.RendingBlow), HarmColor);
+                    return (Icon.Sword, $"{Abilities.Name(Ability.RendingBlow)} {intent.Amount}", HarmColor);
                 case IntentKind.SoulContract:
                     return (Icon.Eye, Abilities.Name(Ability.SoulContract), HarmColor);
                 case IntentKind.FireBreath:
-                    return (Icon.Burst, Abilities.Name(Ability.FireBreath), HarmColor);
+                    return (Icon.Burst, $"{Abilities.Name(Ability.FireBreath)} {intent.Amount}", HarmColor);
                 default:
                     return (enemy.Range > 1 ? Icon.Arrow : Icon.Sword, Abilities.AttackName(enemy.Stats), HarmColor);
             }

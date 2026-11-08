@@ -239,6 +239,9 @@ namespace ArmyRoguelike.Core
         /// <summary>Bloodlust (demons): Fury gained per death next to it.</summary>
         public const int BloodlustFury = 1;
 
+        /// <summary>Fury never goes above this (so Rending Blow plus Fortune's Favored stays readable).</summary>
+        public const int MaxFury = 3;
+
         /// <summary>Hellswap (imps): range in steps, no line of sight needed.</summary>
         public const int HellswapRange = 3;
 
@@ -646,6 +649,7 @@ namespace ArmyRoguelike.Core
             unit.Pos = hole;
             var after = new List<BattleEvent>();
             BreakPackBond(unit, after);
+            DemonDeath(unit, after);
             events.Add(new FallEvent(unit, pusher, from, hole, new Hit(unit, hp, 0)));
             events.AddRange(after);
             CheckEnd();
@@ -3169,22 +3173,31 @@ namespace ArmyRoguelike.Core
         /// </summary>
         private void DemonDeath(Unit dead, List<BattleEvent> after)
         {
+            // A contract on a dead unit is simply gone; a dead Devil (killed, fallen or dropped through the roof) voids its own.
+            dead.ContractBy = null;
+            if (dead.Has(Ability.SoulContract))
+                BreakContracts(dead, after);
+
             if (dead.Has(Ability.BloodOffering))
             {
                 var heir = Living(dead.Team).Where(u => u != dead && u.IsDemon && Distance(u, dead) <= OfferingRange)
                     .OrderBy(u => Distance(u, dead)).ThenBy(u => u.Id).FirstOrDefault();
                 if (heir != null)
-                {
-                    heir.Fury += OfferingFury;
-                    after.Add(new EffectEvent(EffectKind.Fury, heir, OfferingFury, heir.Hp, dead));
-                }
+                    GainFury(heir, OfferingFury, dead, after);
             }
 
             foreach (var demon in _units.Where(u => u != dead && u.IsPlaced && u.IsAlive && u.Has(Ability.Bloodlust) && Distance(u, dead) == 1).ToList())
-            {
-                demon.Fury += BloodlustFury;
-                after.Add(new EffectEvent(EffectKind.Fury, demon, BloodlustFury, demon.Hp, demon));
-            }
+                GainFury(demon, BloodlustFury, demon, after);
+        }
+
+        /// <summary>Adds Fury up to <see cref="MaxFury"/>; nothing is shown once it's full.</summary>
+        private static void GainFury(Unit demon, int amount, Unit source, List<BattleEvent> after)
+        {
+            var gained = Math.Min(amount, MaxFury - demon.Fury);
+            if (gained <= 0)
+                return;
+            demon.Fury += gained;
+            after.Add(new EffectEvent(EffectKind.Fury, demon, gained, demon.Hp, source));
         }
 
         /// <summary>Hellswap: a 1x1 unit of the other side 2 to <see cref="HellswapRange"/> steps away, seen or not.</summary>
@@ -3222,7 +3235,7 @@ namespace ArmyRoguelike.Core
             var hit = Damage(target, DamageAgainst(unit, target) + RendingBlowBonus, unit, DamageKind.Attack, after);
             unit.AttackedThisTurn = true;
             unit.MarkStruck(target);
-            events.Add(new AttackEvent(unit, hit.Target, hit.Damage, hit.HpAfter));
+            events.Add(new AttackEvent(unit, hit.Target, hit.Damage, hit.HpAfter, "rending blow"));
             events.AddRange(after);
             Thorns(unit, hit.Target, events);
             Riposte(hit.Target, unit, events);
@@ -3236,7 +3249,7 @@ namespace ArmyRoguelike.Core
             target != null && target.IsAlive && target.IsPlaced && target.Team != devil.Team && !target.IsHidden && !target.IsObjective &&
             target.ContractBy == null && Distance(devil, target) <= ContractRange && !IsShroudedFrom(target, devil.Team);
 
-        /// <summary>Soul Contract: the target loses <see cref="ContractDamage"/> at the start of the next enemy turn, unless the Devil takes damage first.</summary>
+        /// <summary>Soul Contract: the target takes <see cref="ContractDamage"/> damage (reductions apply) at the start of the next enemy turn, unless the Devil takes damage first.</summary>
         internal List<BattleEvent> DoSoulContract(Unit devil, Unit target)
         {
             UseUp(devil, ActionKind.SoulContract);
@@ -3250,7 +3263,8 @@ namespace ArmyRoguelike.Core
             foreach (var u in _units.Where(u => u.ContractBy == devil).OrderBy(u => u.Id).ToList())
             {
                 u.ContractBy = null;
-                after.Add(new StatusEvent(devil, u, StatusKind.ContractBroken, 0));
+                if (u.IsAlive && u.IsPlaced)
+                    after.Add(new StatusEvent(devil, u, StatusKind.ContractBroken, 0));
             }
         }
 
@@ -3274,17 +3288,19 @@ namespace ArmyRoguelike.Core
         /// The tiles a Fire Breath at the target would cover: <see cref="FireBreathLength"/> tiles in a straight line from the
         /// fiend, stopping at a rock. Null if the target isn't in that line.
         /// </summary>
-        public List<GridPos> FireBreathLine(Unit fiend, Unit target)
+        public List<GridPos> FireBreathLine(Unit fiend, Unit target) =>
+            fiend.Size != 1 || target == null || target.Size != 1 ? null : FireBreathLineFrom(fiend.Pos, target.Pos);
+
+        /// <summary>The Fire Breath line from a 1x1 fiend standing on <paramref name="from"/> at a target tile, or null (also for the intent).</summary>
+        public List<GridPos> FireBreathLineFrom(GridPos from, GridPos target)
         {
-            if (fiend.Size != 1 || target == null || target.Size != 1)
-                return null;
-            var dir = StraightDirection(fiend.Pos, target.Pos);
-            if (dir == null || fiend.Pos.StepsTo(target.Pos) > FireBreathLength)
+            var dir = StraightDirection(from, target);
+            if (dir == null || from.StepsTo(target) > FireBreathLength)
                 return null;
             var line = new List<GridPos>();
-            for (var p = fiend.Pos + dir.Value; line.Count < FireBreathLength && Board.InBounds(p) && !Board.IsRock(p); p += dir.Value)
+            for (var p = from + dir.Value; line.Count < FireBreathLength && Board.InBounds(p) && !Board.IsRock(p); p += dir.Value)
                 line.Add(p);
-            return line.Contains(target.Pos) ? line : null;
+            return line.Contains(target) ? line : null;
         }
 
         /// <summary>Fire Breath: one of your units 1-2 tiles away in a straight line, with no rock in between.</summary>

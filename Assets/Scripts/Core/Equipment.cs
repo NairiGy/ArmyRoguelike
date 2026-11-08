@@ -190,11 +190,11 @@ namespace ArmyRoguelike.Core
                 case Ability.CorpseBlast: return $"a bone pile within its raise range explodes for {Battle.CorpseBlastDamage} damage in the 3x3 around it, friend or foe; the pile is used up";
                 case Ability.StoneHeart: return $"its HP falls in {Battle.BossPhases} phases, and it loses at most one a round: damage past the next phase is lost until your next turn. Each new phase changes how it fights (Giant: 2 actions a turn, then falling rocks on your units' tiles each round; Necromancer: {Battle.PhaseSkeletons} skeletons climb onto the roof). Its max HP grows by {Battle.BossHpPerLevel} for every level in your army";
                 case Ability.Hellborn: return "burning ground doesn't hurt it";
-                case Ability.BloodOffering: return $"when it dies, the nearest other demon within {Battle.OfferingRange} tiles gains {Battle.OfferingFury} Fury (+1 damage per Fury for the rest of the fight)";
+                case Ability.BloodOffering: return $"when it dies, the nearest other demon within {Battle.OfferingRange} tiles gains {Battle.OfferingFury} Fury (+1 damage per Fury for the rest of the fight, {Battle.MaxFury} at most)";
                 case Ability.Hellswap: return $"trades places with one of your units 2-{Battle.HellswapRange} tiles away (no line of sight needed); nothing on either tile goes off";
-                case Ability.Bloodlust: return $"gains {Battle.BloodlustFury} Fury (+1 damage for the rest of the fight) whenever a unit next to it dies, friend or foe";
+                case Ability.Bloodlust: return $"gains {Battle.BloodlustFury} Fury (+1 damage for the rest of the fight, {Battle.MaxFury} at most) whenever a unit next to it dies, friend or foe";
                 case Ability.RendingBlow: return $"loses {Battle.RendingBlowCost} of its own HP, then hits a unit next to it for its damage +{Battle.RendingBlowBonus}";
-                case Ability.SoulContract: return $"marks one of your units within {Battle.ContractRange} tiles (no line of sight needed): at the start of the next enemy turn it loses {Battle.ContractDamage} HP, unless the Devil takes damage before then";
+                case Ability.SoulContract: return $"marks one of your units within {Battle.ContractRange} tiles (no line of sight needed): at the start of the next enemy turn it takes {Battle.ContractDamage} damage (shields and damage reductions still count), unless the Devil takes damage before then";
                 case Ability.Spines: return $"melee attackers take {Battle.ThornsDamage} damage";
                 case Ability.FireBreath: return $"breathes down a straight line of {Battle.FireBreathLength} tiles at one of your units on it (a rock stops it): {Battle.FireBreathDamage} damage to each of your units there, and the tiles burn for {Battle.BurnRounds} rounds";
                 default: return "";

@@ -775,15 +775,23 @@ namespace ArmyRoguelike.View
                         _board.SetHighlight(wolf.Pos, AuraColor);
                     break;
                 case IntentKind.Hellswap:
-                case IntentKind.FireBreath:
-                    // Placeholder: the target, and the tile the swapped unit lands on or the fiend breathes from.
+                    // Placeholder: the target, and the tile it lands on (where the imp swaps from).
                     _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
-                    if (intent.Tile.HasValue && intent.Tile.Value != enemy.Pos)
-                        _board.SetHighlight(intent.Tile.Value, RockLandingColor);
-                    else if (intent.Kind == IntentKind.Hellswap)
-                        _board.SetHighlight(enemy.Pos, RockLandingColor);
+                    _board.SetHighlight(intent.Tile ?? enemy.Pos, RockLandingColor);
                     line.Show(from, to);
                     break;
+                case IntentKind.FireBreath:
+                {
+                    // The whole line that burns, and the tile it breathes from if it walks first.
+                    var breathFrom = intent.Tile ?? enemy.Pos;
+                    foreach (var p in Battle.FireBreathLineFrom(breathFrom, intent.Target.Pos) ?? new List<GridPos> { intent.Target.Pos })
+                        _board.SetHighlight(p, BombZoneColor);
+                    _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
+                    if (breathFrom != enemy.Pos)
+                        _board.SetHighlight(breathFrom, RockLandingColor);
+                    line.Show(from, to);
+                    break;
+                }
                 default:
                     _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
                     line.Show(from, to);
@@ -2227,7 +2235,7 @@ namespace ArmyRoguelike.View
             if (u.Fury > 0)
                 lines.Add($"Fury {u.Fury}: +{u.Fury} damage for the rest of the fight");
             if (u.ContractBy != null)
-                lines.Add($"Soul Contract: loses {Battle.ContractDamage} HP at the start of the enemy turn, unless the {u.ContractBy.Stats.Name} takes damage first");
+                lines.Add($"Soul Contract: takes {Battle.ContractDamage} damage at the start of the enemy turn, unless the {u.ContractBy.Stats.Name} takes damage first");
             var engaged = EngagedLine(u);
             if (engaged.Length > 0)
                 lines.Add(engaged);
@@ -2246,7 +2254,7 @@ namespace ArmyRoguelike.View
             return $"Engaged by {string.Join(", ", holders)}: stepping out of their reach uses up {who} remaining moves";
         }
 
-        private static string IntentText(Intent intent)
+        private string IntentText(Intent intent)
         {
             if (intent.Target == null)
                 return "nothing";
@@ -2282,13 +2290,20 @@ namespace ArmyRoguelike.View
                 case IntentKind.Howl:
                     return $"howl: every wolf gets +{Battle.HowlMoves} move this turn (wolves lit up)";
                 case IntentKind.Hellswap:
-                    return $"hellswap: trade places with the {name}, which lands on the dark tile";
+                {
+                    // Imps go first, so whoever stands next to the landing tile hits the swapped unit right after.
+                    var landing = intent.Tile ?? intent.Target.Pos;
+                    var next = Battle.Living(Team.Enemy).Where(e => !e.IsObjective && e.Stats.Damage > 0 && !e.Has(Ability.Hellswap) && Battle.Distance(landing, 1, e) == 1)
+                        .Select(e => e.Stats.Name).Distinct().ToList();
+                    var follow = next.Count > 0 ? $" next to the {string.Join(" and the ", next)}, which act after the imps and can hit it this turn" : "";
+                    return $"hellswap: trade places with the {name}, which lands on the dark tile{follow}";
+                }
                 case IntentKind.RendingBlow:
-                    return $"rending blow on the {name}: it pays {Battle.RendingBlowCost} HP to hit for +{Battle.RendingBlowBonus}";
+                    return $"rending blow on the {name} for {intent.Amount} damage (it pays {Battle.RendingBlowCost} of its own HP)";
                 case IntentKind.SoulContract:
-                    return $"soul contract on the {name}: it loses {Battle.ContractDamage} HP next enemy turn unless you hurt the Devil first";
+                    return $"soul contract on the {name}: it takes {Battle.ContractDamage} damage next enemy turn unless you hurt the Devil first";
                 case IntentKind.FireBreath:
-                    return $"fire breath at the {name} from the dark tile: {Battle.FireBreathDamage} damage to each of your units in a line of {Battle.FireBreathLength}, and the tiles burn";
+                    return $"fire breath at the {name}: {intent.Amount} damage to each of your units on the lit line, and those tiles burn";
                 default:
                     return $"attack the {name}";
             }

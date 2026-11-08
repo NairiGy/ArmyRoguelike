@@ -175,6 +175,66 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
+        public void SoulContract_IntentSeesTheWalkUp()
+        {
+            var b = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(2, 0) }, new[] { E(UnitStats.Devil, 2, 4) });
+            Assert.AreEqual(4, Battle.Distance(Player(b), Enemy(b)), "out of contract range before it walks");
+            var intent = EnemyAI.PredictIntent(b, Enemy(b));
+            Assert.AreEqual(IntentKind.SoulContract, intent.Kind);
+            Assert.AreEqual(Player(b), intent.Target);
+            Assert.AreEqual(P(2, 4), Enemy(b).Pos, "predicting doesn't move the real devil");
+        }
+
+        [Test]
+        public void SoulContract_ADevilThatFallsVoidsIt()
+        {
+            var b = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(2, 4) }, new[] { E(UnitStats.Devil, 2, 5) });
+            b.SetField(Battlefield.EdgeOfTheWorld);
+            var warrior = Player(b);
+            var devil = Enemy(b);
+            warrior.ContractBy = devil;
+            b.PlayerUseAction(warrior, ActionKind.ShieldBash, devil.Pos);
+            Assert.IsTrue(devil.Fell);
+            Assert.IsNull(warrior.ContractBy);
+        }
+
+        [Test]
+        public void SoulContract_NoBrokenPopupForADeadUnit()
+        {
+            var b = Setup(new[] { M(UnitStats.Rogue), M(UnitStats.Archer) }, new[] { P(2, 3), P(5, 0) }, new[] { E(UnitStats.Devil, 2, 4) });
+            var archer = Player(b, 1);
+            var devil = Enemy(b);
+            archer.ContractBy = devil;
+            archer.Hp = 0;
+            devil.Hp = 1;
+            var events = b.PlayerAttack(Player(b, 0), devil);
+            Assert.IsFalse(events.OfType<StatusEvent>().Any(s => s.Kind == StatusKind.ContractBroken));
+            Assert.IsNull(archer.ContractBy);
+        }
+
+        [Test]
+        public void Fury_IsCapped()
+        {
+            var b = Setup(new[] { M(UnitStats.Rogue) }, new[] { P(2, 2) }, new[] { E(UnitStats.Imp, 2, 3), E(UnitStats.Demon, 3, 3) });
+            var demon = Enemy(b, 1);
+            demon.Fury = Battle.MaxFury - 1;
+            Enemy(b, 0).Hp = 1;
+            b.PlayerAttack(Player(b), Enemy(b, 0));
+            Assert.AreEqual(Battle.MaxFury, demon.Fury, "offering and bloodlust would give 2, the cap stops at 3");
+        }
+
+        [Test]
+        public void RendingBlow_IntentShowsTheTotalWithFuryAndFavored()
+        {
+            var b = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(2, 1) }, new[] { E(UnitStats.Demon, 2, 2) });
+            var demon = Enemy(b);
+            demon.Fury = 2;
+            Assert.AreEqual(UnitStats.Demon.Damage + 2 + Battle.RendingBlowBonus, EnemyAI.PredictIntent(b, demon).Amount);
+            demon.Favored = true;
+            Assert.AreEqual((UnitStats.Demon.Damage + 2 + Battle.RendingBlowBonus) * Battlefields.FavoredMultiplier, EnemyAI.PredictIntent(b, demon).Amount);
+        }
+
+        [Test]
         public void Devil_TridentStrikesTwoTilesAway()
         {
             var b = Setup(new[] { M(UnitStats.Warrior) }, new[] { P(2, 2) }, new[] { E(UnitStats.Devil, 2, 4) });

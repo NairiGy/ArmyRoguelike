@@ -264,7 +264,7 @@ public static class GamepediaWriter
         html.Append("<tr><td>Flee</td><td>It carries stolen gold.</td><td>The enemies' back row, where it will escape.</td></tr>");
         html.Append("<tr><td>Howl</td><td>It can howl, and the extra move would let at least one wolf bite this turn that otherwise couldn't (two if the leader could bite itself).</td><td>Every wolf.</td></tr>");
         html.Append("<tr><td>Hellswap</td><td>An imp with Hellswap ready and a swap that drops one of your units next to a fighting ally (see the Imp routine).</td><td>The target, and the tile it will land on.</td></tr>");
-        html.Append($"<tr><td>Soul Contract</td><td>A devil with Soul Contract ready and one of your units within {Battle.ContractRange} tiles without a contract.</td><td>The target, with an arrow.</td></tr>");
+        html.Append($"<tr><td>Soul Contract</td><td>A devil with Soul Contract ready that would sign one in its coming turn, after backing off or walking up (its turn is played out on a copy of the board).</td><td>The target, with an arrow.</td></tr>");
         html.Append("<tr><td>Fire Breath</td><td>A fiend with Fire Breath ready that can breathe at one of your units this turn, from its tile or one it can walk to.</td><td>The target, and the tile it breathes from.</td></tr>");
         html.Append($"<tr><td>Rending Blow</td><td>It has Rending Blow ready, more than {Battle.RendingBlowCost} HP, and can reach its target to attack this turn.</td><td>The target, with an arrow.</td></tr>");
         html.Append("<tr><td>Fling</td><td>A goblin that can't reach anyone to strike this turn, with a bomb, mine or unacted goblin next to it and one of your units 2-3 tiles away.</td><td>The target, the goblin to be thrown and its landing tile.</td></tr>");

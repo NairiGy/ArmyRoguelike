@@ -10,7 +10,7 @@ The other factions each have one trick: wolves chain bites, goblins fling things
 are tough, split and throw you around. Demons are about **blood and bargains**: they spend their own HP, they get
 stronger when things die around them, and they make you an offer you have to answer. Two new faction-wide ideas:
 
-- **Fury**: a counter on a demon, +1 damage per point for the rest of the fight. Shown on the card ("Fury N") and as a
+- **Fury**: a counter on a demon, +1 damage per point for the rest of the fight, 3 at most. Shown on the card ("Fury N") and as a
   dark red pip. It comes from deaths: imps feed it when they die, demons take it from any death next to them. So
   *where* you kill things matters: kill the imps away from the Demon, or fight the Demon away from the bodies.
 - **Hellborn**: burning ground doesn't hurt demons (every demon has it). Their own Fire Breath leaves fire behind, and
@@ -56,7 +56,7 @@ a contract sits on your unit as a pip and a card line until it comes due.
 - **Trident**: its basic attack is Long Reach (the Warrior technique): 2 tiles in a straight line, hitting both, and
   it's still melee (no line of sight, can be countered).
 - **Soul Contract** (cooldown 3): marks one of your units within 3 tiles (no line of sight needed). At the start of the
-  next enemy turn that unit loses 3 HP, unless the Devil takes any damage before then (from anything: an attack, a
+  next enemy turn that unit takes 3 damage (shields, Tough and other reductions count), unless the Devil takes any damage before then (from anything: an attack, a
   mine, a fireball). A Devil that dies voids its contracts too.
 - **AI** (new behaviour "Devil"): backs off from anyone next to it (comfort distance 2, like the Necromancer), signs a
   contract when it is ready (on a unit the contract would kill first, then the hardest hitter, then the weakest), else
@@ -83,7 +83,7 @@ a contract sits on your unit as a pip and a card line until it comes due.
   imp on each side, the Devil behind the Demon on the back row, the Fiend on the free back-rows tile furthest from the
   Demon. 5 units, 41 HP.
 - **Elite Demons**: the same pair of rocks; two Demons on the front row 2 apart with an imp between them and one beside
-  them, the Devil behind the gap, the Fiend in a back corner. 6 units, 48 HP.
+  them, the Devil behind the gap, the Fiend in a back corner. 6 units, 55 HP.
 - **Pool 2** (like the Elementals): never in step 1, a regular battle from step 2 on. The Run needed no change: it
   draws from `Encounter.Regular`, which now has 5 factions, so rematches start after 5 beaten factions instead of 4
   (with at most 7 fights before the boss, a run sees most factions once).
@@ -144,3 +144,20 @@ next knob is Rending Blow's bonus (+2 to +1), not more HP.
 | Fire Breath | A breath of fire along the 2 tiles | The area flash of a volley plus the existing burning-tile look |
 | Fury | A pip or glow that grows with Fury | A dark red status pip and a "+1 Fury" popup |
 | Intent icons | Icons for Hellswap, Rending Blow, Soul Contract, Fire Breath | Reused: push, sword, eye, burst |
+
+## Review fixes (2026-11-08, after the merge into `feature/night-fun`)
+
+A reviewer went through the faction after the lead merged it. What changed:
+
+1. **Devil intent**: the hover intent now plays the Devil's coming turn on a copy of the battle (`EnemyAI.PredictContract`), so it shows a contract it will sign after backing off or walking up. Before, it only checked from the tile it stood on.
+2. **Falling Devils**: a Devil that falls off Edge of the World or through a Crumbling Roof hole now voids its contracts. `DemonDeath` (called from `Damage`, `Fall` and `DropIntoHole`) calls `BreakContracts`. Blood Offering and Bloodlust now work on falls through holes too.
+3. **Dead units**: a unit's contract is cleared when it dies, and "Contract broken" only plays for living units.
+4. **Fire Breath intent**: shows the real damage (2 + Fury, doubled when Favored), on the hover line and on the badge ("Fire Breath 4"). It lights up the whole line and, if the fiend walks first, the tile it breathes from.
+5. **Rending Blow intent**: shows the total (its damage against that target + 2, Fury and Favored included), on the hover line and the badge. **Fury is capped at 3** (`Battle.MaxFury`); a gain past the cap shows nothing. The worst case, a Favored Rending Blow at Fury 3, is 16 and can still kill a Warrior. That is now always shown beforehand as a number on the badge.
+6. **Hellswap combo warning**: the hover line names the units next to the landing tile ("...lands on the dark tile next to the Demon, which acts after the imps and can hit it this turn").
+7. **Interrupted walk**: an imp whose walk to its swap tile is cut short replans from where it stopped and swaps only if that tile is still a good one.
+8. **Slippery**: ChooseHellswap checks "already next to an enemy" by adjacency, not by zone of control (which ignores Slippery units).
+9. **Soul Contract wording**: it is **3 damage** (a tick: shields, Tough, Shield Wall and the like reduce it; it is never doubled by Favored). All texts now say "takes 3 damage" instead of "loses 3 HP".
+10. **Logs**: attack entries have the `type` of their attack: `rending blow` for a Rending Blow (`AttackEvent.Kind`), `attack` otherwise. Every hit entry records the attacker's `fury`.
+
+Also: imp and fiend hover intents now see the walk-ups their turn will really have (`AsIfFreshTurn` clears last turn's "has acted" flags). The elite's HP sum above was wrong (48); it is 55. The sim numbers above are from before these fixes. The only rule change is the Fury cap, which rarely comes up in those fights.
