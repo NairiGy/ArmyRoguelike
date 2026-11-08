@@ -102,23 +102,49 @@ namespace ArmyRoguelike.Core
 
         // ---------- Mage ----------
 
+        // ---------- Mage (night pool 2026-11-08: fire, ice and arcane; see docs/night/mage-sapper.md) ----------
+
+        // Fire
         public static readonly Technique Fireball = Act(UnitStats.Apprentice, ActionKind.Fireball);
-        public static readonly Technique Chill = P(UnitStats.Apprentice, Ability.Chill);
-        public static readonly Technique Ward = Act(UnitStats.Apprentice, ActionKind.Ward);
-        public static readonly Technique Burning = P(UnitStats.Apprentice, Ability.Burning, Rare, Fireball);
+        public static readonly Technique Burning = P(UnitStats.Apprentice, Ability.Burning, requires: Fireball);
+        public static readonly Technique Firewall = Act(UnitStats.Apprentice, ActionKind.Firewall);
+        public static readonly Technique SearingBolt = P(UnitStats.Apprentice, Ability.SearingBolt);
         public static readonly Technique Concussive = P(UnitStats.Apprentice, Ability.Concussive, Rare, Fireball);
-        public static readonly Technique IceWall = Act(UnitStats.Apprentice, ActionKind.IceWall, Rare);
-        public static readonly Technique Shatter = P(UnitStats.Apprentice, Ability.Shatter, Rare, Chill);
+
+        // Ice
+        public static readonly Technique Chill = P(UnitStats.Apprentice, Ability.Chill);
+        public static readonly Technique IceWall = Act(UnitStats.Apprentice, ActionKind.IceWall);
+        public static readonly Technique Shatter = P(UnitStats.Apprentice, Ability.Shatter, Rare);
+        public static readonly Technique Blizzard = Act(UnitStats.Apprentice, ActionKind.Blizzard, Rare);
+
+        // Arcane
+        public static readonly Technique Ward = Act(UnitStats.Apprentice, ActionKind.Ward);
+        public static readonly Technique Mend = Act(UnitStats.Apprentice, ActionKind.Mend, requires: Ward);
+        public static readonly Technique Transpose = Act(UnitStats.Apprentice, ActionKind.Transpose);
+        public static readonly Technique Twincast = P(UnitStats.Apprentice, Ability.Twincast, Rare);
+
+        // Parked Mage skills: their rules still work, but they aren't in All, so no run offers them.
         public static readonly Technique WideWard = P(UnitStats.Apprentice, Ability.WideWard, Rare, Ward);
-        public static readonly Technique Mend = Act(UnitStats.Apprentice, ActionKind.Mend, Rare, Ward);
+        public static readonly Technique Blink = Act(UnitStats.Apprentice, ActionKind.Blink);
 
-        // ---------- Sapper ----------
+        // ---------- Sapper (night pool 2026-11-08: mines, rubble, walls and blasts) ----------
 
+        // Mines
         public static readonly Technique BigMines = P(UnitStats.Sapper, Ability.BigMines);
+        public static readonly Technique Hook = Act(UnitStats.Sapper, ActionKind.Hook);
+        public static readonly Technique QuickFuse = P(UnitStats.Sapper, Ability.QuickFuse, Rare);
+
+        // Rubble and walls
         public static readonly Technique Barricade = Act(UnitStats.Sapper, ActionKind.Barricade);
-        public static readonly Technique ThrowBomb = Act(UnitStats.Sapper, ActionKind.ThrowBomb, Rare);
-        public static readonly Technique BlastProof = P(UnitStats.Sapper, Ability.BlastProof, Rare);
-        public static readonly Technique Turret = Act(UnitStats.Sapper, ActionKind.Turret, Rare, Barricade);
+        public static readonly Technique CaveIn = Act(UnitStats.Sapper, ActionKind.CaveIn);
+        public static readonly Technique SpikedBarricades = P(UnitStats.Sapper, Ability.SpikedBarricades, requires: Barricade);
+        public static readonly Technique Demolish = Act(UnitStats.Sapper, ActionKind.Demolish, Rare);
+        public static readonly Technique Turret = Act(UnitStats.Sapper, ActionKind.Turret, Rare);
+
+        // Blasts
+        public static readonly Technique ThrowBomb = Act(UnitStats.Sapper, ActionKind.ThrowBomb);
+        public static readonly Technique BlastProof = P(UnitStats.Sapper, Ability.BlastProof);
+        public static readonly Technique Incendiary = P(UnitStats.Sapper, Ability.Incendiary);
         public static readonly Technique Detonate = Act(UnitStats.Sapper, ActionKind.Detonate, Rare, Barricade);
 
         public static readonly IReadOnlyList<Technique> All = new[]
@@ -126,8 +152,8 @@ namespace ArmyRoguelike.Core
             Sweep, ShieldUp, ThrowShield, Vanguard, Charge, Battlecry, Taunt, ZocStrike,
             SteadyAimPlus, Pierce, OpeningShot, Prey, Volley,
             Pincer, Riposte, Momentum, Poison, RipostePlus, Dodge,
-            Fireball, Chill, Ward, Burning, Concussive, IceWall, Shatter, WideWard, Mend,
-            BigMines, Barricade, ThrowBomb, BlastProof, Turret, Detonate,
+            Fireball, Burning, Firewall, SearingBolt, Concussive, Chill, IceWall, Shatter, Blizzard, Ward, Mend, Transpose, Twincast,
+            BigMines, Hook, QuickFuse, Barricade, CaveIn, SpikedBarricades, Demolish, Turret, ThrowBomb, BlastProof, Incendiary, Detonate,
         };
 
         /// <summary>The techniques a member could learn now.</summary>

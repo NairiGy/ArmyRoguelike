@@ -40,11 +40,11 @@ namespace ArmyRoguelike.Tests
         public void Learn_NeedsTheRequirement()
         {
             var mage = M(UnitStats.Apprentice);
-            Assert.IsFalse(mage.Learn(Technique.Shatter), "needs Chill");
-            Assert.IsFalse(Technique.LearnableBy(mage).Contains(Technique.Shatter));
-            Assert.IsTrue(mage.Learn(Technique.Chill));
-            Assert.IsTrue(Technique.LearnableBy(mage).Contains(Technique.Shatter));
-            Assert.IsTrue(mage.Learn(Technique.Shatter));
+            Assert.IsFalse(mage.Learn(Technique.Mend), "needs Ward");
+            Assert.IsFalse(Technique.LearnableBy(mage).Contains(Technique.Mend));
+            Assert.IsTrue(mage.Learn(Technique.Ward));
+            Assert.IsTrue(Technique.LearnableBy(mage).Contains(Technique.Mend));
+            Assert.IsTrue(mage.Learn(Technique.Mend));
         }
 
         [Test]
@@ -92,7 +92,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Catalog_EveryRequirementIsInTheSameLine()
         {
-            Assert.AreEqual(34, Technique.All.Count);
+            Assert.AreEqual(44, Technique.All.Count);
             foreach (var t in Technique.All.Where(t => t.Requires != null))
                 Assert.AreEqual(t.Line, t.Requires.Line, t.Name);
             Assert.AreEqual(Technique.All.Count, Technique.All.Select(t => t.Name).Distinct().Count(), "unique names");
@@ -153,7 +153,7 @@ namespace ArmyRoguelike.Tests
             var b = Started(new[] { M(UnitStats.Apprentice, Technique.Fireball), M(UnitStats.Apprentice) }, new[] { P(3, 0), P(0, 0) },
                 new[] { (UnitStats.Wolf, P(3, 3)), (UnitStats.Wolf, P(7, 7)) });
             var mage = Player(b, 0);
-            CollectionAssert.AreEqual(new[] { ActionKind.Blink, ActionKind.Fireball }, mage.Actions.ToArray());
+            CollectionAssert.AreEqual(new[] { ActionKind.FrostNova, ActionKind.Fireball }, mage.Actions.ToArray());
             Assert.IsFalse(Player(b, 1).HasAction(ActionKind.Fireball));
             b.PlayerUseAction(mage, ActionKind.Fireball, P(3, 3));
             Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.FireballDamage, Enemy(b, 0).Hp);

@@ -188,7 +188,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Blink_TeleportsPastRocksAndReach()
         {
-            var b = Setup(new[] { M(UnitStats.Apprentice) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far }, P(2, 1));
+            var b = Setup(new[] { M(UnitStats.Apprentice, Technique.Blink) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far }, P(2, 1));
             var mage = Player(b);
             Assert.IsTrue(b.CanUseAction(mage, ActionKind.Blink, P(1, 1)), "over the rock");
             Assert.IsTrue(b.CanUseAction(mage, ActionKind.Blink, P(3, 4)), "3 steps is in range");
@@ -202,14 +202,14 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void Blink_IsFree_ButOnlyBeforeActing()
         {
-            var b = Setup(new[] { M(UnitStats.Apprentice) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far });
+            var b = Setup(new[] { M(UnitStats.Apprentice, Technique.Blink) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far });
             var mage = Player(b);
             b.PlayerUseAction(mage, ActionKind.Blink, P(3, 3));
             Assert.AreEqual(mage.MaxAp, mage.Ap, "no AP spent");
             Assert.IsTrue(b.CanMove(mage), "it can still move");
             Assert.IsTrue(b.CanAttack(mage, Enemy(b)), "and attack");
 
-            var other = Setup(new[] { M(UnitStats.Apprentice) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far });
+            var other = Setup(new[] { M(UnitStats.Apprentice, Technique.Blink) }, new[] { P(3, 1) }, new[] { E(UnitStats.Wolf, 3, 2), Far });
             var attacker = Player(other);
             other.PlayerAttack(attacker, Enemy(other));
             Assert.IsFalse(other.CanUseAction(attacker, ActionKind.Blink, P(1, 1)), "no blinking away after attacking");
@@ -437,7 +437,7 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Chill_SlowsNextTurn_ShatterDoubles()
+        public void Chill_SlowsNextTurn_ShatterAddsDamage()
         {
             var b = Setup(new[] { M(UnitStats.Apprentice, Technique.Chill, Technique.Shatter) }, new[] { P(3, 0) }, new[] { E(UnitStats.Brute, 3, 2) });
             var glacier = Player(b);
@@ -445,7 +445,7 @@ namespace ArmyRoguelike.Tests
             var normal = b.DamageAgainst(glacier, brute);
             b.PlayerAttack(glacier, brute);
             Assert.IsTrue(brute.IsSlowed);
-            Assert.AreEqual(normal * 2, b.DamageAgainst(glacier, brute));
+            Assert.AreEqual(normal + Battle.ShatterBonus, b.DamageAgainst(glacier, brute));
             b.EndUnitTurn(glacier);
             b.EndPlayerTurn();
             Assert.IsTrue(brute.SlowedThisTurn);
@@ -528,7 +528,8 @@ namespace ArmyRoguelike.Tests
             Assert.IsTrue(b.Board.IsObstacle(P(3, 2)));
             captain.Ap = 4;
             var events = b.PlayerUseAction(captain, ActionKind.Detonate, captain.Pos);
-            Assert.IsFalse(b.Board.IsObstacle(P(3, 2)));
+            Assert.IsFalse(b.IsBarricade(P(3, 2)));
+            Assert.IsTrue(b.IsRubble(P(3, 2)), "a blown barricade leaves rubble");
             Assert.AreEqual(UnitStats.Wolf.MaxHp - Battle.BarricadeBlastDamage, Enemy(b).Hp);
             Assert.IsTrue(events.OfType<ExplosionEvent>().Any(e => e.Cause == "barricade"));
         }
@@ -551,7 +552,7 @@ namespace ArmyRoguelike.Tests
             warrior.Ap = 1;
             events = b.PlayerAttackBarricade(warrior, P(3, 2));
             Assert.IsFalse(b.IsBarricade(P(3, 2)));
-            Assert.IsFalse(b.Board.IsObstacle(P(3, 2)), "broken: the tile is free");
+            Assert.IsTrue(b.IsRubble(P(3, 2)), "broken: it collapses into rubble");
             Assert.IsTrue(events.OfType<TileEvent>().Any(t => t.Kind == "barricade" && !t.Added));
         }
 

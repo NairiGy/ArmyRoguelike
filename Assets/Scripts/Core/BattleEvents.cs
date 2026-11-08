@@ -197,6 +197,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>The Warrior's zone-of-control passive: <see cref="EffectEvent.Unit"/> struck an enemy stepping out of its reach.</summary>
         ZocStrike,
+
+        /// <summary>Rubble crushed <see cref="EffectEvent.Unit"/>: <see cref="EffectEvent.Amount"/> extra collision damage, and the rubble broke.</summary>
+        Crush,
     }
 
     /// <summary>A unit left the board, e.g. a cutpurse escaping with stolen gold.</summary>
@@ -323,6 +326,12 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Throw Shield: stronger and faster for the battle, <see cref="StatusEvent.Amount"/> HP lost.</summary>
         ThrowShield,
+
+        /// <summary>Frost Nova: the mage blasted cold around itself (Source and Target are the same unit).</summary>
+        FrostNova,
+
+        /// <summary>Grappling Hook: the target is about to be pulled towards the sapper.</summary>
+        Hooked,
     }
 
     /// <summary>A status or support effect was put on a unit by an action or a hit.</summary>

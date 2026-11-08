@@ -11,11 +11,15 @@ namespace ArmyRoguelike.Core
 
         private readonly bool[,] _obstacles;
 
+        // Low obstacles (Rubble): block walking and standing like a rock, but not line of sight.
+        private readonly bool[,] _low;
+
         public Board(int width, int height, IEnumerable<GridPos> obstacles = null)
         {
             Width = width;
             Height = height;
             _obstacles = new bool[width, height];
+            _low = new bool[width, height];
             if (obstacles == null)
                 return;
             foreach (var p in obstacles)
@@ -27,6 +31,7 @@ namespace ArmyRoguelike.Core
             Width = other.Width;
             Height = other.Height;
             _obstacles = (bool[,])other._obstacles.Clone();
+            _low = (bool[,])other._low.Clone();
         }
 
         /// <summary>A separate board with the same rocks.</summary>
@@ -39,15 +44,31 @@ namespace ArmyRoguelike.Core
         /// <summary>Adds a rock during a battle, e.g. where an ogre's boulder lands.</summary>
         public void AddObstacle(GridPos p)
         {
-            if (InBounds(p))
-                _obstacles[p.X, p.Y] = true;
+            if (!InBounds(p))
+                return;
+            _obstacles[p.X, p.Y] = true;
+            _low[p.X, p.Y] = false;
         }
+
+        /// <summary>Adds a low obstacle (Rubble): it blocks walking and standing, but shots and line of sight pass over it.</summary>
+        public void AddLowObstacle(GridPos p)
+        {
+            if (!InBounds(p))
+                return;
+            _obstacles[p.X, p.Y] = true;
+            _low[p.X, p.Y] = true;
+        }
+
+        /// <summary>A low obstacle (Rubble) stands here.</summary>
+        public bool IsLowObstacle(GridPos p) => InBounds(p) && _low[p.X, p.Y];
 
         /// <summary>Clears a tile, e.g. when an ice wall melts or a barricade blows up.</summary>
         public void RemoveObstacle(GridPos p)
         {
-            if (InBounds(p))
-                _obstacles[p.X, p.Y] = false;
+            if (!InBounds(p))
+                return;
+            _obstacles[p.X, p.Y] = false;
+            _low[p.X, p.Y] = false;
         }
 
         public IEnumerable<GridPos> AllTiles()
@@ -103,7 +124,7 @@ namespace ArmyRoguelike.Core
                 var p = new GridPos(cx, cy);
                 if (p == from || p == to)
                     continue;
-                if (!IsObstacle(p))
+                if (!IsObstacle(p) || IsLowObstacle(p))
                     return false;
                 any = true;
             }
