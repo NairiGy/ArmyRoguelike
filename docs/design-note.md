@@ -223,6 +223,14 @@ Decided with the user. Goals for the five heroes: every hero has at least one sy
   - **Sapper, Big Mines** (rework): mines deal 6, but it can have only 2 out.
   - Why: Planted and Overchannel turn a hero's own theme status against itself, the same shape as Steady Aim and Battlecry, and they need no new keyword.
 
+## Faction map (2026-11-09)
+
+Asked for by the user: the goal is factions that fight as one army, not random mobs, so faction fights are more interesting.
+
+- **The map:** [Enemy Faction Map](https://claude.ai/artifact/AqboPtABMZ1qwcSG8CKrLJ) (private claude.ai page; source [faction-map.html](faction-map.html), data as JS tables at the bottom). A different format from the synergy map, because a faction is a fixed team with a plan, not pieces to combine. Per faction: its plan in one line, each unit's role (Anchor, Setup, Payoff, Disruptor, Clock, Filler), the combos between units with whether they fire (works, rare, missing, hurts, untested), the kill-order choice, the question it asks, a judgment (Cohesion, Question, Readability, Counterplay, Distinctness, in that order of weight) and a grid of which hero themes answer, resist or are punished by it.
+- **First read** (Claude, from the code and logs, not checked in play): Wolves are the model (Howl and Blood Scent feed the bite chain; leader-or-pack choice). Demons are designed the same way but never played. Goblins' two halves don't meet (bombs go off before goblins could fling them). Bandits have three jobs that each work alone (the Brute never guards a shooter). Elementals have no link at all; they are hard through HP.
+- **Ideas on the page, none agreed:** setup units act first for every faction, a shared prey per turn, layouts that put partners together, enemy banners, elites with a twist, combo counters in the logs, and a fix per faction. Each needs the user's OK.
+
 ## UI and controls
 
 - **Controls** (2026-11-08): left-click chooses, right-click acts. Left-click one of your units to select it (its card opens); left-click an enemy to open its card while your unit stays selected; left-click empty ground to drop the selection. Right-click a tile to move, an enemy to attack (or walk up and attack), a barricade or rubble to hit it, or a yellow tile to use the aimed action. Esc cancels an aimed action, or else closes the card. Placement and HUD buttons stay on left-click. Alt shows every enemy's intent.

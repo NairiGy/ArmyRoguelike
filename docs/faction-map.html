@@ -1,0 +1,600 @@
+<title>Enemy Faction Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the synergy map's stone look; a summary table first, then one card per faction in its own colour, then the answers grid. */
+:root {
+  --bg: #eef0f2;
+  --panel: #f8f9fa;
+  --line: #d3d8de;
+  --fg: #1d2329;
+  --muted: #5d6873;
+  --accent: #3d5f86;
+  --good: #2e7d4f;
+  --good-bg: #dcefe3;
+  --warn: #8a6a14;
+  --warn-bg: #f3e8c6;
+  --bad: #b2412b;
+  --bad-bg: #f6dcd5;
+  --info: #2f6fb0;
+  --info-bg: #dbe8f6;
+  --f-wolves: #6b5a48; --f-goblins: #4f7a2c; --f-bandits: #9a5b1e; --f-elementals: #4a6c8a; --f-demons: #a3302a; --f-bosses: #64707c;
+  --h-warrior: #b4472f; --h-archer: #3f7d32; --h-rogue: #7445a6; --h-mage: #2b6fb3; --h-sapper: #a0680c;
+  --display: "Marcellus", "Trajan Pro", Georgia, serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151d; --panel: #1a1f2a; --line: #2c3442; --fg: #e3e7ee; --muted: #9aa5b5; --accent: #9dbbe0;
+    --good: #6cc792; --good-bg: #1c3527; --warn: #e2c46e; --warn-bg: #3a3118; --bad: #f08f78; --bad-bg: #43221b; --info: #8fbdf0; --info-bg: #1f3350;
+    --f-wolves: #c2ab92; --f-goblins: #9ccb6e; --f-bandits: #e2a462; --f-elementals: #93b8db; --f-demons: #f0857a; --f-bosses: #9aa5b5;
+    --h-warrior: #ef8a72; --h-archer: #8fcb7c; --h-rogue: #c19af0; --h-mage: #84b8f0; --h-sapper: #e8b65a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151d; --panel: #1a1f2a; --line: #2c3442; --fg: #e3e7ee; --muted: #9aa5b5; --accent: #9dbbe0;
+  --good: #6cc792; --good-bg: #1c3527; --warn: #e2c46e; --warn-bg: #3a3118; --bad: #f08f78; --bad-bg: #43221b; --info: #8fbdf0; --info-bg: #1f3350;
+  --f-wolves: #c2ab92; --f-goblins: #9ccb6e; --f-bandits: #e2a462; --f-elementals: #93b8db; --f-demons: #f0857a; --f-bosses: #9aa5b5;
+  --h-warrior: #ef8a72; --h-archer: #8fcb7c; --h-rogue: #c19af0; --h-mage: #84b8f0; --h-sapper: #e8b65a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1 { font-family: var(--display); font-weight: 400; font-size: 34px; letter-spacing: .02em; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 400; font-size: 22px; margin: 0 0 6px; text-wrap: balance; }
+h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 6px; font-weight: 600; }
+p { margin: 0; max-width: 72ch; }
+.sub { color: var(--muted); margin-top: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px; color: var(--muted); font-size: 13px; align-items: center; }
+nav { display: flex; flex-wrap: wrap; gap: 4px; margin: 22px 0 18px; border-bottom: 1px solid var(--line); }
+nav button { font: inherit; font-weight: 500; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); padding: 8px 12px; cursor: pointer; margin-bottom: -1px; }
+nav button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+button:focus-visible, .cellbtn:focus-visible, .utip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+section { display: grid; gap: 22px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 18px; min-width: 0; }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px; }
+@media (max-width: 820px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+.note { color: var(--muted); font-size: 13px; }
+.num { font-family: var(--mono); color: var(--muted); font-size: 12px; }
+ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+
+.fname { font-family: var(--display); font-size: 17px; color: var(--c); white-space: nowrap; }
+.fname::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--c); margin-right: 7px; vertical-align: 2px; }
+.sc { display: inline-block; font-size: 12px; font-weight: 500; padding: 0 6px; line-height: 18px; border-radius: 3px; border: 1px solid currentColor; white-space: nowrap; margin: 1px 3px 1px 0; }
+.sc b { font-weight: 600; }
+.sc.g { color: var(--good); background: var(--good-bg); }
+.sc.o { color: var(--muted); border-style: dotted; }
+.sc.w { color: var(--bad); background: var(--bad-bg); }
+.st { display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 0 6px; line-height: 18px; border-radius: 3px; white-space: nowrap; }
+.st.works { color: var(--good); background: var(--good-bg); }
+.st.rare { color: var(--warn); background: var(--warn-bg); }
+.st.missing { color: var(--bad); background: var(--bad-bg); }
+.st.hurts { color: var(--bad); border: 1px solid currentColor; }
+.st.untested { color: var(--info); background: var(--info-bg); }
+.role { display: inline-block; font-size: 12px; font-weight: 600; padding: 0 7px; border-radius: 3px; background: var(--bg); border: 1px solid var(--line); color: var(--fg); white-space: nowrap; margin-right: 3px; }
+
+.fcards { display: grid; gap: 22px; }
+.fcard { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--c); border-radius: 6px; padding: 18px; display: grid; gap: 16px; min-width: 0; }
+.fhead { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
+.fhead h2 { color: var(--c); margin: 0; }
+.fplan { font-size: 16px; max-width: 80ch; }
+.fgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 22px; }
+@media (max-width: 820px) { .fgrid { grid-template-columns: minmax(0, 1fr); } }
+.units { display: grid; gap: 8px; }
+.unit { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.unit:last-child { border-bottom: 0; padding-bottom: 0; }
+.unit .uline { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.unit .job { color: var(--muted); font-size: 13px; }
+.utip { font: inherit; font-weight: 600; background: none; border: 0; padding: 0; color: var(--fg); cursor: help; text-decoration: underline dotted var(--muted); text-underline-offset: 3px; }
+.chains { display: grid; gap: 8px; }
+.chain { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: baseline; }
+.chain .why { grid-column: 2; color: var(--muted); font-size: 13px; }
+.flow { font-weight: 500; }
+.flow .arrow { color: var(--muted); padding: 0 4px; }
+.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; font-size: 13px; }
+.facts dt { color: var(--muted); font-weight: 600; }
+.facts dd { margin: 0; }
+.gaps { border-left: 3px solid var(--bad); padding-left: 12px; display: grid; gap: 4px; }
+.gaps.none { border-left-color: var(--good); }
+
+.grid-a { border-collapse: separate; border-spacing: 3px; width: auto; }
+.grid-a th { text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--c, var(--fg)); padding: 4px 6px; text-align: center; border: 0; white-space: nowrap; }
+.grid-a th.row { text-align: right; font-family: var(--display); font-size: 15px; }
+.grid-a td { padding: 0; border: 0; }
+.cellbtn { width: 64px; height: 40px; border-radius: 4px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.cellbtn.A { background: var(--good-bg); color: var(--good); border-color: currentColor; }
+.cellbtn.R { background: var(--warn-bg); color: var(--warn); border-color: currentColor; }
+.cellbtn.P { background: var(--bad-bg); color: var(--bad); border-color: currentColor; }
+.cellbtn.X { background: linear-gradient(135deg, var(--good-bg) 50%, var(--warn-bg) 50%); color: var(--fg); }
+.cellbtn[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cellbtn:disabled { cursor: default; opacity: .55; }
+.key { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); align-items: center; }
+.key .cellbtn { width: auto; height: 22px; padding: 0 8px; cursor: default; }
+.idea { display: grid; gap: 4px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.idea:last-child { border-bottom: 0; padding-bottom: 0; }
+.idea .ih { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.idea .ih b { font-weight: 600; }
+.need { font-size: 12px; color: var(--muted); }
+#tip { position: fixed; z-index: 50; max-width: min(360px, calc(100vw - 16px)); background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; box-shadow: 0 6px 24px rgba(0,0,0,.18); pointer-events: none; display: grid; gap: 6px; font-size: 13px; }
+#tip .tn { font-family: var(--display); font-size: 17px; }
+#tip .ts { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+#tip ul { margin: 0; padding-left: 16px; display: grid; gap: 3px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Enemy Faction Map</h1>
+    <p class="sub">What each enemy faction is trying to do as a team: its plan, each unit's job in it, the combos between units and whether they really happen, the kill-order choice it gives you, and which hero themes answer it. Goal: factions that fight as one army, not five separate mobs. Unit texts come from the gamepedia (2026-11-08 export); numbers are placeholders. The judgments are Claude's first read from the code and the logs of one or two playtests, so check them in play.</p>
+    <div class="legend">
+      <span><span class="st works">works</span> fires in play as designed</span>
+      <span><span class="st rare">rare</span> possible, but the layout or AI seldom sets it up</span>
+      <span><span class="st missing">missing</span> would fit the plan, not in the game</span>
+      <span><span class="st hurts">hurts</span> the faction works against itself</span>
+      <span><span class="st untested">untested</span> designed, never played</span>
+    </div>
+  </header>
+
+  <nav role="tablist" aria-label="Views">
+    <button role="tab" id="tab-factions" aria-selected="true" data-view="factions">Factions</button>
+    <button role="tab" id="tab-answers" aria-selected="false" data-view="answers">Hero answers</button>
+    <button role="tab" id="tab-ideas" aria-selected="false" data-view="ideas">Gaps and ideas</button>
+    <button role="tab" id="tab-ai" aria-selected="false" data-view="ai">Team AI today</button>
+    <button role="tab" id="tab-roles" aria-selected="false" data-view="roles">Roles and criteria</button>
+  </nav>
+
+  <section id="view-factions">
+    <div class="panel">
+      <h2>At a glance</h2>
+      <p class="note">One row per regular faction. Cohesion is how much the units need each other; it is the criterion this page exists for.</p>
+      <div class="scroll" style="margin-top:10px"><table id="summary"></table></div>
+    </div>
+    <div class="fcards" id="cards"></div>
+  </section>
+
+  <section id="view-answers" hidden>
+    <div class="cols">
+      <div class="panel">
+        <h2>Which hero themes answer which faction</h2>
+        <p class="note">Rows are factions, columns are the heroes' theme keywords from the synergy map, coloured by hero. Each faction should make a different hero shine and a different one struggle, so the draft matters and runs differ. Pick a cell for the reason.</p>
+        <div class="key" style="margin:12px 0">
+          <span><span class="cellbtn A">answer</span> the theme is a strong answer</span>
+          <span><span class="cellbtn R">resists</span> the faction blunts it</span>
+          <span><span class="cellbtn P">punishes</span> the faction turns it against you</span>
+          <span><span class="cellbtn X">mixed</span> depends on the unit</span>
+        </div>
+        <div class="scroll"><table class="grid-a" id="agrid"></table></div>
+      </div>
+      <div class="panel" id="adetail"></div>
+    </div>
+    <div class="panel">
+      <h2>What the grid says</h2>
+      <ul class="plain" id="atake" style="margin-top:8px"></ul>
+    </div>
+  </section>
+
+  <section id="view-ideas" hidden>
+    <div class="panel">
+      <h2>Ideas for faction teamwork</h2>
+      <p class="note">Proposals, none built. Rules, kits and AI behaviour need the user's OK; the "Needs" line says what each touches. Faction-wide ideas first, then fixes for each faction's gap.</p>
+      <div id="ideas" style="margin-top:14px; display:grid; gap:12px"></div>
+    </div>
+    <div class="panel">
+      <h2>Combo counters to log</h2>
+      <p class="note">So "do they work as one?" becomes a number per fight in the battle logs and the simulator report. Not built yet.</p>
+      <div class="scroll" style="margin-top:10px"><table id="counters"></table></div>
+    </div>
+  </section>
+
+  <section id="view-ai" hidden>
+    <div class="panel">
+      <h2>How enemies coordinate today</h2>
+      <p class="note">From <span class="num">Core/EnemyAI.cs</span>. Each enemy finishes its turn before the next starts, in the order they entered the battle, and picks its own target. Teamwork comes only from the pieces below.</p>
+      <div class="scroll" style="margin-top:10px"><table id="aitools"></table></div>
+    </div>
+  </section>
+
+  <section id="view-roles" hidden>
+    <div class="cols">
+      <div class="panel">
+        <h2>Roles</h2>
+        <p class="note">A unit's job in its faction's plan. A unit can have two. A faction with a Setup and a Payoff has a combo; one with only Anchors and Fillers has HP.</p>
+        <div class="scroll" style="margin-top:10px"><table id="roles"></table></div>
+      </div>
+      <div class="panel">
+        <h2>Criteria</h2>
+        <p class="note">In order of weight. Each faction is scored good, ok or weak on each.</p>
+        <div class="scroll" style="margin-top:10px"><table id="criteria"></table></div>
+      </div>
+    </div>
+  </section>
+</div>
+<div id="tip" role="tooltip" hidden></div>
+
+<script>
+// ---------- Data. Edit here; the page draws itself from these tables. ----------
+
+const ROLES = {
+  Anchor:    "Holds ground or soaks hits so the others can work (Brute, Demon, Elemental).",
+  Setup:     "Creates the situation the others cash in: moves, pins, swaps, extra reach (Howl, Hellswap, Grasp).",
+  Payoff:    "Gets stronger when the setup has happened (Wolf Bite, Rending Blow).",
+  Disruptor: "Breaks your formation: throws, pushes, dives past your line (Fling, Upheaval, Bull Rush).",
+  Clock:     "Punishes slow play, so you can't just turtle (Cutpurse, Soul Contract, bombs).",
+  Filler:    "A body with no job beyond its basic attack (Shard).",
+};
+
+const CRITERIA = [
+  ["Cohesion", "Do the units need each other? Does the faction play worse when you remove one type?"],
+  ["Question", "Does it ask the player one clear question, different from the other factions'?"],
+  ["Readability", "Do the intents show the combo before it happens, so a loss feels fair?"],
+  ["Counterplay", "How many different heroes and builds have an answer?"],
+  ["Distinctness", "Does it play unlike the other factions, beyond its numbers?"],
+];
+
+// Unit hover texts, from the gamepedia export (2026-11-08).
+const UNITS = {
+  "Pack Leader": ["HP 10 · DMG 3 · MV 2 · huge", ["Howl (cd 2): every wolf that hasn't acted yet gets +1 move this turn; the leader acts before the other enemies.", "Pack Bond: while it lives every wolf has +1 max HP; once it dies they have -1 and lose 2 HP on the spot.", "Wolf Bite: +1 for every wolf bite earlier this turn."]],
+  "Wolf": ["HP 6 · DMG 2 · MV 2 · small", ["Wolf Bite: 2 damage, +1 for every wolf bite earlier this turn.", "Blood Scent: goes for the lowest-HP unit it can reach and attack this turn, instead of the nearest.", "Swift."]],
+  "Goblin": ["HP 6 · DMG 2 · MV 2 · small", ["Fling (cd 2): throws what is next to it at a unit 2-4 tiles away, over obstacles: a bomb or mine goes off there; a goblin that hasn't acted lands next to the unit, deals 2 and can still act.", "Elusive: ignores zone of control.", "Swift."]],
+  "Goblin Bomber": ["HP 4 · DMG 1 · MV 1 · small", ["Bomb (cd 2): lobbed onto the tile of a unit 2-3 tiles away; explodes at the start of the next enemy turn for 3, its own side included.", "Powder Keg: when it dies, 2 damage to everyone around it, its own side included.", "Keeps its distance."]],
+  "Crossbowman": ["HP 6 · DMG 2 · RNG 3 · MV 1 · medium", ["Behind Cover: next to a wall it can't be hit by shots from range; melee and area damage still reach it.", "Overwatch (cd 2): with no shot, it aims; during your next turn the first of your units that walks onto a tile it sees in range is shot and stops there."]],
+  "Cutpurse": ["HP 5 · DMG 2 · MV 2 · small", ["Steal: its first damaging hit takes 5 gold; then it runs for the enemies' back row and escapes with it.", "Light Fingers: may move after attacking.", "Caltrops (cd 3): a unit of yours stepping on them takes 1 and stops.", "Swift."]],
+  "Bandit Brute": ["HP 12 · DMG 3 · MV 1 · huge", ["Guard: takes the hit when an adjacent ally is attacked.", "Bull Rush (cd 2): hit a unit next to it and push it; if it slams into a unit, both take 2."]],
+  "Elemental": ["HP 8 · DMG 3 · MV 1 · huge", ["Upheaval (cd 2): the ground bursts under one of your units within 2 tiles (no line of sight): 2 damage and a push away from the caster.", "Split: when it dies it becomes 2 Shards."]],
+  "Shard": ["HP 4 · DMG 2 · MV 1 · small", ["Half of an Elemental. No passive."]],
+  "Imp": ["HP 5 · DMG 2 · MV 2 · small", ["Hellswap (cd 3): trades places with one of your units 2-3 tiles away (no line of sight); nothing on either tile goes off. Imps act before the other enemies.", "Blood Offering: when it dies, the nearest other demon within 3 tiles gains 1 Fury.", "Hellborn, Swift."]],
+  "Demon": ["HP 14 · DMG 3 · MV 1 · huge", ["Rending Blow (cd 2): loses 2 of its own HP, then hits for its damage +2.", "Bloodlust: gains 1 Fury whenever a unit next to it dies, friend or foe.", "Hellborn."]],
+  "Devil": ["HP 10 · DMG 2 · RNG 2 · MV 1 · medium", ["Soul Contract (cd 3): a unit of yours within 3 tiles takes 3 damage at the start of the next enemy turn, unless the Devil takes damage before then.", "Long Reach: melee 2 tiles in a line, hitting both.", "Backs off to 2 tiles.", "Hellborn."]],
+  "Fiend": ["HP 7 · DMG 2 · MV 2 · small", ["Fire Breath (cd 2): 2 damage to each of your units on a 2-tile line; both tiles burn for 2 rounds.", "Thorns: melee attackers take 1.", "Hellborn, Swift."]],
+  "Necromancer": ["HP 14 · DMG 4 · RNG 3 · medium · boss", ["Raise (cd 3): every bone pile within 4 tiles at once.", "Corpse Blast (cd 2): a bone pile explodes in the 3x3, friend or foe.", "Soul Harvest: your fallen leave bone piles he can raise.", "Stone Heart: 3 phases; 2 skeletons climb on each new phase."]],
+  "Skeleton": ["HP 4 · DMG 2 · MV 1 · small", ["Grasp (cd 2): pins a unit next to it, no damage. Grasps ranged or Swift targets."]],
+  "Raised units": ["Bone Wolf, Bone Goblin Bomber, Bone Crossbowman, Bone Shard, Bone Imp", ["One per faction you beat this act, topped up with skeletons to 4. They keep their faction's kit; harvested player units keep only the basic attack."]],
+  "Giant": ["HP 42 · DMG 5 · huge · 2x2 · boss", ["Smash (every adjacent unit), Slam (within 2, pushes), Boulder (stays as a rock).", "Colossus: can't be pushed, pinned, slowed or grasped.", "Stone Heart: Wrath (2 actions) in phase 2, falling rocks in phase 3."]],
+};
+
+// status: works | rare | missing | hurts | untested
+const FACTIONS = [
+  {
+    id: "wolves", name: "Wolf Pack", layout: "Open Field", pool: 1, color: "--f-wolves",
+    plan: "Surround the weakest unit and chain bites on it in one turn.",
+    units: [
+      ["Pack Leader", ["Setup", "Anchor"], "Howls first so more wolves reach the prey; its death costs every wolf HP."],
+      ["Wolf", ["Payoff"], "Each bite after the first hits harder; Blood Scent sends all of them at the same unit."],
+    ],
+    chains: [
+      ["Howl", "+1 move for every wolf", "works", "The leader acts first and howls only when the extra move lets a wolf bite that otherwise couldn't."],
+      ["Blood Scent", "Wolf Bite chain on one target", "works", "Every wolf picks the lowest-HP unit it can reach, so the +1 per earlier bite stacks on one unit."],
+      ["Pack Bond", "the whole pack's HP", "works", "A lever for you more than for them: kill the leader and every wolf loses 2 HP on the spot."],
+    ],
+    choice: "Leader first, or thin the pack.",
+    dilemma: "Kill the Pack Leader first (no more Howl, every wolf loses 2 HP) while the wolves bite you, or thin the wolves to shorten the chain.",
+    question: "Can you keep your weakest unit from being surrounded?",
+    judge: { Cohesion: "g", Question: "g", Readability: "o", Counterplay: "g", Distinctness: "g" },
+    readNote: "Each badge shows one wolf's bite. Check whether the chain's total on one unit can be read before the enemy turn.",
+    escalation: [["Elite", "Two packs, each around its own leader (2 leaders, 4 wolves). More of the same plan, which suits it."], ["Champion", "The Pack Leader (toughest). Fleet on it means the howl comes from further away."], ["Raised", "Bone Wolf keeps Blood Scent and the bite chain."]],
+    gaps: [],
+    verdict: "The model faction: two unit types, each useless without the other, and a clear kill-order choice. Copy this shape.",
+  },
+  {
+    id: "goblins", name: "Goblin Bombers", layout: "Ridge", pool: 1, color: "--f-goblins",
+    plan: "Bombers lob over the ridge while Swift goblins slip past your line and fling each other at your back row.",
+    units: [
+      ["Goblin", ["Disruptor"], "Ignores your front line (Elusive) and throws other goblins, or your own mines, at you."],
+      ["Goblin Bomber", ["Clock"], "Delayed bombs force your units to move every turn; blows up when it dies."],
+    ],
+    chains: [
+      ["Fling a goblin", "it lands next to your unit, hits for 2 and still acts", "works", "Only when the thrower can't reach anyone to strike, so mostly on turn 1."],
+      ["Bomber's bomb", "a goblin flings it", "rare", "Bombs land on your units' tiles and go off at the start of the enemy turn, before any goblin acts. In practice goblins only fling the Sapper's mines."],
+      ["Powder Keg and bombs", "hit the goblins next to them", "hurts", "The Ridge puts goblins in row 4 right in front of the bombers in row 5, so killing a bomber blasts its own goblins."],
+    ],
+    choice: "Bombers behind the ridge, or goblins in your line.",
+    dilemma: "Chase the fragile bombers behind the ridge, or deal with the goblins already in your back line. Killing a bomber next to goblins hurts them too.",
+    question: "Can you protect your back line when lines and walls don't stop the enemy?",
+    judge: { Cohesion: "w", Question: "g", Readability: "o", Counterplay: "o", Distinctness: "g" },
+    readNote: "The bomber's hover shows Attack when it will bomb a farther unit (open task).",
+    escalation: [["Elite", "4 bombers, 4 goblins."], ["Champion", "A goblin (toughest at 6 HP)."], ["Raised", "Bone Goblin Bomber."], ["Scenario", "Break the Ritual: bombers and goblins guard totems."]],
+    gaps: ["The two unit types barely link: the combo the kit promises (goblins throwing the bombers' bombs) can't happen with the bomb timing.", "Bombers feel weak (playtest 2026-11-01), which is the same problem from the other side: they are a separate mob doing its own thing."],
+    verdict: "Two good ideas that don't meet. One timing or AI change could join them.",
+  },
+  {
+    id: "bandits", name: "Bandit Camp", layout: "Camp", pool: 1, color: "--f-bandits",
+    plan: "Crossbowmen behind cover lock down the approach, the Brute holds the middle, cutpurses steal gold and run.",
+    units: [
+      ["Crossbowman", ["Anchor", "Clock"], "Safe from shots behind a rock; Overwatch punishes walking up."],
+      ["Bandit Brute", ["Anchor", "Disruptor"], "Guard takes hits meant for its neighbours; Bull Rush breaks your line."],
+      ["Cutpurse", ["Clock"], "Steals 5 gold and runs for the back row; caltrops slow the chase."],
+    ],
+    chains: [
+      ["Brute's Guard", "protects a crossbowman from melee", "rare", "Melee is the main way past Behind Cover, and Guard would block it. But the layout starts the Brute in the centre and the AI never walks it to a shooter."],
+      ["Caltrops", "stop your unit on a watched tile", "missing", "Both stop you on a tile; nothing lines them up. Cutpurses drop caltrops only when running, on the tile nearest your units."],
+      ["Bull Rush", "pushes your unit into caltrops or an Overwatch lane", "missing", "Bull Rush pushes in a straight line away from the Brute, aimed at nothing."],
+      ["Cutpurse runs", "pulls your units away from the others", "works", "A clock, but it works by leaving the team, not with it."],
+    ],
+    choice: "Gold or HP.",
+    dilemma: "Gold or HP: chase the cutpurse before it escapes (2-3 turns), or deal with the shooters and the Brute. A real choice, but only the gold side of it is about this faction's teamwork.",
+    question: "How do you crack cover, and is the gold worth chasing?",
+    judge: { Cohesion: "w", Question: "o", Readability: "o", Counterplay: "g", Distinctness: "o" },
+    readNote: "Overwatch tiles show as a faint tint (art row open).",
+    escalation: [["Elite", "3 crossbowmen with cover each, 2 cutpurses, 2 brutes."], ["Champion", "The Brute (toughest)."], ["Raised", "Bone Crossbowman."]],
+    gaps: ["Three jobs that each work alone. The pieces that could link them (Guard on a shooter, caltrops in a firing lane, Bull Rush into either) exist, but the layout and AI never put them together.", "The cutpurse may be too hard to catch (playtest 2026-11-01)."],
+    verdict: "Richest kit of the pool-1 factions, least teamwork. Mostly a layout and AI problem, not a kit problem.",
+  },
+  {
+    id: "elementals", name: "Elementals", layout: "Crystal Cave", pool: 2, color: "--f-elementals",
+    plan: "Tough bodies that throw you around and turn into more bodies when killed.",
+    units: [
+      ["Elemental", ["Anchor", "Disruptor"], "Lots of HP, huge; Upheaval damages and shoves from 2 tiles without line of sight."],
+      ["Shard", ["Filler"], "What an Elemental leaves; just a basic attack."],
+    ],
+    chains: [
+      ["Upheaval", "pushes your unit into another elemental's reach", "rare", "The push goes straight away from the caster, so it lands next to a second elemental only by accident."],
+      ["Split", "2 shards to surround with", "works", "More bodies, but each acts alone."],
+      ["Elementals", "anything from each other", "missing", "No unit makes another better."],
+    ],
+    choice: "Hardly any: all the same unit.",
+    dilemma: "Weak: every enemy is the same. Finish one (2 shards appear) or spread damage.",
+    question: "Can you burn through a lot of HP while being shoved around?",
+    judge: { Cohesion: "w", Question: "w", Readability: "g", Counterplay: "o", Distinctness: "w" },
+    readNote: "Upheaval shows its target with an arrow.",
+    escalation: [["Elite", "4 elementals."], ["Champion", "An elemental."], ["Raised", "Bone Shard (no kit)."], ["Scenario", "Moon Shrine: waves from every edge; there the shrine gives the fight its plan."]],
+    gaps: ["No teamwork at all: it is hard because of HP (the hardest faction for the bot before the 2026-11-01 HP cut), not because of a plan.", "Slowed elementals play badly (open task), so the Mage's answer is stronger here than intended."],
+    verdict: "Needs a link between its units more than any other faction. Works well as scenario enemies, where the shrine is the plan.",
+  },
+  {
+    id: "demons", name: "Demons", layout: "Hellmouth", pool: 2, color: "--f-demons",
+    plan: "Drag your back line into the Demon, feed it deaths, and make you pay to reach the Devil.",
+    units: [
+      ["Imp", ["Setup"], "Acts first and swaps your ranged unit next to the Demon; its death feeds Fury."],
+      ["Demon", ["Anchor", "Payoff"], "Rending Blow on whoever arrives; grows from every death next to it."],
+      ["Devil", ["Clock"], "Contracts you can only break by hitting it, from behind the Demon."],
+      ["Fiend", ["Disruptor"], "Fire Breath punishes standing in a line; Thorns make melee pay."],
+    ],
+    chains: [
+      ["Hellswap", "your unit lands next to the Demon, which hits it the same turn", "untested", "Imps act before the other enemies, and the hover names the units next to the landing tile."],
+      ["Imp dies next to the Demon", "Blood Offering + Bloodlust, up to 2 Fury", "untested", "So where you kill imps matters."],
+      ["Soul Contract", "you walk into Demon reach and Fire Breath lines", "untested", "The Devil starts behind the Demon and backs off to 2 tiles."],
+      ["Fire Breath", "burning ground the demons stand in (Hellborn)", "untested", "Fire becomes their terrain and not yours."],
+      ["Fiend's Thorns", "ranged units are the clean answer, and imps hunt ranged units", "untested", "Two pieces pointing at the same weak spot."],
+    ],
+    choice: "Imps, Devil or Demon: each has a cost.",
+    dilemma: "Imps die easily but feed Fury near the Demon; the Devil voids its contract when hit; the Demon grows the longer you wait. Three good answers, each with a cost.",
+    question: "Where do things die, and do you pay the contract or break formation?",
+    judge: { Cohesion: "g", Question: "g", Readability: "o", Counterplay: "o", Distinctness: "g" },
+    readNote: "Every combo is named on an intent badge with its real damage.",
+    escalation: [["Elite", "2 Demons, 2 imps, Devil, Fiend."], ["Champion", "The Demon (toughest)."], ["Raised", "Bone Imp (Hellswap; Blood Offering usually feeds nobody)."]],
+    gaps: ["Never played. Fights are short (about 7 bot turns against 11 for the Elementals) and swingy at level 0."],
+    verdict: "Best designed for teamwork on paper. Playtest before changing anything; it is the test of whether this shape is fun.",
+  },
+];
+
+const BOSSES = [
+  {
+    id: "necro", name: "Necromancer", layout: "Graveyard", color: "--f-bosses",
+    plan: "Your past fights come back as one mixed army, and your own fallen join it.",
+    units: [["Necromancer", ["Setup", "Payoff"], "Raises every pile at once; Corpse Blast punishes standing on piles."], ["Skeleton", ["Setup"], "Grasp pins your ranged or Swift unit for the Necromancer."], ["Raised units", ["Filler"], "One per faction you beat this act."]],
+    chains: [["Grasp", "a pinned unit next to a bone pile meets Corpse Blast", "works", "Played once (2026-11-04 runs)."], ["Soul Harvest", "your deaths become his units", "works", "Standing on a pile to stop a raise now costs you a Corpse Blast."], ["Raised army", "anything from each other", "rare", "One unit per faction, so no faction's chain is complete (one Bone Wolf has no chain)."]],
+    note: "The raised army can't have faction teamwork by construction; the boss's own kit is the plan. Fine as is.",
+  },
+  {
+    id: "giant", name: "Giant", layout: "Quarry", color: "--f-bosses",
+    plan: "One huge body that reshapes the board with slams and boulders.",
+    units: [["Giant", ["Anchor", "Disruptor"], "Alone; Stone Heart phases give it a plan over time instead of teammates."]],
+    chains: [],
+    note: "A solo fight: cohesion doesn't apply. Its phases do the job a team does elsewhere.",
+  },
+];
+
+// Answers grid. A answer, R resists, P punishes, X mixed. Theme colour follows its hero.
+const THEMES = [
+  ["push", "Warrior"], ["guard", "Warrior"], ["pinned", "Archer"], ["marked", "Archer"], ["exposed", "Rogue"], ["hidden", "Rogue"],
+  ["poison", "Rogue"], ["slowed", "Mage"], ["burning", "Mage"], ["wall", "Sapper"], ["blast", "Sapper"],
+];
+const ANSWERS = {
+  wolves: {
+    push: ["X", "Wolves are small and fly 2 tiles out of the surround; the Pack Leader is huge and doesn't move."],
+    guard: ["A", "Blood Scent sends every wolf at one unit; a shield (they avoid it) or a Taunt on that unit breaks the chain."],
+    pinned: ["A", "Their plan is reach: a pinned wolf can't join the surround."],
+    slowed: ["A", "A slowed wolf can move or bite, not both."],
+    wall: ["A", "Walls make chokepoints; four wolves can't surround a unit with a wall beside it."],
+    blast: ["A", "They bunch around one target."],
+  },
+  goblins: {
+    push: ["A", "Small: a push throws a goblin 2 tiles, and pushing one next to a bomber you then kill sets off its Powder Keg on it."],
+    guard: ["R", "Elusive ignores zone of control, so a front line doesn't protect the back."],
+    pinned: ["A", "A pinned goblin can't dive; bombers only have 1 move anyway."],
+    exposed: ["A", "Bombers sit alone in the back row behind the ridge."],
+    wall: ["R", "Fling throws over obstacles and Elusive slips past your line."],
+    blast: ["P", "A goblin next to one of your mines flings it at you."],
+  },
+  bandits: {
+    push: ["X", "A push moves a crossbowman (medium) off its cover; the Brute is huge."],
+    pinned: ["X", "Pinning a cutpurse stops its escape, but the Archer's shots can't reach a crossbowman behind cover."],
+    marked: ["R", "Behind Cover blocks shots from range, the Archer's whole kit."],
+    exposed: ["A", "Guard protects every bandit next to the Brute; isolate them first."],
+    slowed: ["A", "A slowed cutpurse with gold can run or hit, and slowed shooters can't walk into a shot and fire."],
+    wall: ["P", "Any wall next to a crossbowman gives it cover, your barricades and ice included."],
+    blast: ["A", "Area damage reaches a crossbowman behind cover."],
+  },
+  elementals: {
+    push: ["R", "Huge: elementals never move from a push."],
+    poison: ["A", "Lots of HP, so poison keeps ticking."],
+    slowed: ["A", "Too strong right now: a slowed elemental walks up instead of using Upheaval (open AI task)."],
+    wall: ["P", "Upheaval shoves your units into walls for 2 more damage."],
+    blast: ["A", "Shards come in pairs next to each other."],
+  },
+  demons: {
+    push: ["X", "Imps and the Fiend are small (Edge of the World kills them); the Demon is huge."],
+    guard: ["A", "Shields and damage cuts reduce the contract's 3 damage; Taunt keeps the Demon on the Warrior."],
+    exposed: ["A", "An imp that swapped into your back line stands alone there."],
+    hidden: ["A", "A hidden unit can't be swapped or contracted."],
+    burning: ["R", "Hellborn: burning ground doesn't hurt demons."],
+    blast: ["A", "The Demon starts with an imp on each side."],
+  },
+};
+const ANSWER_TAKEAWAYS = [
+  "<b>Sapper</b> has the clearest spread: punished by Goblins (mines flung back) and Bandits (walls give their shooters cover), answered by Wolves and Elementals' shards. That is the kind of swing each hero should have.",
+  "<b>Archer</b> struggles only against Bandits and has no faction where it is clearly the answer. A faction that rewards pins or marks (something Swift that must be pinned, or a target that must be hit from range) would fill that.",
+  "<b>Mage</b>: Burning is resisted by Demons and answers nobody; Slowed answers Wolves, Bandits and (too well) Elementals.",
+  "<b>Rogue</b>: Exposed answers three factions; Hidden and Poison matter in one each.",
+  "<b>Warrior</b>: Push is mixed almost everywhere, because every faction has a huge unit. Guard is resisted only by Goblins.",
+  "These are judgments, not counts. The combo counters (Gaps and ideas tab) and a per-faction sim by draft would let the grid come from data.",
+];
+
+// need: what it touches. kind: wide (faction-wide) or a faction id.
+const IDEAS = [
+  { kind: "wide", name: "Setup before payoff, every faction", text: "Make the turn-order rule general: units that set things up act first (Howl and imps already do). For example the Brute would walk to guard before the shooters fire, and bombers would act before goblins.", need: "AI behaviour, user's OK. Cheap.", gain: "The biggest step toward 'they act as one' for the least work." },
+  { kind: "wide", name: "Shared prey", text: "Some factions pick one target for the whole turn and go for it together, shown on the intents (a skull over the prey). Wolves would want it most; Bandits could focus whoever the cutpurse is hunting.", need: "AI behaviour and an intent badge, user's OK.", gain: "Teamwork you can see at a glance; Taunt and shields become a real answer to it." },
+  { kind: "wide", name: "Layouts that put partners together", text: "Start combo partners where the combo can happen: the Brute next to a crossbowman, imps beside the Demon (already done).", need: "Encounter layout rules (Core/Encounter.cs), user's OK.", gain: "Combos happen from turn 1 without new rules." },
+  { kind: "wide", name: "Enemy banners", text: "Each faction gets one army-wide rule shown before the fight, mirroring the player's banners. A faction plan without new units. Example: Wolves, 'a wolf that bites a unit already bitten this turn moves 1 after biting'.", need: "New feature, user's call.", gain: "A place to give each faction its plan; also a lever for elites." },
+  { kind: "wide", name: "Elites with a twist", text: "An elite adds one new unit or rule to its faction instead of only more of the same.", need: "Changes a design-note rule ('no new types'), user's call.", gain: "Late fights ask a new question." },
+  { kind: "wide", name: "Combo counters in logs and the sim", text: "Count each faction's combos per fight (table below).", need: "PlaytestLogger and tools/balance only, no rule change.", gain: "Cohesion becomes a number to compare before and after a change." },
+  { kind: "goblins", name: "Bombs as ammo", text: "A bomber lobs its bomb onto an empty tile next to a goblin instead of onto your unit when that goblin can then fling it at you this turn. Or: bombs go off at the end of the enemy turn, so goblins can fling a bomb you stepped away from.", need: "AI behaviour or bomb timing, user's OK.", gain: "Joins the faction's two halves; bombers stop feeling weak." },
+  { kind: "bandits", name: "Bandits work the kill zone", text: "The Brute walks to guard a crossbowman (Guard + Cover means only area damage gets through). Cutpurses drop caltrops on tiles a crossbowman watches. Bull Rush picks a push that ends on caltrops or in an Overwatch lane.", need: "AI behaviour and the Camp layout, user's OK. Pick one first.", gain: "Turns three separate jobs into one trap." },
+  { kind: "elementals", name: "A link between elementals", text: "Options, pick one: Upheaval pushes toward another elemental instead of straight away; Resonance, an elemental next to another takes 1 less damage, so splitting them up is the puzzle; or a second unit type that shapes the cave (grows crystals).", need: "Kit change or a new unit, user's call.", gain: "Gives the faction a question beyond 'lots of HP'." },
+  { kind: "wolves", name: "Show the bite chain", text: "Check whether the intents show the total a surrounded unit will take, not just each bite.", need: "Intent text only.", gain: "Readability for the faction that already works." },
+  { kind: "demons", name: "Playtest first", text: "No change until played. Watch Arcane Overflow (Rending Blow and Fire Breath every turn) and level-0 fights.", need: "A playtest.", gain: "Shows whether the 'team with a plan' shape is fun before copying it." },
+];
+
+const COUNTERS = [
+  ["wolves", "Howls that enabled a bite; the longest bite chain per turn and the damage it dealt; turns with 3+ wolves on one unit."],
+  ["goblins", "Goblins flung (and whether they hit); bombs or mines flung, by whose; Powder Keg damage to its own side."],
+  ["bandits", "Guard triggers, and how many protected a crossbowman; caltrops and Overwatch stops; Bull Rush pushes ending on caltrops, in a watched lane or in a collision."],
+  ["elementals", "Upheaval pushes that ended next to another elemental or in a collision; shards that ever attacked."],
+  ["demons", "Hellswaps followed by a hit the same turn (and the damage); Fury gained, from imps and from Bloodlust; contracts paid against broken; Fire Breath targets per breath."],
+];
+
+const AI_TOOLS = [
+  ["Acting first", "Pack Leader, Imp", "The setup unit moves before its partners, so its effect lands on units that still have their turn.", "works"],
+  ["Blood Scent", "Wolves", "Every wolf picks the same lowest-HP unit, a shared target by accident.", "works"],
+  ["Guard", "Bandit Brute", "Takes hits for neighbours; nothing moves the Brute to a neighbour that needs it.", "rare"],
+  ["Hellswap landing", "Imp", "Chooses a landing tile next to the most fighting allies: the only enemy that plans around its teammates' positions.", "untested"],
+  ["Pack Bond, Blood Offering, Bloodlust", "Wolves, Demons", "Passives that tie one unit's life or death to the others'.", "works"],
+  ["Shared target", "none", "Every other enemy picks its own target: the nearest, then the weakest.", "missing"],
+  ["Formation", "none", "No enemy keeps its place next to a partner after the first turn; layouts set formations only at the start.", "missing"],
+];
+
+// ---------- Drawing ----------
+
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const SCORE_WORD = { g: "good", o: "ok", w: "weak" };
+const scores = j => CRITERIA.map(([c]) => `<span class="sc ${j[c]}">${c} <b>${SCORE_WORD[j[c]]}</b></span>`).join("");
+const st = s => `<span class="st ${s}">${s}</span>`;
+const roles = rs => rs.map(r => `<span class="role" title="${esc(ROLES[r])}">${r}</span>`).join("");
+const utip = n => `<button type="button" class="utip" data-unit="${esc(n)}">${esc(n)}</button>`;
+const HERO_VAR = { Warrior: "--h-warrior", Archer: "--h-archer", Rogue: "--h-rogue", Mage: "--h-mage", Sapper: "--h-sapper" };
+const fname = f => `<span class="fname" style="--c:var(${f.color})">${esc(f.name)}</span>`;
+
+function unitList(units) {
+  return `<div class="units">${units.map(([n, rs, job]) => `<div class="unit"><div class="uline">${utip(n)} ${roles(rs)}</div><div class="job">${esc(job)}</div></div>`).join("")}</div>`;
+}
+function chainList(chains) {
+  if (!chains.length) return `<p class="note">No unit links.</p>`;
+  return `<div class="chains">${chains.map(([a, b, s, why]) => `<div class="chain">${st(s)}<span class="flow">${esc(a)}<span class="arrow">→</span>${esc(b)}</span><span class="why">${esc(why)}</span></div>`).join("")}</div>`;
+}
+
+document.getElementById("summary").innerHTML =
+  `<thead><tr><th>Faction</th><th>Plan</th><th>Cohesion</th><th>Kill-order choice</th><th>Question it asks</th></tr></thead><tbody>` +
+  FACTIONS.map(f => `<tr><td>${fname(f)}<div class="num">pool ${f.pool}</div></td><td>${esc(f.plan)}</td><td><span class="sc ${f.judge.Cohesion}">${SCORE_WORD[f.judge.Cohesion]}</span></td><td>${esc(f.choice)}</td><td>${esc(f.question)}</td></tr>`).join("") + `</tbody>`;
+
+document.getElementById("cards").innerHTML = FACTIONS.map(f => `
+  <article class="fcard" id="f-${f.id}" style="--c:var(${f.color})">
+    <div class="fhead"><h2>${esc(f.name)}</h2><span class="num">${esc(f.layout)} · pool ${f.pool}</span></div>
+    <p class="fplan">${esc(f.plan)}</p>
+    <div class="fgrid">
+      <div><h3>Units and their jobs</h3>${unitList(f.units)}</div>
+      <div><h3>Combos between units</h3>${chainList(f.chains)}</div>
+    </div>
+    <div class="fgrid">
+      <dl class="facts">
+        <dt>Kill order</dt><dd>${esc(f.dilemma)}</dd>
+        <dt>Question</dt><dd>${esc(f.question)}</dd>
+        <dt>Readability</dt><dd>${esc(f.readNote)}</dd>
+        ${f.escalation.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}
+      </dl>
+      <div style="display:grid; gap:10px; align-content:start">
+        <div><h3>Judgment</h3><div>${scores(f.judge)}</div></div>
+        <div class="gaps ${f.gaps.length ? "" : "none"}"><h3>${f.gaps.length ? "Gaps" : "No gaps found"}</h3>${f.gaps.map(g => `<p>${esc(g)}</p>`).join("")}<p><b>${esc(f.verdict)}</b></p></div>
+      </div>
+    </div>
+  </article>`).join("") + `
+  <div class="panel">
+    <h2>Bosses</h2>
+    <p class="note">Bosses aren't factions, but the Necromancer's army is built from them.</p>
+    <div class="fcards" style="margin-top:14px">${BOSSES.map(b => `
+      <div class="fgrid" style="border-top:1px solid var(--line); padding-top:14px">
+        <div><div class="fhead">${fname(b)}<span class="num">${esc(b.layout)}</span></div><p style="margin:6px 0 10px">${esc(b.plan)}</p>${unitList(b.units)}</div>
+        <div><h3>Combos</h3>${chainList(b.chains)}<p class="note" style="margin-top:10px">${esc(b.note)}</p></div>
+      </div>`).join("")}</div>
+  </div>`;
+
+// Answers grid
+const agrid = document.getElementById("agrid");
+agrid.innerHTML = `<thead><tr><th></th>${THEMES.map(([k, h]) => `<th style="--c:var(${HERO_VAR[h]})" title="${h}">${k}</th>`).join("")}</tr></thead><tbody>` +
+  FACTIONS.map(f => `<tr><th class="row" style="--c:var(${f.color})">${esc(f.name)}</th>${THEMES.map(([k]) => {
+    const a = (ANSWERS[f.id] || {})[k];
+    const label = a ? { A: "answer", R: "resists", P: "punishes", X: "mixed" }[a[0]] : "·";
+    return `<td><button type="button" class="cellbtn ${a ? a[0] : ""}" data-f="${f.id}" data-k="${k}" aria-pressed="false" ${a ? "" : "disabled"} aria-label="${esc(f.name)}, ${k}: ${label}">${label}</button></td>`;
+  }).join("")}</tr>`).join("") + `</tbody>`;
+const adetail = document.getElementById("adetail");
+function showAnswer(fid, k) {
+  const f = FACTIONS.find(x => x.id === fid), a = ANSWERS[fid][k], hero = THEMES.find(t => t[0] === k)[1];
+  agrid.querySelectorAll(".cellbtn").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.f === fid && b.dataset.k === k)));
+  const word = { A: "is a strong answer to", R: "is blunted by", P: "is punished by", X: "works on some units of" }[a[0]];
+  adetail.innerHTML = `<h2>${esc(k)} vs ${esc(f.name)}</h2><p class="note" style="margin-bottom:10px"><span style="color:var(${HERO_VAR[hero]}); font-weight:600">${hero}</span>'s theme ${word} this faction.</p><p>${esc(a[1])}</p>
+    <h3 style="margin-top:16px">Everything about ${esc(f.name)}</h3><ul class="plain">${THEMES.filter(([t]) => ANSWERS[fid][t]).map(([t]) => `<li><b>${t}</b>: ${{ A: "answer", R: "resists", P: "punishes", X: "mixed" }[ANSWERS[fid][t][0]]}</li>`).join("")}</ul>`;
+}
+agrid.addEventListener("click", e => { const b = e.target.closest(".cellbtn:not(:disabled)"); if (b) showAnswer(b.dataset.f, b.dataset.k); });
+showAnswer("goblins", "blast");
+document.getElementById("atake").innerHTML = ANSWER_TAKEAWAYS.map(t => `<li>${t}</li>`).join("");
+
+// Ideas
+const fOf = id => FACTIONS.find(f => f.id === id);
+document.getElementById("ideas").innerHTML = IDEAS.map(i => `<div class="idea">
+  <div class="ih">${i.kind === "wide" ? `<span class="role">All factions</span>` : fname(fOf(i.kind))}<b>${esc(i.name)}</b></div>
+  <p>${esc(i.text)}</p>
+  <p class="need"><b>Needs:</b> ${esc(i.need)} <b>Gain:</b> ${esc(i.gain)}</p></div>`).join("");
+document.getElementById("counters").innerHTML = `<thead><tr><th>Faction</th><th>Count per fight</th></tr></thead><tbody>` +
+  COUNTERS.map(([id, c]) => `<tr><td>${fname(fOf(id))}</td><td>${esc(c)}</td></tr>`).join("") + `</tbody>`;
+document.getElementById("aitools").innerHTML = `<thead><tr><th>Piece</th><th>Who</th><th>What it does for teamwork</th><th></th></tr></thead><tbody>` +
+  AI_TOOLS.map(([p, w, d, s]) => `<tr><td><b>${esc(p)}</b></td><td>${esc(w)}</td><td>${esc(d)}</td><td>${st(s)}</td></tr>`).join("") + `</tbody>`;
+document.getElementById("roles").innerHTML = `<tbody>${Object.entries(ROLES).map(([r, m]) => `<tr><td><span class="role">${r}</span></td><td>${esc(m)}</td></tr>`).join("")}</tbody>`;
+document.getElementById("criteria").innerHTML = `<tbody>${CRITERIA.map(([c, m]) => `<tr><td><b>${c}</b></td><td>${esc(m)}</td></tr>`).join("")}</tbody>`;
+
+// Tabs
+const tabs = document.querySelectorAll("nav button");
+function showView(v) {
+  tabs.forEach(t => t.setAttribute("aria-selected", String(t.dataset.view === v)));
+  document.querySelectorAll("section[id^=view-]").forEach(s => s.hidden = s.id !== "view-" + v);
+}
+tabs.forEach(t => t.addEventListener("click", () => { showView(t.dataset.view); try { history.replaceState(null, "", "#" + t.dataset.view); } catch (e) {} }));
+const startView = location.hash.slice(1);
+if ([...tabs].some(t => t.dataset.view === startView)) showView(startView);
+
+// Unit hover cards
+const tip = document.getElementById("tip");
+function showTip(el) {
+  const u = UNITS[el.dataset.unit]; if (!u) return;
+  tip.innerHTML = `<div class="tn">${esc(el.dataset.unit)}</div><div class="ts">${esc(u[0])}</div><ul>${u[1].map(l => `<li>${esc(l)}</li>`).join("")}</ul>`;
+  tip.hidden = false;
+  const r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = Math.min(r.left, window.innerWidth - w - 8), y = r.bottom + 6;
+  if (y + h > window.innerHeight - 8) y = r.top - h - 6;
+  tip.style.left = Math.max(8, x) + "px"; tip.style.top = Math.max(8, y) + "px";
+}
+const hideTip = () => { tip.hidden = true; };
+document.addEventListener("mouseover", e => { const el = e.target.closest(".utip"); if (el) showTip(el); });
+document.addEventListener("mouseout", e => { if (e.target.closest(".utip")) hideTip(); });
+document.addEventListener("focusin", e => { const el = e.target.closest(".utip"); el ? showTip(el) : hideTip(); });
+document.addEventListener("click", e => { const el = e.target.closest(".utip"); el ? showTip(el) : hideTip(); });
+window.addEventListener("scroll", hideTip, { passive: true });
+</script>
