@@ -2,10 +2,10 @@
 
 A single-player roguelike army-builder made in Unity. You lead a small squad of living statues across a branching map. Each fight is a turn-based tactical battle against an AI army on a small isometric grid.
 
-![A battle turn against goblins on the Storm battlefield: shield bash, pinning shot, vanish](docs/media/battle-turn.gif)
-
-| Sun beam against elementals at the Edge of the World | Moon shield, lightning and victory in the Storm |
+| A turn against goblins in the Storm: shield bash, pinning shot, vanish | The wolf pack howls for an extra move and rushes in |
 |---|---|
+| ![Battle turn](docs/media/battle-turn.gif) | ![Wolf pack](docs/media/wolf-howl.gif) |
+| **Sun beam against elementals at the Edge of the World** | **Moon shield, lightning and victory in the Storm** |
 | ![Sun beam](docs/media/sun-beam.gif) | ![Storm victory](docs/media/storm-victory.gif) |
 
 ## The game
