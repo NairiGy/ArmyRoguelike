@@ -463,7 +463,7 @@ const ANSWER_TAKEAWAYS = [
 
 // need: what it touches. kind: wide (faction-wide) or a faction id.
 const IDEAS = [
-  { kind: "wide", name: "Setup before payoff, every faction", text: "Make the turn-order rule general: units that set things up act first (Howl and imps already do). For example the Brute would walk to guard before the shooters fire, and bombers would act before goblins.", need: "AI behaviour, user's OK. Cheap.", gain: "The biggest step toward 'they act as one' for the least work." },
+  { kind: "wide", name: "Setup before payoff, every faction (tried and dropped 2026-11-09)", text: "Tried: units that move or hold your units (Brute, Elemental, Skeleton) acted after Howl and Hellswap and before everyone else. Sim, 15 seeds per draft, same seeds: Wolves, Goblins, Elementals and Demons didn't change at all (wolves and demons already had this order; elementals are all one unit). Bandits got worse: the Brute charged ahead (Bull Rush 0.40 to 0.55 per fight) and left the shooters, so Guard on a crossbowman fell from 0.35 to 0.21, and the elite got easier (bot wins 13% to 18%). Reverted.", need: "Nothing; the order is as before (howlers and imps first).", gain: "Lesson: turn order alone doesn't make teamwork. The gaps need each faction to act differently, and the Brute guarding a shooter wants to move after the shooters, not before." },
   { kind: "wide", name: "Shared prey", text: "Some factions pick one target for the whole turn and go for it together, shown on the intents (a skull over the prey). Wolves would want it most; Bandits could focus whoever the cutpurse is hunting.", need: "AI behaviour and an intent badge, user's OK.", gain: "Teamwork you can see at a glance; Taunt and shields become a real answer to it." },
   { kind: "wide", name: "Layouts that put partners together", text: "Start combo partners where the combo can happen: the Brute next to a crossbowman, imps beside the Demon (already done).", need: "Encounter layout rules (Core/Encounter.cs), user's OK.", gain: "Combos happen from turn 1 without new rules." },
   { kind: "wide", name: "Enemy banners", text: "Each faction gets one army-wide rule shown before the fight, mirroring the player's banners. A faction plan without new units. Example: Wolves, 'a wolf that bites a unit already bitten this turn moves 1 after biting'.", need: "New feature, user's call.", gain: "A place to give each faction its plan; also a lever for elites." },
@@ -502,7 +502,7 @@ function simTable(id) {
 }
 
 const AI_TOOLS = [
-  ["Acting first", "Pack Leader, Imp", "The setup unit moves before its partners, so its effect lands on units that still have their turn.", "works"],
+  ["Acting first", "Pack Leader, Imp", "The setup unit moves before its partners, so its effect lands on units that still have their turn. Widening it to the Brute, Elemental and Skeleton was tried and dropped (Gaps and ideas tab).", "works"],
   ["Blood Scent", "Wolves", "Every wolf picks the same lowest-HP unit, a shared target by accident.", "works"],
   ["Guard", "Bandit Brute", "Takes hits for neighbours; nothing moves the Brute to a neighbour that needs it.", "rare"],
   ["Hellswap landing", "Imp", "Chooses a landing tile next to the most fighting allies: the only enemy that plans around its teammates' positions.", "untested"],
