@@ -249,7 +249,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Rending Blow (demons): HP it pays, and the extra damage of the hit.</summary>
         public const int RendingBlowCost = 2;
 
-        public const int RendingBlowBonus = 2;
+        public const int RendingBlowBonus = 1;
 
         /// <summary>Soul Contract (devils): range in steps (no line of sight needed), and the HP lost when it comes due.</summary>
         public const int ContractRange = 3;

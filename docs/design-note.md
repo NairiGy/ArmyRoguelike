@@ -292,6 +292,7 @@ Decided with the user 2026-11-01. The balance chat owns the numbers: it changes 
   - 2026-11-01 (smart bot): Elementals and Shards less HP (hardest faction by far); Crossbowman less damage (two shots could kill a 5 HP unit on turn 1); Goblins tougher, Elite Goblins one more goblin; Break the Ritual 4 to 6 turns.
   - 2026-11-04 (5 played runs, 17 fights; 2 of 5 first fights won, both runs past the first fight won): Goblin damage back down (fling plus strike took 8 HP off a Warrior on turn 1, and a favored goblin killed an Archer, breaking the luck rule). The late game was easy as the bot predicted (a Third Wheel run rated 1).
   - 2026-11-08 (night pass, bot, 300 runs): 83% run win rate (same as 2026-11-01), drafts 77-97% (were 60-95%). Giant more HP (the easiest wall); the Necromancer is now the harder boss.
+  - 2026-11-09 (3 played Demon fights, all lost in 3-5 turns with no survivors): Rending Blow bonus +2 to +1. Rending Blow did most of the damage (16, 7, 17 per fight) and in 2 of 3 fights killed a Hellswapped Archer or Mage on the first enemy turn, breaking the luck rule. Bot (15 seeds per draft) barely moved (L0 33% to 31%, elite L2 63% to 74%): the bot doesn't lose units on turn 1 the way players do. If Demons still feel too hard, the next knob is the swap itself (Hellswap starting on cooldown, a rule change that needs the user's OK).
 
 ## Logs and tools
 
