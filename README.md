@@ -12,6 +12,7 @@ A single-player roguelike army-builder made in Unity. You lead a small squad of 
 
 Open in the browser at **[nairigy.github.io/ArmyRoguelike](https://nairigy.github.io/ArmyRoguelike/)**:
 
+- **[Game design document](https://nairigy.github.io/ArmyRoguelike/gdd.html)**: the game on a few pages: vision, pillars, core loop, battle, army, enemies, art direction and roadmap.
 - [Gamepedia](https://nairigy.github.io/ArmyRoguelike/gamepedia.html): every unit, ability, item, enemy and rule with its numbers, generated from the game data.
 - [Hero synergy map](https://nairigy.github.io/ArmyRoguelike/synergy-map.html): every hero skill, item and rule tagged by theme, with its role in a build and a judgment.
 - [Enemy faction map](https://nairigy.github.io/ArmyRoguelike/faction-map.html): each faction's plan, unit roles, combos and the hero themes that answer it.

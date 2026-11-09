@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ArmyRoguelike GDD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Game design document for the portfolio: short, readable in ten minutes, the same stone look as the faction map. */
+:root {
+  --bg: #eef0f2; --panel: #f8f9fa; --line: #d3d8de; --fg: #1d2329; --muted: #5d6873; --accent: #3d5f86;
+  --chip: #e3e7ec;
+  --h-warrior: #b4472f; --h-archer: #3f7d32; --h-rogue: #7445a6; --h-mage: #2b6fb3; --h-sapper: #a0680c;
+  --f-wolves: #6b5a48; --f-goblins: #4f7a2c; --f-bandits: #9a5b1e; --f-elementals: #4a6c8a; --f-demons: #a3302a; --f-bosses: #64707c;
+  --now: #2e7d4f; --next: #2f6fb0; --later: #64707c;
+  --display: "Marcellus", Georgia, serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151d; --panel: #1a1f2a; --line: #2c3442; --fg: #e3e7ee; --muted: #9aa5b5; --accent: #9dbbe0; --chip: #232a37;
+    --h-warrior: #ef8a72; --h-archer: #8fcb7c; --h-rogue: #c19af0; --h-mage: #84b8f0; --h-sapper: #e8b65a;
+    --f-wolves: #c2ab92; --f-goblins: #9ccb6e; --f-bandits: #e2a462; --f-elementals: #93b8db; --f-demons: #f0857a; --f-bosses: #9aa5b5;
+    --now: #6cc792; --next: #8fbdf0; --later: #9aa5b5;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151d; --panel: #1a1f2a; --line: #2c3442; --fg: #e3e7ee; --muted: #9aa5b5; --accent: #9dbbe0; --chip: #232a37;
+  --h-warrior: #ef8a72; --h-archer: #8fcb7c; --h-rogue: #c19af0; --h-mage: #84b8f0; --h-sapper: #e8b65a;
+  --f-wolves: #c2ab92; --f-goblins: #9ccb6e; --f-bandits: #e2a462; --f-elementals: #93b8db; --f-demons: #f0857a; --f-bosses: #9aa5b5;
+  --now: #6cc792; --next: #8fbdf0; --later: #9aa5b5;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 var(--body); }
+main { max-width: 900px; margin: 0 auto; padding: 48px 16px 80px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.2; }
+h1 { font-size: 44px; margin: 0 0 6px; letter-spacing: .5px; }
+h2 { font-size: 28px; margin: 56px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+h3 { font-size: 20px; margin: 26px 0 8px; }
+p { margin: 0 0 12px; }
+a { color: var(--accent); }
+ul { margin: 0 0 12px; padding-left: 20px; }
+li { margin: 4px 0; }
+.sub { color: var(--muted); margin-bottom: 26px; }
+.lead { font-size: 19px; }
+.muted { color: var(--muted); }
+figure { margin: 18px 0; }
+figure img { width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid var(--line); }
+figcaption { color: var(--muted); font-size: 14px; margin-top: 6px; }
+.glance { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 22px 0; }
+.glance div { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.glance b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); font-weight: 600; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 14px 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; border-top: 4px solid var(--c, var(--accent)); }
+.card h3 { margin: 0 0 6px; color: var(--c, var(--fg)); }
+.card p { margin: 0; font-size: 15px; }
+.card .tag { display: inline-block; font-size: 12px; background: var(--chip); border-radius: 10px; padding: 1px 8px; margin: 6px 4px 0 0; }
+.loop { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 16px 0; }
+.loop span { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 6px 14px; font-weight: 500; }
+.loop i { color: var(--muted); font-style: normal; }
+.steps { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; margin: 16px 0 6px; }
+.steps div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 2px; text-align: center; font-size: 12px; line-height: 1.35; }
+.steps b { display: block; font-family: var(--display); font-size: 16px; font-weight: 400; color: var(--muted); }
+.steps .boss { border-color: var(--f-demons); color: var(--f-demons); font-weight: 600; }
+@media (max-width: 700px) { .steps { grid-template-columns: repeat(6, 1fr); } }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 15px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); font-weight: 600; }
+.road { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.road .card h3 { font-size: 18px; }
+.road ul { font-size: 15px; margin: 0; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 700px) { .two { grid-template-columns: 1fr; } h1 { font-size: 34px; } }
+.table-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>ArmyRoguelike</h1>
+<div class="sub">Game design document · working title · in development · November 2026 · by Nairi Gyulbudaghyan</div>
+
+<p class="lead">A roguelike army-builder. You lead a small squad of living statues across a map of fights, shops and events. Each fight is a short turn-based tactical battle against an AI army on a 6x6 board on top of a tower above the clouds.</p>
+
+<figure>
+  <img src="media/battle-turn.gif" alt="A turn against goblins in the Storm: shield bash, pinning shot and vanish" loading="lazy">
+  <figcaption>A turn against goblins on the Storm battlefield: the Warrior shield-bashes, the Archer pins, the Rogue vanishes.</figcaption>
+</figure>
+
+<div class="glance">
+  <div><b>Genre</b>Roguelike, tactics, army-builder</div>
+  <div><b>Platform</b>Windows (PC)</div>
+  <div><b>Engine</b>Unity 6, C#</div>
+  <div><b>Players</b>Single-player</div>
+  <div><b>Run length</b>15–20 minutes (goal)</div>
+  <div><b>Status</b>Playable Act 1, in playtesting</div>
+</div>
+
+<h2>Vision</h2>
+<p>Small, sharp tactical fights where every unit's single action matters, wrapped in a run where your army grows one technique at a time, like a deckbuilder. The influences are Slay the Spire's map and card picks, Into the Breach's readable grid and shown enemy intents, and Balatro's run-wide rule-benders.</p>
+
+<h3>Design pillars</h3>
+<div class="cards">
+  <div class="card"><h3>A real choice every turn</h3><p>Every unit has 1 move and 1 action, and moves before it acts. Every special action has a cooldown. Combat is deterministic: no hit rolls, so plans fail because of the enemy, not dice.</p></div>
+  <div class="card"><h3>Readable at a glance</h3><p>A 6x6 board, enemies that show what they will do, and 17 keywords that rule texts name instead of explaining. Hovering a keyword explains it.</p></div>
+  <div class="card"><h3>Builds grow one card at a time</h3><p>After a won fight you pick 1 of 3 techniques for one unit. Techniques combine within a unit and across units, so the army becomes a build.</p></div>
+  <div class="card"><h3>Enemies fight as a team</h3><p>Each faction has a plan its units carry out together, and a question it asks the player: who to kill first, where to stand, what to give up.</p></div>
+</div>
+
+<h2>Core loop</h2>
+<div class="loop">
+  <span>Prepare your army</span><i>→</i>
+  <span>Choose a map node</span><i>→</i>
+  <span>Fight, shop or event</span><i>→</i>
+  <span>Gold and a technique pick</span><i>→</i>
+  <span>Spend at shops</span><i>→</i>
+  <span>Boss</span>
+</div>
+<p><b>Start:</b> pick 1 of 3 banners and draft 3 of the 5 base units. The army holds 4 units at most.</p>
+<p><b>Act 1</b> has 12 steps. At each step you pick 1 of 2 nodes, so you can route towards fights or away from them:</p>
+<div class="steps">
+  <div><b>1</b>Battle<br>Battle</div>
+  <div><b>2</b>Shop<br>?</div>
+  <div><b>3</b>Battle<br>?</div>
+  <div><b>4</b>Scenario<br>Battle</div>
+  <div><b>5</b>Shop<br>?</div>
+  <div><b>6</b>Elite<br>Battle</div>
+  <div><b>7</b>Shop<br>?</div>
+  <div><b>8</b>Scenario<br>Battle</div>
+  <div><b>9</b>?<br>Battle</div>
+  <div><b>10</b>Elite<br>Battle</div>
+  <div><b>11</b>Shop<br>?</div>
+  <div class="boss"><b>12</b>Boss</div>
+</div>
+<p class="muted" style="font-size:14px">? = an event. Each battle node shows its faction and battlefield rule ahead of time; from step 6, fights bring a champion with a shown trait.</p>
+
+<ul>
+  <li><b>Fights</b> bring a faction you haven't beaten yet, then rematches. <b>Elites</b> are harder rematches with a rare reward.</li>
+  <li><b>Gold</b> after a fight scales with how many units survived. It is spent only in shops, on techniques, items, recruits, banners and repairs.</li>
+  <li><b>Events</b> offer trades with a price: a rare technique for a permanent scar, gold for a curse, a gamble.</li>
+  <li><b>Cracks:</b> every unit starts each fight at full HP, but a statue that falls gets a crack (-1 max HP until mended). A third crack shatters it for good, with everything it learned. This keeps losses meaningful across the whole run.</li>
+</ul>
+
+<h2>Battle</h2>
+<div class="two">
+  <div>
+    <ul>
+      <li><b>Board:</b> 6x6, each side in its back two rows, two empty rows between.</li>
+      <li><b>Turns:</b> all your units act, then all enemies. 1 move (2 for Swift units) and 1 action each. Once a unit acts it can't move again: position, then commit.</li>
+      <li><b>Zone of control:</b> stepping away from an adjacent enemy ends your movement, so a front line really holds.</li>
+      <li><b>Cooldowns:</b> basic attacks have none; every other action is ready again after 2–3 of the unit's turns.</li>
+      <li><b>Weight:</b> small, medium or huge decides how far a push moves a unit. Pushes into walls, units, edges and holes deal damage or worse.</li>
+      <li><b>Intents:</b> hover an enemy to see its next action, or hold Alt to see all of them.</li>
+    </ul>
+  </div>
+  <figure style="margin-top:0">
+    <img src="media/wolf-howl.gif" alt="The wolf pack howls for an extra move and rushes in" loading="lazy">
+    <figcaption>Wolves: the Pack Leader howls (+1 move) so the pack can reach and chain their bites.</figcaption>
+  </figure>
+</div>
+
+<h3>Battlefields: one rule per fight</h3>
+<p>Every fight has a battlefield rule that applies to both sides, shown on the map so you can plan your route. Each has its own scene, so the rule reads before any text.</p>
+<div class="table-wrap"><table>
+  <tr><th>Battlefield</th><th>Rule</th></tr>
+  <tr><td>Edge of the World</td><td>A push off the board kills. The tower hangs over a magic void.</td></tr>
+  <tr><td>Storm</td><td>Each round, lightning gathers over one unit of each side and strikes at the end of the enemy turn, unless it steps away.</td></tr>
+  <tr><td>Crumbling Roof</td><td>Collisions and deaths crack the roof; a second crack opens a hole that units fall through.</td></tr>
+  <tr><td>Fortune's Favored</td><td>Each round, one unit on each side deals double damage.</td></tr>
+  <tr><td>Arcane Overflow</td><td>Every cooldown is 1 turn shorter.</td></tr>
+  <tr><td>What's On His Mind?</td><td>Enemy intents are hidden.</td></tr>
+</table></div>
+
+<h2>Your army</h2>
+<p>Five base units, each the start of a line with its own technique pool (62 techniques in all) and its own theme keywords. Themes are what one unit makes and another uses: the Sapper builds walls, and the Warrior's Shield Bash hits harder when it slams an enemy into one.</p>
+<div class="cards">
+  <div class="card" style="--c:var(--h-warrior)"><h3>Warrior</h3><p>Front line. Shield Bash damages and pushes, harder into obstacles.</p><span class="tag">Push</span><span class="tag">Guard</span></div>
+  <div class="card" style="--c:var(--h-archer)"><h3>Archer</h3><p>Range and control. Steady Aim rewards standing still; Pinning Shot stops a unit moving.</p><span class="tag">Pinned</span><span class="tag">Marked</span></div>
+  <div class="card" style="--c:var(--h-rogue)"><h3>Rogue</h3><p>Swift and fragile. Vanish hides it until your next turn; its first hit from hiding deals more.</p><span class="tag">Exposed</span><span class="tag">Hidden</span><span class="tag">Poison</span></div>
+  <div class="card" style="--c:var(--h-mage)"><h3>Mage Apprentice</h3><p>Area damage on a 5 HP body. Frost Nova slows everything next to it.</p><span class="tag">Slowed</span><span class="tag">Burning</span></div>
+  <div class="card" style="--c:var(--h-sapper)"><h3>Sapper</h3><p>Shapes the board with hidden mines, barricades and blasts.</p><span class="tag">Wall</span><span class="tag">Blast</span></div>
+</div>
+
+<h3>Growth</h3>
+<ul>
+  <li><b>Techniques</b> are passives or actions, common or rare, and some need another first. A unit's level is the number it has learned; each level adds stats along its line.</li>
+  <li><b>Tension pieces:</b> every unit has techniques that are strong at a real cost, so taking or using one is a decision. The Archer's <i>Planted</i> roots it in place for powerful pinning shots; the Mage's <i>Overchannel</i> doubles a spell but slows the Mage next turn.</li>
+  <li><b>Items:</b> one slot per unit.</li>
+  <li><b>Banners</b> bend a rule for the whole army for the run, often with a price. <i>Third Wheel</i> gives every unit 2 actions but the army holds only 2 units; <i>Vampiric</i> heals on every hit but brings a sun curse to every fight.</li>
+</ul>
+
+<h2>Enemies</h2>
+<p>Five factions, each built around one plan. The <a href="faction-map.html">faction map</a> rates how well each faction works as a team and which of the player's themes answer it.</p>
+<div class="cards">
+  <div class="card" style="--c:var(--f-wolves)"><h3>Wolves</h3><p>The pack goes for your weakest unit, and every bite in a turn makes the next one harder. The Pack Leader howls for extra moves. Kill the leader, or thin the pack?</p></div>
+  <div class="card" style="--c:var(--f-goblins)"><h3>Goblins</h3><p>Goblins fling whatever is next to them, including each other. Bombers lob bombs to goblins, who fling them straight at you.</p></div>
+  <div class="card" style="--c:var(--f-bandits)"><h3>Bandits</h3><p>Crossbowmen shoot from behind cover while the Brute bodyguards them; the Cutpurse steals your gold and runs for the edge.</p></div>
+  <div class="card" style="--c:var(--f-elementals)"><h3>Elementals</h3><p>Huge and slow. Tremors slow your units, and two overlapping tremors pin them. Elementals split into Shards when they die.</p></div>
+  <div class="card" style="--c:var(--f-demons)"><h3>Demons</h3><p>Blood and bargains: they swap places with your units, grow stronger as they bleed, and sign contracts with a price.</p></div>
+  <div class="card" style="--c:var(--f-bosses)"><h3>Bosses</h3><p>The Giant (2x2, smashes, slams and throws boulders) or the Necromancer (raises your fallen as his own). Both fight in three phases.</p></div>
+</div>
+<p><b>Champions</b> from step 6 carry one trait (Armored, Vengeful, Regenerating, Mighty, Fleet) that asks something new of a finished build.</p>
+
+<h2>Scenarios and omens</h2>
+<div class="two">
+  <div>
+    <p>Two fights with goals other than "kill everything", at steps 4 and 8:</p>
+    <ul>
+      <li><b>Moon Shrine</b> (defend): keep the shrine standing for 5 enemy turns while Elementals walk in from the edges.</li>
+      <li><b>Break the Ritual</b> (attack): smash three totems guarded by goblins before turn 6.</li>
+    </ul>
+    <p>Winning the Moon Shrine gives a blessing that lasts the rest of the run. Losing either scenario gives a curse, the same omen turned against you, and the run goes on. Omens: the Sun (a beam strikes a marked tile), the Night (a shroud stops ranged attacks), the Moon (a shield).</p>
+  </div>
+  <figure style="margin-top:0">
+    <img src="media/sun-beam.gif" alt="A sun beam strikes an elemental at the Edge of the World" loading="lazy">
+    <figcaption>The Blessing of the Sun at the Edge of the World: a sigil appears under an enemy, and a beam strikes it next turn.</figcaption>
+  </figure>
+</div>
+
+<h2>Art and sound direction</h2>
+<div class="two">
+  <div>
+    <ul>
+      <li><b>Living statues:</b> chunky, hand-painted, like wizard-chess pieces. Your army is pale moon marble; enemies are dark basalt, so teams read apart before anything else.</li>
+      <li><b>One stage:</b> every fight is on the roof of a tower above the clouds at night. Each battlefield changes what lies below: a void, a stormy sea, wheat fields.</li>
+      <li><b>Stone moves like stone:</b> rigid, sudden motion, no idle animation. Statues lift when selected and crumble when they die.</li>
+      <li><b>Sound:</b> weighty, ancient magic, never sci-fi. Stone thuds, cracks and grinding.</li>
+    </ul>
+  </div>
+  <figure style="margin-top:0">
+    <img src="media/storm-victory.gif" alt="Moon shield, lightning and victory on the Storm battlefield" loading="lazy">
+    <figcaption>The Storm: lightning gathers over marked tiles while the Moon blessing shields a statue.</figcaption>
+  </figure>
+</div>
+
+<h2>How the design is tested</h2>
+<ul>
+  <li><b>Playtest logs:</b> every battle and run is saved as a JSON log (damage, kills, technique uses, enemy combos fired), so tuning comes from numbers and how it felt.</li>
+  <li><b>Bot simulator:</b> bots play hundreds of battles to compare fights and drafts and catch outliers before a human plays.</li>
+  <li><b>Design maps:</b> the <a href="synergy-map.html">synergy map</a> tags every skill by the themes it makes and uses, to find holes and duplicates; the <a href="faction-map.html">faction map</a> does the same for enemy teamwork.</li>
+  <li><b>Balance targets:</b> a new player wins 10–20% of runs, an experienced one 50–60%. No unit should die without warning, and late builds may break the game, but not by step 4.</li>
+</ul>
+<p>All numbers are in the <a href="gamepedia.html">gamepedia</a>, generated from the game's own data.</p>
+
+<h2>Roadmap</h2>
+<div class="road">
+  <div class="card" style="--c:var(--now)"><h3>Now</h3><ul>
+    <li>Playtest the latest round: tension pieces for every unit and teamwork fixes for three factions</li>
+    <li>Give the Mage a way out of melee</li>
+    <li>Make hidden and slowed states easier to read</li>
+  </ul></div>
+  <div class="card" style="--c:var(--next)"><h3>Next</h3><ul>
+    <li>Fill the weak unit pairings found on the synergy map</li>
+    <li>Teach the bots to use special actions, to measure the strongest techniques</li>
+    <li>UI and HUD art pass; scenes for the remaining battlefields</li>
+    <li>A first playable build</li>
+  </ul></div>
+  <div class="card" style="--c:var(--later)"><h3>Later</h3><ul>
+    <li>Acts 2 and 3, difficulty levels, unlocks between runs</li>
+    <li>Commanders that change the draft and the rules</li>
+    <li>Onboarding, save and continue</li>
+    <li>One signature rule for the game's identity (candidate: the Crumbling Roof)</li>
+  </ul></div>
+</div>
+
+</main>
+</body>
+</html>
