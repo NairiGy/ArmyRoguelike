@@ -270,6 +270,8 @@ namespace ArmyRoguelike.View
             GUILayout.BeginArea(new Rect((screenWidth - w) * 0.5f, 10, w, 700), GUI.skin.box);
             GUILayout.Label("Test battle", Title);
             GUILayout.Label("For testing only: any army with any techniques, any encounter, any blessing or curse, any battle banners, any battlefield. Normal battle rules; no run, gold or map.");
+            // The lists outgrow the screen, so they scroll and the Back / Start buttons stay in view below them.
+            _testSetupScroll = GUILayout.BeginScrollView(_testSetupScroll, GUILayout.ExpandHeight(true));
             GUILayout.BeginHorizontal();
 
             // Left: every unit type, click to add (up to the army limit); below, the chosen unit's techniques.
@@ -404,8 +406,8 @@ namespace ArmyRoguelike.View
             GUILayout.Label(GUI.tooltip, new GUIStyle(GUI.skin.label) { wordWrap = true });
             GUILayout.EndVertical();
             GUILayout.EndHorizontal();
+            GUILayout.EndScrollView();
 
-            GUILayout.FlexibleSpace();
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Back to the draft", GUILayout.Height(32), GUILayout.Width(200)))
                 Do(Restart);
@@ -589,6 +591,7 @@ namespace ArmyRoguelike.View
         }
 
         private Vector2 _scroll;
+        private Vector2 _testSetupScroll;
 
         /// <summary>The start banner picked on the draft screen, taken when the run starts.</summary>
         private Banner? _startPick;
