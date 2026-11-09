@@ -55,7 +55,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 | Night pass: Crumbling Roof | Fractured tiles (1 fracture), holes in the roof, a unit falling through; the scene could look old and broken | Dark brown tile tint for fractures, near-black tile for holes (`BoardView.SyncTiles`), the edge-fall slide and crumble | Needed |
 | Night pass: Archer and Rogue | Snare, Overwatch, Fire Arrow, Suppressing Fire, Kick, Smoke Bomb, Shadowstep, Throwing Knife, Rupture, Mark Target / Death Mark, Into the Shadows (full list in `docs/night/archer-rogue.md`) | Tile tints, popups and the normal lunge, shot and slide | Needed |
 | Night pass: Mage and Sapper | Rubble (a low heap), Crush, Frost Nova, Firewall, Blizzard, Searing Bolt, Transpose, Grappling Hook, Demolish, Twincast, Cave-In (full list in `docs/night/mage-sapper.md`) | Rubble is the rock block tinted and squashed; popups and tile flashes for the rest | Needed |
-| Night pass: Demons | Import the four statues (Tools → Art → Import Statues; heights are set), Hellswap, Rending Blow, Soul Contract sigil, Fire Breath, Fury pips, intent icons (`docs/night/demons.md`) | Code-drawn horned figures (`PlaceholderArt.MakeFigure`), popups, reused icons | Needed |
+| Night pass: Demons | Hellswap, Rending Blow, Soul Contract sigil, Fire Breath, Fury pips, intent icons (`docs/night/demons.md`) | Code-drawn horned figures (`PlaceholderArt.MakeFigure`), popups, reused icons | Needed |
 | Bodyguard (Bandit Brute) | A "Guard" intent icon (the brute about to stand by a crossbowman) | Reused hold icon in the buff colour; the crossbowman lit and the tile it walks to dark | Needed |
 | Bombs as ammo (Goblin Bomber) | The bomb lobbed onto a tile next to a goblin, then flung at your unit; the intent showing both steps | The normal bomb throw and the normal fling (an explosive as a small square); intent lights the goblin and the landing tile, badge "Bomb + Fling" | Needed |
 | Tension pieces (2026-11-09) | Planted (an archer rooted in place, maybe feet braced or roots of stone, while its shots deal more and pin), Overchannel (the mage charged up for its next spell, then drained and slowed), a Rigged Barricade (the barricade looks rigged, and its blast when it breaks) | Popups "Planted: shots +2" and "Overchannel: next spell x2", "Planted" and "Overchanneled" chips on the unit card; the rigged barricade looks like any barricade and its blast is the normal explosion (`BattleController`) | Needed |
@@ -63,7 +63,6 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 ### Other visual work
 
 - [ ] Painted aurora: ChatGPT's free image limit was hit on 2026-10-25; retry the prompt saved in the ChatGPT chat "Generate Crescent Moon Image". Then replace the code aurora with it (maybe for another setting).
-- [ ] Archer, rogue, sapper and wolf keep their painted pedestals or slab for now (user's call); redraw them standing on nothing later if the mix looks off. The pack leader already stands on nothing while the wolves keep their slab.
 - [ ] Improve the player statues' colour (moon marble is better than before, not final).
 - [ ] Labels and health bars over the statues: restyle (part of the UI pass).
 - [ ] Statue rim (2026-10-30): at 3 texels it is under a screen pixel and barely shows; 8 texels was too much and was reverted. The user will think about what they want.
@@ -171,6 +170,8 @@ Targets and working rules: "Balance" in the design note. Report: `tools/dev.sh s
 ## Done
 
 Newest first. Details are in the design note and in git history.
+
+- [x] 2026-11-09 Every unit stands on nothing: Archer, Rogue, Sapper and Wolf redrawn without their pedestals or slab (Leonardo, GPT Image 2.5 Flare, the old art as the design reference), imported with their own heights; Import Statues no longer imports pedestal art for a unit that has a no-ground figure and removes the old sprite. The four demon statues imported and committed. Not playtested.
 
 - [x] 2026-11-09 Balance: Rending Blow bonus +2 to +1 after three lost Demon fights (turn-1 kills after a Hellswap).
 - [x] 2026-11-09 One fix per weak faction: the Bodyguard Brute (Bandits), bombs as ammo (Goblins), Tremor and Aftershock replace Upheaval (Elementals). Tests and faction map updated; illustrated gamepedia not re-exported (open task). Not playtested.

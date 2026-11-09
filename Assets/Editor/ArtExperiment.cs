@@ -471,10 +471,23 @@ public static class ArtExperiment
     public static void ImportStatues()
     {
         Directory.CreateDirectory(StatueFolder);
+
+        // Units drawn standing on nothing: their older pedestal and slab art is no longer imported, and any
+        // sprite left from it is removed, so every unit stands straight on the floor.
+        var noGround = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in Directory.GetFiles(Source, "*_noground*.png"))
+            noGround.Add(UnitPart(file, "_noground"));
+        foreach (var unit in noGround)
+            if (Enum.TryParse<UnitKind>(unit, true, out var kind) && File.Exists(StatueFolder + kind + ".png"))
+            {
+                AssetDatabase.DeleteAsset(StatueFolder + kind + ".png");
+                Debug.Log($"Removed the pedestal statue {kind}: it is drawn standing on nothing now");
+            }
+
         foreach (var file in Directory.GetFiles(Source, "*_iso*.png"))
         {
             var unit = UnitPart(file, "_iso");
-            if (!Enum.TryParse<UnitKind>(unit, true, out var kind))
+            if (noGround.Contains(unit) || !Enum.TryParse<UnitKind>(unit, true, out var kind))
                 continue;
             var (_, tex, pivot, ppu) = CutOut2D(Path.GetFileName(file), unit);
             SaveSprite(StatueFolder + kind + ".png", tex, pivot, ppu);
@@ -486,7 +499,7 @@ public static class ArtExperiment
         foreach (var file in Directory.GetFiles(Source, "*_nopedestal*.png"))
         {
             var unit = UnitPart(file, "_nopedestal");
-            if (!Enum.TryParse<UnitKind>(unit, true, out var kind))
+            if (noGround.Contains(unit) || !Enum.TryParse<UnitKind>(unit, true, out var kind))
                 continue;
             var (_, tex, pivot, ppu) = CutOut2D(Path.GetFileName(file), unit + "_figure");
             SaveSprite(StatueFolder + kind + "_figure.png", tex, pivot, ppu);
@@ -520,6 +533,14 @@ public static class ArtExperiment
         { UnitKind.Mage, 1.3f },
         // Hunched forward.
         { UnitKind.Skeleton, 1.0f },
+        // Braced wide to draw the bow, a little below a standing human.
+        { UnitKind.Archer, 1.05f },
+        // Crouched low to pounce.
+        { UnitKind.Rogue, 0.85f },
+        // Short and stocky.
+        { UnitKind.Sapper, 0.95f },
+        // Hunched, head down: its back sits about where the pack leader's would before the leader's 1.25 scale.
+        { UnitKind.Wolf, 0.65f },
         // Small, crouched to sprint.
         { UnitKind.Goblin, 0.7f },
         // Squat and wide, about the warrior's height.

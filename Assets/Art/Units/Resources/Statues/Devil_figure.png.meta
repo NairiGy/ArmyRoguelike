@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: d2a766f003adb6645a6e783136b7ad09
+guid: 0cbef66ac780d4b4dad0b6e403240d6b
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -5362661111087254534
-    second: Sapper_0
+      213: -5229864911125673189
+    second: Devil_figure_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -50,8 +50,8 @@ TextureImporter:
   spriteExtrude: 1
   spriteMeshType: 0
   alignment: 9
-  spritePivot: {x: 0.48207426, y: 0.16544417}
-  spritePixelsToUnits: 349.99182
+  spritePivot: {x: 0.53571427, y: 0.02}
+  spritePixelsToUnits: 295.3846
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
@@ -113,12 +113,12 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Sapper_0
+      name: Devil_figure_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 244
+        width: 189
         height: 384
       alignment: 0
       pivot: {x: 0, y: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: af3b7dec1200495b0800000000000000
-      internalID: -5362661111087254534
+      spriteID: b1b03158299cb67b0800000000000000
+      internalID: -5229864911125673189
       vertices: []
       indices: 
       edges: []
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Sapper_0: -5362661111087254534
+      Devil_figure_0: -5229864911125673189
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

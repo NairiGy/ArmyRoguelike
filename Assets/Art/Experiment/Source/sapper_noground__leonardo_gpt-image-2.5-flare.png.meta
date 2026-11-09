@@ -1,15 +1,15 @@
 fileFormatVersion: 2
-guid: de74c17db0e14d141a2f293a168efc1d
+guid: 48036986203b63b4f9b3734e55864678
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -458185587419916677
-    second: Wolf_0
+      213: 7705304889258439855
+    second: sapper_noground__leonardo_gpt-image-2.5-flare_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
     mipMapMode: 0
-    enableMipMap: 1
+    enableMipMap: 0
     sRGBTexture: 1
     linearTexture: 0
     fadeOut: 0
@@ -37,7 +37,7 @@ TextureImporter:
   maxTextureSize: 2048
   textureSettings:
     serializedVersion: 2
-    filterMode: 2
+    filterMode: 1
     aniso: 1
     mipBias: 0
     wrapU: 1
@@ -46,12 +46,12 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 1
-  spriteMeshType: 0
-  alignment: 9
-  spritePivot: {x: 0.5068579, y: 0.17506193}
-  spritePixelsToUnits: 423.84805
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
@@ -75,7 +75,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 0
+    textureCompression: 1
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Wolf_0
+      name: sapper_noground__leonardo_gpt-image-2.5-flare_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 254
-        height: 384
+        width: 768
+        height: 1376
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: b76d1a4c2a234a9f0800000000000000
-      internalID: -458185587419916677
+      spriteID: fa4745ae8fdbeea60800000000000000
+      internalID: 7705304889258439855
       vertices: []
       indices: 
       edges: []
@@ -138,7 +138,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 5e97eb03825dee720800000000000000
+    spriteID: 
     internalID: 0
     vertices: []
     indices: 
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Wolf_0: -458185587419916677
+      sapper_noground__leonardo_gpt-image-2.5-flare_0: 7705304889258439855
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

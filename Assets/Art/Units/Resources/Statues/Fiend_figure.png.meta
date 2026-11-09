@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: ee85db130703b6c4f95060b6839d579a
+guid: 050bbea2ab3649541b3e9a16133c105b
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -8180171696930044909
-    second: Warrior_0
+      213: -2520398410172793437
+    second: Fiend_figure_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -50,8 +50,8 @@ TextureImporter:
   spriteExtrude: 1
   spriteMeshType: 0
   alignment: 9
-  spritePivot: {x: 0.4766949, y: 0.1400697}
-  spritePixelsToUnits: 297.92334
+  spritePivot: {x: 0.36828858, y: 0.02}
+  spritePixelsToUnits: 480
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
@@ -113,12 +113,12 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Warrior_0
+      name: Fiend_figure_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 189
+        width: 298
         height: 384
       alignment: 0
       pivot: {x: 0, y: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 314c7ca9e213a7e80800000000000000
-      internalID: -8180171696930044909
+      spriteID: 3adf035effeb50dd0800000000000000
+      internalID: -2520398410172793437
       vertices: []
       indices: 
       edges: []
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Warrior_0: -8180171696930044909
+      Fiend_figure_0: -2520398410172793437
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
