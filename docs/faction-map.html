@@ -84,7 +84,16 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
 .st.untested { color: var(--info); background: var(--info-bg); }
 .role { display: inline-block; font-size: 12px; font-weight: 600; padding: 0 7px; border-radius: 3px; background: var(--bg); border: 1px solid var(--line); color: var(--fg); white-space: nowrap; margin-right: 3px; }
 
-.fcards { display: grid; gap: 22px; }
+.fcards { display: grid; gap: 14px; scroll-margin-top: 12px; }
+.pager { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.pnames { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto; justify-content: center; }
+.pbtn, .pname { font: inherit; font-size: 13px; font-weight: 500; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+.pbtn:hover, .pname:hover { border-color: var(--muted); }
+.pname { color: var(--c); }
+.pname[aria-current="true"] { background: var(--c); color: var(--panel); border-color: var(--c); }
+.pager[data-where="bottom"] .pnames { visibility: hidden; height: 0; overflow: hidden; }
+.goto { font: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+.goto:hover .fname { text-decoration: underline dotted; text-underline-offset: 3px; }
 .fcard { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--c); border-radius: 6px; padding: 18px; display: grid; gap: 16px; min-width: 0; }
 .fhead { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
 .fhead h2 { color: var(--c); margin: 0; }
@@ -156,7 +165,7 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
   <section id="view-factions">
     <div class="panel">
       <h2>At a glance</h2>
-      <p class="note">One row per regular faction. Cohesion is how much the units need each other; it is the criterion this page exists for.</p>
+      <p class="note">One row per regular faction. Cohesion is how much the units need each other; it is the criterion this page exists for. Click a faction's name to open its page below.</p>
       <div class="scroll" style="margin-top:10px"><table id="summary"></table></div>
     </div>
     <div class="fcards" id="cards"></div>
@@ -504,9 +513,9 @@ function chainList(chains) {
 
 document.getElementById("summary").innerHTML =
   `<thead><tr><th>Faction</th><th>Plan</th><th>Cohesion</th><th>Kill-order choice</th><th>Question it asks</th></tr></thead><tbody>` +
-  FACTIONS.map(f => `<tr><td>${fname(f)}<div class="num">pool ${f.pool}</div></td><td>${esc(f.plan)}</td><td><span class="sc ${f.judge.Cohesion}">${SCORE_WORD[f.judge.Cohesion]}</span></td><td>${esc(f.choice)}</td><td>${esc(f.question)}</td></tr>`).join("") + `</tbody>`;
+  FACTIONS.map((f, i) => `<tr><td><button type="button" class="goto" data-goto="${i}" title="Open its page">${fname(f)}</button><div class="num">pool ${f.pool}</div></td><td>${esc(f.plan)}</td><td><span class="sc ${f.judge.Cohesion}">${SCORE_WORD[f.judge.Cohesion]}</span></td><td>${esc(f.choice)}</td><td>${esc(f.question)}</td></tr>`).join("") + `</tbody>`;
 
-document.getElementById("cards").innerHTML = FACTIONS.map(f => `
+const PAGES = FACTIONS.map(f => `
   <article class="fcard" id="f-${f.id}" style="--c:var(${f.color})">
     <div class="fhead"><h2>${esc(f.name)}</h2><span class="num">${esc(f.layout)} · pool ${f.pool}</span></div>
     <p class="fplan">${esc(f.plan)}</p>
@@ -526,16 +535,44 @@ document.getElementById("cards").innerHTML = FACTIONS.map(f => `
         <div class="gaps ${f.gaps.length ? "" : "none"}"><h3>${f.gaps.length ? "Gaps" : "No gaps found"}</h3>${f.gaps.map(g => `<p>${esc(g)}</p>`).join("")}<p><b>${esc(f.verdict)}</b></p></div>
       </div>
     </div>
-  </article>`).join("") + `
-  <div class="panel">
-    <h2>Bosses</h2>
-    <p class="note">Bosses aren't factions, but the Necromancer's army is built from them.</p>
-    <div class="fcards" style="margin-top:14px">${BOSSES.map(b => `
+  </article>`).concat(`
+  <article class="fcard" id="f-bosses" style="--c:var(--f-bosses)">
+    <div class="fhead"><h2>Bosses</h2></div>
+    <p class="fplan">Bosses aren't factions, but the Necromancer's army is built from them.</p>
+    ${BOSSES.map(b => `
       <div class="fgrid" style="border-top:1px solid var(--line); padding-top:14px">
         <div><div class="fhead">${fname(b)}<span class="num">${esc(b.layout)}</span></div><p style="margin:6px 0 10px">${esc(b.plan)}</p>${unitList(b.units)}</div>
         <div><h3>Combos</h3>${chainList(b.chains)}<p class="note" style="margin-top:10px">${esc(b.note)}</p></div>
-      </div>`).join("")}</div>
-  </div>`;
+      </div>`).join("")}
+  </article>`);
+const PAGE_NAMES = FACTIONS.map(f => [f.name, f.color]).concat([["Bosses", "--f-bosses"]]);
+let page = 0;
+try { const saved = +localStorage.getItem("faction-page"); if (saved >= 0 && saved < PAGES.length) page = saved; } catch (e) {}
+const pagerHtml = where => `<div class="pager" data-where="${where}">
+  <button type="button" class="pbtn" data-step="-1" aria-label="Previous faction">‹ Previous</button>
+  <div class="pnames">${PAGE_NAMES.map(([n, c], i) => `<button type="button" class="pname" data-page="${i}" style="--c:var(${c})">${esc(n)}</button>`).join("")}</div>
+  <span class="pcount num"></span>
+  <button type="button" class="pbtn" data-step="1" aria-label="Next faction">Next ›</button>
+</div>`;
+const cardsEl = document.getElementById("cards");
+function showPage(i, scroll) {
+  page = (i + PAGES.length) % PAGES.length;
+  cardsEl.innerHTML = pagerHtml("top") + PAGES[page] + pagerHtml("bottom");
+  cardsEl.querySelectorAll(".pname").forEach(b => b.setAttribute("aria-current", String(+b.dataset.page === page)));
+  cardsEl.querySelectorAll(".pcount").forEach(s => s.textContent = `${page + 1} / ${PAGES.length}`);
+  try { localStorage.setItem("faction-page", String(page)); } catch (e) {}
+  if (scroll) cardsEl.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+cardsEl.addEventListener("click", e => {
+  const s = e.target.closest(".pbtn"), n = e.target.closest(".pname");
+  if (s) showPage(page + +s.dataset.step, s.closest(".pager").dataset.where === "bottom");
+  else if (n) showPage(+n.dataset.page, n.closest(".pager").dataset.where === "bottom");
+});
+document.getElementById("summary").addEventListener("click", e => {
+  const b = e.target.closest("[data-goto]");
+  if (b) showPage(+b.dataset.goto, true);
+});
+showPage(page, false);
 
 // Answers grid
 const agrid = document.getElementById("agrid");
