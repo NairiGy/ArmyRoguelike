@@ -16,6 +16,7 @@ Where things are written down:
 
 - [docs/design-note.md](docs/design-note.md): what has been decided and why, current rules only. Keep it updated when design decisions change. Replaced rules are in [docs/design-history.md](docs/design-history.md).
 - [docs/tasks.md](docs/tasks.md): open tasks across all topics. Read it at the start of a session and update it when you finish or find work.
+- [docs/gdd.html](docs/gdd.html) (on the public docs site, https://nairigy.github.io/ArmyRoguelike/gdd.html): a short game design document for the user's CV, written for outside readers and summarised from the design note. Update it when a big-picture fact changes (pillars, loop, units, factions, roadmap), not for every number.
 - [docs/gamepedia.html](docs/gamepedia.html): every unit, ability, item, enemy and rule with its numbers, generated from the game data. Numbers are right there, not in the design note.
 - [docs/synergy-map.html](docs/synergy-map.html) ([published](https://claude.ai/artifact/BCBjEq3EFMuN1tZi1sLoyw)): every hero skill, item and rule tagged by the theme keywords it makes, uses or hurts, with its role in a build and a judgment on five criteria; hero-pair synergies, theme health, rule duplicates and holes.
 - [docs/faction-map.html](docs/faction-map.html) ([published](https://claude.ai/artifact/AqboPtABMZ1qwcSG8CKrLJ)): every enemy faction's plan, each unit's role in it, the combos between units and whether they fire, its kill-order choice and question, a judgment on five criteria, which hero themes answer it, and ideas for faction teamwork.
