@@ -268,6 +268,7 @@ public static class GamepediaWriter
         html.Append($"<tr><td>Soul Contract</td><td>A devil with Soul Contract ready that would sign one in its coming turn, after backing off or walking up (its turn is played out on a copy of the board).</td><td>The target, with an arrow.</td></tr>");
         html.Append("<tr><td>Fire Breath</td><td>A fiend with Fire Breath ready that can breathe at one of your units this turn, from its tile or one it can walk to.</td><td>The target, and the tile it breathes from.</td></tr>");
         html.Append($"<tr><td>Rending Blow</td><td>It has Rending Blow ready, more than {Battle.RendingBlowCost} HP, and can reach its target to attack this turn.</td><td>The target, with an arrow.</td></tr>");
+        html.Append("<tr><td>Guard</td><td>A brute that will walk next to a crossbowman with one of your units close to it, and has nobody to hit from there this turn (see the Bodyguard routine). If it can hit from there, it shows Bull Rush or Attack on that unit instead.</td><td>The crossbowman, and the tile it walks to.</td></tr>");
         html.Append("<tr><td>Fling</td><td>A goblin that can't reach anyone to strike this turn, with a bomb, mine or unacted goblin next to it and one of your units 2-3 tiles away.</td><td>The target, the goblin to be thrown and its landing tile.</td></tr>");
         html.Append("<tr><td>Grasp</td><td>It grasps, Grasp is ready, it can reach its target to attack this turn, and the target is ranged or Swift and not already pinned.</td><td>The target, with an arrow.</td></tr>");
         html.Append($"<tr><td>Upheaval</td><td>It has Upheaval ready, can't reach its target to strike this turn, and the target is within {Battle.UpheavalRange} tiles plus its moves. It may still pick a nearer unit once it has walked.</td><td>The target, with an arrow.</td></tr>");
@@ -298,6 +299,7 @@ public static class GamepediaWriter
             case EnemyBehaviour.Necromancer: return "Necromancer";
             case EnemyBehaviour.Imp: return "Imp";
             case EnemyBehaviour.Devil: return "Devil";
+            case EnemyBehaviour.Bodyguard: return "Bodyguard";
             default: throw new ArgumentOutOfRangeException(nameof(b), b, "Add a name and steps for this behaviour to the gamepedia.");
         }
     }
@@ -396,6 +398,15 @@ public static class GamepediaWriter
                     $"If Soul Contract is ready and one of your units is within {Battle.ContractRange} tiles: sign it on the unit it would kill first, else the hardest hitter, else the weakest.",
                     "If it can hit the target from where it stands: strike with the trident (Long Reach).",
                     $"Otherwise {range} for a strike, or for a contract when one is ready (once a turn), with a comfort distance of {EnemyAI.DevilComfortDistance}.",
+                };
+            case EnemyBehaviour.Bodyguard:
+                return new[]
+                {
+                    $"Like Walk up and hit when it is taunted, when no crossbowman is threatened (none has one of your units within {EnemyAI.GuardThreatRange} tiles), or when it is slowed and can hit from where it stands.",
+                    "Otherwise it stands next to a threatened crossbowman that no other brute stands next to, so Guard takes the hits meant for it: its own tile or one it can walk to, " +
+                    "first one from which it can hit one of your units, then next to the crossbowman nearest your units, then next to more of them, then the shortest walk.",
+                    "With no such tile in reach: if it can hit someone from where it stands, like Walk up and hit; otherwise it walks towards that crossbowman.",
+                    $"From there it hits whoever it can reach without leaving (Bull Rush when ready): its {target} first, then the weakest.",
                 };
             default:
                 throw new ArgumentOutOfRangeException(nameof(b), b, "Add a name and steps for this behaviour to the gamepedia.");

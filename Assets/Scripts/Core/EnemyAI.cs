@@ -52,6 +52,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>A fiend breathing fire down a line at its target, from <see cref="Intent.Tile"/>.</summary>
         FireBreath,
+
+        /// <summary>A brute walking to <see cref="Intent.Tile"/> next to the crossbowman <see cref="Intent.Target"/> (an ally) to take the hits meant for it, with nobody to hit this turn.</summary>
+        Guard,
     }
 
     /// <summary>What an enemy plans to do next, for the hover display.</summary>
@@ -118,6 +121,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Keeps its distance, signs Soul Contracts and strikes with its trident.</summary>
         Devil,
+
+        /// <summary>Stands next to a crossbowman so Guard covers it, and hits whoever it can reach from there.</summary>
+        Bodyguard,
     }
 
     /// <summary>
@@ -130,6 +136,9 @@ namespace ArmyRoguelike.Core
     {
         public const int NecromancerComfortDistance = 2;
         public const int BomberComfortDistance = 2;
+
+        /// <summary>Bodyguard: a brute guards a crossbowman only while one of your units is within this many tiles of it.</summary>
+        public const int GuardThreatRange = 3;
 
         /// <summary>The turn routine a type runs; <see cref="TakeTurn"/> dispatches on this.</summary>
         public static EnemyBehaviour BehaviourOf(UnitStats stats)
@@ -154,6 +163,8 @@ namespace ArmyRoguelike.Core
                 return EnemyBehaviour.Elemental;
             if (stats.AreaMelee)
                 return EnemyBehaviour.Giant;
+            if (stats.Has(Ability.Guard))
+                return EnemyBehaviour.Bodyguard;
             return EnemyBehaviour.Advance;
         }
 
@@ -378,6 +389,15 @@ namespace ArmyRoguelike.Core
                 battle.Ready(enemy, ActionKind.Overwatch))
                 return new Intent(IntentKind.Overwatch, target);
 
+            // Bodyguard: it walks to a crossbowman first, so it hits only whoever it can reach from there.
+            if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Bodyguard && AsIfFreshTurn(battle, enemy, () => GuardPlan(battle, enemy)) is var guard && guard.HasValue)
+            {
+                var hit = guard.Value.hit;
+                if (hit == null)
+                    return new Intent(IntentKind.Guard, guard.Value.shooter, guard.Value.tile);
+                return new Intent(battle.Ready(enemy, ActionKind.BullRush) ? IntentKind.BullRush : IntentKind.Attack, hit);
+            }
+
             if (enemy.Has(Ability.BullRush) && battle.Ready(enemy, ActionKind.BullRush) && CanReachToAttack(battle, enemy, target))
                 return new Intent(IntentKind.BullRush, target);
 
@@ -466,6 +486,9 @@ namespace ArmyRoguelike.Core
                 case EnemyBehaviour.Devil:
                     DevilTurn(battle, enemy, events);
                     break;
+                case EnemyBehaviour.Bodyguard:
+                    BodyguardTurn(battle, enemy, events);
+                    break;
                 case EnemyBehaviour.PackLeader:
                     if (ShouldHowl(battle, enemy))
                         events.AddRange(battle.DoHowl(enemy));
@@ -507,6 +530,109 @@ namespace ArmyRoguelike.Core
         }
 
         // ---------- Behaviours ----------
+
+        /// <summary>
+        /// Bodyguard (Bandit Brute, 2026-11-09): where it stands this turn so Guard covers a crossbowman, the crossbowman,
+        /// and whoever it will hit from there (null if nobody). It guards only crossbowmen that are threatened: one of your
+        /// units within <see cref="GuardThreatRange"/> tiles. Its own tile counts. Among tiles next to such a crossbowman it
+        /// can reach: one it can hit from first, then the crossbowman nearest your units, then one next to more of them,
+        /// then the shortest walk. With none in reach, it walks towards that crossbowman instead, unless it can hit
+        /// someone from where it stands. Null when it fights as a plain brute: taunted, slowed with a hit from where it
+        /// stands, or no threatened crossbowman (tuned 2026-11-09: guarding every crossbowman all the time turned the
+        /// brutes into turrets and the elite fight stalled).
+        /// </summary>
+        public static (GridPos tile, Unit shooter, Unit hit)? GuardPlan(Battle battle, Unit brute)
+        {
+            if (Taunter(battle, brute) != null)
+                return null;
+            var foes = Visible(battle).Where(u => !u.IsObjective).ToList();
+            // One guard per crossbowman: one that another brute already stands next to is covered, so a second brute
+            // guards another one or presses on (tuned 2026-11-09: two brutes guarding stalled the elite fight).
+            var otherGuards = battle.Living(Team.Enemy).Where(u => u != brute && u.Has(Ability.Guard)).ToList();
+            var shooters = battle.Living(Team.Enemy)
+                .Where(u => u != brute && u.Has(Ability.BehindCover) && foes.Any(f => Battle.Distance(u, f) <= GuardThreatRange) &&
+                            !otherGuards.Any(g => Battle.Distance(g, u) == 1))
+                .ToList();
+            if (shooters.Count == 0)
+                return null;
+            var hitsFromHere = brute.Ap >= Battle.AttackCost && foes.Any(u => battle.CanAttack(brute, u));
+            if (brute.SlowedThisTurn && hitsFromHere)
+                return null;
+
+            int Threat(Unit shooter) => foes.Select(u => Battle.Distance(shooter, u)).DefaultIfEmpty(99).Min();
+            Unit HitFrom(GridPos tile)
+            {
+                if (brute.Ap < Battle.AttackCost)
+                    return null;
+                var preferred = ChooseTarget(battle, brute);
+                return foes.Where(u => battle.CanHitFrom(brute, tile, u))
+                    .OrderBy(u => u == preferred ? 0 : 1).ThenBy(HasShield).ThenBy(u => u.Hp).ThenBy(u => u.Id)
+                    .FirstOrDefault();
+            }
+
+            var spots = StandingSpots(battle, brute)
+                .Select(s => (s.tile, s.cost, guarded: shooters.Where(sh => Battle.Distance(s.tile, brute.Size, sh) == 1).ToList()))
+                .Where(s => s.guarded.Count > 0)
+                .Select(s => (s.tile, s.cost, s.guarded, hit: HitFrom(s.tile)))
+                .ToList();
+            if (spots.Count > 0)
+            {
+                var best = spots
+                    .OrderBy(s => s.hit != null ? 0 : 1)
+                    .ThenBy(s => s.guarded.Min(Threat))
+                    .ThenByDescending(s => s.guarded.Count)
+                    .ThenBy(s => s.cost)
+                    .First();
+                return (best.tile, best.guarded.OrderBy(Threat).ThenBy(u => u.Id).First(), best.hit);
+            }
+
+            if (hitsFromHere)
+                return null;
+            var ward = shooters.OrderBy(Threat).ThenBy(u => u.Id).First();
+            var current = Battle.Distance(brute, ward);
+            var closer = battle.GetReachable(brute)
+                .Where(kv => Battle.Distance(kv.Key, brute.Size, ward) < current)
+                .OrderBy(kv => Battle.Distance(kv.Key, brute.Size, ward)).ThenBy(kv => kv.Value).ThenBy(kv => kv.Key.Y).ThenBy(kv => kv.Key.X)
+                .Select(kv => (GridPos?)kv.Key)
+                .FirstOrDefault();
+            return closer.HasValue ? (closer.Value, ward, HitFrom(closer.Value)) : ((GridPos, Unit, Unit)?)null;
+        }
+
+        /// <summary>Bodyguard: walk to the guard tile, then Bull Rush or strike whoever it can reach without leaving it.</summary>
+        private static void BodyguardTurn(Battle battle, Unit brute, List<BattleEvent> events)
+        {
+            var plan = GuardPlan(battle, brute);
+            if (plan == null)
+            {
+                MeleeTurn(battle, brute, events);
+                return;
+            }
+
+            if (plan.Value.tile != brute.Pos)
+            {
+                var move = battle.DoMove(brute, plan.Value.tile);
+                if (move == null)
+                {
+                    MeleeTurn(battle, brute, events);
+                    return;
+                }
+                events.AddRange(move);
+            }
+
+            while (!battle.IsOver && brute.IsAlive)
+            {
+                var preferred = ChooseTarget(battle, brute);
+                var foe = Visible(battle).Where(u => !u.IsObjective && battle.CanAttack(brute, u))
+                    .OrderBy(u => u == preferred ? 0 : 1).ThenBy(HasShield).ThenBy(u => u.Hp).ThenBy(u => u.Id)
+                    .FirstOrDefault();
+                if (foe == null)
+                    return;
+                var ap = brute.Ap;
+                events.AddRange(battle.CanBullRush(brute, foe) ? battle.DoBullRush(brute, foe) : battle.DoAttack(brute, foe));
+                if (brute.Ap >= ap)
+                    return;
+            }
+        }
 
         /// <summary>Walk up to the nearest player unit and attack. Each loop spends AP or moves, or stops.</summary>
         private static void MeleeTurn(Battle battle, Unit enemy, List<BattleEvent> events)

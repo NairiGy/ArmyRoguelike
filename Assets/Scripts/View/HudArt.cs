@@ -108,6 +108,9 @@ namespace ArmyRoguelike.View
                     return (Icon.Hold, Abilities.Name(Ability.Grasp), ControlColor);
                 case IntentKind.BullRush:
                     return (Icon.Push, Abilities.Name(Ability.BullRush), HarmColor);
+                case IntentKind.Guard:
+                    // Placeholder icon (reused).
+                    return (Icon.Hold, Abilities.Name(Ability.Guard), BuffColor);
                 // Demons (placeholder icons, reusing the existing set).
                 case IntentKind.Hellswap:
                     return (Icon.Push, Abilities.Name(Ability.Hellswap), ControlColor);

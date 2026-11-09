@@ -804,6 +804,13 @@ namespace ArmyRoguelike.View
                     foreach (var wolf in Battle.Living(enemy.Team).Where(w => w.IsWolf))
                         _board.SetHighlight(wolf.Pos, AuraColor);
                     break;
+                case IntentKind.Guard:
+                    // Placeholder: the crossbowman it will guard, and the tile it walks to.
+                    _board.SetHighlight(intent.Target.Pos, AuraColor);
+                    if (intent.Tile.HasValue && intent.Tile.Value != enemy.Pos)
+                        _board.SetHighlight(intent.Tile.Value, RockLandingColor);
+                    line.Show(from, to);
+                    break;
                 case IntentKind.Hellswap:
                     // Placeholder: the target, and the tile it lands on (where the imp swaps from).
                     _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
@@ -2582,6 +2589,10 @@ namespace ArmyRoguelike.View
                     return $"soul contract on the {name}: it takes {Battle.ContractDamage} damage next enemy turn unless you hurt the Devil first";
                 case IntentKind.FireBreath:
                     return $"fire breath at the {name}: {intent.Amount} damage to each of your units on the lit line, and those tiles burn";
+                case IntentKind.Guard:
+                    return intent.Tile.HasValue && Battle.Distance(intent.Tile.Value, 1, intent.Target) > 1
+                        ? $"walk towards the {name} to guard it (nobody to hit this turn)"
+                        : $"stand next to the {name} (lit) and take the hits meant for it; nobody to hit this turn";
                 default:
                     return $"attack the {name}";
             }
