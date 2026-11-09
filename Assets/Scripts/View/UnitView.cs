@@ -132,6 +132,8 @@ namespace ArmyRoguelike.View
 
         // How wide a player statue's pedestal is, in tiles before BattleScenery.UnitScale (big units scale it up).
         private const float PedestalWidth = 0.8f;
+        // How far behind its lowest pixel (the toe) a foot rests on the stone, in the figure's own units.
+        private const float FootDepth = 0.03f;
 
         private Material _statueMaterial;
 
@@ -171,7 +173,8 @@ namespace ArmyRoguelike.View
                     _base.sharedMaterial = BattleScenery.PerTexture(_statueMaterial, pedestal.texture);
                 // The middle between the front and back foot goes on the middle of the top face, so a long stride
                 // keeps both feet on the stone (standing it on its lowest foot pushed the back foot off the far edge).
-                var feetMiddle = PlaceholderArt.Footprint(_body.sprite).z * _body.transform.localScale.y;
+                // The lowest pixel is the toe; the sole rests a little behind it, so it goes FootDepth further down.
+                var feetMiddle = (PlaceholderArt.Footprint(_body.sprite).z + FootDepth) * _body.transform.localScale.y;
                 bodyHeight = PlaceholderArt.PedestalTop(pedestal) * width - feetMiddle;
             }
 

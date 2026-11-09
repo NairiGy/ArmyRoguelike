@@ -514,6 +514,8 @@ public static class ArtExperiment
             if (!Enum.TryParse<UnitKind>(unit, true, out var kind))
                 continue;
             var (_, tex, pivot, ppu) = CutOutFigure(Path.GetFileName(file), unit + "_figure", FigureHeight(kind));
+            if (FeetMiddle.TryGetValue(kind, out var feetX))
+                pivot.x = feetX;
             if (DrawnFacingRight.Contains(kind))
             {
                 tex = Mirrored(tex);
@@ -582,6 +584,13 @@ public static class ArtExperiment
         { UnitKind.Demon, 1.6f },
         { UnitKind.Devil, 1.3f },
         { UnitKind.Fiend, 0.8f },
+    };
+
+    // Where the middle between the feet is, as a share of the cut-out's width, for figures the automatic guess gets
+    // wrong. The rogue's low dagger and back knee pulled it right, so the crouch stood off to the left of its tile.
+    private static readonly Dictionary<UnitKind, float> FeetMiddle = new Dictionary<UnitKind, float>
+    {
+        { UnitKind.Rogue, 0.5f },
     };
 
     private static float FigureHeight(UnitKind kind) => FigureHeights.TryGetValue(kind, out var h) ? h : DefaultFigureHeight;
