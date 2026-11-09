@@ -131,7 +131,7 @@ namespace ArmyRoguelike.View
             return result;
         }
 
-        private static readonly Dictionary<Sprite, Vector2> Footprints = new Dictionary<Sprite, Vector2>();
+        private static readonly Dictionary<Sprite, Vector3> Footprints = new Dictionary<Sprite, Vector3>();
 
         // How high above the lowest point the feet are looked for, as a share of the figure's height: enough to
         // catch the back foot of a figure seen from above or in a long stride (the fiend, the imp), which stands a
@@ -140,9 +140,10 @@ namespace ArmyRoguelike.View
 
         /// <summary>
         /// Where a figure's feet touch the floor, in the sprite's own units: x is the middle of the feet from the
-        /// pivot, y how wide they spread. Measured once per sprite from its opaque pixels near the bottom.
+        /// pivot, y how wide they spread, z how far above the lowest point the middle between the front and back
+        /// foot is drawn. Measured once per sprite from its opaque pixels near the bottom.
         /// </summary>
-        public static Vector2 Footprint(Sprite sprite)
+        public static Vector3 Footprint(Sprite sprite)
         {
             if (Footprints.TryGetValue(sprite, out var found))
                 return found;
@@ -157,7 +158,7 @@ namespace ArmyRoguelike.View
             for (var y = h - 1; y >= 0 && top < 0; y--)
                 for (var x = 0; x < w; x++)
                     if (alpha[y * w + x] > 128) { top = y; break; }
-            var result = new Vector2(0f, 0.3f);
+            var result = new Vector3(0f, 0.3f, 0f);
             if (bottom >= 0)
             {
                 var band = bottom + Mathf.CeilToInt((top - bottom) * FootBand);
@@ -170,7 +171,21 @@ namespace ArmyRoguelike.View
                             maxX = Mathf.Max(maxX, x);
                         }
                 var ppu = sprite.pixelsPerUnit;
-                result = new Vector2(((minX + maxX + 1) * 0.5f - sprite.pivot.x) / ppu, (maxX - minX + 1) / ppu);
+
+                // The pivot stands between the feet; seen from above, the back foot is drawn higher than the front
+                // one. The lowest point on each side of the pivot is that side's foot.
+                var split = Mathf.Clamp(Mathf.RoundToInt(sprite.pivot.x), 1, w - 1);
+                int Lowest(int from, int to)
+                {
+                    for (var y = bottom; y <= band; y++)
+                        for (var x = from; x < to; x++)
+                            if (alpha[y * w + x] > 128)
+                                return y;
+                    return bottom;
+                }
+                var feetApart = Mathf.Abs(Lowest(0, split) - Lowest(split, w));
+
+                result = new Vector3(((minX + maxX + 1) * 0.5f - sprite.pivot.x) / ppu, (maxX - minX + 1) / ppu, feetApart * 0.5f / ppu);
             }
 
             Footprints[sprite] = result;

@@ -169,7 +169,10 @@ namespace ArmyRoguelike.View
                 _base.sprite = pedestal;
                 if (_statueMaterial != null)
                     _base.sharedMaterial = BattleScenery.PerTexture(_statueMaterial, pedestal.texture);
-                bodyHeight = PlaceholderArt.PedestalTop(pedestal) * width;
+                // The middle between the front and back foot goes on the middle of the top face, so a long stride
+                // keeps both feet on the stone (standing it on its lowest foot pushed the back foot off the far edge).
+                var feetMiddle = PlaceholderArt.Footprint(_body.sprite).z * _body.transform.localScale.y;
+                bodyHeight = PlaceholderArt.PedestalTop(pedestal) * width - feetMiddle;
             }
 
             _body.transform.localPosition = Vector3.up * bodyHeight;
