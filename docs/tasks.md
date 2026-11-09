@@ -62,6 +62,8 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 
 ### Other visual work
 
+- [ ] Pedestals (2026-11-09): pick the shape for the player's statues after a playtest (F2 in a test battle cycles none / square / round / tall; square is the default), then drop the others or keep them for later (e.g. a tall one for heroes who level up). Not playtested. Open: should enemies get a rougher pedestal too (the user started with the army only).
+
 - [ ] Grounding the statues, next ideas (2026-11-09, after the feet-sized shadows): a cast shadow (a flattened, slanted copy of each statue's outline falling away from the moon or braziers); darkening the lowest few percent of each statue in the statue shader; sinking the feet into the tile by a hair. Try the cast shadow first if the feet shadows aren't enough in play.
 
 - [ ] Painted aurora: ChatGPT's free image limit was hit on 2026-10-25; retry the prompt saved in the ChatGPT chat "Generate Crescent Moon Image". Then replace the code aurora with it (maybe for another setting).

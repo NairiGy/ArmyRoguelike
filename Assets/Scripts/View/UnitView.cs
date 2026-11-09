@@ -91,31 +91,11 @@ namespace ArmyRoguelike.View
                 // Evolved statues stand a little taller.
                 _body.transform.localScale = Vector3.one * (1f + 0.06f * (unit.Stats.Tier - 1));
 
-            // Optionally a stone base drawn in code, always square to the tile, with the figure standing on it.
-            if (BattleScenery.DrawnBases && PlaceholderArt.IsFigureOnly(unit.Stats.Kind))
-            {
-                _base = new GameObject("Base").AddComponent<SpriteRenderer>();
-                _base.transform.SetParent(transform, false);
-                _base.transform.localScale = Vector3.one * Unit.Size;
-                _base.sprite = PlaceholderArt.StatueBase;
-                _body.transform.localPosition = Vector3.up * (PlaceholderArt.StatueBaseHeight * Unit.Size);
-            }
-
-            _bodyRest = _body.transform.localPosition;
-
             // A soft shadow on the floor grounds the statue; it stays put while the body bobs and lunges.
             _shadow = new GameObject("Shadow").AddComponent<SpriteRenderer>();
             _shadow.transform.SetParent(transform, false);
-            // A figure standing straight on the floor (no base, no painted pedestal) gets a smaller, darker
-            // shadow, tight under its feet, so it reads as standing on the stone rather than floating.
-            var bare = _base == null && PlaceholderArt.IsFigureOnly(unit.Stats.Kind);
-            _shadowColor = bare ? BareShadowColor : ShadowColor;
-            _shadow.transform.localScale = Vector3.one * ((bare ? 0.55f : 0.75f) * Unit.Size);
             _shadow.sprite = PlaceholderArt.SoftShadow;
-            _shadow.color = _shadowColor;
-            if (bare)
-                FitShadowToFeet();
-            _shadowScale = _shadow.transform.localScale;
+            ApplyGrounding();
 
             var top = _body.transform.localPosition.y + _body.sprite.bounds.max.y * _body.transform.localScale.y;
 
@@ -150,23 +130,83 @@ namespace ArmyRoguelike.View
             RefreshHp(unit.Hp);
         }
 
-        /// <summary>
-        /// A figure standing on nothing gets its shadow from its own feet: a wide soft halo and a firm dark patch,
-        /// both as wide as its stance and centred under it, so a crouch, a wide stance or four paws each sit on a
-        /// shadow of their own shape instead of the same round blot.
-        /// </summary>
-        private void FitShadowToFeet()
-        {
-            var feet = PlaceholderArt.Footprint(_body.sprite);
-            var scale = _body.transform.localScale.x;
-            var centre = (_body.flipX ? -feet.x : feet.x) * scale;
-            // Wings, tails and weapons low down can widen the measure; no shadow spreads far past its tile.
-            var span = Mathf.Min(feet.y * scale, 0.8f * Unit.Size);
-            // The back foot stands higher on the picture than the front one, so the shadow sits a little up.
-            var at = new Vector3(centre, span * 0.08f, 0f);
+        // How wide a player statue's pedestal is, in tiles before BattleScenery.UnitScale (big units scale it up).
+        private const float PedestalWidth = 0.8f;
 
-            _shadowColor = FeetHaloColor;
+        private Material _statueMaterial;
+
+        /// <summary>
+        /// What the statue stands on and the shadow under it. A player figure stands on the chosen painted pedestal
+        /// (BattleScenery.Pedestal), its feet on the pedestal's top face; otherwise it stands straight on the floor.
+        /// Run again when the pedestal choice changes (F2 in a test battle).
+        /// </summary>
+        public void ApplyGrounding()
+        {
+            if (_base != null)
+                Destroy(_base.gameObject);
+            _base = null;
+            if (_contact != null)
+                Destroy(_contact.gameObject);
+            _contact = null;
+
+            var kind = Unit.Stats.Kind;
+            var bodyHeight = 0f;
+            if (BattleScenery.DrawnBases && PlaceholderArt.IsFigureOnly(kind))
+            {
+                // A stone base drawn in code (the art experiments' renders), square to the tile.
+                _base = new GameObject("Base").AddComponent<SpriteRenderer>();
+                _base.transform.SetParent(transform, false);
+                _base.transform.localScale = Vector3.one * Unit.Size;
+                _base.sprite = PlaceholderArt.StatueBase;
+                bodyHeight = PlaceholderArt.StatueBaseHeight * Unit.Size;
+            }
+            else if (Unit.Team == Team.Player && PlaceholderArt.IsFigureOnly(kind) && PlaceholderArt.Pedestal(BattleScenery.Pedestal) is Sprite pedestal)
+            {
+                var width = PedestalWidth * Unit.Size;
+                _base = new GameObject("Pedestal").AddComponent<SpriteRenderer>();
+                _base.transform.SetParent(transform, false);
+                _base.transform.localScale = Vector3.one * width;
+                _base.sprite = pedestal;
+                if (_statueMaterial != null)
+                    _base.sharedMaterial = BattleScenery.PerTexture(_statueMaterial, pedestal.texture);
+                bodyHeight = PlaceholderArt.PedestalTop(pedestal) * width;
+            }
+
+            _body.transform.localPosition = Vector3.up * bodyHeight;
+            _bodyRest = _body.transform.localPosition;
+            _shadow.transform.localPosition = Vector3.zero;
+
+            if (_base != null && _base.sprite != PlaceholderArt.StatueBase)
+            {
+                // On a pedestal, the shadow is the pedestal's: as wide as its foot, flat on the floor.
+                FitShadow(0f, PedestalWidth * Unit.Size * 0.95f, 0f);
+            }
+            else if (_base == null && PlaceholderArt.IsFigureOnly(kind))
+            {
+                // A figure standing straight on the floor gets its shadow from its own feet: a crouch, a wide
+                // stance or four paws each sit on a shadow of their own shape instead of the same round blot.
+                var feet = PlaceholderArt.Footprint(_body.sprite);
+                var scale = _body.transform.localScale.x;
+                // Wings, tails and weapons low down can widen the measure; no shadow spreads far past its tile.
+                var span = Mathf.Min(feet.y * scale, 0.8f * Unit.Size);
+                // The back foot stands higher on the picture than the front one, so the shadow sits a little up.
+                FitShadow((_body.flipX ? -feet.x : feet.x) * scale, span, span * 0.08f);
+            }
+            else
+            {
+                _shadowColor = ShadowColor;
+                _shadow.transform.localScale = Vector3.one * (0.75f * Unit.Size);
+            }
+
             _shadow.color = _shadowColor;
+            _shadowScale = _shadow.transform.localScale;
+        }
+
+        /// <summary>A wide soft halo and a firm dark patch, both as wide as <paramref name="span"/>, centred at <paramref name="centre"/>.</summary>
+        private void FitShadow(float centre, float span, float up)
+        {
+            var at = new Vector3(centre, up, 0f);
+            _shadowColor = FeetHaloColor;
             _shadow.transform.localPosition = at;
             // The halo's soft edge shows only about two thirds of its width.
             _shadow.transform.localScale = Vector3.one * Mathf.Max(0.35f, span * 1.6f + 0.15f);
@@ -179,15 +219,31 @@ namespace ArmyRoguelike.View
             _contact.color = FeetContactColor;
         }
 
+        /// <summary>F2 in a test battle: every statue on the board moves to the next pedestal shape.</summary>
+        public static void CyclePedestal()
+        {
+            var shapes = (BattleScenery.PedestalShape[])System.Enum.GetValues(typeof(BattleScenery.PedestalShape));
+            BattleScenery.Pedestal = shapes[((int)BattleScenery.Pedestal + 1) % shapes.Length];
+            foreach (var view in FindObjectsByType<UnitView>(FindObjectsSortMode.None))
+                if (view.Unit.IsAlive && !view._showingBones)
+                {
+                    view.ApplyGrounding();
+                    view.SetWorldPosition(view.transform.position);
+                }
+        }
+
         /// <summary>
         /// The shadow follows the statue off the floor: lifted (selected, or mid-step), it shrinks and fades, and the
         /// dark patch under the feet all but goes, so the statue reads as leaving the ground and landing again.
         /// </summary>
         private void LateUpdate()
         {
+            // A pedestal is part of the statue: it rises, hops, lunges and shakes with the figure.
+            if (_base != null)
+                _base.transform.localPosition = _body.transform.localPosition - _bodyRest;
             if (!_shadow.enabled)
                 return;
-            var lift = Mathf.Clamp01((_body.transform.localPosition.y - _bodyRest.y) / ShadowLiftRange);
+            var lift =Mathf.Clamp01((_body.transform.localPosition.y - _bodyRest.y) / ShadowLiftRange);
             _shadow.transform.localScale = _shadowScale * (1f - ShadowLiftShrink * lift);
             _shadow.color = new Color(0f, 0f, 0f, _shadowColor.a * _shadowFade * (1f - ShadowLiftFade * lift));
             if (_contact != null)
@@ -497,6 +553,7 @@ namespace ArmyRoguelike.View
         {
             if (material == null || !PlaceholderArt.IsPainted(Unit.Stats.Kind))
                 return;
+            _statueMaterial = material;
             _body.sharedMaterial = BattleScenery.PerTexture(material, _body.sprite.texture);
             if (_base != null)
                 _base.sharedMaterial = BattleScenery.PerTexture(material, _base.sprite.texture);

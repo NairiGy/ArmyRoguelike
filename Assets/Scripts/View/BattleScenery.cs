@@ -128,6 +128,15 @@ namespace ArmyRoguelike.View
         /// </summary>
         public static bool DrawnBases;
 
+        /// <summary>The painted pedestals the player's statues can stand on (Resources/Pedestals).</summary>
+        public enum PedestalShape { None, Square, Round, Tall }
+
+        /// <summary>
+        /// Which pedestal the player's statues stand on (2026-11-09, being tried; enemies stand on the floor).
+        /// F2 in a test battle cycles through the shapes.
+        /// </summary>
+        public static PedestalShape Pedestal = PedestalShape.Square;
+
         /// <summary>Statue rims glow in team colours (pale blue for the player, ember red for enemies).</summary>
         public static bool TeamGlow = true;
 

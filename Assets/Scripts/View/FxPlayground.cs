@@ -93,6 +93,9 @@ namespace ArmyRoguelike.View
                 return;
             }
 
+            // F2: the player's statues try the next pedestal (none, square, round, tall).
+            if (keyboard.f2Key.wasPressedThisFrame)
+                UnitView.CyclePedestal();
             if (keyboard.f1Key.wasPressedThisFrame)
                 _open = !_open;
             if (!_open)

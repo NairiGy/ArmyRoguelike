@@ -77,6 +77,60 @@ namespace ArmyRoguelike.View
         /// <summary>A small dark ellipse with a short soft edge, for right where a statue's feet touch the floor (1 x 0.5 units).</summary>
         public static Sprite ContactShadow => _contactShadow != null ? _contactShadow : _contactShadow = MakeContactShadow();
 
+        private static readonly Dictionary<BattleScenery.PedestalShape, Sprite> Pedestals = new Dictionary<BattleScenery.PedestalShape, Sprite>();
+        private static readonly Dictionary<Sprite, float> PedestalTops = new Dictionary<Sprite, float>();
+
+        /// <summary>The painted pedestal of this shape (1 unit wide, pivot at the centre of its base), or null.</summary>
+        public static Sprite Pedestal(BattleScenery.PedestalShape shape)
+        {
+            if (shape == BattleScenery.PedestalShape.None)
+                return null;
+            if (!Pedestals.TryGetValue(shape, out var sprite))
+                Pedestals[shape] = sprite = Resources.Load<Sprite>("Pedestals/Pedestal_" + shape);
+            return sprite;
+        }
+
+        /// <summary>
+        /// How high the middle of a pedestal's top face is above the middle of its base, in the sprite's own
+        /// units: where a figure's feet go. Coming down from the top, the face widens until its left and right
+        /// corners (or the round top's widest point); that row is level with its middle.
+        /// </summary>
+        public static float PedestalTop(Sprite sprite)
+        {
+            if (PedestalTops.TryGetValue(sprite, out var found))
+                return found;
+            var rect = sprite.rect;
+            var w = (int)rect.width;
+            var h = (int)rect.height;
+            var alpha = ReadAlpha(sprite.texture, rect);
+            int Width(int y)
+            {
+                int first = -1, last = -1;
+                for (var x = 0; x < w; x++)
+                    if (alpha[y * w + x] > 128)
+                    {
+                        if (first < 0)
+                            first = x;
+                        last = x;
+                    }
+                return first < 0 ? 0 : last - first + 1;
+            }
+
+            var top = h - 1;
+            while (top > 0 && Width(top) == 0)
+                top--;
+            // The top slab is the widest part of the upper half (the foot below may be wider still).
+            var widest = 0;
+            for (var y = top; y >= h / 2; y--)
+                widest = Mathf.Max(widest, Width(y));
+            var corners = top;
+            while (corners > h / 2 && Width(corners) < widest * 0.98f)
+                corners--;
+            var result = (corners - sprite.pivot.y) / sprite.pixelsPerUnit;
+            PedestalTops[sprite] = result;
+            return result;
+        }
+
         private static readonly Dictionary<Sprite, Vector2> Footprints = new Dictionary<Sprite, Vector2>();
 
         // How high above the lowest point the feet are looked for, as a share of the figure's height: enough to

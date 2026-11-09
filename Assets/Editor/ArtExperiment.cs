@@ -522,7 +522,22 @@ public static class ArtExperiment
             SaveSprite(StatueFolder + kind + "_figure.png", tex, pivot, ppu);
             Debug.Log($"Imported statue {kind} (no ground) from {file}");
         }
+
+        // Empty pedestals the figures can stand on (Source/pedestal_<shape>[__<tool>].png): cut out with the pivot at
+        // the centre of the base and 1 unit wide, so the game picks their size (UnitView.PedestalWidth).
+        Directory.CreateDirectory(PedestalFolder);
+        foreach (var file in Directory.GetFiles(Source, "pedestal_*.png"))
+        {
+            var shape = UnitPart(Path.GetFileName(file).Substring("pedestal_".Length), "__");
+            shape = char.ToUpperInvariant(shape[0]) + shape.Substring(1);
+            // An empty pedestal is mostly its own base, so its corners can sit up to half way up the picture.
+            var (_, tex, pivot, ppu) = CutOut2D(Path.GetFileName(file), "pedestal_" + shape, 1f, 0.5f);
+            SaveSprite(PedestalFolder + "Pedestal_" + shape + ".png", tex, pivot, ppu);
+            Debug.Log($"Imported pedestal {shape} from {file}");
+        }
     }
+
+    private const string PedestalFolder = "Assets/Art/Units/Resources/Pedestals/";
 
     // Height of a figure drawn standing on nothing, in world units before BattleScenery.UnitScale (a tile
     // is 1 wide). A standing human is the default; units that crouch, sit or tower get their own.
@@ -939,7 +954,7 @@ public static class ArtExperiment
 
     // ---------- 2D: cut the statue out of the generated image ----------
 
-    private static (string, Texture2D, Vector2, float) CutOut2D(string file, string name)
+    private static (string, Texture2D, Vector2, float) CutOut2D(string file, string name, float pedestalWidth = PedestalWidth, float baseShare = 0.25f)
     {
         var src = new Texture2D(2, 2, TextureFormat.RGBA32, false);
         src.LoadImage(File.ReadAllBytes(SourcePath(file)));
@@ -1011,7 +1026,7 @@ public static class ArtExperiment
         for (var y = 0; y < ch; y++)
             Array.Copy(px, (y + minY) * w + minX, cropped, y * cw, cw);
 
-        // Find the pedestal: its widest row in the bottom quarter is its left and right corners. Those
+        // Find the pedestal: its widest row in the bottom quarter (baseShare) is its left and right corners. Those
         // corners are vertical edges, and the lowest widest row is level with the centre of the base.
         // Rows start at the bottom of the texture.
         int Span(int y, out int first)
@@ -1031,11 +1046,11 @@ public static class ArtExperiment
         }
 
         var widest = 0;
-        for (var y = 0; y < ch / 4; y++)
+        for (var y = 0; y < ch * baseShare; y++)
             widest = Mathf.Max(widest, Span(y, out _));
         var baseY = 0;
         var baseX = cw / 2f;
-        for (var y = 0; y < ch / 4; y++)
+        for (var y = 0; y < ch * baseShare; y++)
         {
             var span = Span(y, out var first);
             if (span < widest * 0.98f)
@@ -1046,7 +1061,7 @@ public static class ArtExperiment
         }
 
         var tex = Downscale(cropped, cw, ch, SpriteHeightPx);
-        var ppu = widest * ((float)tex.height / ch) / PedestalWidth;
+        var ppu = widest * ((float)tex.height / ch) / pedestalWidth;
         return (name, tex, new Vector2(baseX / cw, (float)baseY / ch), ppu);
     }
 
