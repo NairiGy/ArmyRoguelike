@@ -34,8 +34,10 @@ namespace ArmyRoguelike.Core
             ("bandits.bullRushIntoTrap", "Bull Rush pushes that ended on caltrops or in an Overwatch shot"),
             ("bandits.steals", "Gold steals"),
             ("bandits.escapes", "Cutpurses that escaped"),
-            ("elementals.upheavals", "Upheavals"),
-            ("elementals.upheavalCollisions", "Upheaval pushes that slammed into something"),
+            ("elementals.tremors", "Tremors"),
+            ("elementals.tremorSlows", "Your units slowed by a tremor"),
+            ("elementals.tremorPins", "Your units pinned by a tremor (already slowed)"),
+            ("elementals.aftershockSlows", "Your units slowed by a dying shard (Aftershock)"),
             ("elementals.splits", "Elementals split"),
             ("elementals.shardHits", "Shard attacks"),
             ("demons.hellswaps", "Hellswaps"),
@@ -64,12 +66,11 @@ namespace ArmyRoguelike.Core
         // Sequence state: what an action set up for the events that follow it. Cleared when the next action starts.
         private bool _explosiveFlung;
         private Unit _rushed;
-        private Unit _upheavalCaster;
 
         /// <summary>Events that start a unit's action; the ones after it (pushes, blasts, ticks) are its results.</summary>
         private static bool StartsAction(BattleEvent ev) =>
             ev is MoveEvent || ev is AttackEvent || ev is SmashEvent || ev is BoulderEvent || ev is BombThrowEvent ||
-            ev is AreaAttackEvent || ev is FlingEvent || ev is HowlEvent || ev is SwapEvent || ev is UpheavalEvent ||
+            ev is AreaAttackEvent || ev is FlingEvent || ev is HowlEvent || ev is SwapEvent || ev is TremorEvent ||
             ev is OverwatchEvent;
 
         public IReadOnlyDictionary<string, int> Counts => _counts;
@@ -95,13 +96,11 @@ namespace ArmyRoguelike.Core
 
             var flung = _explosiveFlung;
             var rushed = _rushed;
-            var upheavalCaster = _upheavalCaster;
             if (StartsAction(ev) || ev is ExplosionEvent)
                 _explosiveFlung = false;
             if (StartsAction(ev))
             {
                 _rushed = null;
-                _upheavalCaster = null;
             }
 
             switch (ev)
@@ -206,13 +205,12 @@ namespace ArmyRoguelike.Core
                             Add("bandits.bullRushCollisions");
                         _rushed = push.Unit;
                     }
-                    if (upheavalCaster != null && push.Pusher == upheavalCaster && push.Collision.HasValue)
-                        Add("elementals.upheavalCollisions");
                     break;
 
-                case UpheavalEvent upheaval:
-                    Add("elementals.upheavals");
-                    _upheavalCaster = upheaval.Caster;
+                case TremorEvent tremor:
+                    Add("elementals.tremors");
+                    Add("elementals.tremorSlows", tremor.Slowed.Count);
+                    Add("elementals.tremorPins", tremor.Pinned.Count);
                     break;
 
                 case SplitEvent _:
@@ -229,6 +227,8 @@ namespace ArmyRoguelike.Core
                         Add("demons.contracts");
                     else if (status.Kind == StatusKind.ContractBroken)
                         Add("demons.contractsBroken");
+                    else if (status.Kind == StatusKind.Slow && status.Source != null && status.Source.Has(Ability.Aftershock) && status.Target.Team == Team.Player)
+                        Add("elementals.aftershockSlows");
                     break;
             }
         }

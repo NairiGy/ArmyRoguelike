@@ -243,16 +243,18 @@ namespace ArmyRoguelike.Core
         public override Unit Actor => null;
     }
 
-    /// <summary>Upheaval: the ground burst up under the target and hurt it. Any push follows as its own event.</summary>
-    public sealed class UpheavalEvent : BattleEvent
+    /// <summary>Tremor: the ground shook around the caster. Slowed and Pinned hold who it caught; their status events follow.</summary>
+    public sealed class TremorEvent : BattleEvent
     {
         public readonly Unit Caster;
-        public readonly Hit Hit;
+        public readonly IReadOnlyList<Unit> Slowed;
+        public readonly IReadOnlyList<Unit> Pinned;
 
-        public UpheavalEvent(Unit caster, Hit hit)
+        public TremorEvent(Unit caster, IReadOnlyList<Unit> slowed, IReadOnlyList<Unit> pinned)
         {
             Caster = caster;
-            Hit = hit;
+            Slowed = slowed;
+            Pinned = pinned;
         }
 
         public override Unit Actor => Caster;

@@ -170,7 +170,7 @@ public static class GamepediaWriter
         foreach (var (ability, kind) in new[]
                  {
                      (Ability.Caltrops, ActionKind.Caltrops), (Ability.Overwatch, ActionKind.Overwatch), (Ability.BullRush, ActionKind.BullRush),
-                     (Ability.Upheaval, ActionKind.Upheaval), (Ability.Grasp, ActionKind.Grasp), (Ability.CorpseBlast, ActionKind.CorpseBlast),
+                     (Ability.Tremor, ActionKind.Tremor), (Ability.Grasp, ActionKind.Grasp), (Ability.CorpseBlast, ActionKind.CorpseBlast),
                      (Ability.Hellswap, ActionKind.Hellswap), (Ability.RendingBlow, ActionKind.RendingBlow),
                      (Ability.SoulContract, ActionKind.SoulContract), (Ability.FireBreath, ActionKind.FireBreath),
                  })
@@ -271,7 +271,7 @@ public static class GamepediaWriter
         html.Append("<tr><td>Guard</td><td>A brute that will walk next to a crossbowman with one of your units close to it, and has nobody to hit from there this turn (see the Bodyguard routine). If it can hit from there, it shows Bull Rush or Attack on that unit instead.</td><td>The crossbowman, and the tile it walks to.</td></tr>");
         html.Append("<tr><td>Fling</td><td>A goblin that can't reach anyone to strike this turn, with a bomb, mine or unacted goblin next to it and one of your units 2-3 tiles away.</td><td>The target, the goblin to be thrown and its landing tile.</td></tr>");
         html.Append("<tr><td>Grasp</td><td>It grasps, Grasp is ready, it can reach its target to attack this turn, and the target is ranged or Swift and not already pinned.</td><td>The target, with an arrow.</td></tr>");
-        html.Append($"<tr><td>Upheaval</td><td>It has Upheaval ready, can't reach its target to strike this turn, and the target is within {Battle.UpheavalRange} tiles plus its moves. It may still pick a nearer unit once it has walked.</td><td>The target, with an arrow.</td></tr>");
+        html.Append($"<tr><td>Tremor</td><td>It has Tremor ready and the Elemental routine would tremor this turn (from its tile or a spot it walks to). The badge counts the units it would pin (already slowed). A later elemental may still pin a unit an earlier one slows.</td><td>The tiles within {Battle.TremorRange} of where it will stand, the units caught, and that spot.</td></tr>");
         html.Append("<tr><td>Slam</td><td>It can slam, 2 or more of your units are within 2 tiles, and the slam would deal more in total than a smash.</td><td>The area within 2 tiles.</td></tr>");
         html.Append("<tr><td>Corpse Blast</td><td>It has Corpse Blast ready and a bone pile in range whose 3x3 holds more of your units than of its own (at least one).</td><td>The 3x3 around the pile.</td></tr>");
         html.Append("<tr><td>Raise</td><td>It can raise and a bone pile it can raise (its own side's, or one of your fallen with Soul Harvest) is in raise range and free. AP isn't checked.</td><td>The bone pile.</td></tr>");
@@ -349,9 +349,10 @@ public static class GamepediaWriter
             case EnemyBehaviour.Elemental:
                 return new[]
                 {
-                    $"If it can hit its {target} from where it stands: strike.",
-                    $"If it can reach a tile to strike from this turn: {approach} and strike.",
-                    $"Otherwise walk as close as it can, then use Upheaval on its target, or on the nearest of your units within {Battle.UpheavalRange} tiles.",
+                    $"Tremor, if ready: from its tile or one it can walk to (only its own tile when slowed), the spot whose tremor catches the most of your units within {Battle.TremorRange} tiles, " +
+                    "counting a unit already slowed (which it pins) twice; then the spot nearest its target, then the shortest walk. " +
+                    $"If it could hit its {target} this turn instead, it tremors only when that pins someone or catches 2 or more.",
+                    $"Otherwise strike its target from where it stands, or {approach} and strike.",
                 };
             case EnemyBehaviour.PackLeader:
                 return new[]
@@ -547,7 +548,7 @@ public static class GamepediaWriter
         html.Append("<table><tr><th>Battlefield</th><th>Rule</th></tr>");
         foreach (var field in Battlefields.All)
             html.Append($"<tr><td>{Esc(Battlefields.Name(field))}</td><td>{Esc(Battlefields.Describe(field))}</td></tr>");
-        html.Append("</table><p>Enemy AI: on Edge of the World an enemy that can push one of your units off the board with Bull Rush or Upheaval does that first. ");
+        html.Append("</table><p>Enemy AI: on Edge of the World an enemy that can push one of your units off the board with Bull Rush does that first. ");
         html.Append("In a Storm, enemies never stop on a tile the lightning gathers over, and step off one before acting.</p></section>");
     }
 

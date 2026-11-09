@@ -100,8 +100,8 @@ namespace ArmyRoguelike.View
                     return (intent.Thrown != null ? Icon.Arrow : Icon.Burst, Abilities.Name(Ability.Fling), HarmColor);
                 case IntentKind.Overwatch:
                     return (Icon.Eye, Abilities.Name(Ability.Overwatch), HarmColor);
-                case IntentKind.Upheaval:
-                    return (Icon.Burst, Abilities.Name(Ability.Upheaval), HarmColor);
+                case IntentKind.Tremor:
+                    return (Icon.Hold, intent.Amount > 0 ? $"{Abilities.Name(Ability.Tremor)}: pin {intent.Amount}" : Abilities.Name(Ability.Tremor), ControlColor);
                 case IntentKind.CorpseBlast:
                     return (Icon.Burst, Abilities.Name(Ability.CorpseBlast), HarmColor);
                 case IntentKind.Grasp:

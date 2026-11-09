@@ -377,28 +377,51 @@ namespace ArmyRoguelike.Tests
         }
 
         [Test]
-        public void Upheaval_HurtsAndPushesAway_NoRock()
+        public void Tremor_OutOfReach_WalksCloserAndSlows()
         {
             var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 1) }, new[] { (UnitStats.Elemental, new GridPos(3, 4)) });
             var warrior = Player(b);
             var elemental = Enemy(b);
-            Assert.AreEqual(IntentKind.Upheaval, EnemyAI.PredictIntent(b, elemental).Kind);
+            Assert.AreEqual(IntentKind.Tremor, EnemyAI.PredictIntent(b, elemental).Kind);
             var events = b.EndPlayerTurn();
-            Assert.IsTrue(events.OfType<UpheavalEvent>().Any());
+            Assert.IsTrue(events.OfType<TremorEvent>().Any());
             Assert.AreEqual(new GridPos(3, 3), elemental.Pos, "walked closer first");
-            Assert.AreEqual(new GridPos(3, 0), warrior.Pos, "thrown away from the elemental");
-            Assert.AreEqual(warrior.MaxHp - Battle.UpheavalDamage, warrior.Hp);
-            Assert.IsFalse(b.Board.IsObstacle(new GridPos(3, 1)), "no rock is left behind");
+            Assert.AreEqual(warrior.MaxHp, warrior.Hp, "no damage");
+            Assert.IsTrue(warrior.SlowedThisTurn, "slowed on its next turn");
+            Assert.IsFalse(warrior.IsSnared, "one tremor only slows");
         }
 
         [Test]
-        public void Upheaval_AgainstTheEdge_HurtsMore()
+        public void Tremor_TwoOverlapping_Pin()
         {
-            var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 0) }, new[] { (UnitStats.Elemental, new GridPos(3, 3)) });
+            // Neither elemental can reach the warrior to strike; the first slows it, the second pins it.
+            var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 1) },
+                new[] { (UnitStats.Elemental, new GridPos(3, 4)), (UnitStats.Elemental, new GridPos(1, 2)) });
             var warrior = Player(b);
-            b.EndPlayerTurn();
-            Assert.AreEqual(new GridPos(3, 0), warrior.Pos);
-            Assert.AreEqual(warrior.MaxHp - Battle.UpheavalDamage - Battle.CollisionDamage, warrior.Hp);
+            var events = b.EndPlayerTurn();
+            var tremors = events.OfType<TremorEvent>().ToList();
+            Assert.AreEqual(2, tremors.Count);
+            Assert.Contains(warrior, tremors[0].Slowed.ToList());
+            Assert.Contains(warrior, tremors[1].Pinned.ToList());
+            Assert.IsTrue(warrior.IsSnared, "pinned: it can't move this turn");
+            Assert.IsFalse(warrior.SlowedThisTurn, "pinned instead of slowed");
+
+            var tally = new ComboTally();
+            tally.Observe(events, 1);
+            Assert.AreEqual(1, tally["elementals.tremorPins"]);
+        }
+
+        [Test]
+        public void Aftershock_KillingAShard_SlowsWhoIsNextToIt()
+        {
+            var b = Started(new[] { UnitStats.Warrior }, new[] { new GridPos(3, 1) }, new[] { (UnitStats.Shard, new GridPos(3, 2)) });
+            var warrior = Player(b);
+            var shard = Enemy(b);
+            shard.Hp = 1;
+            var events = b.PlayerAttack(warrior, shard);
+            Assert.IsFalse(shard.IsAlive);
+            Assert.IsTrue(events.OfType<StatusEvent>().Any(s => s.Kind == StatusKind.Slow && s.Target == warrior && s.Source == shard));
+            Assert.AreEqual(1, warrior.SlowNext, "slowed on its next turn, so a tremor before then pins it");
         }
 
         [Test]

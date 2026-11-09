@@ -238,6 +238,9 @@ namespace ArmyRoguelike.Core
         /// <summary>When it dies it explodes: damage to everyone around it, its own side included.</summary>
         PowderKeg,
 
+        /// <summary>Shards: when it dies, the units of the other side next to it are slowed on their next turn.</summary>
+        Aftershock,
+
         // ---------- Bandits ----------
 
         /// <summary>The only unit that may still move after attacking.</summary>
@@ -257,8 +260,8 @@ namespace ArmyRoguelike.Core
 
         // ---------- Elementals and skeletons ----------
 
-        /// <summary>Its action can be Upheaval: the ground bursts up under a unit within 2 tiles, hurting it and pushing it off.</summary>
-        Upheaval,
+        /// <summary>Its action can be Tremor: every unit of the other side within 2 tiles is slowed, or pinned if already slowed.</summary>
+        Tremor,
 
         /// <summary>Its action can be Grasp: an adjacent unit is pinned.</summary>
         Grasp,
@@ -360,7 +363,7 @@ namespace ArmyRoguelike.Core
         Overwatch,
         Caltrops,
         BullRush,
-        Upheaval,
+        Tremor,
         Grasp,
         CorpseBlast,
 
@@ -593,13 +596,14 @@ namespace ArmyRoguelike.Core
 
         public static readonly UnitStats Shard = new UnitStats(UnitKind.Shard, "Shard", 4, 2, 1, 1)
         {
-            Weight = Weight.Small, Role = "Half of an Elemental.",
+            Weight = Weight.Small, Abilities = A(Ability.Aftershock),
+            Role = "Half of an Elemental. When it dies, your units next to it are slowed, ready for a tremor to pin them.",
         };
 
         public static readonly UnitStats Elemental = new UnitStats(UnitKind.Elemental, "Elemental", 8, 3, 1, 1)
         {
-            Weight = Weight.Huge, SplitsInto = Shard, Abilities = A(Ability.Upheaval),
-            Role = "Bursts the ground under your units and pushes them out of line. When it dies it splits into 2 Shards (5 HP each).",
+            Weight = Weight.Huge, SplitsInto = Shard, Abilities = A(Ability.Tremor),
+            Role = "Shakes the ground around it: your units near it are slowed, and a unit caught by two tremors is pinned. When it dies it splits into 2 Shards.",
         };
 
         // ---------- Raised versions (necromancer boss) ----------

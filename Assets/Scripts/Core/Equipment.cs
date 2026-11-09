@@ -95,12 +95,13 @@ namespace ArmyRoguelike.Core
                 case Ability.Howl: return "Howl";
                 case Ability.Fling: return "Fling";
                 case Ability.PowderKeg: return "Powder Keg";
+                case Ability.Aftershock: return "Aftershock";
                 case Ability.LightFingers: return "Light Fingers";
                 case Ability.Caltrops: return "Caltrops";
                 case Ability.BehindCover: return "Behind Cover";
                 case Ability.Overwatch: return "Overwatch";
                 case Ability.BullRush: return "Bull Rush";
-                case Ability.Upheaval: return "Upheaval";
+                case Ability.Tremor: return "Tremor";
                 case Ability.Grasp: return "Grasp";
                 case Ability.Colossus: return "Colossus";
                 case Ability.Wrath: return "Wrath";
@@ -176,12 +177,13 @@ namespace ArmyRoguelike.Core
                 case Ability.Howl: return $"every wolf that hasn't acted yet gets +{Battle.HowlMoves} move this turn";
                 case Ability.Fling: return $"throws what is next to it at a unit 2-{Battle.FlingRange} tiles away, over obstacles: a bomb or mine goes off there with its own blast; a goblin that hasn't acted lands next to the unit, deals {Battle.FlingDamage}, and can still act";
                 case Ability.PowderKeg: return $"when it dies it explodes: {Battle.PowderKegDamage} damage to everyone around it, its own side included";
+                case Ability.Aftershock: return "when it dies, your units next to it are slowed on their next turn";
                 case Ability.LightFingers: return "the only unit that can still move after attacking: it stabs, grabs the gold and runs in the same turn";
                 case Ability.Caltrops: return $"drops caltrops on its tile or a free tile next to it; a unit of yours stepping on them takes {Battle.CaltropsDamage} and its movement ends";
                 case Ability.BehindCover: return "while next to a wall it can't be hit by shots from range; melee and area damage still reach it";
                 case Ability.Overwatch: return "instead of shooting, it aims: during your next turn the first of your units that walks onto a tile it can see in range is shot and stops there";
                 case Ability.BullRush: return $"hit a unit next to it and push it; if it slams into a unit, both take {Battle.CollisionDamage}";
-                case Ability.Upheaval: return $"the ground bursts up under one of your units within {Battle.UpheavalRange} tiles (no line of sight needed): {Battle.UpheavalDamage} damage, and it is pushed away from the caster ({Battle.CollisionDamage} more if it slams into something)";
+                case Ability.Tremor: return $"the ground shakes around it: every unit of yours within {Battle.TremorRange} tiles (no line of sight needed) is slowed on its next turn; one that is already slowed is pinned instead";
                 case Ability.Grasp: return "grabs a unit next to it: no damage, but it is pinned";
                 case Ability.Colossus: return "can't be pushed, pinned, slowed or grasped";
                 case Ability.Wrath: return "from its second phase it gets 2 actions a turn instead of 1 (each still has its cooldown)";
@@ -218,7 +220,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Overwatch: return "Overwatch";
                 case ActionKind.Caltrops: return "Caltrops";
                 case ActionKind.BullRush: return "Bull Rush";
-                case ActionKind.Upheaval: return "Upheaval";
+                case ActionKind.Tremor: return "Tremor";
                 case ActionKind.Grasp: return "Grasp";
                 case ActionKind.CorpseBlast: return "Corpse Blast";
                 case ActionKind.Hellswap: return "Hellswap";
@@ -361,7 +363,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Abilities that describe one of the unit's actions rather than a passive (listed with the actions).</summary>
         public static bool IsAction(Ability ability) =>
             ability == Ability.WolfBite || ability == Ability.Howl || ability == Ability.Fling || ability == Ability.Caltrops ||
-            ability == Ability.Overwatch || ability == Ability.BullRush || ability == Ability.Upheaval || ability == Ability.Grasp ||
+            ability == Ability.Overwatch || ability == Ability.BullRush || ability == Ability.Tremor || ability == Ability.Grasp ||
             ability == Ability.CorpseBlast || ability == Ability.Hellswap || ability == Ability.RendingBlow || ability == Ability.SoulContract ||
             ability == Ability.FireBreath;
 
@@ -417,7 +419,7 @@ namespace ArmyRoguelike.Core
                      {
                          (Ability.Fling, ActionKind.Fling), (Ability.Howl, ActionKind.Howl), (Ability.Caltrops, ActionKind.Caltrops),
                          (Ability.Overwatch, ActionKind.Overwatch), (Ability.BullRush, ActionKind.BullRush),
-                         (Ability.Upheaval, ActionKind.Upheaval), (Ability.Grasp, ActionKind.Grasp), (Ability.CorpseBlast, ActionKind.CorpseBlast),
+                         (Ability.Tremor, ActionKind.Tremor), (Ability.Grasp, ActionKind.Grasp), (Ability.CorpseBlast, ActionKind.CorpseBlast),
                          (Ability.Hellswap, ActionKind.Hellswap), (Ability.RendingBlow, ActionKind.RendingBlow),
                          (Ability.SoulContract, ActionKind.SoulContract), (Ability.FireBreath, ActionKind.FireBreath),
                      })

@@ -254,3 +254,7 @@ Decided with the user and built 2026-10-30 (branch `feature/techniques`, merged 
 
 Ideas from the same discussion, parked for after techniques (suggested order): battlefield modifiers shown on the map node (built 2026-10-31 as "Battlefields", see below; still unbuilt: Ice Floor, Fog, Mud, High Ground, Crumbling Floor, Braziers, Ley Line); Banners as army-wide rules (see "Later / maybe"); a first choice at run start (pick 1 of 3: a bonus technique, gold, a curse for a strong banner), then Commanders that set the draft pool, a starting banner and a rule twist; unlocks between runs; a branching map; ? events with trade-offs.
 
+
+## Upheaval (elementals, 2026-10-30 to 2026-11-09)
+
+The Elemental's action before Tremor: the ground burst up under one of your units within 2 tiles (no line of sight): 2 damage and a push straight away from the elemental (2 more if it slammed into something). It first left a rock behind; that was dropped after the 2026-10-30 playtest (too many rocks). Replaced by Tremor on 2026-11-09 because elementals never helped each other: in the sim an Upheaval slammed your unit into something only 0.3 times per fight, and the push went wherever the caster happened to be, never towards another elemental. The Shard had no passive; it got Aftershock at the same time.

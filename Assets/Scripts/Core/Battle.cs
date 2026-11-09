@@ -224,10 +224,8 @@ namespace ArmyRoguelike.Core
         /// <summary>Caltrops (cutpurses): damage to a unit of yours stepping on them; its movement ends there.</summary>
         public const int CaltropsDamage = 1;
 
-        /// <summary>Upheaval (elementals): range in steps (ignores line of sight), and damage to the unit it throws.</summary>
-        public const int UpheavalRange = 2;
-
-        public const int UpheavalDamage = 2;
+        /// <summary>Tremor (elementals): reach in steps around the caster (ignores line of sight).</summary>
+        public const int TremorRange = 2;
 
         /// <summary>Corpse Blast (Necromancer): damage to everyone in the 3x3 around the bone pile, friend or foe.</summary>
         public const int CorpseBlastDamage = 2;
@@ -3233,37 +3231,61 @@ namespace ArmyRoguelike.Core
 
         // ---------- Elementals and skeletons ----------
 
-        /// <summary>Upheaval: a 1x1 unit of the other side within <see cref="UpheavalRange"/> steps, seen or not.</summary>
-        public bool CanUpheave(Unit unit, Unit target) =>
-            !IsOver && unit.IsAlive && unit.Has(Ability.Upheaval) && unit.Ap >= AttackCost && Ready(unit, ActionKind.Upheaval) &&
-            target != null && target.IsAlive && target.IsPlaced && target.Team != unit.Team && !target.IsHidden && !target.IsObjective &&
-            target.Size == 1 && Distance(unit, target) <= UpheavalRange && !IsShroudedFrom(target, unit.Team);
-
-        /// <summary>Which way Upheaval throws the target: straight away from the caster, along the longer axis (rows on a tie).</summary>
-        public static GridPos UpheavalDirection(Unit unit, Unit target)
-        {
-            var dx = target.Pos.X - unit.Pos.X;
-            var dy = target.Pos.Y - unit.Pos.Y;
-            return Math.Abs(dy) >= Math.Abs(dx) ? new GridPos(0, Math.Sign(dy)) : new GridPos(Math.Sign(dx), 0);
-        }
+        /// <summary>Tremor: the caster has it, its AP and the action ready.</summary>
+        public bool CanTremor(Unit unit) =>
+            !IsOver && unit.IsAlive && unit.Has(Ability.Tremor) && unit.Ap >= AttackCost && Ready(unit, ActionKind.Tremor);
 
         /// <summary>
-        /// Upheaval: the ground bursts up under the target. It takes <see cref="UpheavalDamage"/> and is pushed away
-        /// from the caster (collision damage if blocked). No rock is left behind (rocks were too much, 2026-10-30).
+        /// Who a Tremor from <paramref name="at"/> would shake: every unit of the other side within
+        /// <see cref="TremorRange"/> steps, hidden or not (it's an area), but not objectives or a Colossus.
         /// </summary>
-        internal List<BattleEvent> DoUpheaval(Unit unit, Unit target)
-        {
-            UseUp(unit, ActionKind.Upheaval);
-            var dir = UpheavalDirection(unit, target);
-            var after = new List<BattleEvent>();
-            var hit = Damage(target, UpheavalDamage, unit, DamageKind.Blast, after);
-            var events = new List<BattleEvent> { new UpheavalEvent(unit, hit) };
-            events.AddRange(after);
-            if (target.IsAlive)
-                Push(target, dir, unit, events);
+        public List<Unit> TremorVictims(Unit unit, GridPos at) =>
+            _units.Where(u => u.IsAlive && u.IsPlaced && u.Team != unit.Team && !u.IsObjective && !u.Has(Ability.Colossus) &&
+                              Distance(at, unit.Size, u) <= TremorRange && !IsShroudedFrom(u.Pos, unit.Team))
+                .OrderBy(u => u.Id).ToList();
 
-            CheckEnd();
+        /// <summary>
+        /// Tremor (replaces Upheaval, 2026-11-09): every unit of the other side within <see cref="TremorRange"/> steps is
+        /// Slowed on its next turn; one that is already slowed for it is Pinned instead (so two overlapping tremors pin).
+        /// No damage. Why: elementals fought alone; this makes them dangerous together, by overlapping their zones.
+        /// </summary>
+        internal List<BattleEvent> DoTremor(Unit unit)
+        {
+            UseUp(unit, ActionKind.Tremor);
+            var slowed = new List<Unit>();
+            var pinned = new List<Unit>();
+            var statuses = new List<BattleEvent>();
+            foreach (var u in TremorVictims(unit, unit.Pos))
+            {
+                if (u.SlowNext > 0)
+                {
+                    u.SlowNext = 0;
+                    u.SnareTurns = 1;
+                    pinned.Add(u);
+                    statuses.Add(new StatusEvent(unit, u, StatusKind.Pin, 1));
+                }
+                else
+                {
+                    u.SlowNext = 1;
+                    slowed.Add(u);
+                    statuses.Add(new StatusEvent(unit, u, StatusKind.Slow, 1));
+                }
+            }
+
+            var events = new List<BattleEvent> { new TremorEvent(unit, slowed, pinned) };
+            events.AddRange(statuses);
             return events;
+        }
+
+        /// <summary>Aftershock (shards): a dying shard slows the units of the other side next to it, so a tremor can pin them.</summary>
+        private void Aftershock(Unit shard, List<BattleEvent> after)
+        {
+            foreach (var u in _units.Where(u => u.IsAlive && u.IsPlaced && u.Team != shard.Team && !u.IsObjective && !u.Has(Ability.Colossus) &&
+                                                Distance(shard, u) == 1 && u.SlowNext == 0 && u.SnareTurns == 0).OrderBy(u => u.Id).ToList())
+            {
+                u.SlowNext = 1;
+                after.Add(new StatusEvent(shard, u, StatusKind.Slow, 1));
+            }
         }
 
         /// <summary>Grasp: an adjacent unit it could attack, not already pinned.</summary>
@@ -3742,6 +3764,8 @@ namespace ArmyRoguelike.Core
 
                 if (target.Has(Ability.PowderKeg))
                     Explode(target.Pos, PowderKegDamage, "powder keg", target, after);
+                if (target.Has(Ability.Aftershock))
+                    Aftershock(target, after);
 
                 // Crumbling Roof: a statue crashing down cracks the floor under it.
                 if (!target.Fell && target.Size == 1 && target.IsPlaced && !target.IsObjective)

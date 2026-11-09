@@ -254,8 +254,14 @@ namespace ArmyRoguelike.View
                         toX = escape.Unit.Pos.X, toY = escape.Unit.Pos.Y,
                     });
                     break;
-                case UpheavalEvent upheaval:
-                    _log.actions.Add(HitEntry(turn, upheaval.Caster, "upheaval", upheaval.Hit));
+                case TremorEvent tremor:
+                    // One entry per tremor: who it slowed and pinned (each also gets its own status entry).
+                    _log.actions.Add(new ActionEntry
+                    {
+                        turn = turn, team = tremor.Caster.Team.ToString(), unit = Name(tremor.Caster), type = "tremor",
+                        target = string.Join(", ", tremor.Slowed.Concat(tremor.Pinned).Select(Name)), amount = tremor.Slowed.Count + tremor.Pinned.Count,
+                        note = $"slowed {tremor.Slowed.Count}, pinned {tremor.Pinned.Count}",
+                    });
                     break;
                 case SplitEvent split:
                     _log.actions.Add(new ActionEntry

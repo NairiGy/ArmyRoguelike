@@ -811,6 +811,19 @@ namespace ArmyRoguelike.View
                     foreach (var wolf in Battle.Living(enemy.Team).Where(w => w.IsWolf))
                         _board.SetHighlight(wolf.Pos, AuraColor);
                     break;
+                case IntentKind.Tremor:
+                {
+                    // Placeholder: every tile the tremor reaches from where it will stand, the units it catches, and that spot if it walks first.
+                    var at = intent.Tile ?? enemy.Pos;
+                    foreach (var p in Battle.Board.AllTiles())
+                        if (p != at && p.StepsTo(at) <= Battle.TremorRange && !Battle.Board.IsObstacle(p))
+                            _board.SetHighlight(p, SmashZoneColor);
+                    foreach (var u in Battle.TremorVictims(enemy, at))
+                        _board.SetHighlight(u.Pos, IntentTargetColor);
+                    if (at != enemy.Pos)
+                        _board.SetHighlight(at, RockLandingColor);
+                    break;
+                }
                 case IntentKind.Guard:
                     // Placeholder: the crossbowman it will guard, and the tile it walks to.
                     _board.SetHighlight(intent.Target.Pos, AuraColor);
@@ -1276,16 +1289,13 @@ namespace ArmyRoguelike.View
                     view.gameObject.SetActive(false);
                     break;
                 }
-                case UpheavalEvent upheaval:
+                case TremorEvent tremor:
                 {
-                    // Placeholder: the caster lunges and the target is hit; the push follows as its own event.
-                    var caster = _board.ViewOf(upheaval.Caster);
-                    var target = _board.ViewOf(upheaval.Hit.Target);
-                    yield return caster.Lunge(target.transform.position, null);
-                    caster.SetGridPosition(upheaval.Caster.Pos);
-                    DamagePopup.Spawn(target.TopWorld + Vector3.up * 0.4f, "Upheaval!", DamagePopup.AbilityColor, 44);
-                    ShowHit(upheaval.Hit);
-                    yield return upheaval.Hit.Killed ? target.Die() : target.Hit();
+                    // Placeholder (see the "Art needed" table): a popup and a screen shake; the slow and pin popups follow as status events.
+                    var caster = _board.ViewOf(tremor.Caster);
+                    DamagePopup.Spawn(caster.TopWorld + Vector3.up * 0.25f, "Tremor!", DamagePopup.AbilityColor, 48);
+                    StartCoroutine(Shake(0.05f, 0.4f));
+                    yield return new WaitForSeconds(0.45f);
                     break;
                 }
                 case SplitEvent split:
@@ -2575,8 +2585,10 @@ namespace ArmyRoguelike.View
                     return "overwatch: no shot this turn, so it aims; the first of your units to walk into its sight next turn gets shot";
                 case IntentKind.BullRush:
                     return $"bull rush the {name}: hit it and push it";
-                case IntentKind.Upheaval:
-                    return $"upheaval: walk closer, then burst the ground under the {name}: {Battle.UpheavalDamage} damage and it is pushed away";
+                case IntentKind.Tremor:
+                    return intent.Amount > 0
+                        ? $"tremor: your units in the lit area are slowed, and {intent.Amount} already slowed get pinned (can't move next turn)"
+                        : $"tremor: your units in the lit area are slowed (move or act next turn); one caught by a second tremor is pinned";
                 case IntentKind.Grasp:
                     return $"grasp the {name}: no damage, but it can't move on your next turn";
                 case IntentKind.CorpseBlast:

@@ -27,8 +27,8 @@ namespace ArmyRoguelike.Core
         /// <summary>A crossbowman aiming: it shoots the first of your units that walks onto the marked tiles.</summary>
         Overwatch,
 
-        /// <summary>An elemental bursting the ground up under its target: damage and a push.</summary>
-        Upheaval,
+        /// <summary>An elemental shaking the ground around <see cref="Intent.Tile"/>: your units there are slowed, those already slowed pinned (<see cref="Intent.Amount"/> of them).</summary>
+        Tremor,
 
         /// <summary>A necromancer blowing up a bone pile your units stand on or next to.</summary>
         CorpseBlast,
@@ -108,7 +108,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Howls when that lets wolves reach their prey, otherwise like Advance.</summary>
         PackLeader,
 
-        /// <summary>Walks up and strikes; when it can't reach anyone, walks closer and raises a rock under one of your units.</summary>
+        /// <summary>Shakes the ground (Tremor) where it slows or pins the most of your units, otherwise walks up and strikes.</summary>
         Elemental,
 
         /// <summary>Raises bone piles, keeps its distance and fires bolts.</summary>
@@ -159,7 +159,7 @@ namespace ArmyRoguelike.Core
                 return EnemyBehaviour.Goblin;
             if (stats.Has(Ability.Howl))
                 return EnemyBehaviour.PackLeader;
-            if (stats.Has(Ability.Upheaval))
+            if (stats.Has(Ability.Tremor))
                 return EnemyBehaviour.Elemental;
             if (stats.AreaMelee)
                 return EnemyBehaviour.Giant;
@@ -404,10 +404,9 @@ namespace ArmyRoguelike.Core
             if (WantsToGrasp(battle, enemy, target) && CanReachToAttack(battle, enemy, target))
                 return new Intent(IntentKind.Grasp, target);
 
-            // Upheaval: it can't reach the target to strike, but can walk to within Upheaval range of it.
-            if (enemy.Has(Ability.Upheaval) && battle.Ready(enemy, ActionKind.Upheaval) && !CanReachToAttack(battle, enemy, target) &&
-                target.Size == 1 && !target.IsObjective && Battle.Distance(enemy, target) <= Battle.UpheavalRange + enemy.MaxMoves)
-                return new Intent(IntentKind.Upheaval, target);
+            // Tremor: from its tile or the spot it walks to (see TremorPlan); Target is the first unit caught.
+            if (enemy.Has(Ability.Tremor) && AsIfFreshTurn(battle, enemy, () => TremorPlan(battle, enemy)) is var tremor && tremor.HasValue)
+                return new Intent(IntentKind.Tremor, tremor.Value.victims[0], tremor.Value.from, amount: tremor.Value.pins);
 
             if (BehaviourOf(enemy.Stats) == EnemyBehaviour.Goblin)
             {
@@ -455,9 +454,7 @@ namespace ArmyRoguelike.Core
             // Edge of the World: a push that throws one of your units off the tower comes before anything else.
             var edge = EdgeKill(battle, enemy);
             if (edge.HasValue)
-                events.AddRange(edge.Value.kind == IntentKind.BullRush
-                    ? battle.DoBullRush(enemy, edge.Value.target)
-                    : battle.DoUpheaval(enemy, edge.Value.target));
+                events.AddRange(battle.DoBullRush(enemy, edge.Value.target));
             if (battle.IsOver || !enemy.IsAlive)
                 return;
 
@@ -697,8 +694,45 @@ namespace ArmyRoguelike.Core
             target.SnareTurns == 0 && (target.IsRanged || target.MaxMoves > Battle.BaseMoves);
 
         /// <summary>
-        /// Strike its target if it can (walking up first if that reaches). If it can't reach anyone to strike this turn,
-        /// walk as close as it can, then raise a rock under its target, or under the nearest of your units in range.
+        /// Where an elemental would Tremor from this turn, who it would catch and how many of them it would pin (already
+        /// slowed). Null when it strikes or walks instead. Each spot it can stand on this turn (only its own tile when
+        /// slowed) scores 1 per unit slowed and 2 per unit pinned; the best score wins, then the spot nearest its target,
+        /// then the shortest walk. If it can hit its target this turn, it strikes unless the tremor would pin someone or
+        /// catch 2 or more. Why: a later elemental pins what an earlier one slowed, so they overlap their zones.
+        /// </summary>
+        public static (GridPos from, List<Unit> victims, int pins)? TremorPlan(Battle battle, Unit elemental)
+        {
+            if (!battle.CanTremor(elemental))
+                return null;
+            var target = ChooseTarget(battle, elemental);
+            var spots = elemental.SlowedThisTurn ? new List<(GridPos tile, int cost)> { (elemental.Pos, 0) } : StandingSpots(battle, elemental);
+            var best = spots
+                .Select(s =>
+                {
+                    var victims = battle.TremorVictims(elemental, s.tile);
+                    var pins = victims.Count(u => u.SlowNext > 0);
+                    return (s.tile, s.cost, victims, pins, score: victims.Count + pins);
+                })
+                .Where(o => o.victims.Count > 0)
+                .OrderByDescending(o => o.score)
+                .ThenBy(o => target == null ? 0 : Battle.Distance(o.tile, elemental.Size, target))
+                .ThenBy(o => o.cost)
+                .Select(o => ((GridPos, int, List<Unit>, int, int)?)o)
+                .FirstOrDefault();
+            if (best == null)
+                return null;
+
+            var (tile, _, caught, pinned, _) = best.Value;
+            var canStrike = target != null && (battle.CanAttack(elemental, target) ||
+                                               (!elemental.SlowedThisTurn && battle.FindAttackSpot(elemental, target) != null));
+            if (canStrike && pinned == 0 && caught.Count < 2)
+                return null;
+            return (tile, caught, pinned);
+        }
+
+        /// <summary>
+        /// Tremor when <see cref="TremorPlan"/> says so (walking to its spot first). Otherwise strike its target if it can,
+        /// walking up first if that reaches, or walk closer.
         /// </summary>
         private static void ElementalTurn(Battle battle, Unit elemental, List<BattleEvent> events)
         {
@@ -708,21 +742,24 @@ namespace ArmyRoguelike.Core
                 if (target == null)
                     return;
 
-                if (battle.CanAttack(elemental, target))
+                if (TremorPlan(battle, elemental) is var plan && plan.HasValue)
                 {
-                    events.AddRange(battle.DoAttack(elemental, target));
+                    if (plan.Value.from != elemental.Pos)
+                    {
+                        var move = battle.DoMove(elemental, plan.Value.from);
+                        if (move == null)
+                            return;
+                        events.AddRange(move);
+                        continue;
+                    }
+
+                    events.AddRange(battle.DoTremor(elemental));
                     continue;
                 }
 
-                if (battle.FindAttackSpot(elemental, target) == null)
+                if (battle.CanAttack(elemental, target))
                 {
-                    if (elemental.Moves > 0 && Approach(battle, elemental, target, Battle.AttackCost, events))
-                        continue;
-                    var victim = new[] { target }.Concat(Aimable(battle, elemental).OrderBy(u => Battle.Distance(elemental, u)).ThenBy(u => u.Id))
-                        .FirstOrDefault(u => battle.CanUpheave(elemental, u));
-                    if (victim == null)
-                        return;
-                    events.AddRange(battle.DoUpheaval(elemental, victim));
+                    events.AddRange(battle.DoAttack(elemental, target));
                     continue;
                 }
 
@@ -1392,7 +1429,7 @@ namespace ArmyRoguelike.Core
 
         /// <summary>
         /// Edge of the World: one of your units this enemy can push off the board right now, with Bull Rush (next to it)
-        /// or Upheaval. Null if there is none, or on any other battlefield.
+        /// (the only push left in an enemy kit that aims at one unit). Null if there is none, or on any other battlefield.
         /// </summary>
         public static (IntentKind kind, Unit target)? EdgeKill(Battle battle, Unit enemy)
         {
@@ -1403,8 +1440,6 @@ namespace ArmyRoguelike.Core
                 var dir = Battle.StraightDirection(enemy.Pos, u.Pos);
                 if (dir.HasValue && battle.CanBullRush(enemy, u) && battle.WouldFall(u, dir.Value, enemy))
                     return (IntentKind.BullRush, u);
-                if (battle.CanUpheave(enemy, u) && battle.WouldFall(u, Battle.UpheavalDirection(enemy, u), enemy))
-                    return (IntentKind.Upheaval, u);
             }
 
             return null;
