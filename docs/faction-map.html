@@ -116,6 +116,8 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
 .facts dd { margin: 0; }
 .gaps { border-left: 3px solid var(--bad); padding-left: 12px; display: grid; gap: 4px; }
 .gaps.none { border-left-color: var(--good); }
+.simt td, .simt th { padding: 4px 10px; font-size: 13px; }
+.simt td.n, .simt th:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 12px; }
 
 .grid-a { border-collapse: separate; border-spacing: 3px; width: auto; }
 .grid-a th { text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--c, var(--fg)); padding: 4px 6px; text-align: center; border: 0; white-space: nowrap; }
@@ -146,11 +148,11 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
     <h1>Enemy Faction Map</h1>
     <p class="sub">What each enemy faction is trying to do as a team: its plan, each unit's job in it, the combos between units and whether they really happen, the kill-order choice it gives you, and which hero themes answer it. Goal: factions that fight as one army, not five separate mobs. Unit texts come from the gamepedia (2026-11-08 export); numbers are placeholders. The judgments are Claude's first read from the code and the logs of one or two playtests, so check them in play.</p>
     <div class="legend">
-      <span><span class="st works">works</span> fires in play as designed</span>
+      <span><span class="st works">works</span> fires as designed (in play or in the sim)</span>
       <span><span class="st rare">rare</span> possible, but the layout or AI seldom sets it up</span>
       <span><span class="st missing">missing</span> would fit the plan, not in the game</span>
       <span><span class="st hurts">hurts</span> the faction works against itself</span>
-      <span><span class="st untested">untested</span> designed, never played</span>
+      <span><span class="st untested">untested</span> designed, not yet seen working</span>
     </div>
   </header>
 
@@ -200,7 +202,7 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
     </div>
     <div class="panel">
       <h2>Combo counters to log</h2>
-      <p class="note">So "do they work as one?" becomes a number per fight in the battle logs and the simulator report. Not built yet.</p>
+      <p class="note">So "do they work as one?" becomes a number per fight. Built 2026-11-09: <span class="num">Core/ComboTally.cs</span> counts them, battle logs save them as <span class="num">combos</span>, and <span class="num">tools/dev.sh sim N combos</span> writes the sim's numbers (shown on each faction's page).</p>
       <div class="scroll" style="margin-top:10px"><table id="counters"></table></div>
     </div>
   </section>
@@ -282,7 +284,7 @@ const FACTIONS = [
     ],
     chains: [
       ["Howl", "+1 move for every wolf", "works", "The leader acts first and howls only when the extra move lets a wolf bite that otherwise couldn't."],
-      ["Blood Scent", "Wolf Bite chain on one target", "works", "Every wolf picks the lowest-HP unit it can reach, so the +1 per earlier bite stacks on one unit."],
+      ["Blood Scent", "Wolf Bite chain on one target", "works", "Every wolf picks the lowest-HP unit it can reach, so the +1 per earlier bite stacks on one unit. In the sim it adds about 1 damage per fight at L0 (6 in the elite), and a true surround (3 bites on one unit in a turn) almost never happens: 0.02 per fight."],
       ["Pack Bond", "the whole pack's HP", "works", "A lever for you more than for them: kill the leader and every wolf loses 2 HP on the spot."],
     ],
     choice: "Leader first, or thin the pack.",
@@ -291,8 +293,8 @@ const FACTIONS = [
     judge: { Cohesion: "g", Question: "g", Readability: "o", Counterplay: "g", Distinctness: "g" },
     readNote: "Each badge shows one wolf's bite. Check whether the chain's total on one unit can be read before the enemy turn.",
     escalation: [["Elite", "Two packs, each around its own leader (2 leaders, 4 wolves). More of the same plan, which suits it."], ["Champion", "The Pack Leader (toughest). Fleet on it means the howl comes from further away."], ["Raised", "Bone Wolf keeps Blood Scent and the bite chain."]],
-    gaps: [],
-    verdict: "The model faction: two unit types, each useless without the other, and a clear kill-order choice. Copy this shape.",
+    gaps: ["The shape is right, but the payoff is small against the bot: the chain adds about 1 damage per fight and wolves rarely get three on one unit. Only the elite (two packs) makes it bite."],
+    verdict: "The model faction: two unit types, each useless without the other, and a clear kill-order choice. Copy this shape; the chain itself may need to hit harder.",
   },
   {
     id: "goblins", name: "Goblin Bombers", layout: "Ridge", pool: 1, color: "--f-goblins",
@@ -302,9 +304,9 @@ const FACTIONS = [
       ["Goblin Bomber", ["Clock"], "Delayed bombs force your units to move every turn; blows up when it dies."],
     ],
     chains: [
-      ["Fling a goblin", "it lands next to your unit, hits for 2 and still acts", "works", "Only when the thrower can't reach anyone to strike, so mostly on turn 1."],
-      ["Bomber's bomb", "a goblin flings it", "rare", "Bombs land on your units' tiles and go off at the start of the enemy turn, before any goblin acts. In practice goblins only fling the Sapper's mines."],
-      ["Powder Keg and bombs", "hit the goblins next to them", "hurts", "The Ridge puts goblins in row 4 right in front of the bombers in row 5, so killing a bomber blasts its own goblins."],
+      ["Fling a goblin", "it lands next to your unit, hits for 2 and still acts", "rare", "Only when the thrower can't reach anyone to strike. Sim: 0.26 per fight."],
+      ["Bomber's bomb", "a goblin flings it", "missing", "Bombs land on your units' tiles and go off at the start of the enemy turn, before any goblin acts. Sim: 0 bombs flung in 200 fights; your mines 0.02 per fight."],
+      ["Powder Keg and bombs", "hit the goblins next to them", "hurts", "The Ridge puts goblins in row 4 right in front of the bombers in row 5, so killing a bomber blasts its own goblins. Sim: 1.7 damage to their own side per fight, 7.5 in the elite: more than any of their combos deal."],
     ],
     choice: "Bombers behind the ridge, or goblins in your line.",
     dilemma: "Chase the fragile bombers behind the ridge, or deal with the goblins already in your back line. Killing a bomber next to goblins hurts them too.",
@@ -324,10 +326,10 @@ const FACTIONS = [
       ["Cutpurse", ["Clock"], "Steals 5 gold and runs for the back row; caltrops slow the chase."],
     ],
     chains: [
-      ["Brute's Guard", "protects a crossbowman from melee", "rare", "Melee is the main way past Behind Cover, and Guard would block it. But the layout starts the Brute in the centre and the AI never walks it to a shooter."],
-      ["Caltrops", "stop your unit on a watched tile", "missing", "Both stop you on a tile; nothing lines them up. Cutpurses drop caltrops only when running, on the tile nearest your units."],
-      ["Bull Rush", "pushes your unit into caltrops or an Overwatch lane", "missing", "Bull Rush pushes in a straight line away from the Brute, aimed at nothing."],
-      ["Cutpurse runs", "pulls your units away from the others", "works", "A clock, but it works by leaving the team, not with it."],
+      ["Brute's Guard", "protects a crossbowman from melee", "rare", "Melee is the main way past Behind Cover, and Guard would block it. But the layout starts the Brute in the centre and the AI never walks it to a shooter. Sim: 0.28 per fight (1 in the elite, with two brutes)."],
+      ["Caltrops", "stop your unit on a watched tile", "missing", "Both stop you on a tile; nothing lines them up. Cutpurses drop caltrops only when running, on the tile nearest your units. Sim: caltrops stop a unit 0.00-0.06 times per fight."],
+      ["Bull Rush", "pushes your unit into caltrops or an Overwatch lane", "missing", "Bull Rush pushes in a straight line away from the Brute, aimed at nothing. Sim: 0 of about 0.5 rushes per fight ended in a trap."],
+      ["Cutpurse runs", "pulls your units away from the others", "works", "A clock, but it works by leaving the team, not with it. Sim: 0.6 escape per fight even against the bot."],
     ],
     choice: "Gold or HP.",
     dilemma: "Gold or HP: chase the cutpurse before it escapes (2-3 turns), or deal with the shooters and the Brute. A real choice, but only the gold side of it is about this faction's teamwork.",
@@ -346,8 +348,8 @@ const FACTIONS = [
       ["Shard", ["Filler"], "What an Elemental leaves; just a basic attack."],
     ],
     chains: [
-      ["Upheaval", "pushes your unit into another elemental's reach", "rare", "The push goes straight away from the caster, so it lands next to a second elemental only by accident."],
-      ["Split", "2 shards to surround with", "works", "More bodies, but each acts alone."],
+      ["Upheaval", "pushes your unit into another elemental's reach", "rare", "The push goes straight away from the caster, so it lands next to a second elemental only by accident. Sim: 3 Upheavals per fight, 0.3 of them slam into something."],
+      ["Split", "2 shards to surround with", "works", "More bodies, but each acts alone. Sim: about 1 shard attack per fight."],
       ["Elementals", "anything from each other", "missing", "No unit makes another better."],
     ],
     choice: "Hardly any: all the same unit.",
@@ -369,10 +371,10 @@ const FACTIONS = [
       ["Fiend", ["Disruptor"], "Fire Breath punishes standing in a line; Thorns make melee pay."],
     ],
     chains: [
-      ["Hellswap", "your unit lands next to the Demon, which hits it the same turn", "untested", "Imps act before the other enemies, and the hover names the units next to the landing tile."],
-      ["Imp dies next to the Demon", "Blood Offering + Bloodlust, up to 2 Fury", "untested", "So where you kill imps matters."],
-      ["Soul Contract", "you walk into Demon reach and Fire Breath lines", "untested", "The Devil starts behind the Demon and backs off to 2 tiles."],
-      ["Fire Breath", "burning ground the demons stand in (Hellborn)", "untested", "Fire becomes their terrain and not yours."],
+      ["Hellswap", "your unit lands next to the Demon, which hits it the same turn", "works", "Imps act before the other enemies, and the hover names the units next to the landing tile. Sim: 1.6 swaps per fight, 1.3 of them followed by a hit, 6 damage per fight (10 in the elite). The strongest combo in the game; never played by a human."],
+      ["Imp dies next to the Demon", "Blood Offering + Bloodlust, up to 2 Fury", "works", "So where you kill imps matters. Sim: about 3 Fury per fight at L0, 4-5 in the elite."],
+      ["Soul Contract", "you walk into Demon reach and Fire Breath lines", "untested", "The Devil starts behind the Demon and backs off to 2 tiles. Sim: 2 contracts per fight at L0, two thirds of them paid; the bot can't tell whether breaking one walked it into danger."],
+      ["Fire Breath", "two of your units in a line, and burning ground the demons stand in (Hellborn)", "rare", "Fire becomes their terrain and not yours. Sim: 1.3 breaths per fight, but only 0.06 hit two units: the line rarely lines up."],
       ["Fiend's Thorns", "ranged units are the clean answer, and imps hunt ranged units", "untested", "Two pieces pointing at the same weak spot."],
     ],
     choice: "Imps, Devil or Demon: each has a cost.",
@@ -381,7 +383,7 @@ const FACTIONS = [
     judge: { Cohesion: "g", Question: "g", Readability: "o", Counterplay: "o", Distinctness: "g" },
     readNote: "Every combo is named on an intent badge with its real damage.",
     escalation: [["Elite", "2 Demons, 2 imps, Devil, Fiend."], ["Champion", "The Demon (toughest)."], ["Raised", "Bone Imp (Hellswap; Blood Offering usually feeds nobody)."]],
-    gaps: ["Never played. Fights are short (about 7 bot turns against 11 for the Elementals) and swingy at level 0."],
+    gaps: ["Never played. Fights are short (about 6 bot turns against 10 for the Elementals) and swingy at level 0 (30% bot wins, 2% in the elite).", "Fire Breath almost never hits two units, so the Fiend's part in the plan is mostly the burning ground."],
     verdict: "Best designed for teamwork on paper. Playtest before changing anything; it is the test of whether this shape is fun.",
   },
 ];
@@ -482,6 +484,23 @@ const COUNTERS = [
   ["demons", "Hellswaps followed by a hit the same turn (and the damage); Fury gained, from imps and from Bloodlust; contracts paid against broken; Fire Breath targets per breath."],
 ];
 
+// Sim numbers: tools/dev.sh sim 5 combos, 2026-11-09 (smart bot, every draft, 5 seeds each). Per fight; "Max" rows are the highest in any fight.
+// Columns: fight L0, fight L2, elite L0, elite L2.
+const SIM_DATE = "2026-11-09";
+const SIM = {
+  wolves: [["Bot win rate", "94%", "100%", "2%", "98%"], ["Turns", "5.5", "4.4", "5.6", "5.7"], ["Howls", "0.56", "0.62", "1.12", "0.96"], ["Howled wolves that bit the same turn", "0.64", "0.58", "1.44", "1.06"], ["Wolf bites", "4.90", "2.52", "8.72", "5.66"], ["Extra damage from the bite chain", "1.12", "0.38", "6.22", "1.98"], ["Most bites in one enemy turn (Max)", "3", "2", "5", "3"], ["A unit's 3rd bite in one turn", "0.02", "0.00", "0.16", "0.00"]],
+  goblins: [["Bot win rate", "100%", "100%", "100%", "100%"], ["Turns", "5.1", "4.1", "6.1", "4.8"], ["Goblins flung", "0.26", "0.20", "0.38", "0.30"], ["Flung goblins that hit on landing", "0.26", "0.10", "0.38", "0.22"], ["Bombs flung by goblins", "0.00", "0.00", "0.00", "0.00"], ["Your mines flung back", "0.00", "0.00", "0.02", "0.02"], ["Bomb and keg damage to their own side", "1.72", "1.60", "7.48", "8.08"]],
+  bandits: [["Bot win rate", "66%", "100%", "18%", "96%"], ["Turns", "13.4", "6.6", "15.0", "8.8"], ["Guard triggers", "1.02", "0.66", "2.96", "2.18"], ["Guards that protected a crossbowman", "0.28", "0.28", "1.02", "0.72"], ["Overwatch shots", "0.56", "0.58", "0.52", "0.50"], ["Your units stopped by caltrops", "0.00", "0.00", "0.06", "0.04"], ["Bull Rush pushes", "0.48", "0.42", "0.68", "0.78"], ["Bull Rushes that slammed into something", "0.00", "0.10", "0.02", "0.10"], ["Bull Rushes into caltrops or Overwatch", "0.00", "0.00", "0.00", "0.00"], ["Gold steals", "1.14", "0.74", "1.30", "0.98"], ["Cutpurses that escaped", "0.60", "0.44", "0.84", "0.54"]],
+  elementals: [["Bot win rate", "16%", "66%", "0%", "48%"], ["Turns", "10.0", "9.2", "8.3", "11.6"], ["Upheavals", "3.04", "2.28", "4.04", "3.84"], ["Upheavals that slammed into something", "0.34", "0.20", "0.56", "0.68"], ["Elementals split", "1.42", "2.52", "1.42", "2.94"], ["Shard attacks", "1.10", "1.48", "0.98", "1.70"]],
+  demons: [["Bot win rate", "30%", "100%", "2%", "62%"], ["Turns", "6.3", "6.0", "5.3", "7.6"], ["Hellswaps", "1.64", "1.12", "1.76", "0.98"], ["Hellswaps followed by a hit the same turn", "1.28", "0.98", "1.54", "0.90"], ["Damage to swapped units that turn", "6.08", "3.72", "9.80", "5.66"], ["Fury from imp deaths", "1.18", "1.58", "1.02", "1.58"], ["Fury from Bloodlust", "1.68", "1.12", "3.28", "3.48"], ["Rending Blows", "1.46", "1.54", "2.26", "2.88"], ["Soul Contracts signed", "2.04", "1.74", "1.28", "1.94"], ["Contracts broken", "0.60", "1.08", "0.18", "0.82"], ["Contracts paid", "1.34", "0.66", "1.02", "1.06"], ["Fire Breaths", "1.26", "0.98", "1.02", "1.06"], ["Fire Breaths that hit 2 units", "0.06", "0.04", "0.00", "0.02"]],
+};
+function simTable(id) {
+  const rows = SIM[id];
+  if (!rows) return "";
+  return `<div><h3>Sim numbers, per fight</h3><p class="note" style="margin-bottom:6px">Smart bot, every draft, ${SIM_DATE}. The bot plays better than a player: compare factions and changes, not absolute numbers.</p>
+    <div class="scroll"><table class="simt"><thead><tr><th>Combo</th><th>Fight L0</th><th>Fight L2</th><th>Elite L0</th><th>Elite L2</th></tr></thead><tbody>${rows.map(([n, ...v]) => `<tr><td>${esc(n)}</td>${v.map(x => `<td class="n">${x}</td>`).join("")}</tr>`).join("")}</tbody></table></div></div>`;
+}
+
 const AI_TOOLS = [
   ["Acting first", "Pack Leader, Imp", "The setup unit moves before its partners, so its effect lands on units that still have their turn.", "works"],
   ["Blood Scent", "Wolves", "Every wolf picks the same lowest-HP unit, a shared target by accident.", "works"],
@@ -535,6 +554,7 @@ const PAGES = FACTIONS.map(f => `
         <div class="gaps ${f.gaps.length ? "" : "none"}"><h3>${f.gaps.length ? "Gaps" : "No gaps found"}</h3>${f.gaps.map(g => `<p>${esc(g)}</p>`).join("")}<p><b>${esc(f.verdict)}</b></p></div>
       </div>
     </div>
+    ${simTable(f.id)}
   </article>`).concat(`
   <article class="fcard" id="f-bosses" style="--c:var(--f-bosses)">
     <div class="fhead"><h2>Bosses</h2></div>
