@@ -772,6 +772,13 @@ namespace ArmyRoguelike.View
                     foreach (var p in Battle.BombArea(intent.Target.Pos))
                         _board.SetHighlight(p, BombZoneColor);
                     _board.SetHighlight(intent.Target.Pos, IntentTargetColor);
+                    // Bombs as ammo (placeholder look): the goblin that flings it, and the tile the bomb lands on first.
+                    if (intent.Thrown != null)
+                    {
+                        _board.SetHighlight(intent.Thrown.Pos, AuraColor);
+                        if (intent.Tile.HasValue)
+                            _board.SetHighlight(intent.Tile.Value, RockLandingColor);
+                    }
                     line.Show(from, to);
                     break;
                 case IntentKind.Flee:
@@ -2553,7 +2560,9 @@ namespace ArmyRoguelike.View
                 case IntentKind.Throw:
                     return $"throw a boulder at the {name} (the rock lands on the dark tile)";
                 case IntentKind.Bomb:
-                    return $"bomb the {name}'s tile (goes off next enemy turn)";
+                    return intent.Thrown != null
+                        ? $"lob a bomb next to the {intent.Thrown.Stats.Name} (dark tile), which flings it at the {name} this turn: it goes off there at once, no time to step away"
+                        : $"bomb the {name}'s tile (goes off next enemy turn)";
                 case IntentKind.Flee:
                     return $"run off the far edge with {intent.Target.CarryingLoot} of your gold. Kill it first!";
                 case IntentKind.Slam:

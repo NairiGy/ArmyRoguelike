@@ -416,6 +416,10 @@ namespace ArmyRoguelike.Core
                     return new Intent(IntentKind.Fling, fling.Value.target, fling.Value.to, fling.Value.goblin);
             }
 
+            // Bombs as ammo: the bomb lands next to a goblin, which flings it at Target this turn (Thrown is the goblin).
+            if (enemy.Stats.CanBomb && AsIfFreshTurn(battle, enemy, () => ChooseAmmo(battle, enemy)) is var ammo && ammo.HasValue)
+                return new Intent(IntentKind.Bomb, ammo.Value.victim, ammo.Value.tile, ammo.Value.goblin);
+
             if (enemy.Stats.CanBomb)
             {
                 var steps = Battle.Distance(enemy, target);
@@ -1250,6 +1254,40 @@ namespace ArmyRoguelike.Core
         /// Back away from anyone adjacent, lob one bomb per turn at the nearest unit 2+ tiles away,
         /// otherwise walk up to bomb range (never closer than 2). Stabs only when cornered.
         /// </summary>
+        /// <summary>
+        /// Bombs as ammo (2026-11-09): a free tile in bomb range next to a goblin that hasn't acted and would fling the bomb
+        /// on its turn (Fling ready, one of your units in fling range: its target first, then the nearest), with no other
+        /// explosive already next to it. The goblin acts after the bomber (they enter the battle after the bombers), picks
+        /// the bomb up first thing and flings it: it goes off on that unit at once, so it can't be dodged. Among
+        /// candidates, the weakest victim, then the goblin listed first. Null if none.
+        /// </summary>
+        public static (GridPos tile, Unit goblin, Unit victim)? ChooseAmmo(Battle battle, Unit bomber)
+        {
+            if (!bomber.Stats.CanBomb)
+                return null;
+            var options = new List<(GridPos tile, Unit goblin, Unit victim)>();
+            foreach (var goblin in battle.Living(bomber.Team).Where(g => g.Has(Ability.Fling) && (battle.Phase != Phase.EnemyTurn || !g.IsDone)).OrderBy(g => g.Id))
+            {
+                if (goblin.Pos.Neighbours().Any(n => (battle.MineAt(n) != null || battle.BombAt(n) != null) && battle.UnitAt(n) == null))
+                    continue;
+                var victim = AsIfFreshTurn(battle, goblin, () =>
+                    goblin.Ap < Battle.AttackCost
+                        ? null
+                        : new[] { ChooseTarget(battle, goblin) }.Concat(Aimable(battle, goblin).OrderBy(u => Battle.Distance(goblin, u)).ThenBy(u => u.Id))
+                            .FirstOrDefault(u => u != null && battle.CanFlingAt(goblin, u)));
+                if (victim == null)
+                    continue;
+                var tile = goblin.Pos.Neighbours().Where(n => battle.CanBombTile(bomber, n))
+                    .OrderBy(n => n.StepsTo(bomber.Pos)).ThenBy(n => n.Y).ThenBy(n => n.X)
+                    .Select(n => (GridPos?)n).FirstOrDefault();
+                if (tile.HasValue)
+                    options.Add((tile.Value, goblin, victim));
+            }
+
+            return options.Count == 0 ? ((GridPos, Unit, Unit)?)null
+                : options.OrderBy(o => o.victim.Hp).ThenBy(o => o.goblin.Id).First();
+        }
+
         private static void BomberTurn(Battle battle, Unit bomber, List<BattleEvent> events)
         {
             var retreated = false;
@@ -1266,6 +1304,13 @@ namespace ArmyRoguelike.Core
                     retreated = true;
                     if (Retreat(battle, bomber, events))
                         continue;
+                }
+
+                if (!thrown && ChooseAmmo(battle, bomber) is var ammo && ammo.HasValue)
+                {
+                    events.AddRange(battle.DoBombTile(bomber, ammo.Value.tile));
+                    thrown = true;
+                    continue;
                 }
 
                 if (!thrown)

@@ -187,7 +187,7 @@ public static class GamepediaWriter
             lines.Add($"<b>Boulder</b> ({e.ThrowCost} AP, cooldown {Battle.Cooldown(ActionKind.Boulder)}): {e.ThrowDamage} damage to a unit 2-{e.ThrowRange} tiles away, ignoring line of sight. " +
                       "The boulder stays as a rock on the free tile next to the target that is closest to the thrower, burying any mine or bomb there.");
         if (e.CanBomb)
-            lines.Add($"<b>Bomb</b> ({e.BombCost} AP, cooldown {Battle.Cooldown(ActionKind.Bomb)}): lobbed onto the tile of a unit 2-{e.BombRange} tiles away that has no bomb on it yet, ignoring line of sight. " +
+            lines.Add($"<b>Bomb</b> ({e.BombCost} AP, cooldown {Battle.Cooldown(ActionKind.Bomb)}): lobbed onto the tile of a unit 2-{e.BombRange} tiles away that has no bomb on it yet, ignoring line of sight, or onto a free tile 2-{e.BombRange} away next to a goblin (ammo: the goblin flings it on its turn, see the Bomber routine). " +
                       $"It explodes at the start of the next enemy turn for {e.BombDamage} damage to whoever stands on that tile, its own side included, and sets off a mine or bomb on it.");
         if (e.CanRaise)
             lines.Add($"<b>Raise</b> ({e.RaiseCost} AP, cooldown {Battle.Cooldown(ActionKind.Raise)}): brings every one of its side's bone piles within {e.RaiseRange} tiles back at full HP at once, unless someone stands on it. " +
@@ -275,7 +275,7 @@ public static class GamepediaWriter
         html.Append("<tr><td>Slam</td><td>It can slam, 2 or more of your units are within 2 tiles, and the slam would deal more in total than a smash.</td><td>The area within 2 tiles.</td></tr>");
         html.Append("<tr><td>Corpse Blast</td><td>It has Corpse Blast ready and a bone pile in range whose 3x3 holds more of your units than of its own (at least one).</td><td>The 3x3 around the pile.</td></tr>");
         html.Append("<tr><td>Raise</td><td>It can raise and a bone pile it can raise (its own side's, or one of your fallen with Soul Harvest) is in raise range and free. AP isn't checked.</td><td>The bone pile.</td></tr>");
-        html.Append("<tr><td>Bomb</td><td>It bombs and its target is 2 to bomb-range tiles away with no bomb on its tile. Otherwise it shows Attack, though it may still bomb another unit or back off.</td><td>The target's tile, where the bomb lands.</td></tr>");
+        html.Append("<tr><td>Bomb</td><td>Ammo first: a goblin would fling the bomb this turn (see the Bomber routine); it shows the unit it will hit, the goblin and the tile the bomb lands on. Otherwise: it bombs and its target is 2 to bomb-range tiles away with no bomb on its tile. Otherwise it shows Attack, though it may still bomb another unit or back off.</td><td>The target's tile, where the bomb lands.</td></tr>");
         html.Append("<tr><td>Smash</td><td>It smashes and the target is next to it, or the target is out of boulder range.</td><td>The ring around it and the target.</td></tr>");
         html.Append("<tr><td>Throw</td><td>It throws boulders and the target is 2 to throw-range tiles away.</td><td>The target and the tile where the rock will land.</td></tr>");
         html.Append("<tr><td>Attack</td><td>Anything else, whether or not it can reach the target this turn.</td><td>The target, with an arrow.</td></tr>");
@@ -364,7 +364,8 @@ public static class GamepediaWriter
                 return new[]
                 {
                     $"If its {target} is closer than {EnemyAI.BomberComfortDistance} tiles: {retreat} (once a turn).",
-                    "Bomb its target if it can; if not, the nearest of your units it can bomb (once a turn).",
+                    $"Ammo: if a goblin that hasn't acted would fling a bomb at one of your units this turn (Fling ready, a unit 2-{Battle.FlingRange} tiles from it, no explosive next to it yet), lob the bomb onto a free tile next to that goblin instead. The goblins act after the bombers and fling it first thing, so it goes off on your unit at once. The weakest victim first (once a turn).",
+                    "Otherwise bomb its target if it can; if not, the nearest of your units it can bomb (once a turn).",
                     "If the target is next to it: stab.",
                     $"If it hasn't bombed yet: {range} for a bomb (once a turn), with a comfort distance of {EnemyAI.BomberComfortDistance}.",
                 };

@@ -410,7 +410,7 @@ namespace ArmyRoguelike.Core
             if (s.CanThrow)
                 list.Add(("Boulder", s.ThrowCost, ActionKind.Boulder, $"{s.ThrowDamage} damage to a unit 2-{s.ThrowRange} tiles away, over obstacles; the rock stays"));
             if (s.CanBomb)
-                list.Add(("Bomb", s.BombCost, ActionKind.Bomb, $"lands on a unit 2-{s.BombRange} tiles away and explodes on that tile for {s.BombDamage} at the start of the next enemy turn"));
+                list.Add(("Bomb", s.BombCost, ActionKind.Bomb, $"lands on a unit 2-{s.BombRange} tiles away and explodes on that tile for {s.BombDamage} at the start of the next enemy turn; or lands next to a goblin, which flings it at one of your units at once"));
             if (s.CanRaise)
                 list.Add(("Raise", s.RaiseCost, ActionKind.Raise, $"brings back every bone pile within {s.RaiseRange} tiles at full HP"));
             foreach (var (ability, kind) in new[]

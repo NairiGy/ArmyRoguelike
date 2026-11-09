@@ -89,7 +89,7 @@ namespace ArmyRoguelike.View
                 case IntentKind.Raise:
                     return (Icon.Up, "Raise", ControlColor);
                 case IntentKind.Bomb:
-                    return (Icon.Burst, "Bomb", HarmColor);
+                    return (Icon.Burst, intent.Thrown != null ? "Bomb + Fling" : "Bomb", HarmColor);
                 case IntentKind.Flee:
                     return (Icon.Push, "Flee", FleeColor);
                 case IntentKind.Slam:

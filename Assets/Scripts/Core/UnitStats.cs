@@ -652,7 +652,7 @@ namespace ArmyRoguelike.Core
         public static readonly UnitStats GoblinBomber = new UnitStats(UnitKind.GoblinBomber, "Goblin Bomber", 4, 1, 1, 1)
         {
             Weight = Weight.Small, BombCost = 1, BombDamage = 3, BombRange = 3, Abilities = A(Ability.PowderKeg),
-            Role = "Lobs a bomb onto a unit 2-3 tiles away; it explodes on that tile at the start of the next enemy turn. Keeps its distance, and blows up when it dies.",
+            Role = "Lobs a bomb onto a unit 2-3 tiles away; it explodes on that tile at the start of the next enemy turn. Or lobs it next to a goblin, which flings it at you at once. Keeps its distance, and blows up when it dies.",
         };
 
         // ---------- Demons (see docs/night/demons.md) ----------

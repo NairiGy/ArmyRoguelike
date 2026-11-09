@@ -3107,13 +3107,19 @@ namespace ArmyRoguelike.Core
         /// next to it first (it explodes on the target's tile), else a goblin next to it that hasn't acted yet this
         /// turn (it lands on the free tile next to the target nearest the thrower). Null if it can't.
         /// </summary>
-        public (Unit goblin, GridPos from, GridPos to)? FlingOption(Unit thrower, Unit target)
+        /// <summary>Whether a goblin could fling something at this unit: Fling ready, the unit 2 to fling-range away, visible, not shrouded.</summary>
+        public bool CanFlingAt(Unit thrower, Unit target)
         {
             if (IsOver || !thrower.IsAlive || !thrower.Has(Ability.Fling) || !Ready(thrower, ActionKind.Fling) || target == null || !target.IsAlive ||
                 target.Team == thrower.Team || target.IsObjective || target.IsHidden || IsShroudedFrom(target, thrower.Team))
-                return null;
+                return false;
             var steps = Distance(thrower, target);
-            if (steps < 2 || steps > FlingRange)
+            return steps >= 2 && steps <= FlingRange;
+        }
+
+        public (Unit goblin, GridPos from, GridPos to)? FlingOption(Unit thrower, Unit target)
+        {
+            if (!CanFlingAt(thrower, target))
                 return null;
 
             foreach (var n in thrower.Pos.Neighbours())
@@ -3460,11 +3466,26 @@ namespace ArmyRoguelike.Core
             return events;
         }
 
-        internal List<BattleEvent> DoBomb(Unit thrower, Unit target)
+        internal List<BattleEvent> DoBomb(Unit thrower, Unit target) => DoBombTile(thrower, target.Pos);
+
+        /// <summary>
+        /// Bombs as ammo (2026-11-09): a bomber may lob its bomb onto a free tile 2 to bomb-range away instead of onto a
+        /// unit, for a goblin next to that tile to fling. Not a tile with a unit, an obstacle, a hazard or shroud.
+        /// </summary>
+        public bool CanBombTile(Unit thrower, GridPos tile)
+        {
+            if (IsOver || !thrower.IsAlive || !thrower.Stats.CanBomb || thrower.Ap < thrower.Stats.BombCost || !Ready(thrower, ActionKind.Bomb))
+                return false;
+            var steps = Distance(tile, 1, thrower);
+            return steps >= 2 && steps <= thrower.Stats.BombRange && IsFree(tile) && !HasHazard(tile) && BombAt(tile) == null &&
+                   !IsShroudedFrom(tile, thrower.Team);
+        }
+
+        internal List<BattleEvent> DoBombTile(Unit thrower, GridPos tile)
         {
             UseUp(thrower, ActionKind.Bomb);
-            _bombs.Add(new Bomb(target.Pos, thrower, thrower.Stats.BombDamage));
-            return new List<BattleEvent> { new BombThrowEvent(thrower, target.Pos) };
+            _bombs.Add(new Bomb(tile, thrower, thrower.Stats.BombDamage));
+            return new List<BattleEvent> { new BombThrowEvent(thrower, tile) };
         }
 
         /// <summary>
