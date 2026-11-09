@@ -46,7 +46,7 @@ Where things are written down:
 
 ## Version control
 
-- Local git on `main`, no remote.
+- Git on `main`, pushed to a public GitHub repo (`origin`, https://github.com/NairiGy/ArmyRoguelike) that serves as the user's CV portfolio. Everything committed is public: no secrets, nothing private. `README.md` is the portfolio page; its GIFs live in `docs/media/`.
 - Commit every `.cs` and asset file together with its `.meta`. Never commit `Library/`, `Temp/`, `Logs/` or `UserSettings/`.
 
 ## Working preferences
