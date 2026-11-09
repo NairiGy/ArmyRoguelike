@@ -2935,7 +2935,7 @@ namespace ArmyRoguelike.Core
                 _overwatch.Remove(watcher);
                 var after = new List<BattleEvent>();
                 var hit = Damage(unit, DamageAgainst(watcher, unit), watcher, DamageKind.Attack, after);
-                events.Add(new AttackEvent(watcher, hit.Target, hit.Damage, hit.HpAfter));
+                events.Add(new AttackEvent(watcher, hit.Target, hit.Damage, hit.HpAfter, "overwatch"));
                 events.AddRange(after);
             }
 
@@ -3565,7 +3565,7 @@ namespace ArmyRoguelike.Core
                                                         g.Has(Ability.Guard) && Distance(g, target) == 1);
                 if (guard != null)
                 {
-                    after.Add(new EffectEvent(EffectKind.Guard, guard, 0, guard.Hp, guard));
+                    after.Add(new EffectEvent(EffectKind.Guard, guard, 0, guard.Hp, guard, target));
                     target = guard;
                 }
             }

@@ -56,6 +56,9 @@ namespace ArmyRoguelike.View
 
         private readonly Func<int, int> _goldIfWon;
 
+        /// <summary>The enemy factions' combos (see docs/faction-map.html), counted from every recorded event.</summary>
+        private readonly ComboTally _combos = new ComboTally();
+
         public static string Folder =>
             Application.isEditor
                 ? Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Playtests"))
@@ -90,6 +93,7 @@ namespace ArmyRoguelike.View
         /// </summary>
         public void Record(BattleEvent ev, int turn, bool autoApproach = false)
         {
+            _combos.Observe(ev, turn);
             switch (ev)
             {
                 case MoveEvent move:
@@ -466,6 +470,7 @@ namespace ArmyRoguelike.View
             _log.turnRitualBroken = _battle.TotemsBroken ? _battle.TurnNumber : 0;
             _log.goldEarned = _battle.Phase == Phase.Victory ? _goldIfWon(_log.survivors) : 0;
             _log.units = Summarise();
+            _log.combos = _combos.Counts.Where(kv => kv.Value > 0).Select(kv => new ComboEntry { name = kv.Key, count = kv.Value }).ToList();
 
             var name = $"battle-{_created:yyyyMMdd-HHmmss}-{_log.battleNumber}.json";
             if (PlaytestFiles.Write(name, JsonUtility.ToJson(_log, true)))
@@ -694,6 +699,16 @@ namespace ArmyRoguelike.View
             public List<UnitSummary> units = new List<UnitSummary>();
             public List<MarkerEntry> markers = new List<MarkerEntry>();
             public List<ActionEntry> actions = new List<ActionEntry>();
+
+            /// <summary>Enemy faction combos that fired (ComboTally keys, e.g. "wolves.howledBites"); zero counts are left out.</summary>
+            public List<ComboEntry> combos = new List<ComboEntry>();
+        }
+
+        [Serializable]
+        private sealed class ComboEntry
+        {
+            public string name;
+            public int count;
         }
 
         [Serializable]

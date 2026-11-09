@@ -7,6 +7,7 @@
 #                          Tools > Export Gamepedia for the illustrated version)
 #   tools/dev.sh synergy   copy the game's rule texts into docs/synergy-map.html (its hover cards)
 #   tools/dev.sh sim [N]   play N seeds per draft and fight with bots (default 50); writes tools/out/balance-report.md
+#   tools/dev.sh sim N combos   how often each enemy faction's combos fire (smart bot); writes tools/out/combos.md
 #
 # Output goes to tools/out/ (git-ignored). Needs Git Bash on Windows and the project's Unity version.
 set -u
@@ -91,6 +92,7 @@ case "${1:-}" in
       smart) "$DOTNET" "$OUT/BalanceSim.exe" "$OUT/balance-smart.md" "${2:-5}" smart ;;
       runs) "$DOTNET" "$OUT/BalanceSim.exe" "$OUT/balance-runs.md" "${2:-20}" runs ;;
       fights) "$DOTNET" "$OUT/BalanceSim.exe" "$OUT/balance-fights.md" "${2:-10}" fights ${4:+"$4"} ;;
+      combos) "$DOTNET" "$OUT/BalanceSim.exe" "$OUT/combos.md" "${2:-10}" combos ;;
       *) "$DOTNET" "$OUT/BalanceSim.exe" "$OUT/balance-report.md" "${2:-50}" ;;
     esac
     ;;

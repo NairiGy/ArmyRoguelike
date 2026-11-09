@@ -100,7 +100,7 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 
 ### Enemies and AI
 
-- [ ] Faction teamwork (2026-11-09, [faction map](faction-map.html), "Gaps and ideas" tab): decide with the user which ideas to build. Proposed order: combo counters in `PlaytestLogger` and the sim first (no rule change), then setup-before-payoff turn order, then one fix per weak faction (Goblins: bombs as ammo; Bandits: the Brute guards a shooter; Elementals: a link between elementals). Playtest the Demons before copying their shape.
+- [ ] Faction teamwork (2026-11-09, [faction map](faction-map.html), "Gaps and ideas" tab): the combo counters are built (`Core/ComboTally.cs`, battle log `combos`, `tools/dev.sh sim N combos`). Next, with the user: setup-before-payoff turn order, then one fix per weak faction (Goblins: bombs as ammo; Bandits: the Brute guards a shooter; Elementals: a link between elementals), each measured against the combo numbers before and after. Playtest the Demons before copying their shape.
 - [ ] Faction map: its unit hover texts are copied by hand from the gamepedia; extend `tools/dev.sh synergy` (or a sibling) to refresh them like the synergy map's.
 - [ ] Slowed enemy AI plays some turns badly: a slowed Elemental out of reach walks up instead of using Upheaval from where it stands, and the AI doesn't weigh moving against acting when slowed. That makes slow stronger against those enemies than intended.
 - [ ] Enemies can't see mines, snares or the Archer's Overwatch tiles and walk into them. With more traps in the pools (Quick Fuse, Snare Trap) this may be "win without playing". Watch it in a playtest.

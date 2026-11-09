@@ -471,13 +471,17 @@ namespace ArmyRoguelike.Core
         /// <summary>The unit whose ability it was (the Thorned Mail wearer for thorns, otherwise the same unit).</summary>
         public readonly Unit Source;
 
-        public EffectEvent(EffectKind kind, Unit unit, int amount, int hpAfter, Unit source)
+        /// <summary>Guard: the ally the hit was meant for; null for every other effect.</summary>
+        public readonly Unit Protected;
+
+        public EffectEvent(EffectKind kind, Unit unit, int amount, int hpAfter, Unit source, Unit protectedAlly = null)
         {
             Kind = kind;
             Unit = unit;
             Amount = amount;
             HpAfter = hpAfter;
             Source = source;
+            Protected = protectedAlly;
         }
 
         public override Unit Actor => Source;

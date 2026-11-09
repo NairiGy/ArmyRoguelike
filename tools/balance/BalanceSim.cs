@@ -19,11 +19,13 @@ public static class BalanceSim
         public int Turns;
         public int Survivors;
         public string Stuck;
+        public ComboTally Combos;
     }
 
     private sealed class Tally
     {
         public int Games, Wins, Timeouts, Turns;
+        public readonly ComboTally Combos = new ComboTally();
 
         public void Add(Result r)
         {
@@ -31,6 +33,7 @@ public static class BalanceSim
             Turns += r.Turns;
             if (r.Outcome > 0) Wins++;
             if (r.Outcome == 0) Timeouts++;
+            if (r.Combos != null) Combos.Merge(r.Combos);
         }
 
         public string WinRate => Games == 0 ? "-" : $"{100.0 * Wins / Games:F0}%";
@@ -86,14 +89,16 @@ public static class BalanceSim
             Deploy(battle);
         if (!battle.StartBattle())
             throw new InvalidOperationException("couldn't start " + fight.Name);
+        var combos = new ComboTally();
+        combos.Observe(battle.OpeningEvents, battle.TurnNumber);
 
         while (!battle.IsOver && battle.TurnNumber <= TurnCap)
         {
             if (bot == Bot.Smart || bot == Bot.Smart2)
             {
-                SmartBot.TakeTurn(battle, bot == Bot.Smart ? 1 : 2);
+                SmartBot.TakeTurn(battle, bot == Bot.Smart ? 1 : 2, combos);
                 if (!battle.IsOver)
-                    battle.EndPlayerTurn();
+                    combos.Observe(battle.EndPlayerTurn(), battle.TurnNumber - 1);
                 continue;
             }
 
@@ -111,7 +116,7 @@ public static class BalanceSim
                     battle.EndUnitTurn(unit);
             }
             if (!battle.IsOver)
-                battle.EndPlayerTurn();
+                combos.Observe(battle.EndPlayerTurn(), battle.TurnNumber - 1);
         }
 
         var outcome = battle.Phase == Phase.Victory ? 1 : battle.Phase == Phase.Defeat ? -1 : 0;
@@ -119,6 +124,7 @@ public static class BalanceSim
         {
             Outcome = outcome,
             Turns = battle.TurnNumber,
+            Combos = combos,
             Survivors = battle.Units.Count(u => u.Team == Team.Player && !u.IsObjective && u.IsAlive),
             Stuck = outcome != 0 ? null : string.Join(" + ", battle.Living(Team.Enemy).Select(u => u.Stats.Name).OrderBy(n => n)) +
                 " vs " + string.Join(" + ", battle.Living(Team.Player).Select(u => u.Stats.Name).OrderBy(n => n)),
@@ -350,6 +356,36 @@ public static class BalanceSim
 
     private static int Hits(int hp, int damage) => (hp + damage - 1) / damage;
 
+    /// <summary>
+    /// How often each faction's combos fire (ComboTally, docs/faction-map.html): per fight, smart bot, every draft.
+    /// Each faction is shown with its own counters, as a regular fight and as an elite, at levels 0 and 2.
+    /// </summary>
+    private static void CombosReport(TextWriter o, int seeds)
+    {
+        var levels = new[] { 0, 2 };
+        o.WriteLine("# Faction combos: smart bot");
+        o.WriteLine();
+        o.WriteLine($"How often each enemy faction's combos fire, per fight (Max rows: the highest in any fight). Smart bot, every draft, {seeds} seeds per draft, random techniques per level. The bot plays better than a player, so compare factions and changes, not absolute numbers.");
+        o.WriteLine();
+        var factions = new[] { "wolves", "goblins", "bandits", "elementals", "demons" };
+        for (var i = 0; i < factions.Length; i++)
+        {
+            var regular = Encounter.Regular[i];
+            var fights = new[] { regular, Encounter.EliteOf(regular) };
+            var tallies = (from f in fights from l in levels select (f, l, t: Sweep(AllDrafts(), new[] { f }, seeds, Bot.Smart, l, null))).ToList();
+            o.WriteLine($"## {regular.Name}");
+            o.WriteLine();
+            o.WriteLine("| Combo | " + string.Join(" | ", tallies.Select(x => $"{(x.f.IsElite ? "Elite" : "Fight")} L{x.l}")) + " |");
+            o.WriteLine("|---|" + string.Concat(tallies.Select(_ => "---:|")));
+            o.WriteLine("| Win rate | " + string.Join(" | ", tallies.Select(x => x.t.WinRate)) + " |");
+            o.WriteLine("| Turns | " + string.Join(" | ", tallies.Select(x => x.t.AvgTurns)) + " |");
+            foreach (var (key, meaning) in ComboTally.Counters.Where(c => c.Key.StartsWith(factions[i] + ".")))
+                o.WriteLine($"| {meaning} | " + string.Join(" | ", tallies.Select(x =>
+                    key.EndsWith("Max") ? x.t.Combos[key].ToString() : x.t.Games == 0 ? "-" : $"{(double)x.t.Combos[key] / x.t.Games:F2}")) + " |");
+            o.WriteLine();
+        }
+    }
+
     public static int Main(string[] args)
     {
         CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
@@ -376,6 +412,14 @@ public static class BalanceSim
         {
             using (var report = new StreamWriter(outPath))
                 RunSim.Report(report, AllDrafts(), seeds);
+            Console.WriteLine($"wrote {outPath} in {clock.Elapsed.TotalSeconds:F0}s");
+            return 0;
+        }
+
+        if (args.Length > 2 && args[2] == "combos")
+        {
+            using (var report = new StreamWriter(outPath))
+                CombosReport(report, seeds);
             Console.WriteLine($"wrote {outPath} in {clock.Elapsed.TotalSeconds:F0}s");
             return 0;
         }

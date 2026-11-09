@@ -87,7 +87,8 @@ public static class SmartBot
 
     // ---------- The turn ----------
 
-    public static void TakeTurn(Battle battle, int depth)
+    /// <summary><paramref name="combos"/>, if given, counts the faction combos in the events this turn causes.</summary>
+    public static void TakeTurn(Battle battle, int depth, ComboTally combos = null)
     {
         for (var step = 0; step < StepsPerTurn && !battle.IsOver; step++)
         {
@@ -109,7 +110,7 @@ public static class SmartBot
 
             if (best == null)
                 break;
-            Apply(battle, best);
+            Apply(battle, best, combos);
         }
     }
 
@@ -164,10 +165,19 @@ public static class SmartBot
         return (plan, Score(copy));
     }
 
-    private static bool Apply(Battle battle, Plan plan)
+    /// <summary>False if the action was refused (null); otherwise hands its events to the combo tally, if any.</summary>
+    private static bool Observed(ComboTally combos, Battle battle, List<BattleEvent> events)
+    {
+        if (events == null)
+            return false;
+        combos?.Observe(events, battle.TurnNumber);
+        return true;
+    }
+
+    private static bool Apply(Battle battle, Plan plan, ComboTally combos = null)
     {
         var unit = Same(battle, plan.UnitId);
-        if (plan.Move.HasValue && battle.PlayerMove(unit, plan.Move.Value) == null)
+        if (plan.Move.HasValue && !Observed(combos, battle, battle.PlayerMove(unit, plan.Move.Value)))
             return false;
         if (battle.IsOver || !unit.IsAlive)
             return true;
@@ -175,13 +185,13 @@ public static class SmartBot
         var acted = false;
         if (plan.AttackId.HasValue)
         {
-            if (battle.PlayerAttack(unit, Same(battle, plan.AttackId.Value)) == null)
+            if (!Observed(combos, battle, battle.PlayerAttack(unit, Same(battle, plan.AttackId.Value))))
                 return false;
             acted = true;
         }
         else if (plan.Action.HasValue)
         {
-            if (battle.PlayerUseAction(unit, plan.Action.Value, plan.Tile) == null)
+            if (!Observed(combos, battle, battle.PlayerUseAction(unit, plan.Action.Value, plan.Tile)))
                 return false;
             acted = true;
         }
