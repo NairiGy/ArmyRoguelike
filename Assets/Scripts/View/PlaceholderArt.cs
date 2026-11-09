@@ -72,6 +72,79 @@ namespace ArmyRoguelike.View
         /// <summary>A soft dark oval the width of a tile, for grounding things that stand on the board.</summary>
         public static Sprite SoftShadow => _softShadow != null ? _softShadow : _softShadow = MakeSoftShadow();
 
+        private static Sprite _contactShadow;
+
+        /// <summary>A small dark ellipse with a short soft edge, for right where a statue's feet touch the floor (1 x 0.5 units).</summary>
+        public static Sprite ContactShadow => _contactShadow != null ? _contactShadow : _contactShadow = MakeContactShadow();
+
+        private static readonly Dictionary<Sprite, Vector2> Footprints = new Dictionary<Sprite, Vector2>();
+
+        // How high above the lowest point the feet are looked for, as a share of the figure's height: enough to
+        // catch the back foot of a figure seen from above or in a long stride (the fiend, the imp), which stands a
+        // quarter of the figure higher on the picture than the front one.
+        private const float FootBand = 0.3f;
+
+        /// <summary>
+        /// Where a figure's feet touch the floor, in the sprite's own units: x is the middle of the feet from the
+        /// pivot, y how wide they spread. Measured once per sprite from its opaque pixels near the bottom.
+        /// </summary>
+        public static Vector2 Footprint(Sprite sprite)
+        {
+            if (Footprints.TryGetValue(sprite, out var found))
+                return found;
+            var rect = sprite.rect;
+            var w = (int)rect.width;
+            var h = (int)rect.height;
+            var alpha = ReadAlpha(sprite.texture, rect);
+            int bottom = -1, top = -1;
+            for (var y = 0; y < h && bottom < 0; y++)
+                for (var x = 0; x < w; x++)
+                    if (alpha[y * w + x] > 128) { bottom = y; break; }
+            for (var y = h - 1; y >= 0 && top < 0; y--)
+                for (var x = 0; x < w; x++)
+                    if (alpha[y * w + x] > 128) { top = y; break; }
+            var result = new Vector2(0f, 0.3f);
+            if (bottom >= 0)
+            {
+                var band = bottom + Mathf.CeilToInt((top - bottom) * FootBand);
+                int minX = w, maxX = -1;
+                for (var y = bottom; y <= band; y++)
+                    for (var x = 0; x < w; x++)
+                        if (alpha[y * w + x] > 128)
+                        {
+                            minX = Mathf.Min(minX, x);
+                            maxX = Mathf.Max(maxX, x);
+                        }
+                var ppu = sprite.pixelsPerUnit;
+                result = new Vector2(((minX + maxX + 1) * 0.5f - sprite.pivot.x) / ppu, (maxX - minX + 1) / ppu);
+            }
+
+            Footprints[sprite] = result;
+            return result;
+        }
+
+        // The statue textures aren't readable from script, so their alpha is copied out through the GPU.
+        private static byte[] ReadAlpha(Texture2D source, Rect rect)
+        {
+            var rt = RenderTexture.GetTemporary(source.width, source.height, 0, RenderTextureFormat.ARGB32);
+            var previous = RenderTexture.active;
+            Graphics.Blit(source, rt);
+            RenderTexture.active = rt;
+            var copy = new Texture2D((int)rect.width, (int)rect.height, TextureFormat.RGBA32, false);
+            copy.ReadPixels(rect, 0, 0);
+            RenderTexture.active = previous;
+            RenderTexture.ReleaseTemporary(rt);
+            var pixels = copy.GetPixels32();
+            if (Application.isPlaying)
+                Object.Destroy(copy);
+            else
+                Object.DestroyImmediate(copy);
+            var alpha = new byte[pixels.Length];
+            for (var i = 0; i < pixels.Length; i++)
+                alpha[i] = pixels[i].a;
+            return alpha;
+        }
+
         /// <summary>A single white pixel, for bars and lines.</summary>
         public static Sprite Pixel
         {
@@ -300,6 +373,25 @@ namespace ArmyRoguelike.View
                 var dy = (y + 0.5f - h * 0.5f) / (h * 0.5f);
                 var r = Mathf.Sqrt(dx * dx + dy * dy);
                 tex.SetPixel(x, y, new Color(1f, 1f, 1f, Mathf.Clamp01(1f - r) * Mathf.Clamp01(1f - r) * 1.6f));
+            }
+
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), w);
+        }
+
+        private static Sprite MakeContactShadow()
+        {
+            const int w = 64, h = 32;
+            var tex = NewTexture(w, h);
+            tex.filterMode = FilterMode.Bilinear;
+            for (var y = 0; y < h; y++)
+            for (var x = 0; x < w; x++)
+            {
+                var dx = (x + 0.5f - w * 0.5f) / (w * 0.5f);
+                var dy = (y + 0.5f - h * 0.5f) / (h * 0.5f);
+                var r = Mathf.Sqrt(dx * dx + dy * dy);
+                // Solid to about half way, then a short fade: a firm dark patch, not a blur.
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, 1f - Mathf.SmoothStep(0.45f, 1f, r)));
             }
 
             tex.Apply();

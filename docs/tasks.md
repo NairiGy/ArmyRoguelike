@@ -62,6 +62,8 @@ table and sets the Status (Needed / In progress / Done, with the date) when it s
 
 ### Other visual work
 
+- [ ] Grounding the statues, next ideas (2026-11-09, after the feet-sized shadows): a cast shadow (a flattened, slanted copy of each statue's outline falling away from the moon or braziers); darkening the lowest few percent of each statue in the statue shader; sinking the feet into the tile by a hair. Try the cast shadow first if the feet shadows aren't enough in play.
+
 - [ ] Painted aurora: ChatGPT's free image limit was hit on 2026-10-25; retry the prompt saved in the ChatGPT chat "Generate Crescent Moon Image". Then replace the code aurora with it (maybe for another setting).
 - [ ] Improve the player statues' colour (moon marble is better than before, not final).
 - [ ] Labels and health bars over the statues: restyle (part of the UI pass).
@@ -170,6 +172,8 @@ Targets and working rules: "Balance" in the design note. Report: `tools/dev.sh s
 ## Done
 
 Newest first. Details are in the design note and in git history.
+
+- [x] 2026-11-09 Statues grounded: each one's shadow is measured from its own feet (soft halo plus a dark contact patch), and it shrinks and fades when the statue lifts. Statue sizes evened out (Rogue, Sapper, Wolf). Test battle setup scrolls so its Start button stays on screen. Not playtested.
 
 - [x] 2026-11-09 Every unit stands on nothing: Archer, Rogue, Sapper and Wolf redrawn without their pedestals or slab (Leonardo, GPT Image 2.5 Flare, the old art as the design reference), imported with their own heights; Import Statues no longer imports pedestal art for a unit that has a no-ground figure and removes the old sprite. The four demon statues imported and committed. Not playtested.
 

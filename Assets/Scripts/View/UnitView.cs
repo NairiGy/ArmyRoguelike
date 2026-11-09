@@ -27,10 +27,24 @@ namespace ArmyRoguelike.View
 
         private static readonly Color ShadowColor = new Color(0f, 0f, 0f, 0.5f);
         private static readonly Color BareShadowColor = new Color(0f, 0f, 0f, 0.7f);
+        // For figures standing on nothing: a wide soft halo around the feet and a firm dark patch where they touch.
+        private static readonly Color FeetHaloColor = new Color(0f, 0f, 0f, 0.45f);
+        private static readonly Color FeetContactColor = new Color(0f, 0f, 0f, 0.75f);
+
+        // How far above the floor a lifted statue's shadow has shrunk and faded the most, and by how much.
+        private const float ShadowLiftRange = 0.1f;
+        private const float ShadowLiftShrink = 0.3f;
+        private const float ShadowLiftFade = 0.45f;
         private Color _shadowColor;
 
         private SpriteRenderer _body;
         private SpriteRenderer _shadow;
+        // A figure standing straight on the floor also gets a small dark patch right under its feet.
+        private SpriteRenderer _contact;
+        private Vector3 _shadowScale;
+        private Vector3 _contactScale;
+        // 1 normally; the death animation fades it out.
+        private float _shadowFade = 1f;
         private SpriteRenderer _base;
         private TextMesh _label;
         private MeshRenderer _labelRenderer;
@@ -99,6 +113,9 @@ namespace ArmyRoguelike.View
             _shadow.transform.localScale = Vector3.one * ((bare ? 0.55f : 0.75f) * Unit.Size);
             _shadow.sprite = PlaceholderArt.SoftShadow;
             _shadow.color = _shadowColor;
+            if (bare)
+                FitShadowToFeet();
+            _shadowScale = _shadow.transform.localScale;
 
             var top = _body.transform.localPosition.y + _body.sprite.bounds.max.y * _body.transform.localScale.y;
 
@@ -133,6 +150,60 @@ namespace ArmyRoguelike.View
             RefreshHp(unit.Hp);
         }
 
+        /// <summary>
+        /// A figure standing on nothing gets its shadow from its own feet: a wide soft halo and a firm dark patch,
+        /// both as wide as its stance and centred under it, so a crouch, a wide stance or four paws each sit on a
+        /// shadow of their own shape instead of the same round blot.
+        /// </summary>
+        private void FitShadowToFeet()
+        {
+            var feet = PlaceholderArt.Footprint(_body.sprite);
+            var scale = _body.transform.localScale.x;
+            var centre = (_body.flipX ? -feet.x : feet.x) * scale;
+            // Wings, tails and weapons low down can widen the measure; no shadow spreads far past its tile.
+            var span = Mathf.Min(feet.y * scale, 0.8f * Unit.Size);
+            // The back foot stands higher on the picture than the front one, so the shadow sits a little up.
+            var at = new Vector3(centre, span * 0.08f, 0f);
+
+            _shadowColor = FeetHaloColor;
+            _shadow.color = _shadowColor;
+            _shadow.transform.localPosition = at;
+            // The halo's soft edge shows only about two thirds of its width.
+            _shadow.transform.localScale = Vector3.one * Mathf.Max(0.35f, span * 1.6f + 0.15f);
+
+            _contact = new GameObject("Contact shadow").AddComponent<SpriteRenderer>();
+            _contact.transform.SetParent(transform, false);
+            _contact.transform.localPosition = at;
+            _contact.transform.localScale = _contactScale = Vector3.one * Mathf.Max(0.18f, span * 1.05f);
+            _contact.sprite = PlaceholderArt.ContactShadow;
+            _contact.color = FeetContactColor;
+        }
+
+        /// <summary>
+        /// The shadow follows the statue off the floor: lifted (selected, or mid-step), it shrinks and fades, and the
+        /// dark patch under the feet all but goes, so the statue reads as leaving the ground and landing again.
+        /// </summary>
+        private void LateUpdate()
+        {
+            if (!_shadow.enabled)
+                return;
+            var lift = Mathf.Clamp01((_body.transform.localPosition.y - _bodyRest.y) / ShadowLiftRange);
+            _shadow.transform.localScale = _shadowScale * (1f - ShadowLiftShrink * lift);
+            _shadow.color = new Color(0f, 0f, 0f, _shadowColor.a * _shadowFade * (1f - ShadowLiftFade * lift));
+            if (_contact != null)
+            {
+                _contact.transform.localScale = _contactScale * (1f - ShadowLiftShrink * lift);
+                _contact.color = new Color(0f, 0f, 0f, FeetContactColor.a * _shadowFade * (1f - 0.85f * lift));
+            }
+        }
+
+        private void SetShadowsEnabled(bool enabled)
+        {
+            _shadow.enabled = enabled;
+            if (_contact != null)
+                _contact.enabled = enabled;
+        }
+
         private SpriteRenderer MakeBar(string name, Color color, float y)
         {
             var sr = new GameObject(name).AddComponent<SpriteRenderer>();
@@ -158,6 +229,8 @@ namespace ArmyRoguelike.View
             transform.position = world;
             var order = IsoMath.SortingOrder(world) + 5;
             _shadow.sortingOrder = order - 5;
+            if (_contact != null)
+                _contact.sortingOrder = order - 5;
             if (_base != null)
                 _base.sortingOrder = order - 1;
             // Bones lie flat on the tile, under anything standing there.
@@ -681,18 +754,17 @@ namespace ArmyRoguelike.View
             Fx.Shake(0.04f, 0.18f);
             Sfx.Play("unit_die", transform.position);
             var start = _body.color;
-            var shadowStart = _shadow.color;
             for (var t = 0f; t < 1f; t += Time.deltaTime / 0.45f)
             {
                 _body.transform.localPosition = _bodyRest + Vector3.down * (t * 0.15f);
                 _body.color = new Color(start.r, start.g, start.b, 1f - t);
-                _shadow.color = new Color(0f, 0f, 0f, shadowStart.a * (1f - t));
+                _shadowFade = 1f - t;
                 if (_base != null)
                     _base.color = new Color(1f, 1f, 1f, 1f - t);
                 yield return null;
             }
 
-            _shadow.enabled = false;
+            SetShadowsEnabled(false);
             if (_base != null)
                 _base.enabled = false;
 
@@ -718,7 +790,7 @@ namespace ArmyRoguelike.View
         {
             SetSelected(false);
             SetBarsVisible(false);
-            _shadow.enabled = false;
+            SetShadowsEnabled(false);
             if (_base != null)
                 _base.enabled = false;
             Fx.Dust(transform.position);
@@ -791,8 +863,8 @@ namespace ArmyRoguelike.View
         {
             _body.sprite = PlaceholderArt.Statue(Unit.Stats.Kind);
             _showingBones = false;
-            _shadow.color = _shadowColor;
-            _shadow.enabled = true;
+            _shadowFade = 1f;
+            SetShadowsEnabled(true);
             if (_base != null)
             {
                 _base.color = Color.white;
