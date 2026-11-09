@@ -535,12 +535,12 @@ public static class ArtExperiment
         { UnitKind.Skeleton, 1.0f },
         // Braced wide to draw the bow, a little below a standing human.
         { UnitKind.Archer, 1.05f },
-        // Crouched low to pounce.
-        { UnitKind.Rogue, 0.85f },
+        // Crouched low to pounce: by height, so the crouch keeps the body the size of a standing human.
+        { UnitKind.Rogue, 0.7f },
         // Short and stocky.
-        { UnitKind.Sapper, 0.95f },
-        // Hunched, head down: its back sits about where the pack leader's would before the leader's 1.25 scale.
-        { UnitKind.Wolf, 0.65f },
+        { UnitKind.Sapper, 0.9f },
+        // Hunched, head down: its back reaches a human's hip, still clearly below the pack leader.
+        { UnitKind.Wolf, 0.75f },
         // Small, crouched to sprint.
         { UnitKind.Goblin, 0.7f },
         // Squat and wide, about the warrior's height.
