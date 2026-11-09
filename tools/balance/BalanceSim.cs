@@ -360,7 +360,7 @@ public static class BalanceSim
     /// How often each faction's combos fire (ComboTally, docs/faction-map.html): per fight, smart bot, every draft.
     /// Each faction is shown with its own counters, as a regular fight and as an elite, at levels 0 and 2.
     /// </summary>
-    private static void CombosReport(TextWriter o, int seeds)
+    private static void CombosReport(TextWriter o, int seeds, string only = null)
     {
         var levels = new[] { 0, 2 };
         o.WriteLine("# Faction combos: smart bot");
@@ -370,6 +370,9 @@ public static class BalanceSim
         var factions = new[] { "wolves", "goblins", "bandits", "elementals", "demons" };
         for (var i = 0; i < factions.Length; i++)
         {
+            // e.g. tools/dev.sh sim 15 combos bandits,demons: only those factions.
+            if (!string.IsNullOrEmpty(only) && !only.Split(',').Contains(factions[i]))
+                continue;
             var regular = Encounter.Regular[i];
             var fights = new[] { regular, Encounter.EliteOf(regular) };
             var tallies = (from f in fights from l in levels select (f, l, t: Sweep(AllDrafts(), new[] { f }, seeds, Bot.Smart, l, null))).ToList();
@@ -419,7 +422,7 @@ public static class BalanceSim
         if (args.Length > 2 && args[2] == "combos")
         {
             using (var report = new StreamWriter(outPath))
-                CombosReport(report, seeds);
+                CombosReport(report, seeds, args.Length > 3 ? args[3] : null);
             Console.WriteLine($"wrote {outPath} in {clock.Elapsed.TotalSeconds:F0}s");
             return 0;
         }

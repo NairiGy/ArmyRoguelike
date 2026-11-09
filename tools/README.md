@@ -11,7 +11,7 @@ tools/dev.sh sim       # play battles with crude bots; writes tools/out/balance-
 tools/dev.sh sim 10 smart  # the same with the look-ahead bot, about 12 minutes; writes tools/out/balance-smart.md
 tools/dev.sh sim 10 fights "Elementals,Giant"  # quick look-ahead check of chosen fights; set SIM_CORE to a patched copy of Core to try a number
 tools/dev.sh sim 20 runs  # whole runs (seeds x 5 per draft without banners, seeds per draft for each banner), about an hour at 20; writes tools/out/balance-runs.md
-tools/dev.sh sim 5 combos  # how often each enemy faction's combos fire per fight (ComboTally), smart bot, fights and elites at L0 and L2; writes tools/out/combos.md
+tools/dev.sh sim 5 combos  # how often each enemy faction's combos fire per fight (ComboTally), smart bot, fights and elites at L0 and L2; writes tools/out/combos.md. Add factions to run only those: tools/dev.sh sim 15 combos bandits,demons
 ```
 
 - `balance/`: the simulator behind `dev.sh sim` (`BalanceSim.cs`), its look-ahead bot (`SmartBot.cs`) and whole runs (`RunSim.cs`). Compare fights with each other rather than reading the results as real win rates.

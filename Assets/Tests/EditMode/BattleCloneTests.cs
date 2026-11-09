@@ -146,8 +146,11 @@ namespace ArmyRoguelike.Tests
             var waves = 0;
             var snares = 0;
             var hidden = 0;
+            var sync = new object();
             Action<Battle> seen = c =>
             {
+                lock (sync)
+                {
                 mines += c.Mines.Count;
                 bombs += c.Bombs.Count;
                 burning += c.BurningTiles.Count;
@@ -166,12 +169,31 @@ namespace ArmyRoguelike.Tests
                 waves += c.PendingWaves.Count;
                 snares += c.Snares.Count;
                 hidden += c.Units.Count(u => u.IsHidden);
+                }
             };
 
-            foreach (var encounter in encounters)
-            foreach (var field in fields)
-            for (var seed = 0; seed < 3; seed++)
-                PlayAndCompare(StartedBattle(encounter, field, seed), seed, $"{encounter.Name} on {field}, seed {seed}", seen);
+            // The battles don't share state, so they run side by side (about 490 of them; one at a time took ~15 s).
+            // Core's two lazy caches aren't safe to fill from several threads, so fill them first, as the simulator does.
+            foreach (var faction in Encounter.Regular)
+                UnitStats.Raised(faction.RaisedRepresentative);
+            foreach (var unit in UnitStats.BaseUnits)
+                UnitStats.Harvested(unit);
+            var jobs = (from encounter in encounters from field in fields from seed in Enumerable.Range(0, 3) select (encounter, field, seed)).ToList();
+            var failures = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            System.Threading.Tasks.Parallel.ForEach(jobs, job =>
+            {
+                var name = $"{job.encounter.Name} on {job.field}, seed {job.seed}";
+                try
+                {
+                    PlayAndCompare(StartedBattle(job.encounter, job.field, job.seed), job.seed, name, seen);
+                }
+                catch (Exception e)
+                {
+                    failures.Enqueue($"{name}: {e.GetType().Name}: {e.Message}");
+                }
+            });
+            if (!failures.IsEmpty)
+                Assert.Fail($"{failures.Count} of {jobs.Count} battles failed, for example:\n" + string.Join("\n", failures.OrderBy(f => f).Take(5)));
 
             foreach (var (name, count) in new[]
                      {
@@ -397,16 +419,14 @@ namespace ArmyRoguelike.Tests
                 Collect(field.GetValue(o), found);
         }
 
-        private static readonly Dictionary<Type, FieldInfo[]> FieldCache = new Dictionary<Type, FieldInfo[]>();
+        // Concurrent: the encounter test plays its battles on several threads at once.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, FieldInfo[]> FieldCache =
+            new System.Collections.Concurrent.ConcurrentDictionary<Type, FieldInfo[]>();
 
         /// <summary>A type's fields in a fixed order. Not OpeningEvents, which holds the original's first events only; the copy starts with none.</summary>
-        private static FieldInfo[] FieldsOf(Type type)
-        {
-            if (!FieldCache.TryGetValue(type, out var fields))
-                FieldCache[type] = fields = type.GetFields(AllFields).Where(f => f.Name != "<OpeningEvents>k__BackingField")
-                    .OrderBy(f => f.Name, StringComparer.Ordinal).ToArray();
-            return fields;
-        }
+        private static FieldInfo[] FieldsOf(Type type) =>
+            FieldCache.GetOrAdd(type, t => t.GetFields(AllFields).Where(f => f.Name != "<OpeningEvents>k__BackingField")
+                .OrderBy(f => f.Name, StringComparer.Ordinal).ToArray());
 
         private sealed class ReferenceComparer : IEqualityComparer<object>
         {
