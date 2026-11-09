@@ -1141,6 +1141,13 @@ namespace ArmyRoguelike.View
                         case StatusKind.Twincast:
                             DamagePopup.Spawn(at, "Twincast: free", DamagePopup.AbilityColor, 40);
                             break;
+                        // Placeholder looks for the tension pieces (see the "Art needed" table).
+                        case StatusKind.Planted:
+                            DamagePopup.Spawn(at, $"Planted: shots +{status.Amount}", DamagePopup.AbilityColor, 44);
+                            break;
+                        case StatusKind.Overchannel:
+                            DamagePopup.Spawn(at, "Overchannel: next spell x2", DamagePopup.AbilityColor, 44);
+                            break;
                         case StatusKind.Battlecry:
                             DamagePopup.Spawn(at, $"+1 move, +{status.Amount} HP", DamagePopup.HealColor, 40);
                             break;
@@ -2469,6 +2476,11 @@ namespace ArmyRoguelike.View
                 chips.Add(("Shield thrown", $"+{Battle.ThrowShieldDamage} damage, +{Battle.ThrowShieldMoves} move.", true));
             if (u.Team == Team.Player && u.Has(Ability.Twincast) && !u.TwincastUsed)
                 chips.Add(("Twincast ready", "Its next action this turn costs no AP.", true));
+            if (u.IsPlanted)
+                chips.Add(("Planted", $"Its shots deal +{Battle.PlantedBonus} and leave enemies pinned, until " +
+                                      (u.PlantedTurns > 1 ? "the end of your next turn." : "your next turn."), true));
+            if (u.Overchanneled)
+                chips.Add(("Overchanneled", "Its next damaging spell this turn deals double damage.", true));
             if (u.Favored)
                 chips.Add(($"Favored x{Battlefields.FavoredMultiplier}", $"Favored by fortune: {Battlefields.FavoredMultiplier}x damage this round.", true));
             if (u.IsChampion)

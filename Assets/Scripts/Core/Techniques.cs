@@ -99,6 +99,7 @@ namespace ArmyRoguelike.Core
         public static readonly Technique SuppressingFire = Act(UnitStats.Archer, ActionKind.SuppressingFire, Rare, Pierce);
         public static readonly Technique MarkTarget = Act(UnitStats.Archer, ActionKind.MarkTarget);
         public static readonly Technique DeathMark = P(UnitStats.Archer, Ability.DeathMark, Rare, MarkTarget);
+        public static readonly Technique Planted = Act(UnitStats.Archer, ActionKind.Planted);
 
         // Parked Archer skills: their rules still work, but they aren't in All, so no run offers them.
         public static readonly Technique Volley = P(UnitStats.Archer, Ability.Volley, Rare);
@@ -118,6 +119,7 @@ namespace ArmyRoguelike.Core
         public static readonly Technique Rupture = Act(UnitStats.Rogue, ActionKind.Rupture, Rare, Poison);
         public static readonly Technique IntoShadows = P(UnitStats.Rogue, Ability.IntoShadows, Rare);
         public static readonly Technique Isolate = P(UnitStats.Rogue, Ability.Isolate);
+        public static readonly Technique LoneWolf = P(UnitStats.Rogue, Ability.LoneWolf);
 
         // Parked Rogue skill: its rule still works, but it isn't in All, so no run offers it.
         public static readonly Technique RipostePlus = P(UnitStats.Rogue, Ability.CounterAll, Rare, Riposte);
@@ -144,6 +146,7 @@ namespace ArmyRoguelike.Core
         public static readonly Technique Mend = Act(UnitStats.Apprentice, ActionKind.Mend, requires: Ward);
         public static readonly Technique Transpose = Act(UnitStats.Apprentice, ActionKind.Transpose);
         public static readonly Technique Twincast = P(UnitStats.Apprentice, Ability.Twincast, Rare);
+        public static readonly Technique Overchannel = Act(UnitStats.Apprentice, ActionKind.Overchannel);
 
         // Parked Mage skills: their rules still work, but they aren't in All, so no run offers them.
         public static readonly Technique WideWard = P(UnitStats.Apprentice, Ability.WideWard, Rare, Ward);
@@ -159,7 +162,7 @@ namespace ArmyRoguelike.Core
         // Rubble and walls
         public static readonly Technique Barricade = Act(UnitStats.Sapper, ActionKind.Barricade);
         public static readonly Technique CaveIn = Act(UnitStats.Sapper, ActionKind.CaveIn);
-        public static readonly Technique SpikedBarricades = P(UnitStats.Sapper, Ability.SpikedBarricades, requires: Barricade);
+        public static readonly Technique RiggedBarricades = P(UnitStats.Sapper, Ability.RiggedBarricades, requires: Barricade);
         public static readonly Technique Demolish = Act(UnitStats.Sapper, ActionKind.Demolish, Rare);
         public static readonly Technique Turret = Act(UnitStats.Sapper, ActionKind.Turret, Rare);
 
@@ -172,10 +175,10 @@ namespace ArmyRoguelike.Core
         public static readonly IReadOnlyList<Technique> All = new[]
         {
             Sweep, ShieldUp, ThrowShield, Vanguard, Charge, Battlecry, Taunt, ZocStrike,
-            SteadyAimPlus, LongShot, Vantage, Kick, SnareTrap, FireArrow, MarkTarget, Pierce, OpeningShot, Prey, CoveringFire, SuppressingFire, DeathMark,
-            Pincer, Riposte, Poison, CheapShot, Elusive, ThrowingKnife, Shadowstep, Isolate, Momentum, Dodge, SmokeBomb, Rupture, IntoShadows,
-            Fireball, Burning, Firewall, SearingBolt, Concussive, Chill, IceWall, Shatter, Blizzard, Ward, Mend, Transpose, Twincast,
-            BigMines, Hook, QuickFuse, Barricade, CaveIn, SpikedBarricades, Demolish, Turret, ThrowBomb, BlastProof, Incendiary, Detonate,
+            SteadyAimPlus, Planted, LongShot, Vantage, Kick, SnareTrap, FireArrow, MarkTarget, Pierce, OpeningShot, Prey, CoveringFire, SuppressingFire, DeathMark,
+            Pincer, Riposte, Poison, CheapShot, Elusive, ThrowingKnife, Shadowstep, Isolate, Momentum, Dodge, SmokeBomb, Rupture, IntoShadows, LoneWolf,
+            Fireball, Burning, Firewall, SearingBolt, Concussive, Chill, IceWall, Shatter, Blizzard, Ward, Mend, Transpose, Twincast, Overchannel,
+            BigMines, Hook, QuickFuse, Barricade, CaveIn, RiggedBarricades, Demolish, Turret, ThrowBomb, BlastProof, Incendiary, Detonate,
         };
 
         /// <summary>The techniques a member could learn now.</summary>

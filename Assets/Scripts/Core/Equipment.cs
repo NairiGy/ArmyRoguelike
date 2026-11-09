@@ -62,6 +62,7 @@ namespace ArmyRoguelike.Core
                 case Ability.IntoShadows: return "Into the Shadows";
                 case Ability.DeathMark: return "Death Mark";
                 case Ability.Isolate: return "Isolate";
+                case Ability.LoneWolf: return "Lone Wolf";
                 case Ability.Pincer: return "Pincer";
                 case Ability.KillRefund: return "Momentum";
                 case Ability.Poison: return "Poison";
@@ -81,7 +82,7 @@ namespace ArmyRoguelike.Core
                 case Ability.Twincast: return "Twincast";
                 case Ability.QuickFuse: return "Quick Fuse";
                 case Ability.Incendiary: return "Incendiary";
-                case Ability.SpikedBarricades: return "Spiked Barricades";
+                case Ability.RiggedBarricades: return "Rigged Barricades";
                 case Ability.VampireFang: return "Vampire Fang";
                 case Ability.Thorns: return "Thorns";
                 case Ability.SpringBoots: return "Spring Step";
@@ -129,7 +130,7 @@ namespace ArmyRoguelike.Core
                 case Ability.ZocStrike: return "attacks any unit that steps out of its reach, at most once a round";
                 case Ability.Tough: return "takes 1 less damage from everything";
                 case Ability.SteadyAim: return "+1 damage if it hasn't moved this turn";
-                case Ability.SteadyAimPlus: return "+2 damage if it hasn't moved this turn";
+                case Ability.SteadyAimPlus: return $"+{Battle.SteadyAimPlusBonus} damage if it hasn't moved this turn, -{Battle.SteadyAimPlusPenalty} if it has";
                 case Ability.Pierce: return "shots along a straight row or column hit every enemy in the line";
                 case Ability.FirstShotDouble: return "double damage the first time it hits each enemy in a battle";
                 case Ability.PreyOnSnared: return $"pinned enemies take +{Battle.PreyBonus} damage from everyone";
@@ -141,6 +142,7 @@ namespace ArmyRoguelike.Core
                 case Ability.Elusive: return "ignores zone of control";
                 case Ability.DeathMark: return "its marks spread: when a marked enemy dies, every enemy next to it is marked";
                 case Ability.Isolate: return $"+{Battle.IsolateBonus} damage to exposed enemies";
+                case Ability.LoneWolf: return $"+{Battle.LoneWolfBonus} damage while it is exposed itself";
                 case Ability.IntoShadows: return $"a kill hides it until your next turn: enemies can't target or attack it (area damage still hits). At most once every {Battle.IntoShadowsCooldown} turns";
                 case Ability.Pincer: return $"+{Battle.PincerBonus} damage if an ally stands on the far side of the target";
                 case Ability.KillRefund: return "a kill gives its action back and 1 move: it can attack again or walk on";
@@ -155,13 +157,13 @@ namespace ArmyRoguelike.Core
                 case Ability.Shatter: return $"slowed enemies take +{Battle.ShatterBonus} damage from every attack of your units";
                 case Ability.WideWard: return "Ward also shields every ally next to the target";
                 case Ability.Mines: return "an enemy stepping on one of its mines sets it off: it hurts whoever stands on that tile";
-                case Ability.BigMines: return $"its mines deal {Battle.BigMineDamage} damage and it can have {Battle.BigMaxMines} out";
+                case Ability.BigMines: return $"its mines deal {Battle.BigMineDamage} damage, but it can have only {Battle.BigMaxMines} out";
                 case Ability.BlastProof: return "its blasts (mines, bombs, Demolish, Detonate) don't hurt your units";
                 case Ability.SearingBolt: return $"its bolt sets the target's tile burning for {Battle.BurnRounds} rounds";
                 case Ability.Twincast: return "the first action it uses each turn costs no AP, so it can still attack or cast another (it can't move afterwards)";
                 case Ability.QuickFuse: return "Place Mine is free and ready every turn: use it before acting, then move and attack as usual";
                 case Ability.Incendiary: return $"its blasts (mines, bombs, Demolish, Detonate) leave the ground they hit burning for {Battle.BurnRounds} rounds";
-                case Ability.SpikedBarricades: return $"an enemy starting its turn next to one of its barricades takes {Battle.SpikeDamage}";
+                case Ability.RiggedBarricades: return $"its barricades explode when they break: a blast of {Battle.RiggedBlastDamage} damage to everyone in the 3x3 around it";
                 case Ability.VampireFang: return $"heals {Battle.VampireHeal} HP on a kill";
                 case Ability.Thorns: return $"melee attackers take {Battle.ThornsDamage} damage";
                 case Ability.SpringBoots: return "+1 move each turn";
@@ -253,6 +255,8 @@ namespace ArmyRoguelike.Core
                 case ActionKind.CaveIn: return "Cave-In";
                 case ActionKind.Hook: return "Grappling Hook";
                 case ActionKind.Demolish: return "Demolish";
+                case ActionKind.Planted: return "Planted";
+                case ActionKind.Overchannel: return "Overchannel";
                 default: return action.ToString();
             }
         }
@@ -286,6 +290,8 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Transpose: return $"swap places with any unit within {Battle.TransposeRange}";
                 case ActionKind.Hook: return $"pull an enemy 2-{Battle.HookRange} tiles away in a straight line next to it";
                 case ActionKind.Demolish: return $"blow up a wall or rubble within {Battle.DemolishRange}: {Battle.DemolishDamage} damage in a 3x3";
+                case ActionKind.Planted: return $"pinned this turn and next; its shots deal +{Battle.PlantedBonus} and leave enemies pinned. Free";
+                case ActionKind.Overchannel: return "its next spell this turn deals double; it is slowed on its next turn. Free";
                 default: return Describe(action);
             }
         }
@@ -344,6 +350,8 @@ namespace ArmyRoguelike.Core
                 case ActionKind.CaveIn: return $"drop rubble on a free tile within {Battle.CaveInRange}";
                 case ActionKind.Hook: return $"pull an enemy 2-{Battle.HookRange} tiles away in a straight line (in sight) to the tile next to it; mines on the way go off, and it slams into whatever blocks it (not huge units). A pull, not a push: weight and Battering Ram don't change it";
                 case ActionKind.Demolish: return $"blow up a wall or rubble within {Battle.DemolishRange}: {Battle.DemolishDamage} damage to everyone in the 3x3 around it. A rock or barricade collapses into rubble";
+                case ActionKind.Planted: return $"it is pinned this turn and the next, and until then its shots (Kick is not one) deal +{Battle.PlantedBonus} and every enemy they hit is pinned. Free, but it can't move afterwards";
+                case ActionKind.Overchannel: return "its next damaging spell this turn, its bolt included, deals double damage, but it is slowed on its next turn. Free";
                 default: return "";
             }
         }

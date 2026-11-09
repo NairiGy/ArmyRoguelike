@@ -66,7 +66,9 @@ namespace ArmyRoguelike.Tests
                 // Skip a boss's Stone Heart phases for the test.
                 e.BossPhase = Battle.BossPhases;
                 e.PhaseFloor = 0;
-                var killer = players[0];
+                // The first living unit, kept at full HP: a Powder Keg going off next to it can kill it otherwise.
+                var killer = players.First(p => p.IsAlive);
+                killer.Hp = killer.MaxHp;
                 killer.Ap = 99;
                 // Teleport next to the enemy for the test and hit it once.
                 killer.Pos = e.Pos.Neighbours().Where(p => b.IsFree(p)).DefaultIfEmpty(new GridPos(e.Pos.X, e.Pos.Y - 1)).First();

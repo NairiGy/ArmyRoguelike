@@ -97,9 +97,9 @@ namespace ArmyRoguelike.Core
         // Mines and bombs.
         public const int MineCost = 1;
         public const int MineDamage = 4;
-        public const int BigMineDamage = 5;
+        public const int BigMineDamage = 6;
         public const int MaxMinesPerUnit = 3;
-        public const int BigMaxMines = 4;
+        public const int BigMaxMines = 2;
         public const int PlayerBombRange = 3;
         public const int PlayerBombDamage = 4;
 
@@ -158,6 +158,9 @@ namespace ArmyRoguelike.Core
 
         /// <summary>Pinning Shot (archers): damage, and the target can't move on its next turn.</summary>
         public const int PinDamage = 1;
+
+        /// <summary>The flat damage of Pinning Shot and Suppressing Fire: Planted adds to it.</summary>
+        public static int PinShotDamage(Unit unit) => PinDamage + (unit.IsPlanted ? PlantedBonus : 0);
 
         /// <summary>Vanish (rogues): enemy turns it stays hidden (until your next turn), and the bonus on its first attack while hidden.</summary>
         public const int VanishTurns = 1;
@@ -296,12 +299,26 @@ namespace ArmyRoguelike.Core
         public const int DemolishRange = 3;
         public const int DemolishDamage = 3;
 
-        /// <summary>Spiked Barricades: damage to an enemy starting its turn next to one.</summary>
-        public const int SpikeDamage = 1;
+        /// <summary>Rigged Barricades: blast damage in the 3x3 when one of its barricades breaks.</summary>
+        public const int RiggedBlastDamage = 3;
 
-        /// <summary>Special actions cost the unit's one AP, except Blink and Vanish: free, but only before it has acted.</summary>
+        // Tension pieces (2026-11-09, placeholders).
+
+        /// <summary>Steady Aim+: bonus if the Archer hasn't moved this turn, and the loss if it has.</summary>
+        public const int SteadyAimPlusBonus = 3;
+        public const int SteadyAimPlusPenalty = 1;
+
+        /// <summary>Planted: extra damage on its shots while planted, and own turns it lasts (the one it was used in counts).</summary>
+        public const int PlantedBonus = 2;
+        public const int PlantedTurns = 2;
+
+        /// <summary>Lone Wolf: bonus damage while the Rogue itself is exposed.</summary>
+        public const int LoneWolfBonus = 2;
+
+        /// <summary>Special actions cost the unit's one AP, except the free ones (Blink, Vanish and others): free, but only before it has acted.</summary>
         public static int ActionCost(ActionKind action) =>
-            action == ActionKind.Blink || action == ActionKind.Vanish || action == ActionKind.ThrowShield || action == ActionKind.Shadowstep || action == ActionKind.MarkTarget ? 0 : action == ActionKind.PlaceMine ? MineCost : AttackCost;
+            action == ActionKind.Blink || action == ActionKind.Vanish || action == ActionKind.ThrowShield || action == ActionKind.Shadowstep || action == ActionKind.MarkTarget ||
+            action == ActionKind.Planted || action == ActionKind.Overchannel ? 0 : action == ActionKind.PlaceMine ? MineCost : AttackCost;
 
         /// <summary>
         /// What the action costs this unit: <see cref="ActionCost(ActionKind)"/>, but Quick Fuse makes Place Mine free
@@ -349,6 +366,8 @@ namespace ArmyRoguelike.Core
                 case ActionKind.Demolish:
                 case ActionKind.Hellswap:
                 case ActionKind.SoulContract:
+                case ActionKind.Planted:
+                case ActionKind.Overchannel:
                     return 3;
                 case ActionKind.SmokeBomb:
                     return 4;
@@ -1170,13 +1189,11 @@ namespace ArmyRoguelike.Core
         public int EffectiveDamage(Unit unit)
         {
             var damage = unit.BaseDamage + unit.Fury;
-            if (!unit.MovedThisTurn)
-            {
-                if (unit.Has(Ability.SteadyAimPlus))
-                    damage += 2;
-                else if (unit.Has(Ability.SteadyAim))
-                    damage += 1;
-            }
+            // Steady Aim+ is a bet: more for standing still, less for moving.
+            if (unit.Has(Ability.SteadyAimPlus))
+                damage += unit.MovedThisTurn ? -SteadyAimPlusPenalty : SteadyAimPlusBonus;
+            else if (unit.Has(Ability.SteadyAim) && !unit.MovedThisTurn)
+                damage += 1;
 
             return Math.Max(1, damage);
         }
@@ -1188,12 +1205,15 @@ namespace ArmyRoguelike.Core
         /// The target bonuses on top of a base damage: the conditional flat bonuses (at most
         /// <see cref="MaxConditionalBonus"/> in total), Wolf Bite's chain, then the opening shot's double.
         /// </summary>
-        private int DamageFrom(Unit attacker, Unit target, int damage)
+        private int DamageFrom(Unit attacker, Unit target, int damage, bool shot = true)
         {
-            damage += ConditionalBonus(attacker, target);
+            damage += ConditionalBonus(attacker, target, shot);
             if (attacker.Has(Ability.WolfBite))
                 damage += BiteChain;
             if (attacker.Has(Ability.FirstShotDouble) && !attacker.HasStruck(target))
+                damage *= 2;
+            // Overchannel: the Mage's next damaging spell (its bolt included) deals double.
+            if (attacker.Overchanneled)
                 damage *= 2;
             return damage;
         }
@@ -1262,10 +1282,10 @@ namespace ArmyRoguelike.Core
             var kills = new List<Unit>();
             if (!CanUseAction(unit, action, tile))
                 return kills;
-            if (action == ActionKind.PinningShot && FixedHitKills(UnitAt(tile), PinDamage, unit, DamageKind.Attack))
+            if (action == ActionKind.PinningShot && FixedHitKills(UnitAt(tile), PinShotDamage(unit), unit, DamageKind.Attack))
                 kills.Add(UnitAt(tile));
             var target = UnitAt(tile);
-            if ((action == ActionKind.Kick && FixedHitKills(target, ActionDamage(unit, target, KickDamage), unit, DamageKind.Attack)) ||
+            if ((action == ActionKind.Kick && FixedHitKills(target, ActionDamage(unit, target, KickDamage, shot: false), unit, DamageKind.Attack)) ||
                 (action == ActionKind.ThrowingKnife && FixedHitKills(target, ActionDamage(unit, target, KnifeDamage), unit, DamageKind.Attack)) ||
                 (action == ActionKind.FireArrow && FixedHitKills(target, DamageAgainst(unit, target), unit, DamageKind.Attack)) ||
                 (action == ActionKind.Rupture && (FixedHitKills(target, target.PoisonTurns * PoisonDamage, unit, DamageKind.Tick) ||
@@ -1273,11 +1293,11 @@ namespace ArmyRoguelike.Core
                 kills.Add(target);
             if (action == ActionKind.SuppressingFire)
                 kills.AddRange(SuppressLine(unit, tile).Select(UnitAt).Where(u => u != null && u.Team != unit.Team && !u.IsObjective).Distinct()
-                    .Where(u => FixedHitKills(u, PinDamage, unit, DamageKind.Attack)));
+                    .Where(u => FixedHitKills(u, PinShotDamage(unit), unit, DamageKind.Attack)));
             if (action == ActionKind.Fireball)
             {
                 var area = PlusArea(tile);
-                kills.AddRange(_units.Where(u => u.IsPlaced && u.IsAlive && Cells(u).Any(area.Contains) && FixedHitKills(u, FireballDamage, unit, DamageKind.Blast)));
+                kills.AddRange(_units.Where(u => u.IsPlaced && u.IsAlive && Cells(u).Any(area.Contains) && FixedHitKills(u, SpellDamage(unit, FireballDamage), unit, DamageKind.Blast)));
             }
 
             return kills;
@@ -1703,6 +1723,10 @@ namespace ArmyRoguelike.Core
                     return target != null && target.Team != unit.Team && target.PoisonTurns > 0 && unit.Size == 1 && Distance(unit, target) == 1;
                 case ActionKind.MarkTarget:
                     return target != null && target.Team != unit.Team && !target.IsHidden && !target.Marked && CanHitFrom(unit, unit.Pos, target);
+                case ActionKind.Planted:
+                    return tile == unit.Pos && !unit.IsPlanted;
+                case ActionKind.Overchannel:
+                    return tile == unit.Pos && !unit.Overchanneled;
                 default:
                     return false;
             }
@@ -1759,7 +1783,7 @@ namespace ArmyRoguelike.Core
                 case ActionKind.PinningShot:
                 {
                     var after = new List<BattleEvent>();
-                    var hit = Damage(UnitAt(tile), PinDamage, unit, DamageKind.Attack, after);
+                    var hit = Damage(UnitAt(tile), PinShotDamage(unit), unit, DamageKind.Attack, after);
                     events.Add(new AttackEvent(unit, hit.Target, hit.Damage, hit.HpAfter));
                     events.AddRange(after);
                     if (hit.Target.IsAlive && !hit.Target.Has(Ability.Colossus))
@@ -1822,7 +1846,7 @@ namespace ArmyRoguelike.Core
                 {
                     var target = UnitAt(tile);
                     var dir = StraightDirection(unit.Pos, Cells(target).First(c => c.StepsTo(unit.Pos) == 1)).Value;
-                    ActionHit(unit, target, ActionDamage(unit, target, KickDamage), events, "kick");
+                    ActionHit(unit, target, ActionDamage(unit, target, KickDamage, shot: false), events, "kick");
                     Push(target, dir, unit, events);
                     break;
                 }
@@ -1834,7 +1858,8 @@ namespace ArmyRoguelike.Core
                 {
                     var target = UnitAt(tile);
                     var cells = Cells(target).Where(p => !Board.IsObstacle(p)).ToList();
-                    ActionHit(unit, target, DamageAgainst(unit, target), events, "fire arrow");
+                    var arrow = ActionHit(unit, target, DamageAgainst(unit, target), events, "fire arrow");
+                    PlantedPin(unit, new[] { arrow.Target }, events);
                     foreach (var p in cells)
                     {
                         _burning[p] = BurnRounds;
@@ -1856,7 +1881,7 @@ namespace ArmyRoguelike.Core
                     var line = SuppressLine(unit, tile);
                     var victims = line.Select(UnitAt).Where(u => u != null && u.Team != unit.Team && !u.IsObjective).Distinct().ToList();
                     var after = new List<BattleEvent>();
-                    var hits = victims.Select(v => Damage(v, PinDamage, unit, DamageKind.Attack, after)).ToList();
+                    var hits = victims.Select(v => Damage(v, PinShotDamage(unit), unit, DamageKind.Attack, after)).ToList();
                     unit.AttackedThisTurn = true;
                     foreach (var v in victims)
                         unit.MarkStruck(v);
@@ -1908,6 +1933,20 @@ namespace ArmyRoguelike.Core
                     events.Add(new StatusEvent(unit, target, StatusKind.Mark, MarkBonus));
                     break;
                 }
+                case ActionKind.Planted:
+                    // Pinned for the rest of this turn and on its next one; the bonus lasts as long.
+                    unit.PlantedTurns = PlantedTurns;
+                    unit.RootedThisTurn = true;
+                    unit.Moves = 0;
+                    unit.SnareTurns = Math.Max(unit.SnareTurns, 1);
+                    events.Add(new StatusEvent(unit, unit, StatusKind.Planted, PlantedBonus));
+                    break;
+                case ActionKind.Overchannel:
+                    // The cost is paid on use: slowed on its next turn even if no spell follows.
+                    unit.Overchanneled = true;
+                    unit.SlowNext = 1;
+                    events.Add(new StatusEvent(unit, unit, StatusKind.Overchannel, 2));
+                    break;
                 case ActionKind.Rupture:
                 {
                     var target = UnitAt(tile);
@@ -2075,8 +2114,9 @@ namespace ArmyRoguelike.Core
             var line = FirewallLine(caster, center);
             var after = new List<BattleEvent>();
             var hits = _units.Where(u => u.IsPlaced && u.IsAlive && Cells(u).Any(line.Contains)).ToList()
-                .Select(u => Damage(u, FirewallDamage, caster, DamageKind.Blast, after)).ToList();
+                .Select(u => Damage(u, SpellDamage(caster, FirewallDamage), caster, DamageKind.Blast, after)).ToList();
             events.Add(new AreaAttackEvent(caster, "firewall", center, line, hits));
+            caster.Overchanneled = false;
             events.AddRange(after);
             foreach (var p in line)
                 SetBurning(p, caster, events);
@@ -2088,8 +2128,9 @@ namespace ArmyRoguelike.Core
             var area = PlusArea(center);
             var foes = _units.Where(u => u.IsPlaced && u.IsAlive && u.Team != caster.Team && Cells(u).Any(area.Contains)).ToList();
             var after = new List<BattleEvent>();
-            var hits = foes.Select(u => Damage(u, BlizzardDamage, caster, DamageKind.Blast, after)).ToList();
+            var hits = foes.Select(u => Damage(u, SpellDamage(caster, BlizzardDamage), caster, DamageKind.Blast, after)).ToList();
             events.Add(new AreaAttackEvent(caster, "blizzard", center, area, hits));
+            caster.Overchanneled = false;
             events.AddRange(after);
             foreach (var foe in foes.Where(u => u.IsAlive && !u.IsObjective && !u.Has(Ability.Colossus)))
             {
@@ -2140,13 +2181,29 @@ namespace ArmyRoguelike.Core
                 AddRubble(tile, null, events);
         }
 
+        /// <summary>A spell's flat damage on each target: double after Overchannel.</summary>
+        private static int SpellDamage(Unit caster, int amount) => caster.Overchanneled ? amount * 2 : amount;
+
+        /// <summary>Planted: a planted Archer's shots pin every enemy they hit (not objectives or a Colossus).</summary>
+        private void PlantedPin(Unit shooter, IEnumerable<Unit> hit, List<BattleEvent> events)
+        {
+            if (!shooter.IsPlanted)
+                return;
+            foreach (var u in hit.Distinct().Where(u => u.IsAlive && u.Team != shooter.Team && !u.IsObjective && !u.Has(Ability.Colossus)).ToList())
+            {
+                u.SnareTurns = Math.Max(u.SnareTurns, 1);
+                events.Add(new StatusEvent(shooter, u, StatusKind.Pin, 1));
+            }
+        }
+
         private void Fireball(Unit caster, GridPos center, List<BattleEvent> events)
         {
             var area = PlusArea(center);
             var after = new List<BattleEvent>();
             var hits = _units.Where(u => u.IsPlaced && u.IsAlive && Cells(u).Any(area.Contains)).ToList()
-                .Select(u => Damage(u, FireballDamage, caster, DamageKind.Blast, after)).ToList();
+                .Select(u => Damage(u, SpellDamage(caster, FireballDamage), caster, DamageKind.Blast, after)).ToList();
             events.Add(new AreaAttackEvent(caster, "fireball", center, area, hits));
+            caster.Overchanneled = false;
             events.AddRange(after);
 
             if (caster.Has(Ability.Burning))
@@ -2208,16 +2265,21 @@ namespace ArmyRoguelike.Core
         }
 
         /// <summary>An action's own base damage in place of the unit's attack damage; bonuses to its damage still count.</summary>
-        private int ActionDamage(Unit unit, Unit target, int baseDamage) =>
-            DamageFrom(unit, target, Math.Max(1, EffectiveDamage(unit) - unit.Stats.Damage + baseDamage));
+        private int ActionDamage(Unit unit, Unit target, int baseDamage, bool shot = true) =>
+            DamageFrom(unit, target, Math.Max(1, EffectiveDamage(unit) - unit.Stats.Damage + baseDamage), shot);
 
         /// <summary>
-        /// Pincer, Prey, Cheap Shot, Long Shot, Isolate, Shatter and the hidden ambush, added up and capped at
-        /// <see cref="MaxConditionalBonus"/> so stacked conditions can't one-shot anything.
+        /// Pincer, Prey, Cheap Shot, Long Shot, Isolate, Lone Wolf, Planted, Shatter and the hidden ambush, added up and
+        /// capped at <see cref="MaxConditionalBonus"/> so stacked conditions can't one-shot anything. Planted counts
+        /// only for shots (<paramref name="shot"/> is false for Kick).
         /// </summary>
-        public int ConditionalBonus(Unit attacker, Unit target)
+        public int ConditionalBonus(Unit attacker, Unit target, bool shot = true)
         {
             var bonus = 0;
+            if (shot && attacker.IsPlanted)
+                bonus += PlantedBonus;
+            if (attacker.Has(Ability.LoneWolf) && IsExposed(attacker))
+                bonus += LoneWolfBonus;
             if (attacker.Has(Ability.Pincer) && IsPinched(attacker, target))
                 bonus += PincerBonus;
             if (target.IsSnared && Living(attacker.Team).Any(u => u.Has(Ability.PreyOnSnared)))
@@ -2582,9 +2644,42 @@ namespace ArmyRoguelike.Core
             return steps <= attacker.Range && (steps == 1 || Cells(attacker).Any(c => Board.HasLineOfSight(c, tile)));
         }
 
+        /// <summary>The explosion cause of a Rigged Barricade going off (for the view and the playtest log).</summary>
+        public const string RiggedCause = "rigged barricade";
+
+        /// <summary>The sapper that built the barricade on this tile, or null.</summary>
+        public Unit BarricadeOwner(GridPos tile) => _barricades.FirstOrDefault(b => b.tile == tile).owner;
+
+        /// <summary>Whether breaking the barricade on this tile would set off a Rigged Barricades blast.</summary>
+        public bool IsRigged(GridPos tile) => IsBarricade(tile) && BarricadeOwner(tile) is Unit owner && owner.Has(Ability.RiggedBarricades);
+
+        /// <summary>
+        /// For the enemy AI: the HP each side would lose if the rigged barricade on this tile broke now (3x3 blast,
+        /// Blast Proof sparing the sapper's side). Mines and bombs it would set off aren't counted.
+        /// </summary>
+        public (int own, int foe) RiggedBlastLoss(GridPos tile, Team breaker)
+        {
+            var owner = BarricadeOwner(tile);
+            if (owner == null || !owner.Has(Ability.RiggedBarricades))
+                return (0, 0);
+            var area = BlastArea(tile);
+            var safe = owner.Has(Ability.BlastProof) ? owner.Team : (Team?)null;
+            int own = 0, foe = 0;
+            foreach (var u in _units.Where(u => u.IsPlaced && u.IsAlive && !u.IsObjective && u.Team != safe && Cells(u).Any(area.Contains)))
+            {
+                var loss = Math.Min(u.Hp, RiggedBlastDamage);
+                if (u.Team == breaker)
+                    own += loss;
+                else
+                    foe += loss;
+            }
+
+            return (own, foe);
+        }
+
         /// <summary>
         /// A basic attack on a barricade: the attacker's damage (no target bonuses), one hit. At 0 HP the
-        /// barricade breaks and its tile is free again. Attacking reveals a vanished unit.
+        /// barricade breaks and its tile is free again (a rigged one explodes first). Attacking reveals a vanished unit.
         /// </summary>
         internal List<BattleEvent> DoAttackBarricade(Unit attacker, GridPos tile)
         {
@@ -2605,11 +2700,14 @@ namespace ArmyRoguelike.Core
                 events.Add(new BarricadeHitEvent(attacker, tile, damage, hp));
                 if (hp == 0)
                 {
-                    // A broken barricade collapses into rubble.
+                    // A broken barricade collapses into rubble; a rigged one blows up first (its sapper's blast).
+                    var owner = BarricadeOwner(tile);
                     _barricades.RemoveAll(b => b.tile == tile);
                     _barricadeHp.Remove(tile);
                     Board.RemoveObstacle(tile);
                     events.Add(new TileEvent("barricade", tile, false, attacker));
+                    if (owner != null && owner.Has(Ability.RiggedBarricades))
+                        Explode(tile, RiggedBlastDamage, RiggedCause, owner, events);
                     AddRubble(tile, null, events);
                 }
             }
@@ -2816,6 +2914,7 @@ namespace ArmyRoguelike.Core
                 SpendAmbush(watcher);
                 events.Add(new AttackEvent(watcher, hit.Target, hit.Damage, hit.HpAfter, "covering fire"));
                 events.AddRange(after);
+                PlantedPin(watcher, new[] { hit.Target }, events);
                 watcher = null;
             }
 
@@ -2873,6 +2972,10 @@ namespace ArmyRoguelike.Core
             attacker.MarkStruck(target);
             // Attacking doesn't reveal a hidden unit (Vanish lasts until your next turn); it only spends the +2.
             SpendAmbush(attacker);
+            // The bolt was the overchanneled spell.
+            attacker.Overchanneled = false;
+            if (!IsOver)
+                PlantedPin(attacker, struck, events);
 
             if (attacker.Has(Ability.WolfBite))
                 BiteChain++;
@@ -3789,16 +3892,6 @@ namespace ArmyRoguelike.Core
                     events.Add(new TickEvent("poison", Damage(u, PoisonDamage, null, DamageKind.Tick, after), u.PoisonSource));
                     events.AddRange(after);
                 }
-
-                // Spiked Barricades: once per turn, however many spiked barricades it stands next to.
-                var spikes = u.IsAlive ? _barricades.FirstOrDefault(b => b.owner != null && b.owner.Team != u.Team && b.owner.Has(Ability.SpikedBarricades) &&
-                                                                         Cells(u).Any(c => c.StepsTo(b.tile) == 1)) : default;
-                if (spikes.owner != null)
-                {
-                    var after = new List<BattleEvent>();
-                    events.Add(new TickEvent("spikes", Damage(u, SpikeDamage, null, DamageKind.Tick, after), spikes.owner));
-                    events.AddRange(after);
-                }
             }
 
             if (team == Team.Player)
@@ -3837,6 +3930,8 @@ namespace ArmyRoguelike.Core
             {
                 u.ZocStrikeUsed = false;
                 u.TwincastUsed = false;
+                u.Overchanneled = false;
+                u.PlantedTurns = Math.Max(0, u.PlantedTurns - 1);
                 u.ShieldUpTurns = Math.Max(0, u.ShieldUpTurns - 1);
                 u.TauntTurns = Math.Max(0, u.TauntTurns - 1);
                 if (u.BattlecryTurns > 0 && --u.BattlecryTurns == 0)

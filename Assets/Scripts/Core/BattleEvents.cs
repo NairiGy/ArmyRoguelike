@@ -359,6 +359,12 @@ namespace ArmyRoguelike.Core
 
         /// <summary>The Devil (Source) took damage: its contract on the target is void.</summary>
         ContractBroken,
+
+        /// <summary>Planted: the archer pinned itself; its shots deal <see cref="StatusEvent.Amount"/> more (Source and Target are the same unit).</summary>
+        Planted,
+
+        /// <summary>Overchannel: the mage's next spell this turn deals double, and it is slowed next turn (Source and Target are the same unit).</summary>
+        Overchannel,
     }
 
     /// <summary>A status or support effect was put on a unit by an action or a hit.</summary>

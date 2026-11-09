@@ -60,7 +60,7 @@ namespace ArmyRoguelike.Core
                 case Keyword.Burning: return $"Burning ground: {Battle.BurnDamage} damage to whoever starts a turn on it. Enemies walk through it but never stop on it.";
                 case Keyword.Wall: return "A rock (crystals, tombstones and boulders too), ice or a barricade: blocks walking and shots, and gives cover. Rubble and holes are not walls.";
                 case Keyword.Rubble: return $"A low heap: blocks walking but not shots, and gives no cover. A unit pushed into it is crushed for {Battle.CollisionDamage + Battle.CrushDamage} and the rubble breaks. One hit clears it.";
-                case Keyword.Blast: return "An explosion: a mine, a bomb, Demolish, Detonate, a Powder Keg or a Corpse Blast. It hurts everyone in its area, either side, and sets off any mine or bomb inside it.";
+                case Keyword.Blast: return "An explosion: a mine, a bomb, Demolish, Detonate, a Rigged Barricade, a Powder Keg or a Corpse Blast. It hurts everyone in its area, either side, and sets off any mine or bomb inside it.";
                 case Keyword.Poison: return $"{Battle.PoisonDamage} damage at the start of the target's turn, {Battle.PoisonTurns} times.";
                 case Keyword.Push: return $"A medium unit moves 1 tile, a small one 2, a huge one not at all. If it slams into a wall, a unit or the edge, it stops and takes {Battle.CollisionDamage}. An enemy pushed onto a mine sets it off.";
                 case Keyword.ZoneOfControl: return "Stepping out of a tile next to an enemy uses up all remaining moves, for both sides.";

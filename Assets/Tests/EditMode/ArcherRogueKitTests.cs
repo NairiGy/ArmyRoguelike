@@ -33,12 +33,12 @@ namespace ArmyRoguelike.Tests
         // ---------- Pools ----------
 
         [Test]
-        public void Pools_ThirteenEach_AboutOneThirdRare_WithParkedOnesLeftOut()
+        public void Pools_FourteenEach_AboutOneThirdRare_WithParkedOnesLeftOut()
         {
             foreach (var (line, rares) in new[] { (UnitStats.Archer, 6), (UnitStats.Rogue, 5) })
             {
                 var offered = Technique.All.Where(t => t.Line == line).ToList();
-                Assert.AreEqual(13, offered.Count, line.Name);
+                Assert.AreEqual(14, offered.Count, line.Name);
                 Assert.AreEqual(rares, offered.Count(t => t.Rarity == TechniqueRarity.Rare), line.Name);
                 Assert.Greater(offered.Count(t => t.Action.HasValue), 3, line.Name + " has actions");
                 Assert.Greater(offered.Count(t => !t.Action.HasValue), 3, line.Name + " has passives");

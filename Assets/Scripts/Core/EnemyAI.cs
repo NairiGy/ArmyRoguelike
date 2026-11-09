@@ -487,11 +487,23 @@ namespace ArmyRoguelike.Core
         {
             if (battle.IsOver || !enemy.IsAlive || enemy.ActedThisTurn)
                 return;
-            var tile = battle.Barricades.Concat(battle.Rubble).Where(t => battle.CanAttackBarricade(enemy, t))
+            var tile = battle.Barricades.Concat(battle.Rubble).Where(t => battle.CanAttackBarricade(enemy, t) && !RiggedBlastHurtsUs(battle, enemy, t))
                 .OrderBy(t => battle.BarricadeHpAt(t)).ThenBy(t => t.X).ThenBy(t => t.Y)
                 .Cast<GridPos?>().FirstOrDefault();
             if (tile.HasValue)
                 events.AddRange(battle.DoAttackBarricade(enemy, tile.Value));
+        }
+
+        /// <summary>
+        /// Rigged Barricades: an enemy leaves a rigged barricade standing when its hit would break it and the blast
+        /// would cost its own side HP without costing yours more (the Corpse Blast rule turned around).
+        /// </summary>
+        public static bool RiggedBlastHurtsUs(Battle battle, Unit enemy, GridPos tile)
+        {
+            if (!battle.IsRigged(tile) || battle.BarricadeHpAt(tile) > battle.EffectiveDamage(enemy))
+                return false;
+            var (own, foe) = battle.RiggedBlastLoss(tile, enemy.Team);
+            return own > 0 && own >= foe;
         }
 
         // ---------- Behaviours ----------

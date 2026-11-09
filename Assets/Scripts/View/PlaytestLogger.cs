@@ -26,6 +26,10 @@ namespace ArmyRoguelike.View
         private readonly Stopwatch _clock = new Stopwatch();
         private bool _saved;
 
+        // Overchannel: the turn each mage used it in, until its doubled spell is logged (the rules clear the flag
+        // before the logger sees the spell).
+        private readonly Dictionary<Unit, int> _overchannel = new Dictionary<Unit, int>();
+
         public PlaytestLogger(Battle battle, BattleContext context)
         {
             _battle = battle;
@@ -102,6 +106,8 @@ namespace ArmyRoguelike.View
                     var entry = HitEntry(turn, attack.Attacker, attack.Via ?? "attack", new Hit(attack.Target, attack.Damage, attack.TargetHpAfter));
                     entry.autoApproach = autoApproach;
                     _log.actions.Add(entry);
+                    if (entry.overchanneled)
+                        _overchannel.Remove(attack.Attacker);
                     break;
                 }
                 case SmashEvent smash:
@@ -182,6 +188,8 @@ namespace ArmyRoguelike.View
                         _log.actions.Add(entry);
                     }
 
+                    if (_overchannel.TryGetValue(area.Attacker, out var channelTurn) && channelTurn == turn && area.Kind != "sweep")
+                        _overchannel.Remove(area.Attacker);
                     break;
                 case PushEvent push:
                 {
@@ -202,6 +210,8 @@ namespace ArmyRoguelike.View
                     break;
                 }
                 case StatusEvent status:
+                    if (status.Kind == StatusKind.Overchannel)
+                        _overchannel[status.Source] = turn;
                     _log.actions.Add(new ActionEntry
                     {
                         turn = turn, team = status.Source.Team.ToString(), unit = Name(status.Source),
@@ -367,6 +377,8 @@ namespace ArmyRoguelike.View
             damage = hit.Damage, targetHpAfter = hit.HpAfter, killed = hit.Killed, apAfter = ApAfter(attacker),
             ranged = attacker.IsRanged && Battle.Distance(attacker, hit.Target) > 1, favored = attacker.Favored, fury = attacker.Fury,
             slowed = attacker.SlowedThisTurn,
+            planted = attacker.IsPlanted && type != "kick",
+            overchanneled = _overchannel.TryGetValue(attacker, out var channelTurn) && channelTurn == turn,
         };
 
         private static int ApAfter(Unit u) => u.Team == Team.Player ? u.Ap : -1;
@@ -736,6 +748,12 @@ namespace ArmyRoguelike.View
             /// <summary>Hits and explosions: dealt by a unit favored by fortune (Fortune's Favored), so at double damage.</summary>
             public bool favored;
 
+            /// <summary>Hits: a shot by a Planted archer (+2, and it pins). The use itself is a "status" entry with note "planted".</summary>
+            public bool planted;
+
+            /// <summary>Hits: the Mage's overchanneled spell (double damage). The use itself is a "status" entry with note "overchannel"; the slow it costs shows as "slowed" on its next turn.</summary>
+            public bool overchanneled;
+
             /// <summary>Hits: the attacker's Fury (demons, +1 damage each) when it struck; type "rending blow" marks a Rending Blow.</summary>
             public int fury;
 
@@ -761,7 +779,7 @@ namespace ArmyRoguelike.View
 
             /// <summary>
             /// End turn prompt: "asked", "confirmed" or "cancelled" ("target" lists the units that could still act).
-            /// Explosion: "mine", "bomb", "barricade" or "sun". Omen: e.g. "sun blessing", "moon curse" ("target" is the unit picked).
+            /// Explosion: "mine", "bomb", "barricade", "rigged barricade" (a Rigged Barricade broken by a hit) or "sun". Omen: e.g. "sun blessing", "moon curse" ("target" is the unit picked).
             /// </summary>
             public string note;
 

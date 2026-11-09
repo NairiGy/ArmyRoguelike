@@ -88,7 +88,7 @@ namespace ArmyRoguelike.Tests
         [Test]
         public void OpeningShot_FirstShotOnEachTargetDouble()
         {
-            var b = Setup(new[] { M(UnitStats.Archer, Technique.SteadyAimPlus, Technique.OpeningShot) }, new[] { P(3, 1) },
+            var b = Setup(new[] { M(UnitStats.Archer, Technique.OpeningShot) }, new[] { P(3, 1) },
                 new[] { E(UnitStats.Ogre, 3, 4), E(UnitStats.Brute, 1, 3) });
             var deadeye = Player(b);
             var ogre = Enemy(b, 0);

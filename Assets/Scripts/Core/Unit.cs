@@ -157,6 +157,17 @@ namespace ArmyRoguelike.Core
         /// <summary>Twincast: the free action of this turn was already used.</summary>
         public bool TwincastUsed { get; internal set; }
 
+        /// <summary>
+        /// Planted (Archer): own turns left of being planted, the one it was used in counts (so 2 = this turn and the
+        /// next). While planted its shots deal more and pin; the pin itself is <see cref="SnareTurns"/>.
+        /// </summary>
+        public int PlantedTurns { get; internal set; }
+
+        public bool IsPlanted => PlantedTurns > 0;
+
+        /// <summary>Overchannel (Mage): its next damaging spell this turn deals double damage.</summary>
+        public bool Overchanneled { get; internal set; }
+
         /// <summary>The zone-of-control attack was already used this round.</summary>
         public bool ZocStrikeUsed { get; internal set; }
 
@@ -223,6 +234,7 @@ namespace ArmyRoguelike.Core
                 BannerAp = BannerAp, BannerMoves = BannerMoves, LeftPile = LeftPile, PileGone = PileGone,
                 ShieldUpTurns = ShieldUpTurns, TauntTurns = TauntTurns, BattlecryTurns = BattlecryTurns, CryShield = CryShield,
                 ShieldThrown = ShieldThrown, ZocStrikeUsed = ZocStrikeUsed, AmbushUsed = AmbushUsed, ShadowsTurn = ShadowsTurn, Marked = Marked, MarkSpreads = MarkSpreads, TwincastUsed = TwincastUsed, Fury = Fury,
+                PlantedTurns = PlantedTurns, Overchanneled = Overchanneled,
                 Affix = Affix, ExtraHp = ExtraHp, BossPhase = BossPhase, PhaseFloor = PhaseFloor, Enraged = Enraged,
             };
             foreach (var cooldown in _cooldowns)

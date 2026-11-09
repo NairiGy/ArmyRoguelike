@@ -27,12 +27,12 @@ namespace ArmyRoguelike.Tests
         private static List<ArmyMember> FullArmy() => new List<ArmyMember>
         {
             new ArmyMember(UnitStats.Warrior, null, Technique.Sweep, Technique.Guard, Technique.ShieldUp, Technique.Battlecry, Technique.Taunt, Technique.ThrowShield, Technique.ZocStrike),
-            new ArmyMember(UnitStats.Archer, null, Technique.OpeningShot, Technique.SnareTrap, Technique.CoveringFire, Technique.FireArrow, Technique.Kick, Technique.Vantage, Technique.MarkTarget, Technique.DeathMark),
-            new ArmyMember(UnitStats.Rogue, null, Technique.Poison, Technique.Riposte, Technique.Dodge, Technique.SmokeBomb, Technique.Shadowstep, Technique.ThrowingKnife, Technique.Rupture, Technique.IntoShadows, Technique.Isolate),
+            new ArmyMember(UnitStats.Archer, null, Technique.OpeningShot, Technique.SnareTrap, Technique.CoveringFire, Technique.FireArrow, Technique.Kick, Technique.Vantage, Technique.MarkTarget, Technique.DeathMark, Technique.Planted),
+            new ArmyMember(UnitStats.Rogue, null, Technique.Poison, Technique.Riposte, Technique.Dodge, Technique.SmokeBomb, Technique.Shadowstep, Technique.ThrowingKnife, Technique.Rupture, Technique.IntoShadows, Technique.Isolate, Technique.LoneWolf),
             new ArmyMember(UnitStats.Apprentice, null, Technique.Fireball, Technique.Burning, Technique.Chill, Technique.Ward, Technique.IceWall,
-                Technique.Firewall, Technique.SearingBolt, Technique.Blizzard, Technique.Transpose, Technique.Twincast),
+                Technique.Firewall, Technique.SearingBolt, Technique.Blizzard, Technique.Transpose, Technique.Twincast, Technique.Overchannel),
             new ArmyMember(UnitStats.Sapper, null, Technique.Barricade, Technique.Turret, Technique.Detonate, Technique.ThrowBomb,
-                Technique.CaveIn, Technique.Hook, Technique.Demolish, Technique.QuickFuse, Technique.Incendiary, Technique.SpikedBarricades),
+                Technique.CaveIn, Technique.Hook, Technique.Demolish, Technique.QuickFuse, Technique.Incendiary, Technique.RiggedBarricades),
         };
 
         private static Battle Placed(Encounter encounter, Battlefield? field, int seed)

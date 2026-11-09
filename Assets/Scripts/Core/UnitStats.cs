@@ -84,7 +84,7 @@ namespace ArmyRoguelike.Core
         /// <summary>+1 damage if the unit hasn't moved this turn.</summary>
         SteadyAim,
 
-        /// <summary>+2 damage if the unit hasn't moved this turn.</summary>
+        /// <summary>+3 damage if the unit hasn't moved this turn, -1 if it has.</summary>
         SteadyAimPlus,
 
         /// <summary>Shots along a straight row or column hit every enemy in the line.</summary>
@@ -143,6 +143,9 @@ namespace ArmyRoguelike.Core
         /// <summary>+2 damage against exposed enemies (no ally of theirs next to them).</summary>
         Isolate,
 
+        /// <summary>+2 damage while it is exposed itself (no ally next to it).</summary>
+        LoneWolf,
+
         // ---------- Mage line ----------
 
         /// <summary>Its bolt ignores line of sight.</summary>
@@ -174,7 +177,7 @@ namespace ArmyRoguelike.Core
         /// <summary>Can place mines (see the Place Mine action).</summary>
         Mines,
 
-        /// <summary>Its mines deal 5 damage and it can have 4 on the board.</summary>
+        /// <summary>Its mines deal 6 damage, but it can have only 2 on the board.</summary>
         BigMines,
 
         /// <summary>Its own blasts don't hurt its side.</summary>
@@ -186,8 +189,8 @@ namespace ArmyRoguelike.Core
         /// <summary>Its mines, bombs and blasts leave their area burning.</summary>
         Incendiary,
 
-        /// <summary>Enemies starting their turn next to one of its barricades take damage.</summary>
-        SpikedBarricades,
+        /// <summary>Its barricades explode in a 3x3 blast when they break.</summary>
+        RiggedBarricades,
 
         // ---------- Items ----------
 
@@ -343,6 +346,9 @@ namespace ArmyRoguelike.Core
         CaveIn,
         Hook,
         Demolish,
+        // Tension pieces (2026-11-09)
+        Planted,
+        Overchannel,
 
         // Enemy actions: never in a unit's Actions list (the AI uses them), but they share the cooldown table.
         Slam,

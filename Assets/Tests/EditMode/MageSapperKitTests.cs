@@ -38,7 +38,7 @@ namespace ArmyRoguelike.Tests
         {
             var mage = Technique.All.Where(t => t.Line == UnitStats.Apprentice).ToList();
             var sapper = Technique.All.Where(t => t.Line == UnitStats.Sapper).ToList();
-            Assert.AreEqual(13, mage.Count);
+            Assert.AreEqual(14, mage.Count);
             Assert.AreEqual(12, sapper.Count);
             Assert.IsFalse(mage.Contains(Technique.WideWard));
             Assert.IsFalse(mage.Contains(Technique.Blink));
@@ -361,18 +361,6 @@ namespace ArmyRoguelike.Tests
             var events = new List<BattleEvent>();
             b.Explode(P(3, 3), Battle.MineDamage, "mine", sapper, events);
             Assert.IsTrue(b.BurningTiles.ContainsKey(P(3, 3)));
-        }
-
-        [Test]
-        public void SpikedBarricades_HurtEnemiesStartingNextToThem()
-        {
-            var b = Setup(new[] { M(UnitStats.Sapper, Technique.Barricade, Technique.SpikedBarricades) }, new[] { P(3, 1) },
-                new[] { E(UnitStats.Brute, 4, 2), Far });
-            var sapper = Player(b);
-            b.PlayerUseAction(sapper, ActionKind.Barricade, P(3, 2));
-            b.EndUnitTurn(sapper);
-            var events = b.EndPlayerTurn();
-            Assert.IsTrue(events.OfType<TickEvent>().Any(t => t.Cause == "spikes" && t.Hit.Target == Enemy(b) && t.Hit.Damage == Battle.SpikeDamage));
         }
 
         // ---------- Review fixes (2026-11-08) ----------
