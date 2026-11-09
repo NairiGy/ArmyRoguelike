@@ -1,0 +1,5 @@
+title: ArmyRoguelike design docs
+exclude:
+  - tasks.md
+  - night-log.md
+  - night

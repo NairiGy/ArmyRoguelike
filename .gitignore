@@ -51,3 +51,7 @@ Desktop.ini
 
 # Raw AI art drops before import (art experiment)
 /ArtInbox/
+
+# Night-pass notes: kept locally, not in the public repo
+/docs/night-log.md
+/docs/night/

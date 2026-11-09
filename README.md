@@ -17,8 +17,16 @@ A single-player roguelike army-builder made in Unity. You lead a small squad of 
 - **One path for damage.** All damage goes through a single method, so every ability works with every source of damage. Actions return the events they caused, and the view animates those events.
 - **AI that looks ahead.** The battle can make an exact copy of itself, with its own copyable random generator, so bots can try moves before choosing one.
 - **Balance from data.** A bot-vs-bot simulator plays whole battles and writes balance reports (`tools/balance/`). Every playtest battle and run is saved as a JSON log tagged with its git commit.
-- **Tools.** A game wiki generated from the game's own data ([docs/gamepedia.html](docs/gamepedia.html)), headless battle renders, an in-game effects and sound test bench, and design maps of hero synergies and enemy factions.
-- **Design docs.** What was decided and why: [docs/design-note.md](docs/design-note.md); replaced rules: [docs/design-history.md](docs/design-history.md).
+- **Tools.** A game wiki generated from the game's own data, headless battle renders, an in-game effects and sound test bench, and design maps of hero synergies and enemy factions.
+
+## Design docs
+
+Open in the browser at **[nairigy.github.io/ArmyRoguelike](https://nairigy.github.io/ArmyRoguelike/)**:
+
+- [Gamepedia](https://nairigy.github.io/ArmyRoguelike/gamepedia.html): every unit, ability, item, enemy and rule with its numbers, generated from the game data.
+- [Hero synergy map](https://nairigy.github.io/ArmyRoguelike/synergy-map.html): every hero skill, item and rule tagged by theme, with its role in a build and a judgment.
+- [Enemy faction map](https://nairigy.github.io/ArmyRoguelike/faction-map.html): each faction's plan, unit roles, combos and the hero themes that answer it.
+- [Design note](docs/design-note.md): what has been decided and why. [Design history](docs/design-history.md): replaced rules and why.
 
 ## Tech
 
